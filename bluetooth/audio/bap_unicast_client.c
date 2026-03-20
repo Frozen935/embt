@@ -73,13 +73,14 @@ LOG_MODULE_REGISTER(bt_bap_unicast_client, CONFIG_BT_BAP_UNICAST_CLIENT_LOG_LEVE
 
 #define PAC_DIR_UNUSED(dir) ((dir) != BT_AUDIO_DIR_SINK && (dir) != BT_AUDIO_DIR_SOURCE)
 #define BAP_HANDLE_UNUSED   0x0000U
+#define BAP_LONG_READ_SLOTS (2U + CONFIG_BT_BAP_UNICAST_CLIENT_ASE_SNK_COUNT + \
+			    CONFIG_BT_BAP_UNICAST_CLIENT_ASE_SRC_COUNT)
 struct bt_bap_unicast_client_ep {
 	uint16_t handle;
 	uint16_t cp_handle;
 	struct bt_gatt_subscribe_params subscribe;
 	struct bt_gatt_discover_params discover;
 	struct bt_bap_ep ep;
-	struct bt_work_delayable ase_read_work;
 
 	/* Bool to help handle different order of CP and ASE notification when releasing */
 	bool release_requested;
@@ -114,7 +115,9 @@ static struct unicast_client {
 #endif /* CONFIG_BT_BAP_UNICAST_CLIENT_ASE_SRC_COUNT > 0 */
 
 	struct bt_gatt_subscribe_params cp_subscribe;
+	struct bt_gatt_subscribe_params snk_pac_subscribe;
 	struct bt_gatt_subscribe_params snk_loc_subscribe;
+	struct bt_gatt_subscribe_params src_pac_subscribe;
 	struct bt_gatt_subscribe_params src_loc_subscribe;
 	struct bt_gatt_subscribe_params avail_ctx_subscribe;
 	struct bt_gatt_subscribe_params supp_ctx_subscribe;
@@ -125,12 +128,16 @@ static struct unicast_client {
 	 * discovery needs to be done in serial to avoid using the same discover
 	 * parameters twice
 	 */
+	struct bt_gatt_discover_params src_pac_cc_disc;
+	struct bt_gatt_discover_params snk_pac_cc_disc;
 	struct bt_gatt_discover_params loc_cc_disc;
 	struct bt_gatt_discover_params avail_ctx_cc_disc;
 	struct bt_gatt_discover_params supp_ctx_cc_disc;
 
-	/* Discovery parameters */
+	/* Only valid when flags has UNICAST_CLIENT_FLAG_BUSY set */
 	enum bt_audio_dir dir;
+
+	/* Discovery parameters */
 	union {
 		struct bt_gatt_read_params read_params;
 		struct bt_gatt_discover_params disc_params;
@@ -142,6 +149,22 @@ static struct unicast_client {
 	 */
 	uint8_t att_buf[BT_ATT_MAX_ATTRIBUTE_LEN];
 	struct net_buf_simple net_buf;
+	struct bt_work_delayable long_read_work;
+	bool long_read_work_initialized;
+	struct bt_gatt_read_params long_read_params;
+	uint8_t long_read_data[BT_ATT_MAX_ATTRIBUTE_LEN];
+	struct net_buf_simple long_read_buf;
+	BT_ATOMIC_DEFINE(long_read_pending, BAP_LONG_READ_SLOTS);
+	BT_ATOMIC_DEFINE(long_read_removed, BAP_LONG_READ_SLOTS);
+	size_t long_read_next;
+	size_t long_read_slot;
+	struct bt_conn *long_read_conn;
+	bool long_read_active;
+	bool long_read_owns_busy;
+	bt_atomic_t long_read_stopping;
+	bool pac_subscribe_pending[2];
+	bt_gatt_read_func_t long_read_func;
+	uint16_t long_read_handle;
 
 	BT_ATOMIC_DEFINE(flags, UNICAST_CLIENT_FLAG_NUM_FLAGS);
 } uni_cli_insts[CONFIG_BT_MAX_CONN];
@@ -160,7 +183,10 @@ static void reset_att_buf(struct unicast_client *client);
 
 static void unicast_client_reset(struct bt_bap_ep *ep, uint8_t reason);
 
-static void delayed_ase_read_handler(struct bt_work *work);
+static void delayed_long_read_handler(struct bt_work *work);
+static uint8_t unicast_client_read_pac_func(struct bt_conn *conn, uint8_t err,
+					struct bt_gatt_read_params *read, const void *data,
+					uint16_t length);
 static void unicast_client_ep_set_status(const struct bt_conn *conn, struct bt_bap_ep *ep,
 					 struct net_buf_simple *buf, bool is_notification);
 
@@ -458,6 +484,11 @@ bool bt_bap_unicast_client_has_ep(const struct bt_bap_ep *ep)
 	return false;
 }
 
+static struct bt_conn *unicast_client_get_conn(const struct unicast_client *client)
+{
+	return bt_conn_lookup_index((uint8_t)ARRAY_INDEX(uni_cli_insts, client));
+}
+
 struct bt_conn *bt_bap_unicast_client_ep_get_conn(const struct bt_bap_ep *ep)
 {
 	for (size_t i = 0U; i < ARRAY_SIZE(uni_cli_insts); i++) {
@@ -504,7 +535,6 @@ static void unicast_client_ep_init(struct bt_bap_ep *ep, uint16_t handle, uint8_
 	ep->id = 0U;
 	ep->dir = dir;
 	ep->reason = BT_HCI_ERR_SUCCESS;
-	bt_work_init_delayable(&client_ep->ase_read_work, delayed_ase_read_handler);
 }
 
 static struct bt_bap_ep *unicast_client_ep_find(struct bt_conn *conn, uint16_t handle)
@@ -603,6 +633,28 @@ static struct bt_bap_ep *unicast_client_ep_get(struct bt_conn *conn, enum bt_aud
 	return unicast_client_ep_new(conn, dir, handle);
 }
 
+/**
+ * @brief Relinquish only the long reader's BUSY reservation.
+ *
+ * Call before application callbacks so they can start a normal operation. The dedicated
+ * parameters and buffer remain live until the outer GATT callback has returned.
+ */
+static void clear_and_reset_if_long_read(const struct bt_conn *conn,
+					 const struct net_buf_simple *buf)
+{
+	struct unicast_client *client;
+
+	if (conn == NULL) {
+		return;
+	}
+	client = &uni_cli_insts[bt_conn_index(conn)];
+	if (buf == &client->long_read_buf && client->long_read_owns_busy) {
+		/* Dedicated parameters and data remain live through the outer GATT callback. */
+		client->long_read_owns_busy = false;
+		bt_atomic_clear_bit(client->flags, UNICAST_CLIENT_FLAG_BUSY);
+	}
+}
+
 static void unicast_client_ep_set_local_idle_state(struct bt_bap_ep *ep)
 {
 	struct bt_conn *conn = ep->stream != NULL ? ep->stream->conn : NULL;
@@ -643,11 +695,10 @@ static void unicast_client_notify_available_contexts(struct bt_conn *conn,
 }
 
 static void unicast_client_notify_pac_record(struct bt_conn *conn,
-					     const struct bt_audio_codec_cap *codec_cap)
+					     const struct bt_audio_codec_cap *codec_cap,
+					     enum bt_audio_dir dir)
 {
-	const struct unicast_client *client = &uni_cli_insts[bt_conn_index(conn)];
 	struct bt_bap_unicast_client_cb *listener, *next;
-	const enum bt_audio_dir dir = client->dir;
 
 	/* TBD: Since the PAC records are optionally notifiable we may want to supply the
 	 * index and total count of records in the callback, so that it easier for the
@@ -683,8 +734,7 @@ static void unicast_client_discover_complete(struct bt_conn *conn, int err)
 	/* Discover complete - Reset discovery values */
 	client->dir = 0U;
 	reset_att_buf(client);
-	bt_atomic_clear_bit(client->flags, UNICAST_CLIENT_FLAG_DISCOVERY_IN_PROGRESS);
-	bt_atomic_clear_bit(client->flags, UNICAST_CLIENT_FLAG_BUSY);
+	bt_atomic_clear(client->flags);
 
 	SYS_SLIST_FOR_EACH_CONTAINER_SAFE(&unicast_client_cbs, listener, next, _node) {
 		if (listener->discover != NULL) {
@@ -872,40 +922,6 @@ static void unicast_client_ep_qos_update(struct bt_bap_ep *ep,
 	iso_io_qos->phy = qos->phy;
 	iso_io_qos->sdu = sys_le16_to_cpu(qos->sdu);
 	iso_io_qos->rtn = qos->rtn;
-}
-
-/**
- * @brief Clear data related to long reads
- *
- * Once we have pulled all the data from the buffer, we can clear the busy flag and reset
- * the buffer. This function should be called after all data from the buffer has been properly
- * applied, but before the application callbacks are called, so that an application can perform a
- * new operation in the callback
- */
-static void clear_and_reset_if_long_read(const struct bt_conn *conn,
-					 const struct net_buf_simple *buf)
-{
-	struct unicast_client *client;
-
-	if (conn == NULL) {
-		/* Local operation, no buffers used */
-		return;
-	}
-
-	client = &uni_cli_insts[bt_conn_index(conn)];
-
-	if (buf == &client->net_buf) {
-		reset_att_buf(client);
-
-		/* Clear busy flag if not during discovery. Discovery will need to keep the busy
-		 * flag for the remaining part of the discovery procedure
-		 */
-		if (!bt_atomic_test_bit(client->flags, UNICAST_CLIENT_FLAG_DISCOVERY_IN_PROGRESS)) {
-			__ASSERT_NO_MSG(bt_atomic_test_bit(client->flags, UNICAST_CLIENT_FLAG_BUSY));
-			bt_atomic_clear_bit(client->flags, UNICAST_CLIENT_FLAG_BUSY);
-		}
-	} /* else buf may just be a stack allocated net_buf_simple which isn't used for long reads
-	   */
 }
 
 static bool unicast_client_ep_config_state(struct bt_bap_ep *ep, struct net_buf_simple *buf)
@@ -1705,21 +1721,22 @@ static uint8_t unicast_client_ase_ntf_read_func(struct bt_conn *conn, uint8_t er
 
 	LOG_DBG("conn %p err 0x%02x len %u", conn, err, length);
 
+	client = &uni_cli_insts[bt_conn_index(conn)];
+	buf = &client->long_read_buf;
+
 	if (err != 0) {
 		LOG_DBG("Failed to read ASE: %u", err);
+		clear_and_reset_if_long_read(conn, buf);
 
 		return BT_GATT_ITER_STOP;
 	}
 
 	LOG_DBG("handle 0x%04x", handle);
 
-	client = &uni_cli_insts[bt_conn_index(conn)];
-	buf = &client->net_buf;
-
 	if (data != NULL) {
 		if (net_buf_simple_tailroom(buf) < length) {
 			LOG_DBG("Buffer full, invalid server response of size %u",
-				length + client->net_buf.len);
+				length + client->long_read_buf.len);
 			clear_and_reset_if_long_read(conn, buf);
 
 			return BT_GATT_ITER_STOP;
@@ -1740,10 +1757,9 @@ static uint8_t unicast_client_ase_ntf_read_func(struct bt_conn *conn, uint8_t er
 		return BT_GATT_ITER_STOP;
 	}
 
-	ep = unicast_client_ep_get(conn, client->dir, handle);
+	ep = unicast_client_ep_find(conn, handle);
 	if (!ep) {
-		LOG_DBG("Unknown %s ep for handle 0x%04X", bt_audio_dir_to_str(client->dir),
-			handle);
+		LOG_DBG("Unknown ep for handle 0x%04X", handle);
 		clear_and_reset_if_long_read(conn, buf);
 	} else {
 		/* Set reason in case this exits the streaming state, unless already set */
@@ -1752,110 +1768,290 @@ static uint8_t unicast_client_ase_ntf_read_func(struct bt_conn *conn, uint8_t er
 		}
 
 		/* Also treat long reads from notifications as notifications */
-		unicast_client_ep_set_status(conn, ep, &client->net_buf, true);
+		unicast_client_ep_set_status(conn, ep, &client->long_read_buf, true);
 	}
 
 	return BT_GATT_ITER_STOP;
 }
 
-static void long_ase_read(struct bt_bap_unicast_client_ep *client_ep)
+/** @brief Locate a stable PAC or ASE subscription slot. */
+static struct bt_gatt_subscribe_params *long_read_subscription(struct unicast_client *client,
+							    size_t slot)
 {
-	/* Perform long read if notification is maximum size */
-	struct bt_conn *conn = client_ep->ep.stream->conn;
-	struct unicast_client *client = &uni_cli_insts[bt_conn_index(conn)];
-	struct net_buf_simple *long_read_buf = &client->net_buf;
-	int err;
-
-	LOG_DBG("conn %p ep %p 0x%04X", conn, &client_ep->ep, client_ep->handle);
-
-	if (bt_atomic_test_and_set_bit(client->flags, UNICAST_CLIENT_FLAG_BUSY)) {
-		/* If the client is busy reading or writing something else, reschedule the
-		 * long read.
-		 */
-		struct bt_conn_info conn_info;
-
-		err = bt_conn_get_info(conn, &conn_info);
-		if (err != 0) {
-			LOG_DBG("Failed to get conn info, use default interval");
-
-			conn_info.le.interval_us = BT_CONN_INTERVAL_TO_US(BT_GAP_INIT_CONN_INT_MIN);
-		}
-
-		/* Wait a connection interval to retry */
-		err = bt_work_reschedule(&client_ep->ase_read_work,
-					BT_MSEC(bt_time_us_to_ms_ceil(conn_info.le.interval_us)));
-		if (err < 0) {
-			LOG_DBG("Failed to reschedule ASE long read work: %d", err);
-		}
-
-		return;
+	if (slot == 0U) {
+		return &client->snk_pac_subscribe;
 	}
+	if (slot == 1U) {
+		return &client->src_pac_subscribe;
+	}
+	slot -= 2U;
+#if CONFIG_BT_BAP_UNICAST_CLIENT_ASE_SNK_COUNT > 0
+	if (slot < ARRAY_SIZE(client->snks)) {
+		return &client->snks[slot].subscribe;
+	}
+	slot -= ARRAY_SIZE(client->snks);
+#endif
+#if CONFIG_BT_BAP_UNICAST_CLIENT_ASE_SRC_COUNT > 0
+	if (slot < ARRAY_SIZE(client->srcs)) {
+		return &client->srcs[slot].subscribe;
+	}
+#endif
+	return NULL;
+}
 
-	client->read_params.func = unicast_client_ase_ntf_read_func;
-	client->read_params.handle_count = 1U;
-	client->read_params.single.handle = client_ep->handle;
-	client->read_params.single.offset = long_read_buf->len;
+static size_t long_read_slot_for_params(struct unicast_client *client,
+				       struct bt_gatt_subscribe_params *params)
+{
+	for (size_t slot = 0U; slot < BAP_LONG_READ_SLOTS; slot++) {
+		if (long_read_subscription(client, slot) == params) {
+			return slot;
+		}
+	}
+	return BAP_LONG_READ_SLOTS;
+}
 
-	err = bt_gatt_read(conn, &client->read_params);
-	if (err != 0) {
-		LOG_DBG("Failed to read ASE: %d", err);
-		bt_atomic_clear_bit(client->flags, UNICAST_CLIENT_FLAG_BUSY);
+/** @brief Queue removal without modifying an off-owner subscription or live request. */
+static void long_read_removed(struct bt_gatt_subscribe_params *params)
+{
+	for (size_t i = 0U; i < ARRAY_SIZE(uni_cli_insts); i++) {
+		struct unicast_client *client = &uni_cli_insts[i];
+		size_t slot = long_read_slot_for_params(client, params);
+
+		if (slot < BAP_LONG_READ_SLOTS && client->long_read_work_initialized) {
+			bt_atomic_set_bit(client->long_read_removed, slot);
+			bt_atomic_clear_bit(client->long_read_pending, slot);
+			(void)bt_host_work_reschedule(&client->long_read_work, BT_NO_WAIT);
+			return;
+		}
 	}
 }
 
-static void delayed_ase_read_handler(struct bt_work *work)
+/** @brief Finish reader ownership; the next queued invocation reuses its static parameters. */
+static void long_read_finish(struct unicast_client *client, bool schedule_next)
 {
-	struct bt_work_delayable *dwork = bt_work_delayable_from_work(work);
-	struct bt_bap_unicast_client_ep *client_ep =
-		CONTAINER_OF(dwork, struct bt_bap_unicast_client_ep, ase_read_work);
+	struct bt_conn *conn = client->long_read_conn;
 
-	LOG_DBG("ep %p 0x%04X", &client_ep->ep, client_ep->handle);
+	clear_and_reset_if_long_read(conn, &client->long_read_buf);
+	client->long_read_active = false;
+	client->long_read_conn = NULL;
+	client->long_read_func = NULL;
+	client->long_read_handle = BAP_HANDLE_UNUSED;
+	if (conn != NULL) {
+		bt_conn_unref(conn);
+	}
+	if (schedule_next && !bt_atomic_get(&client->long_read_stopping)) {
+		(void)bt_host_work_reschedule(&client->long_read_work, BT_NO_WAIT);
+	}
+}
 
-	/* Try reading again */
-	long_ase_read(client_ep);
+/** @brief Retain an active request until STOP or terminal completion, never cancel its work as a proxy. */
+static uint8_t long_read_complete(struct bt_conn *conn, uint8_t err,
+				 struct bt_gatt_read_params *params, const void *data,
+				 uint16_t length)
+{
+	struct unicast_client *client = &uni_cli_insts[bt_conn_index(conn)];
+	bt_gatt_read_func_t callback = client->long_read_func;
+	uint8_t result;
+
+	if (bt_atomic_get(&client->long_read_stopping) || callback == NULL ||
+	    bt_atomic_test_bit(client->long_read_removed, client->long_read_slot) ||
+	    bt_atomic_test_bit(client->long_read_pending, client->long_read_slot)) {
+		long_read_finish(client, true);
+		return BT_GATT_ITER_STOP;
+	}
+	if (err != 0U || data == NULL) {
+		clear_and_reset_if_long_read(conn, &client->long_read_buf);
+	}
+	result = callback(conn, err, params, data, length);
+	if (result == BT_GATT_ITER_STOP) {
+		long_read_finish(client, true);
+	}
+	return result;
+}
+
+static void unicast_client_retry_long_read(struct bt_conn *conn)
+{
+	struct unicast_client *client = &uni_cli_insts[bt_conn_index(conn)];
+	struct bt_conn_info info;
+	int err;
+
+	err = bt_conn_get_info(conn, &info);
+	if (err != 0) {
+		info.le.interval_us = BT_CONN_INTERVAL_TO_US(BT_GAP_INIT_CONN_INT_MIN);
+	}
+	err = bt_host_work_reschedule(&client->long_read_work,
+				     BT_MSEC(bt_time_us_to_ms_ceil(info.le.interval_us)));
+	if (err < 0) {
+		LOG_DBG("Failed to reschedule ASE long read work: %d", err);
+	}
+}
+
+/** @brief Start one pending handle on the same Host owner as notifications and responses. */
+static void unicast_client_try_long_read(struct unicast_client *client)
+{
+	struct bt_conn *conn;
+	struct bt_gatt_subscribe_params *subscription;
+	size_t slot = BAP_LONG_READ_SLOTS;
+	int err;
+
+	if (bt_atomic_get(&client->long_read_stopping) || client->long_read_active) {
+		return;
+	}
+	conn = unicast_client_get_conn(client);
+	if (conn == NULL) {
+		return;
+	}
+	for (size_t step = 0U; step < BAP_LONG_READ_SLOTS; step++) {
+		size_t candidate = (client->long_read_next + step) % BAP_LONG_READ_SLOTS;
+
+		if (!bt_atomic_test_bit(client->long_read_pending, candidate) ||
+		    bt_atomic_test_bit(client->long_read_removed, candidate)) {
+			continue;
+		}
+		subscription = long_read_subscription(client, candidate);
+		if (subscription->value_handle == BAP_HANDLE_UNUSED) {
+			bt_atomic_clear_bit(client->long_read_pending, candidate);
+			continue;
+		}
+		slot = candidate;
+		break;
+	}
+	if (slot == BAP_LONG_READ_SLOTS) {
+		bt_conn_unref(conn);
+		return;
+	}
+	if (bt_atomic_test_and_set_bit(client->flags, UNICAST_CLIENT_FLAG_BUSY)) {
+		unicast_client_retry_long_read(conn);
+		bt_conn_unref(conn);
+		return;
+	}
+	subscription = long_read_subscription(client, slot);
+	bt_atomic_clear_bit(client->long_read_pending, slot);
+	client->long_read_next = (slot + 1U) % BAP_LONG_READ_SLOTS;
+	client->long_read_slot = slot;
+	client->long_read_handle = subscription->value_handle;
+	client->long_read_func = slot < 2U ? unicast_client_read_pac_func
+					 : unicast_client_ase_ntf_read_func;
+	client->long_read_conn = conn;
+	client->long_read_active = true;
+	client->long_read_owns_busy = true;
+	net_buf_simple_reset(&client->long_read_buf);
+	memset(&client->long_read_params, 0, sizeof(client->long_read_params));
+	client->long_read_params.func = long_read_complete;
+	client->long_read_params.handle_count = 1U;
+	client->long_read_params.single.handle = client->long_read_handle;
+	/* Reread from zero so a newer notification never contributes an old prefix. */
+	err = bt_gatt_read(conn, &client->long_read_params);
+	if (err != 0) {
+		LOG_DBG("Failed to read long value: %d", err);
+		if (err == -ENOMEM || err == -EAGAIN) {
+			bt_atomic_set_bit(client->long_read_pending, slot);
+		}
+		if (err == -ENOMEM || err == -EAGAIN) {
+			/* Retain a local reference after finishing the rejected request. */
+			bt_conn_ref(conn);
+			long_read_finish(client, false);
+			unicast_client_retry_long_read(conn);
+			bt_conn_unref(conn);
+		} else {
+			long_read_finish(client, true);
+		}
+	}
+}
+
+/** @brief Complete removal only after its CCC request owner has finished. */
+static void long_read_process_removals(struct unicast_client *client)
+{
+	for (size_t slot = 0U; slot < 2U; slot++) {
+		if (bt_atomic_test_bit(client->long_read_removed, slot) &&
+		    !client->pac_subscribe_pending[slot]) {
+			long_read_subscription(client, slot)->value_handle = BAP_HANDLE_UNUSED;
+		}
+	}
+}
+
+/** @brief Initialize static reader storage once, retaining it across rediscovery. */
+static void long_read_initialize(struct unicast_client *client)
+{
+	if (!client->long_read_work_initialized) {
+		bt_work_init_delayable(&client->long_read_work, delayed_long_read_handler);
+		net_buf_simple_init_with_data(&client->long_read_buf, client->long_read_data,
+					      sizeof(client->long_read_data));
+		net_buf_simple_reset(&client->long_read_buf);
+		client->long_read_work_initialized = true;
+	}
+}
+
+static void delayed_long_read_handler(struct bt_work *work)
+{
+	struct bt_work_delayable *delayed = bt_work_delayable_from_work(work);
+	struct unicast_client *client = CONTAINER_OF(delayed, struct unicast_client, long_read_work);
+
+	long_read_process_removals(client);
+	unicast_client_try_long_read(client);
+}
+
+/** @brief Coalesce full or superseding notifications per handle without claiming request ownership. */
+static bool unicast_client_check_and_do_long_read(struct bt_conn *conn, uint16_t handle,
+						const void *data, uint16_t length,
+						bt_gatt_read_func_t callback)
+{
+	struct unicast_client *client = &uni_cli_insts[bt_conn_index(conn)];
+	int max_size = bt_att_get_max_notify_size(conn, BT_ATT_CHAN_OPT_NONE);
+	size_t slot = BAP_LONG_READ_SLOTS;
+
+	ARG_UNUSED(data);
+	ARG_UNUSED(callback);
+	if (max_size <= 0 || bt_atomic_get(&client->long_read_stopping)) {
+		return true;
+	}
+	for (size_t i = 0U; i < BAP_LONG_READ_SLOTS; i++) {
+		if (long_read_subscription(client, i)->value_handle == handle) {
+			slot = i;
+			break;
+		}
+	}
+	if (slot == BAP_LONG_READ_SLOTS ||
+	    bt_atomic_test_bit(client->long_read_removed, slot)) {
+		return true;
+	}
+	if (length == max_size || bt_atomic_test_bit(client->long_read_pending, slot) ||
+	    (client->long_read_active && client->long_read_slot == slot)) {
+		bt_atomic_set_bit(client->long_read_pending, slot);
+		(void)bt_host_work_reschedule(&client->long_read_work, BT_NO_WAIT);
+		return true;
+	}
+	return false;
 }
 
 static uint8_t unicast_client_ep_notify(struct bt_conn *conn,
 					struct bt_gatt_subscribe_params *params, const void *data,
 					uint16_t length)
 {
-	struct net_buf_simple buf;
 	struct bt_bap_unicast_client_ep *client_ep;
-	int max_ntf_size;
+	struct net_buf_simple buf;
 	struct bt_bap_ep *ep;
+
+	if (conn == NULL) {
+		/* conn was unpaired */
+		long_read_removed(params);
+		return BT_GATT_ITER_CONTINUE;
+	}
 
 	client_ep = CONTAINER_OF(params, struct bt_bap_unicast_client_ep, subscribe);
 	ep = &client_ep->ep;
 
 	LOG_DBG("conn %p ep %p len %u", conn, ep, length);
 
-	/* Cancel any pending long reads for the endpoint */
-	(void)bt_work_cancel_delayable(&client_ep->ase_read_work);
 
 	if (!data) {
 		LOG_DBG("Unsubscribed");
-		params->value_handle = BAP_HANDLE_UNUSED;
+		long_read_removed(params);
 		return BT_GATT_ITER_STOP;
 	}
 
-	max_ntf_size = bt_att_get_max_notify_size(conn, BT_ATT_CHAN_OPT_NONE);
-	if (max_ntf_size < 0) {
-		__ASSERT(max_ntf_size != -EINVAL, "Unexpected -EINVAL");
-		return BT_GATT_ITER_STOP;
-	}
-
-	if (length == max_ntf_size) {
-		struct unicast_client *client = &uni_cli_insts[bt_conn_index(conn)];
-
-		if (!bt_atomic_test_bit(client->flags, UNICAST_CLIENT_FLAG_BUSY)) {
-			struct net_buf_simple *long_read_buf = &client->net_buf;
-
-			/* store data*/
-			net_buf_simple_add_mem(long_read_buf, data, length);
-		}
-
-		long_ase_read(client_ep);
-
+	if (unicast_client_check_and_do_long_read(conn, params->value_handle, data, length,
+						  unicast_client_ase_ntf_read_func)) {
 		return BT_GATT_ITER_CONTINUE;
 	}
 
@@ -2240,7 +2436,6 @@ static void unicast_client_reset(struct bt_bap_ep *ep, uint8_t reason)
 
 	__ASSERT(ep->iso == NULL, "CIS for ep %p was not disconnected before ACL", ep);
 
-	(void)bt_work_cancel_delayable(&client_ep->ase_read_work);
 	(void)memset(ep, 0, sizeof(*ep));
 
 	client_ep->cp_handle = BAP_HANDLE_UNUSED;
@@ -2277,6 +2472,15 @@ static void unicast_client_ep_reset(struct bt_conn *conn, uint8_t reason)
 #endif /* CONFIG_BT_BAP_UNICAST_CLIENT_ASE_SRC_COUNT > 0 */
 
 	client = &uni_cli_insts[index];
+
+	bt_atomic_set(&client->long_read_stopping, 1);
+	if (client->long_read_work_initialized) {
+		(void)bt_work_cancel_delayable(&client->long_read_work);
+	}
+	for (size_t slot = 0U; slot < BAP_LONG_READ_SLOTS; slot++) {
+		bt_atomic_clear_bit(client->long_read_pending, slot);
+		bt_atomic_set_bit(client->long_read_removed, slot);
+	}
 	client->dir = 0U;
 	reset_att_buf(client);
 	bt_atomic_clear(client->flags);
@@ -4305,6 +4509,11 @@ static uint8_t unicast_client_pacs_location_notify_cb(struct bt_conn *conn,
 
 	LOG_DBG("conn %p len %u", conn, length);
 
+	if (conn == NULL) {
+		/* conn was unpaired */
+		return BT_GATT_ITER_CONTINUE;
+	}
+
 	if (!data) {
 		LOG_DBG("Unsubscribed");
 		params->value_handle = BAP_HANDLE_UNUSED;
@@ -4616,18 +4825,101 @@ static int unicast_client_pacs_supp_context_discover(struct bt_conn *conn)
 	return bt_gatt_discover(conn, &client->disc_params);
 }
 
-static uint8_t unicast_client_read_func(struct bt_conn *conn, uint8_t err,
-					struct bt_gatt_read_params *read, const void *data,
-					uint16_t length)
+static uint8_t parse_pac_records(struct bt_conn *conn, struct net_buf_simple *buf,
+				 enum bt_audio_dir dir)
+{
+	struct bt_pac_value *rsp;
+
+	LOG_DBG("conn %p buf->len %u dir %s", conn, buf->len, bt_audio_dir_to_str(dir));
+
+	if (buf->len < sizeof(*rsp)) {
+		LOG_DBG("Invalid length of PAC record: %u", buf->len);
+
+		return BT_ATT_ERR_INVALID_PDU;
+	}
+
+	rsp = net_buf_simple_pull_mem(buf, sizeof(*rsp));
+
+	for (uint8_t i = 0U; i < rsp->num_pac; i++) {
+		struct bt_audio_codec_cap codec_cap;
+		struct bt_pac_codec *pac_codec;
+		struct bt_pac_ltv_data *meta, *cc;
+		void *cc_ltv, *meta_ltv;
+
+		LOG_DBG("pac #%u/%u", i + 1, rsp->num_pac);
+
+		if (buf->len < sizeof(*pac_codec)) {
+			LOG_WRN("Malformed PAC: remaining len %u expected %zu", buf->len,
+				sizeof(*pac_codec));
+
+			return BT_ATT_ERR_INVALID_PDU;
+		}
+
+		pac_codec = net_buf_simple_pull_mem(buf, sizeof(*pac_codec));
+
+		if (buf->len < sizeof(*cc)) {
+			LOG_WRN("Malformed PAC: remaining len %u expected %zu", buf->len,
+				sizeof(*cc));
+
+			return BT_ATT_ERR_INVALID_PDU;
+		}
+
+		cc = net_buf_simple_pull_mem(buf, sizeof(*cc));
+		if (buf->len < cc->len) {
+			LOG_WRN("Malformed PAC: remaining len %u expected %u", buf->len, cc->len);
+
+			return BT_ATT_ERR_INVALID_PDU;
+		}
+
+		cc_ltv = net_buf_simple_pull_mem(buf, cc->len);
+
+		if (buf->len < sizeof(*meta)) {
+			LOG_WRN("Malformed PAC: remaining len %u expected %zu", buf->len,
+				sizeof(*meta));
+
+			return BT_ATT_ERR_INVALID_PDU;
+		}
+
+		meta = net_buf_simple_pull_mem(buf, sizeof(*meta));
+		if (buf->len < meta->len) {
+			LOG_WRN("Malformed PAC: remaining len %u expected %u", buf->len, meta->len);
+
+			return BT_ATT_ERR_INVALID_PDU;
+		}
+
+		meta_ltv = net_buf_simple_pull_mem(buf, meta->len);
+
+		if (unicast_client_set_codec_cap(pac_codec->id, sys_le16_to_cpu(pac_codec->cid),
+						 sys_le16_to_cpu(pac_codec->vid), cc_ltv, cc->len,
+						 meta_ltv, meta->len, &codec_cap)) {
+			LOG_DBG("Unable to parse Codec");
+
+			return BT_ATT_ERR_UNLIKELY;
+		}
+
+		LOG_DBG("codec 0x%02x capabilities len %u meta len %u ", codec_cap.id,
+			codec_cap.data_len, codec_cap.meta_len);
+
+		unicast_client_notify_pac_record(conn, &codec_cap, dir);
+	}
+
+	return BT_ATT_ERR_SUCCESS;
+}
+
+static uint8_t unicast_client_read_pac_func(struct bt_conn *conn, uint8_t err,
+					    struct bt_gatt_read_params *read, const void *data,
+					    uint16_t length)
 {
 	uint16_t handle = read->single.handle;
 	struct unicast_client *client;
-	struct bt_pacs_read_rsp *rsp;
 	struct net_buf_simple *buf;
+	enum bt_audio_dir dir;
 	int cb_err = err;
-	uint8_t i;
 
 	LOG_DBG("conn %p err 0x%02x len %u", conn, err, length);
+
+	client = &uni_cli_insts[bt_conn_index(conn)];
+	buf = read == &client->long_read_params ? &client->long_read_buf : &client->net_buf;
 
 	if (cb_err != BT_ATT_ERR_SUCCESS) {
 		goto fail;
@@ -4635,13 +4927,10 @@ static uint8_t unicast_client_read_func(struct bt_conn *conn, uint8_t err,
 
 	LOG_DBG("handle 0x%04x", handle);
 
-	client = &uni_cli_insts[bt_conn_index(conn)];
-	buf = &client->net_buf;
-
 	if (data != NULL) {
 		if (net_buf_simple_tailroom(buf) < length) {
 			LOG_DBG("Buffer full, invalid server response of size %u",
-				length + client->net_buf.len);
+				length + buf->len);
 
 			cb_err = BT_ATT_ERR_INVALID_ATTRIBUTE_LEN;
 
@@ -4654,100 +4943,210 @@ static uint8_t unicast_client_read_func(struct bt_conn *conn, uint8_t err,
 		return BT_GATT_ITER_CONTINUE;
 	}
 
-	memset(read, 0, sizeof(*read));
+	(void)memset(read, 0, sizeof(*read));
 
-	if (buf->len < sizeof(*rsp)) {
-		LOG_DBG("Read response too small (%u)", buf->len);
+	/* client->dir is only valid during discovery - If the read is triggered from a notification
+	 * we can use the handles in the subscription parameters
+	 */
+	if (read != &client->long_read_params &&
+	    bt_atomic_test_bit(client->flags, UNICAST_CLIENT_FLAG_DISCOVERY_IN_PROGRESS)) {
+		dir = client->dir;
+	} else {
+		if (handle == client->snk_pac_subscribe.value_handle) {
+			dir = BT_AUDIO_DIR_SINK;
+		} else if (handle == client->src_pac_subscribe.value_handle) {
+			dir = BT_AUDIO_DIR_SOURCE;
+		} else {
+			__ASSERT(false, "Invalid read handle 0x%04X for %p", handle, conn);
 
-		cb_err = BT_ATT_ERR_INVALID_ATTRIBUTE_LEN;
+			return BT_GATT_ITER_STOP;
+		}
+	}
 
+	cb_err = parse_pac_records(conn, buf, dir);
+
+	if (cb_err != BT_ATT_ERR_SUCCESS) {
+		LOG_WRN("Failed to process all PAC records: %d", cb_err);
 		goto fail;
 	}
 
-	rsp = net_buf_simple_pull_mem(buf, sizeof(*rsp));
+	/* Mark long read a completed */
+	clear_and_reset_if_long_read(conn, buf);
 
-	/* If no PAC was found don't bother discovering ASE and ASE CP */
-	if (!rsp->num_pac) {
-		goto fail;
-	}
-
-	for (i = 0U; i < rsp->num_pac; i++) {
-		struct bt_audio_codec_cap codec_cap;
-		struct bt_pac_codec *pac_codec;
-		struct bt_pac_ltv_data *meta, *cc;
-		void *cc_ltv, *meta_ltv;
-
-		LOG_DBG("pac #%u/%u", i + 1, rsp->num_pac);
-
-		if (buf->len < sizeof(*pac_codec)) {
-			LOG_ERR("Malformed PAC: remaining len %u expected %zu", buf->len,
-				sizeof(*pac_codec));
-			break;
+	/* We read the PAC records during discovery but also if there are long-reads to be done
+	 * afterwards. If we are in the middle of discovery when we reach this point, we continue
+	 * the discovery, else we consider the read complete.
+	 */
+	if (read != &client->long_read_params &&
+	    bt_atomic_test_bit(client->flags, UNICAST_CLIENT_FLAG_DISCOVERY_IN_PROGRESS)) {
+		reset_att_buf(client);
+		/* Read PACS contexts */
+		cb_err = unicast_client_pacs_supp_context_discover(conn);
+		if (cb_err != 0) {
+			LOG_DBG("Unable to read PACS context: %d", cb_err);
+			goto fail;
 		}
-
-		pac_codec = net_buf_simple_pull_mem(buf, sizeof(*pac_codec));
-
-		if (buf->len < sizeof(*cc)) {
-			LOG_ERR("Malformed PAC: remaining len %u expected %zu", buf->len,
-				sizeof(*cc));
-			break;
-		}
-
-		cc = net_buf_simple_pull_mem(buf, sizeof(*cc));
-		if (buf->len < cc->len) {
-			LOG_ERR("Malformed PAC: remaining len %u expected %zu", buf->len, cc->len);
-			break;
-		}
-
-		cc_ltv = net_buf_simple_pull_mem(buf, cc->len);
-
-		if (buf->len < sizeof(*meta)) {
-			LOG_ERR("Malformed PAC: remaining len %u expected %zu", buf->len,
-				sizeof(*meta));
-			break;
-		}
-
-		meta = net_buf_simple_pull_mem(buf, sizeof(*meta));
-		if (buf->len < meta->len) {
-			LOG_ERR("Malformed PAC: remaining len %u expected %u", buf->len, meta->len);
-			break;
-		}
-
-		meta_ltv = net_buf_simple_pull_mem(buf, meta->len);
-
-		if (unicast_client_set_codec_cap(pac_codec->id, sys_le16_to_cpu(pac_codec->cid),
-						 sys_le16_to_cpu(pac_codec->vid), cc_ltv, cc->len,
-						 meta_ltv, meta->len, &codec_cap)) {
-			LOG_ERR("Unable to parse Codec");
-			break;
-		}
-
-		LOG_DBG("codec 0x%02x capabilities len %u meta len %u ", codec_cap.id,
-			codec_cap.data_len, codec_cap.meta_len);
-
-		unicast_client_notify_pac_record(conn, &codec_cap);
-	}
-
-	reset_att_buf(client);
-
-	if (i != rsp->num_pac) {
-		LOG_DBG("Failed to process all PAC records (%u/%u)", i, rsp->num_pac);
-		cb_err = BT_ATT_ERR_INVALID_PDU;
-		goto fail;
-	}
-
-	/* Read PACS contexts */
-	cb_err = unicast_client_pacs_supp_context_discover(conn);
-	if (cb_err != 0) {
-		LOG_ERR("Unable to read PACS context: %d", cb_err);
-		goto fail;
 	}
 
 	return BT_GATT_ITER_STOP;
 
 fail:
-	unicast_client_discover_complete(conn, cb_err);
+	clear_and_reset_if_long_read(conn, buf);
+	if (read != &client->long_read_params &&
+	    bt_atomic_test_bit(client->flags, UNICAST_CLIENT_FLAG_DISCOVERY_IN_PROGRESS)) {
+		unicast_client_discover_complete(conn, cb_err);
+	}
+
 	return BT_GATT_ITER_STOP;
+}
+
+static int unicast_client_pac_read(struct bt_conn *conn, uint16_t handle)
+{
+	struct unicast_client *client = &uni_cli_insts[bt_conn_index(conn)];
+
+	/* Reset to use for long read */
+	reset_att_buf(client);
+
+	client->read_params.func = unicast_client_read_pac_func;
+	client->read_params.handle_count = 1U;
+	client->read_params.single.handle = handle;
+	client->read_params.single.offset = 0U;
+
+	return bt_gatt_read(conn, &client->read_params);
+}
+
+static uint8_t unicast_client_pac_notify_cb(struct bt_conn *conn,
+					    struct bt_gatt_subscribe_params *params,
+					    const void *data, uint16_t length)
+{
+	struct unicast_client *client;
+	struct net_buf_simple buf;
+	enum bt_audio_dir dir;
+	int err;
+
+	LOG_DBG("conn %p len %u", conn, length);
+
+	if (conn == NULL) {
+		/* conn was unpaired */
+		long_read_removed(params);
+		return BT_GATT_ITER_CONTINUE;
+	}
+
+	client = &uni_cli_insts[bt_conn_index(conn)];
+
+	if (data == NULL) {
+		size_t slot = long_read_slot_for_params(client, params);
+
+		if (slot >= 2U) {
+			return BT_GATT_ITER_CONTINUE;
+		}
+		client->pac_subscribe_pending[slot] = false;
+		LOG_DBG("Unsubscribed");
+		long_read_removed(params);
+
+		return BT_GATT_ITER_CONTINUE;
+	}
+
+	if (length < sizeof(struct bt_pac_value)) {
+		LOG_DBG("Notification too small (%u)", length);
+
+		return BT_GATT_ITER_CONTINUE;
+	}
+
+	if (params == &client->snk_pac_subscribe) {
+		dir = BT_AUDIO_DIR_SINK;
+	} else if (params == &client->src_pac_subscribe) {
+		dir = BT_AUDIO_DIR_SOURCE;
+	} else {
+		__ASSERT(false, "Invalid subscribe params %p for %p", params, conn);
+
+		return BT_GATT_ITER_CONTINUE;
+	}
+
+	if (unicast_client_check_and_do_long_read(conn, params->value_handle, data, length,
+						  unicast_client_read_pac_func)) {
+		return BT_GATT_ITER_CONTINUE;
+	}
+
+	net_buf_simple_init_with_data(&buf, (void *)data, length);
+
+	err = parse_pac_records(conn, &buf, dir);
+	if (err != 0) {
+		LOG_DBG("Unable to parse PAC records: %d", err);
+	}
+
+	return BT_GATT_ITER_CONTINUE;
+}
+
+/** @brief Publish CCC completion without reusing parameters inside its GATT callback. */
+static void pac_subscribe_complete(struct bt_conn *conn, uint8_t err,
+				   struct bt_gatt_subscribe_params *params)
+{
+	struct unicast_client *client = &uni_cli_insts[bt_conn_index(conn)];
+	size_t slot = long_read_slot_for_params(client, params);
+
+	if (slot >= 2U) {
+		return;
+	}
+	client->pac_subscribe_pending[slot] = false;
+	if (err != 0U) {
+		bt_atomic_set_bit(client->long_read_removed, slot);
+	}
+	(void)bt_host_work_reschedule(&client->long_read_work, BT_NO_WAIT);
+}
+
+static int unicast_client_pac_subscribe(struct bt_conn *conn, uint16_t handle)
+{
+	struct unicast_client *client = &uni_cli_insts[bt_conn_index(conn)];
+	struct bt_gatt_subscribe_params *sub_params;
+	size_t slot;
+
+	if (client->dir == BT_AUDIO_DIR_SINK) {
+		sub_params = &client->snk_pac_subscribe;
+	} else if (client->dir == BT_AUDIO_DIR_SOURCE) {
+		sub_params = &client->src_pac_subscribe;
+	} else {
+		__ASSERT(false, "Invalid client->dir %d", client->dir);
+
+		return -EINVAL;
+	}
+
+	slot = long_read_slot_for_params(client, sub_params);
+
+	if (bt_atomic_test_bit(client->long_read_removed, slot)) {
+		if (client->pac_subscribe_pending[slot]) {
+			return -EBUSY;
+		}
+		memset(sub_params, 0, sizeof(*sub_params));
+		bt_atomic_clear_bit(client->long_read_removed, slot);
+	}
+	if (sub_params->value_handle == BAP_HANDLE_UNUSED) {
+		int err;
+
+		sub_params->disc_params = slot == 0U ? &client->snk_pac_cc_disc : &client->src_pac_cc_disc;
+		sub_params->value_handle = handle;
+		sub_params->ccc_handle = BT_GATT_AUTO_DISCOVER_CCC_HANDLE;
+		sub_params->end_handle = BT_ATT_LAST_ATTRIBUTE_HANDLE;
+		sub_params->notify = unicast_client_pac_notify_cb;
+		sub_params->subscribe = pac_subscribe_complete;
+		sub_params->value = BT_GATT_CCC_NOTIFY;
+		bt_atomic_set_bit(sub_params->flags, BT_GATT_SUBSCRIBE_FLAG_VOLATILE);
+
+		client->pac_subscribe_pending[slot] = true;
+		err = bt_gatt_subscribe(conn, sub_params);
+		if (err != 0) {
+			if (err != -EBUSY && err != -EALREADY) {
+				client->pac_subscribe_pending[slot] = false;
+				(void)memset(sub_params, 0, sizeof(*sub_params));
+			}
+			LOG_DBG("Failed to subscribe to %s PAC: %d",
+				bt_audio_dir_to_str(client->dir), err);
+
+			return err;
+		}
+	}
+
+	return 0;
 }
 
 static uint8_t unicast_client_pac_discover_cb(struct bt_conn *conn, const struct bt_gatt_attr *attr,
@@ -4755,6 +5154,7 @@ static uint8_t unicast_client_pac_discover_cb(struct bt_conn *conn, const struct
 {
 	struct unicast_client *client = &uni_cli_insts[bt_conn_index(conn)];
 	struct bt_gatt_chrc *chrc;
+	uint8_t chrc_properties;
 	uint16_t value_handle;
 	int err;
 
@@ -4768,26 +5168,29 @@ static uint8_t unicast_client_pac_discover_cb(struct bt_conn *conn, const struct
 
 	chrc = attr->user_data;
 	value_handle = chrc->value_handle;
+	chrc_properties = chrc->properties;
 	memset(discover, 0, sizeof(*discover));
 
 	LOG_DBG("conn %p attr %p handle 0x%04x dir %s", conn, attr, value_handle,
 		bt_audio_dir_to_str(client->dir));
 
-	/* TODO: Subscribe to PAC */
+	/* PAC records are optionally notifiable */
+	if (chrc_properties & BT_GATT_CHRC_NOTIFY) {
+		err = unicast_client_pac_subscribe(conn, value_handle);
+		if (err != 0) {
+			unicast_client_discover_complete(conn, err);
 
-	/* Reset to use for long read */
-	reset_att_buf(client);
+			return BT_GATT_ITER_STOP;
+		}
+	}
 
-	client->read_params.func = unicast_client_read_func;
-	client->read_params.handle_count = 1U;
-	client->read_params.single.handle = value_handle;
-	client->read_params.single.offset = 0U;
-
-	err = bt_gatt_read(conn, &client->read_params);
+	err = unicast_client_pac_read(conn, value_handle);
 	if (err != 0) {
-		LOG_DBG("Failed to read PAC records: %d", err);
+		LOG_DBG("Failed to read %s PAC records: %d", bt_audio_dir_to_str(client->dir), err);
 
 		unicast_client_discover_complete(conn, err);
+
+		return BT_GATT_ITER_STOP;
 	}
 
 	return BT_GATT_ITER_STOP;
@@ -4802,6 +5205,13 @@ static void unicast_client_disconnected(struct bt_conn *conn, uint8_t reason)
 	LOG_DBG("conn %p reason 0x%02x", conn, reason);
 
 	unicast_client_ep_reset(conn, reason);
+	struct unicast_client *client = &uni_cli_insts[bt_conn_index(conn)];
+
+	client->pac_subscribe_pending[0] = false;
+	client->pac_subscribe_pending[1] = false;
+	if (client->long_read_work_initialized) {
+		(void)bt_host_work_reschedule(&client->long_read_work, BT_NO_WAIT);
+	}
 }
 
 BT_CONN_CB_DEFINE(conn_cbs) = {
@@ -4846,6 +5256,9 @@ int bt_bap_unicast_client_discover(struct bt_conn *conn, enum bt_audio_dir dir)
 	}
 	bt_atomic_set_bit(client->flags, UNICAST_CLIENT_FLAG_DISCOVERY_IN_PROGRESS);
 
+	long_read_initialize(client);
+
+	bt_atomic_clear(&client->long_read_stopping);
 	if (dir == BT_AUDIO_DIR_SINK) {
 		client->disc_params.uuid = snk_uuid;
 	} else {

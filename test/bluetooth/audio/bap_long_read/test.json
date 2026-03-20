@@ -1,0 +1,57 @@
+{
+  "runner": "cmocka",
+  "tags": [
+    "bluetooth",
+    "audio",
+    "host",
+    "cmocka"
+  ],
+  "timeout_s": 30,
+  "execution": "case",
+  "scenarios": {
+    "default": {
+      "required_cases": [
+        "pending_while_write",
+        "superseding_handles_are_fair",
+        "off_owner_removal_retains_read",
+        "ccc_removal_waits_for_completion",
+        "ccc_missing_descriptor_retires_pending",
+        "synchronous_ccc_errors_and_teardown",
+        "reentrant_discovery_keeps_its_busy",
+        "read_allocation_retry_is_delayed"
+      ]
+    },
+    "bluetooth.audio.bap_long_read.sink_only": {
+      "options": [
+        "CONFIG_BT_BAP_UNICAST_CLIENT_ASE_SNK_COUNT=2",
+        "CONFIG_BT_BAP_UNICAST_CLIENT_ASE_SRC_COUNT=0"
+      ],
+      "required_cases": [
+        "pending_while_write",
+        "superseding_handles_are_fair",
+        "off_owner_removal_retains_read",
+        "ccc_removal_waits_for_completion",
+        "ccc_missing_descriptor_retires_pending",
+        "synchronous_ccc_errors_and_teardown",
+        "reentrant_discovery_keeps_its_busy",
+        "read_allocation_retry_is_delayed"
+      ]
+    },
+    "bluetooth.audio.bap_long_read.source_only": {
+      "options": [
+        "CONFIG_BT_BAP_UNICAST_CLIENT_ASE_SNK_COUNT=0",
+        "CONFIG_BT_BAP_UNICAST_CLIENT_ASE_SRC_COUNT=2"
+      ],
+      "required_cases": [
+        "pending_while_write",
+        "superseding_handles_are_fair",
+        "off_owner_removal_retains_read",
+        "ccc_removal_waits_for_completion",
+        "ccc_missing_descriptor_retires_pending",
+        "synchronous_ccc_errors_and_teardown",
+        "reentrant_discovery_keeps_its_busy",
+        "read_allocation_retry_is_delayed"
+      ]
+    }
+  }
+}
