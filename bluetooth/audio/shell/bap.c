@@ -3798,13 +3798,15 @@ static int create_broadcast_sink(const struct bt_shell *sh, struct bt_le_per_adv
 			err = bt_bap_broadcast_sink_delete(default_broadcast_sink.bap_sink);
 			if (err != 0) {
 				bt_shell_error("Failed to delete broadcast sink: %d", err);
+			} else {
+				default_broadcast_sink.bap_sink = NULL;
 			}
 
 			return -ENOEXEC;
 		}
 
 		sync_state = scan_delegator_sync_state_get_by_values(
-			auto_scan.broadcast_info.broadcast_id, sync_info.addr.type, sync_info.sid);
+			broadcast_id, sync_info.addr.type, sync_info.sid);
 	}
 
 	if (sync_state == NULL) {
@@ -3815,6 +3817,8 @@ static int create_broadcast_sink(const struct bt_shell *sh, struct bt_le_per_adv
 			err = bt_bap_broadcast_sink_delete(default_broadcast_sink.bap_sink);
 			if (err != 0) {
 				bt_shell_error("Failed to delete broadcast sink: %d", err);
+			} else {
+				default_broadcast_sink.bap_sink = NULL;
 			}
 
 			return -ENOEXEC;
