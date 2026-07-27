@@ -397,6 +397,7 @@ int bt_ccp_call_control_server_set_bearer_tech(struct bt_ccp_call_control_server
 					       enum bt_bearer_tech tech)
 {
 	int err;
+	int ret;
 
 	if (bearer == NULL) {
 		LOG_DBG("bearer is NULL");
@@ -404,33 +405,37 @@ int bt_ccp_call_control_server_set_bearer_tech(struct bt_ccp_call_control_server
 		return -EINVAL;
 	}
 
+	err = osi_mutex_lock(&bearer->mutex, MUTEX_TIMEOUT);
+	if (err != 0) {
+		return err;
+	}
+
 	if (!bearer->registered) {
 		LOG_DBG("Bearer %p not registered", bearer);
-
-		return -EFAULT;
-	}
-
-	if (!IN_RANGE(tech, BT_BEARER_TECH_3G, BT_BEARER_TECH_WCDMA)) {
+		ret = -EFAULT;
+	} else if (!IN_RANGE(tech, BT_BEARER_TECH_3G, BT_BEARER_TECH_WCDMA)) {
 		LOG_DBG("Invalid tech param: %d", tech);
-
-		return -EINVAL;
+		ret = -EINVAL;
+	} else if (bearer->bearer_tech == tech) {
+		ret = 0;
+	} else {
+		ret = bt_tbs_set_bearer_technology(bearer->tbs_index, tech);
+		if (ret == 0) {
+			bearer->bearer_tech = tech;
+		}
 	}
 
-	if (bearer->bearer_tech == tech) {
-		return 0;
-	}
-
-	err = bt_tbs_set_bearer_technology(bearer->tbs_index, tech);
-	if (err == 0) {
-		bearer->bearer_tech = tech;
-	}
-
-	return err;
+	err = osi_mutex_unlock(&bearer->mutex);
+	return err != 0 ? err : ret;
 }
 
 int bt_ccp_call_control_server_get_bearer_tech(
 	const struct bt_ccp_call_control_server_bearer *bearer, enum bt_bearer_tech *tech)
 {
+	os_mutex_t *mutex;
+	int err;
+	int ret;
+
 	if (bearer == NULL) {
 		LOG_DBG("bearer is NULL");
 
@@ -443,15 +448,22 @@ int bt_ccp_call_control_server_get_bearer_tech(
 		return -EINVAL;
 	}
 
-	if (!bearer->registered) {
-		LOG_DBG("Bearer %p not registered", bearer);
-
-		return -EFAULT;
+	mutex = (os_mutex_t *)&bearer->mutex;
+	err = osi_mutex_lock(mutex, MUTEX_TIMEOUT);
+	if (err != 0) {
+		return err;
 	}
 
-	*tech = bearer->bearer_tech;
+	if (!bearer->registered) {
+		LOG_DBG("Bearer %p not registered", bearer);
+		ret = -EFAULT;
+	} else {
+		*tech = bearer->bearer_tech;
+		ret = 0;
+	}
 
-	return 0;
+	err = osi_mutex_unlock(mutex);
+	return err != 0 ? err : ret;
 }
 
 int bt_ccp_call_control_server_set_bearer_uri_schemes(
