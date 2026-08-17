@@ -8,6 +8,24 @@
   "timeout_s": 45,
   "execution": "case",
   "scenarios": {
-    "default": {}
+    "default": {},
+    "bluetooth.audio.cap_initiator.test_sink_only": {
+      "options": [
+        "CONFIG_BT_BAP_UNICAST_CLIENT_ASE_SRC_COUNT=0"
+      ],
+      "required_cases": [
+        "cap_initiator_test_unicast_group__test_initiator_unicast_group_create",
+        "cap_initiator_test_unicast_start__test_initiator_unicast_start"
+      ]
+    },
+    "bluetooth.audio.cap_initiator.test_source_only": {
+      "options": [
+        "CONFIG_BT_BAP_UNICAST_CLIENT_ASE_SNK_COUNT=0"
+      ],
+      "required_cases": [
+        "cap_initiator_test_unicast_group__test_initiator_unicast_group_create",
+        "cap_initiator_test_unicast_start__test_initiator_unicast_start"
+      ]
+    }
   }
 }
