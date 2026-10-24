@@ -9,6 +9,10 @@
   "timeout_s": 45,
   "execution": "case",
   "scenarios": {
-    "default": {}
+    "default": {
+      "required_cases": [
+        "host_l2cap_le_tx__test_status_sync"
+      ]
+    }
   }
 }

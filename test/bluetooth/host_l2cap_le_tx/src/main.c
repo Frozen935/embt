@@ -48,7 +48,7 @@ static const struct bt_hci_transport test_driver;
  */
 #define TX_TIMEOUT BT_MSEC(100)
 
-/* One SDU is sent */
+/* One SDU is sent at a time */
 NET_BUF_POOL_FIXED_DEFINE(sdu_pool, 1, BT_L2CAP_SDU_CHAN_SEND_RESERVE + sizeof(DATA),
 			  CONFIG_BT_CONN_TX_USER_DATA_SIZE, NULL);
 /* The PDUs that the Host sent and the test has not taken yet: at most a signalling
@@ -58,6 +58,7 @@ NET_BUF_POOL_FIXED_DEFINE(sent_pool, 2, LE_ACL_MAX_LEN, 0, NULL);
 
 static struct bt_conn *conn;
 static struct bt_l2cap_le_chan chan;
+static os_sem_t connected_sem;
 
 /* The L2CAP PDUs that the Host sent */
 static BT_FIFO_DEFINE(sent);
@@ -357,6 +358,11 @@ static void recv_unknown_conn_req(uint8_t ident)
 	recv_sig(buf);
 }
 
+static void chan_connected(struct bt_l2cap_chan *ch)
+{
+	bt_test_require(osi_sem_give(&connected_sem));
+}
+
 static int chan_recv(struct bt_l2cap_chan *ch, struct net_buf *buf)
 {
 	return 0;
@@ -446,6 +452,70 @@ static void host_l2cap_le_tx__test_no_credits(void **cm_state)
 	net_buf_unref(buf);
 }
 
+/* Given by the status callback once the channel is out of credits */
+static os_sem_t paused_sem;
+/* What the status callback saw: the credits left and the command's result */
+static bt_atomic_val_t paused_credits;
+static int paused_err;
+
+/* Out of credits, wait for the Controller, as bt_conn_disconnect() does */
+static void chan_status(struct bt_l2cap_chan *ch, bt_atomic_t *status)
+{
+	if (bt_atomic_test_bit(status, BT_L2CAP_STATUS_OUT)) {
+		return;
+	}
+
+	paused_credits = bt_atomic_get(&BT_L2CAP_LE_CHAN(ch)->tx.credits);
+	paused_err = bt_hci_cmd_send_sync(BT_HCI_OP_READ_LOCAL_VERSION_INFO, NULL, NULL);
+	bt_test_require(osi_sem_give(&paused_sem));
+}
+
+/* The status callback of a channel that runs out of credits may wait for the Controller */
+static void host_l2cap_le_tx__test_status_sync(void **state)
+{
+	static const struct bt_l2cap_chan_ops ops = {
+		.recv = chan_recv,
+		.status = chan_status,
+		.connected = chan_connected,
+	};
+	static struct bt_l2cap_le_chan status_chan;
+	/* Not a CID of the other test */
+	const uint16_t peer_cid = PEER_CID + 2U;
+	struct net_buf *buf;
+	uint8_t ident;
+
+	status_chan.chan.ops = &ops;
+	status_chan.rx.mtu = LE_MIN_MTU;
+	assert_int_equal(bt_l2cap_chan_connect(conn, &status_chan.chan, PSM), 0);
+
+	/* Credit for one K-frame */
+	ident = tx_sig(BT_L2CAP_LE_CONN_REQ);
+	buf = sig_cmd(BT_L2CAP_LE_CONN_RSP, ident);
+	net_buf_add_le16(buf, peer_cid);
+	net_buf_add_le16(buf, LE_MIN_MTU);
+	net_buf_add_le16(buf, LE_MIN_MTU);
+	net_buf_add_le16(buf, 1U);
+	net_buf_add_le16(buf, BT_L2CAP_LE_SUCCESS);
+	recv_sig(buf);
+	assert_int_equal(osi_sem_take(&connected_sem, TX_TIMEOUT), 0);
+	assert_int_equal(status_chan.state, BT_L2CAP_CONNECTED);
+
+	buf = net_buf_alloc(&sdu_pool, BT_NO_WAIT);
+	assert_non_null(buf);
+	net_buf_reserve(buf, BT_L2CAP_SDU_CHAN_SEND_RESERVE);
+	(void)net_buf_add_mem(buf, DATA, strlen(DATA));
+	assert_int_equal(bt_l2cap_chan_send(&status_chan.chan, buf), 0);
+
+	assert_int_equal(osi_sem_take(&paused_sem, TX_TIMEOUT), 0);
+	assert_int_equal(paused_credits, 0);
+	assert_int_equal(paused_err, 0);
+
+	buf = tx(peer_cid);
+	assert_int_equal(net_buf_pull_le16(buf), strlen(DATA));
+	assert_memory_equal(buf->data, DATA, strlen(DATA));
+	net_buf_unref(buf);
+}
+
 static void storage_init_7767618e85(void)
 {
 	net_buf_pool_init(&sdu_pool);
@@ -467,6 +537,8 @@ int bt_test_host_l2cap_le_tx_setup(void **state)
 		return environment_result;
 	}
 
+	bt_test_require(osi_sem_init(&connected_sem, 0, 1));
+	bt_test_require(osi_sem_init(&paused_sem, 0, 1));
 	bt_test_require(bt_conn_init());
 	migrated_pools_init();
 	test_transport_init();
