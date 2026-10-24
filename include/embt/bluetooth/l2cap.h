@@ -313,6 +313,8 @@ struct bt_l2cap_le_chan {
 
 	struct bt_work			rx_work;
 	struct bt_fifo			rx_queue;
+	/* Calls bt_l2cap_chan_ops.status on behalf of the TX processor */
+	struct bt_work			status_work;
 
 	bt_l2cap_chan_state_t		state;
 	/** Remote PSM to be connected */
