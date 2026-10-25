@@ -11,7 +11,11 @@
   "scenarios": {
     "default": {
       "required_cases": [
-        "host_l2cap_le_tx__test_status_sync"
+        "host_l2cap_le_tx__test_status_sync",
+        "host_l2cap_le_tx__test_disconnect_two",
+        "host_l2cap_le_tx__test_disconnect_reconf_pending",
+        "host_l2cap_le_tx__test_credits_no_buf",
+        "host_l2cap_le_tx__test_disconn_rsp_no_buf"
       ]
     }
   }

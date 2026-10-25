@@ -84,11 +84,6 @@ int bt_l2cap_fixed_chan_register(const struct bt_l2cap_fixed_chan *channel)
 
 #define L2CAP_CONN_TIMEOUT	BT_SECONDS(CONFIG_BT_L2CAP_CONN_RTX_TIMEOUT)
 #define L2CAP_DISC_TIMEOUT	BT_SECONDS(2)
-/** @brief Local L2CAP RTX (Response Timeout eXpired)
- *
- *  Specification-allowed range for the value of RTX is 1 to 60 seconds.
- */
-#define L2CAP_RTX_TIMEOUT	BT_SECONDS(2)
 
 #if defined(CONFIG_BT_L2CAP_DYNAMIC_CHANNEL)
 /* Declared ahead: it allocates from disc_pool, whose destroy callback submits it */
@@ -587,7 +582,7 @@ static struct net_buf *l2cap_create_le_sig_pdu(uint8_t code, uint8_t ident,
 	struct net_buf *buf;
 
 	/* Don't wait more than the minimum RTX timeout of 2 seconds */
-	buf = bt_l2cap_create_pdu_timeout(NULL, 0, L2CAP_RTX_TIMEOUT);
+	buf = bt_l2cap_create_pdu_timeout(NULL, 0, BT_L2CAP_RTX_TIMEOUT);
 	if (!buf) {
 		/* If it was not possible to allocate a buffer within the
 		 * timeout return NULL.
