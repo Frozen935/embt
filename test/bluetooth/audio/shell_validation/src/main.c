@@ -49,5 +49,50 @@ static void codec_frame_limit(void **state)
 	assert_true(supported_lc3_config(&cap, stereo, &mono));
 }
 
-static const struct CMUnitTest cases[] = {cmocka_unit_test(codec_frame_limit)};
+/** @brief Quoting and leading whitespace cannot turn a negative ID positive. */
+static void unsigned_id_rejection(void **state)
+{
+	const char *negative[] = {"-1", " -1", "\t-0x1", "\r\n -0"};
+	char line[] = "id \" -1\"";
+	char *argv[4];
+	int error;
+
+	(void)state;
+	for (size_t i = 0; i < ARRAY_SIZE(negative); i++) {
+		error = 0;
+		assert_int_equal(bt_shell_strtoull(negative[i], 0, &error), 0);
+		assert_int_equal(error, -EINVAL);
+	}
+	assert_int_equal(bt_shell_tokenize(line, argv, ARRAY_SIZE(argv)), 2);
+	error = 0;
+	assert_int_equal(bt_shell_strtoull(argv[1], 0, &error), 0);
+	assert_int_equal(error, -EINVAL);
+	error = -ERANGE;
+	assert_int_equal(bt_shell_strtoull("1", 0, &error), 0);
+	assert_int_equal(error, -ERANGE);
+}
+
+/** @brief Full-width values remain valid while overflow and junk fail. */
+static void unsigned_id_range(void **state)
+{
+	int error = 0;
+	unsigned long long value;
+
+	(void)state;
+	value = bt_shell_strtoull(" 0xffffffffffffffff", 0, &error);
+	assert_true(value == ULLONG_MAX);
+	assert_int_equal(error, 0);
+	error = 0;
+	assert_int_equal(bt_shell_strtoull("18446744073709551616", 10, &error), 0);
+	assert_int_equal(error, -ERANGE);
+	error = 0;
+	assert_int_equal(bt_shell_strtoull("42junk", 0, &error), 0);
+	assert_int_equal(error, -EINVAL);
+}
+
+static const struct CMUnitTest cases[] = {
+	cmocka_unit_test(codec_frame_limit),
+	cmocka_unit_test(unsigned_id_rejection),
+	cmocka_unit_test(unsigned_id_range),
+};
 BT_TEST_SUITE(shell_validation, cases, bt_test_base_setup, NULL);

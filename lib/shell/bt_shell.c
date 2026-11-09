@@ -324,6 +324,11 @@ unsigned long long bt_shell_strtoull(const char *text, int base, int *error)
 	if (!error || *error) {
 		return 0;
 	}
+	if (text) {
+		while (isspace((unsigned char)*text)) {
+			text++;
+		}
+	}
 	if (!text || !*text || *text == '-') {
 		*error = -EINVAL;
 		return 0;

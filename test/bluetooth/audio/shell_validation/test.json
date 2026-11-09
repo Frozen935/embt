@@ -11,7 +11,9 @@
   "scenarios": {
     "default": {
       "required_cases": [
-        "codec_frame_limit"
+        "codec_frame_limit",
+        "unsigned_id_rejection",
+        "unsigned_id_range"
       ]
     },
     "bluetooth.audio.shell.broadcast_only": {
@@ -38,7 +40,9 @@
         "CONFIG_BT_BAP_BROADCAST_SRC_SUBGROUP_COUNT=1"
       ],
       "required_cases": [
-        "codec_frame_limit"
+        "codec_frame_limit",
+        "unsigned_id_rejection",
+        "unsigned_id_range"
       ]
     }
   }
