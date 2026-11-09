@@ -102,6 +102,10 @@ static int cmd_priv_node_id_get(const struct bt_shell *sh, size_t argc, char *ar
 	int err = 0;
 
 	key_net_idx = bt_shell_strtoul(argv[1], 0, &err);
+	if (err) {
+		bt_shell_session_warn(sh, "Unable to parse input string argument");
+		return err;
+	}
 
 	err = bt_mesh_priv_beacon_cli_node_id_get(bt_mesh_shell_target_ctx.net_idx,
 						  bt_mesh_shell_target_ctx.dst, key_net_idx, &val);

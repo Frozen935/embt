@@ -473,7 +473,7 @@ static int cmd_tx_cancel(const struct bt_shell *sh, size_t argc,
 static int cmd_tx_get(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint16_t group;
-	int err;
+	int err = 0;
 
 	if (!blob_cli_usable(sh)) {
 		return -ENODEV;
@@ -483,6 +483,11 @@ static int cmd_tx_get(const struct bt_shell *sh, size_t argc, char *argv[])
 		group = bt_shell_strtoul(argv[1], 0, &err);
 	} else {
 		group = BT_MESH_ADDR_UNASSIGNED;
+	}
+
+	if (err) {
+		bt_shell_session_warn(sh, "Unable to parse input string argument");
+		return err;
 	}
 
 	if (!blob_cli_xfer.target_count) {
