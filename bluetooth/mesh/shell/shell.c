@@ -276,7 +276,7 @@ static int cmd_lpn(const struct bt_shell *sh, size_t argc, char *argv[])
 
 		err = bt_mesh_lpn_set(false);
 		if (err) {
-			bt_shell_session_error(sh, "Enabling LPN failed (err %d)", err);
+			bt_shell_session_error(sh, "Disabling LPN failed (err %d)", err);
 		} else {
 			enabled = false;
 		}
@@ -1753,7 +1753,7 @@ BT_SHELL_STATIC_SUBCMD_SET_CREATE(auth_cmds,
 		      cmd_auth_method_set_input, 3, 0),
 	BT_SHELL_CMD_ARG(output, NULL, "<Action> <Size>",
 		      cmd_auth_method_set_output, 3, 0),
-	BT_SHELL_CMD_ARG(static, NULL, "<Val(1-16 hex)>", cmd_auth_method_set_static, 2,
+	BT_SHELL_CMD_ARG(static, NULL, "<Val(1-32 hex)>", cmd_auth_method_set_static, 2,
 		      0),
 	BT_SHELL_CMD_ARG(none, NULL, NULL, cmd_auth_method_set_none, 1, 0),
 	BT_SHELL_SUBCMD_SET_END);
