@@ -1631,7 +1631,7 @@ static int cmd_mod_pub(const struct bt_shell *sh, size_t argc, char *argv[])
 	}
 
 	if (argc > 0) {
-		if (argc < 7) {
+		if (argc != 8) {
 			bt_shell_session_warn(sh, "Invalid number of argument");
 			return -EINVAL;
 		}
