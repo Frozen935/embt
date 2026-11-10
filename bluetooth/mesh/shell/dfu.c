@@ -713,16 +713,22 @@ static int cmd_dfu_send(const struct bt_shell *sh, size_t argc, char *argv[])
 		group = BT_MESH_ADDR_UNASSIGNED;
 	}
 
-	if (argc > 3) {
-		xfer.mode = bt_shell_strtoul(argv[3], 0, &err);
-	} else {
+	if (argc < 4 || !strcmp(argv[3], "push")) {
 		xfer.mode = BT_MESH_BLOB_XFER_MODE_PUSH;
+	} else if (!strcmp(argv[3], "pull")) {
+		xfer.mode = BT_MESH_BLOB_XFER_MODE_PULL;
+	} else {
+		bt_shell_session_print(sh, "Mode must be either push or pull");
+		return -EINVAL;
 	}
 
 	if (argc > 5) {
 		blob_params.block_size_log = bt_shell_strtoul(argv[4], 0, &err);
 		blob_params.chunk_size = bt_shell_strtoul(argv[5], 0, &err);
 		xfer.blob_params = &blob_params;
+	} else if (argc == 5) {
+		bt_shell_session_print(sh, "BlockSizeLog must be given together with ChunkSize");
+		return -EINVAL;
 	} else {
 		xfer.blob_params = NULL;
 	}
