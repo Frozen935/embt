@@ -1145,6 +1145,7 @@ static const struct bt_mesh_elem *primary_element(void)
 static int cmd_add_fault(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint8_t fault_id;
+	unsigned long val;
 	uint8_t i;
 	const struct bt_mesh_elem *elem;
 	int err = 0;
@@ -1155,16 +1156,18 @@ static int cmd_add_fault(const struct bt_shell *sh, size_t argc, char *argv[])
 		return -EINVAL;
 	}
 
-	fault_id = bt_shell_strtoul(argv[1], 0, &err);
+	val = bt_shell_strtoul(argv[1], 0, &err);
 	if (err) {
 		bt_shell_session_warn(sh, "Unable to parse input string argument");
 		return err;
 	}
 
-	if (!fault_id) {
-		bt_shell_session_print(sh, "The Fault ID must be non-zero!");
+	if (val == 0 || val > 0xff) {
+		bt_shell_session_print(sh, "The Fault ID must be between 0x01 and 0xff");
 		return -EINVAL;
 	}
+
+	fault_id = (uint8_t)val;
 
 	for (i = 0U; i < sizeof(cur_faults); i++) {
 		if (!cur_faults[i]) {
@@ -1198,6 +1201,7 @@ static int cmd_add_fault(const struct bt_shell *sh, size_t argc, char *argv[])
 static int cmd_del_fault(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint8_t fault_id;
+	unsigned long val;
 	uint8_t i;
 	const struct bt_mesh_elem *elem;
 	int err = 0;
@@ -1215,16 +1219,18 @@ static int cmd_del_fault(const struct bt_shell *sh, size_t argc, char *argv[])
 		return 0;
 	}
 
-	fault_id = bt_shell_strtoul(argv[1], 0, &err);
+	val = bt_shell_strtoul(argv[1], 0, &err);
 	if (err) {
 		bt_shell_session_warn(sh, "Unable to parse input string argument");
 		return err;
 	}
 
-	if (!fault_id) {
-		bt_shell_session_print(sh, "The Fault ID must be non-zero!");
+	if (val == 0 || val > 0xff) {
+		bt_shell_session_print(sh, "The Fault ID must be between 0x01 and 0xff");
 		return -EINVAL;
 	}
+
+	fault_id = (uint8_t)val;
 
 	for (i = 0U; i < sizeof(cur_faults); i++) {
 		if (cur_faults[i] == fault_id) {
