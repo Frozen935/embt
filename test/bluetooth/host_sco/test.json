@@ -1,0 +1,19 @@
+{
+  "runner": "cmocka",
+  "tags": [
+    "bluetooth",
+    "classic",
+    "cmocka"
+  ],
+  "timeout_s": 15,
+  "execution": "case",
+  "required_cases": [
+    "sco_hooks__test_setup",
+    "sco_hooks__test_accept",
+    "sco_hooks__test_setup_send_error",
+    "sco_hooks__test_accept_send_error"
+  ],
+  "scenarios": {
+    "default": {}
+  }
+}
