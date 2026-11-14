@@ -1,8 +1,0 @@
-# Copyright 2026 NXP
-# SPDX-License-Identifier: Apache-2.0
-
-description: Dummy codec
-
-compatible: "zephyr,dummy-codec"
-
-include: base.yaml

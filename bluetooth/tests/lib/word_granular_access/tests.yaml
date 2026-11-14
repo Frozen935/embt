@@ -1,5 +1,0 @@
-tests:
-  libraries.word_granular_access:
-    ignore_faults: true
-    platform_allow:
-      - esp32_devkitc/esp32/procpu

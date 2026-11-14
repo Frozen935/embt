@@ -1,6 +1,0 @@
-board:
-  name: pico_ultra
-  full_name: Pico Ultra
-  vendor: luckfox
-  socs:
-  - name: rv1106

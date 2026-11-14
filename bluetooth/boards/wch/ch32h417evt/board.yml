@@ -1,6 +1,0 @@
-board:
-  name: ch32h417evt
-  full_name: WCH CH32H417EVT
-  vendor: wch
-  socs:
-    - name: ch32h417
