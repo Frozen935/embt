@@ -1,8 +1,0 @@
-# Copyright 2024 The ChromiumOS Authors
-# SPDX-License-Identifier: Apache-2.0
-
-if SOC_MT8196
-
-rsource "Kconfig.defconfig.*"
-
-endif # SOC_MT8196

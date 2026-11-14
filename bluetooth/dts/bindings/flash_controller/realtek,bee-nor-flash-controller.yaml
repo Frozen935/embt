@@ -1,5 +1,0 @@
-description: Realtek Bee Nor Flash Controller
-
-compatible: "realtek,bee-nor-flash-controller"
-
-include: flash-controller.yaml

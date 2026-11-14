@@ -1,7 +1,0 @@
-common:
-  tags: nocache
-  platform_allow:
-    - esp32p4x_function_ev_board/esp32p4/hpcore
-  harness: ztest
-tests:
-  boards.esp32p4.nocache: {}

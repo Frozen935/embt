@@ -1,4 +1,0 @@
-tests:
-  acpi.unit:
-    tags: acpi
-    type: unit

@@ -1,6 +1,0 @@
-boards:
-  - name: intel_nvl_s_rvp
-    full_name: Nova Lake RVP
-    vendor: intel
-    socs:
-      - name: nova_lake

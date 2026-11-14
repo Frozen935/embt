@@ -1,8 +1,0 @@
-common:
-  tags:
-    - drivers
-    - modem
-  platform_allow:
-    - native_sim
-tests:
-  drivers.modem.cellular.network_status: {}

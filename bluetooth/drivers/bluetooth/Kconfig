@@ -17,11 +17,7 @@ menuconfig BT_DRIVERS
 if BT_DRIVERS
 
 if BT_HCI
-source "drivers/bluetooth/hci/Kconfig"
-endif
-
-if BT_CUSTOM
-# Insert here any custom (non-HCI) offload drives
+rsource "hci/Kconfig"
 endif
 
 endif # BT_DRIVERS
