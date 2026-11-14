@@ -18,7 +18,7 @@
 
 # EmBT 项目规划（Review v1）
 
-状态：Review v1，作为开发中的工作文档通过草稿 PR 跟踪。init 来源说明和整包目录迁移已在 main；源码尚未裁剪，独立构建和 OS 适配尚未完成。
+状态：Review v1，作为开发中的工作文档通过草稿 PR 跟踪。init 来源说明和整包目录迁移已在 main；代码目录工作分支（Draft PR #4）已完成蓝牙目录提升、头文件目录改名和无关代码裁剪，独立构建和 OS 适配尚未完成。这些后续修改未合入 main。
 
 ## 1. 定位与当前基线
 
@@ -45,31 +45,40 @@ EmBT 是源码起源于 Zephyr Bluetooth、独立维护的开源蓝牙 Host 项�
 | R1 | 首先提交 init 来源文档；之后每批社区补丁按时间文件归档，保留原始 comments、完整 SHA、作者和对应关系 |
 | R2 | 项目使用 Apache-2.0 和统一完整文件头模板；模板不固定公司名称，版权按实际主体填写；导入源码保留原始许可和版权 |
 | R3 | 继续遵循 Zephyr coding style |
-| R4 | Zephyr 蓝牙源码及必要依赖集中到 bluetooth/；项目文档单独放 docs/；其他源码、原 samples/tests 删除 |
+| R4 | 原 subsys/bluetooth/ 除 controller/ 外的所有文件和目录迁移后继续保留；首期未启用功能只影响构建选择；其他依赖按明确清单裁剪 |
 | R5 | 先 review 规划，再按通过的规划实施 |
 | R6 | 保留 Kconfig 和 CMake；移除、适配或替换 Zephyr 专有配置扩展；构建入口使用 EmBT 自己的函数 |
 | R7 | 提交和 PR 使用英文标题及详细说明；代码和 review comments 不使用中文；当前阶段所有研发 PR 保持草稿、未合入，直到运行基线验证后由人决定合入；Agent 永不直接合入 |
 | R8 | 移除设备树、重新适配驱动；保留 buffer；先适配 POSIX；运行期对象和注册机制改为显式初始化 |
 | R9 | 基础目标是让协议栈实际跑起来 |
+| R10 | 同一板块尚未合入的更新继续修改原 commit、原 PR；文档更新放原文档 PR，代码 PR 不混入项目文档；不直接合入主线 |
 
 M0 的仓库及源码基线已建立，整份 Zephyr 已迁移到 bluetooth/。文档和后续实现均沿本地工作分支推进，通过草稿 PR 记录，调试到实际运行前不合入主线；继续本地开发不依赖 PR 已合入。向 Zephyr 提交贡献时遵守其上游规则。
 
 ## 3. 目标目录
 
-当前已将整份 Zephyr 基线迁移到 bluetooth/。以下是后续裁剪和独立构建的目标结构，尚未按该细化层级实施。
+代码目录工作分支（Draft PR #4）已将蓝牙模块提升到 bluetooth/，通用库移到根目录 lib/，头文件目录改为 include/embt/。以下列出目标结构；port/、third_party/ 和独立构建入口尚未建立。OS、日志、settings、随机数、CRC、shell 和 crypto 等待适配依赖暂存于 bluetooth/ 下。硬件平台、无关驱动/子系统和 west/native_sim 构建设施已在该工作分支删除。
 
 ~~~text
 embt/
-├── bluetooth/                  # 导入的协议源码和必要工具库
+├── bluetooth/                  # 蓝牙协议模块；其他待适配基线依赖暂存于此
 │   ├── host/
 │   │   └── classic/
 │   ├── common/
-│   ├── services/               # 必要、可选的 GATT services
-│   ├── lib/
-│   ├── deps/
-│   │   ├── net_buf/
-│   │   └── sys/
-│   └── include/zephyr/         # 首期保留必要头文件路径
+│   ├── crypto/
+│   ├── mesh/                  # 保留源码，首期可不编译
+│   ├── audio/                 # 保留源码，首期可不编译
+│   ├── services/               # 全部源码保留，构建按选定功能
+│   └── lib/                    # 蓝牙辅助库
+├── include/
+│   └── embt/                  # 头文件目录已迁移并按引用裁剪，内部引用尚待迁移
+│       ├── bluetooth/
+│       ├── net_buf.h
+│       └── sys/
+├── lib/                        # Zephyr 通用库，后续按依赖裁剪
+│   ├── net_buf/
+│   ├── uuid/
+│   └── utils/
 ├── port/                       # EmBT 的运行适配
 │   ├── compat/                 # 必要的 Zephyr 接口兼容
 │   ├── posix/
@@ -92,29 +101,30 @@ embt/
 └── LICENSE
 ~~~
 
-- 首期保留必要的 zephyr/... 头文件布局、bt_* API、net_buf/net_buf_simple 名称，减少与功能无关的改名。
+- 头文件采用 include/embt/ 布局，公共引用目标为 <embt/bluetooth/...> 等；目录整理阶段不修改源码引用，后续单独完成引用迁移。bt_* API、net_buf/net_buf_simple 名称保持不变。
 - 重新适配的驱动、OSAL 放 port/；原始出处记录到路径映射。
 - samples/ 和 tests/ 暂不建立。运行验证使用仓库外调用程序或现有工具，验证命令和结果记入文档。
-- 不重写 Git 历史。目录迁移、裁剪和行为修改分开记录，纯迁移尽量保持文件内容不变。
+- 保留导入的原始 Git 历史。目录整理和行为改造按板块跟踪，纯迁移保持文件内容不变；同一未合入板块的修正更新原 patch。
 
 ### 3.1 保留、替换和删除边界
 
 | 来源 | 处理 |
 | --- | --- |
-| subsys/bluetooth/host，包括 classic | 保留；按配置构建 BLE/BR 核心及相应 Profile |
-| common、lib、必要 services | 按实际使用保留 |
-| Bluetooth 公共头文件、lib/net_buf、必要 sys 工具 | 收敛到 bluetooth/ 的头文件和依赖目录 |
+| subsys/bluetooth 除 controller 外的所有内容 | 全部保留，禁止按功能开关或首期构建候选删除文件 |
+| common、lib、services、mesh、audio 及 shell | 全部保留文件，按实际配置选择参与构建的内容 |
+| Bluetooth 公共头文件、lib/net_buf、必要 sys 工具 | 头文件放根目录 include/embt/，通用实现放根目录 lib/；后续按消费者收敛 |
 | kernel、日志、settings、密码学、HCI 接入 | 识别所需接口；保留必要公共代码，运行实现改接 POSIX 或外部库 |
-| controller、mesh、LE Audio 目录 | 移除首批目标中不使用的代码和配置 |
-| boards、soc、arch、设备树、无关 drivers/subsys | 替换其必要接口后删除 |
+| subsys/bluetooth/controller | 整个目录不保留；执行时只清理其直接入口 |
+| subsys/bluetooth 内的 mesh、audio、shell 等 | 全部保留源码和配置文件；首期可按配置不编译 |
+| boards、soc、arch、设备树、无关 drivers/subsys 和 HAL | 目录工作分支已删除；仍被保留源码引用的接口头文件留待 POSIX/device 适配 |
 | samples、tests、Zephyr SDK/west/native_sim 构建设施 | 不保留为 EmBT 运行或构建依赖 |
 | 风格配置、必要检查工具、版权和许可文件 | 按职责保留必要部分 |
 
 LE Audio 的排除不影响 Classic 的 HFP、A2DP、AVRCP 源码。具体 Profile 的首轮运行验收在第 8 节单独确定。
 
-### 3.2 裁剪依据
+### 3.2 构建选择与保护范围外的依赖裁剪依据
 
-实施前产出路径和依赖清单：原路径、目标路径、消费者、配置条件、保留原因、适配方式及验证方法。依赖分析同时覆盖 include、Kconfig、编译目标、链接符号和运行期注册关系。
+实施前产出路径和依赖清单：原路径、目标路径、消费者、配置条件、保留原因、适配方式及验证方法。subsys/bluetooth 内除 controller 外的内容全部保留；这份清单只用于该目录内的构建选择和适配，以及该目录之外的依赖裁剪，不能授予删除受保护源码的权限。依赖分析同时覆盖 include、Kconfig、编译目标、链接符号和运行期注册关系。
 
 当前已确认的候选依赖包括 kernel.h、net_buf、原子操作、链表、字节序、日志、settings、PSA crypto、iterable sections。候选清单不是最终保留集合。禁止通过保留整个 Zephyr kernel、伪造成功返回值或空注册遍历掩盖缺失实现。
 
@@ -214,7 +224,7 @@ HCI 接收处理须在同步 HCI 命令等待响应前可运行；连接相关�
 | --- | --- | --- |
 | Review | 本规划、openblue 参考、来源记录、license 模板 | 规则、范围和阶段通过 review；不修改代码 |
 | M0 文档记录 | INIT 已记录；项目文档通过草稿 PR 持续跟踪 | 来源、SHA、许可和维护规则可读回，不要求先合入才能继续开发 |
-| M1.1 依赖与结构 | 路径白名单、迁移、裁剪、EmBT 项目规范 | 来源可追溯；样例、测试、设备树和无关代码按清单移除 |
+| M1.1 依赖与结构 | 构建候选清单、controller 删除计划、依赖范围和 EmBT 项目规范 | subsys/bluetooth 除 controller 外全部保留；其他目录只按明确任务处理 |
 | M1.2 独立构建 | Kconfig、CMake、必要兼容接口 | 配置/头文件一致；能编译库；未解决链接符号有明确归属 |
 | M1.3 运行适配 | POSIX、真实注册表、HCI、crypto/存储接入 | 外部调用程序完整链接；初始化和失败退出可执行 |
 | M1.4 基础连通 | BLE/BR 协议流程、证据及剩余依赖清理 | 达到第 8 节运行标准，获得独立运行基线 |
@@ -253,9 +263,9 @@ M1.1～M1.3 允许按依赖迭代，但通过各阶段验收后才标记完成�
 本轮请优先 review：
 
 1. bluetooth/ 收纳协议及依赖，port/ 收纳新运行适配的分层。
-2. 首期保留必要 zephyr/... 头文件布局和 buf/API 名称。
+2. 头文件采用 embt/... 命名空间，保留 buf/API 名称；引用迁移与运行适配分开验证。
 3. 基础运行矩阵是否采用 BLE GAP/GATT + BR SDP/RFCOMM，哪些 Classic Profile 必须首轮跑通。
 4. comments 是否需要扩展为全量 PR/review 评论归档。
 5. 首版是否要求重启后的 bond 恢复。
 
-这些项目的实现都在规划通过后开始。
+目录布局已按约定在工作分支实施；其余实现按后续明确的任务推进。

@@ -134,3 +134,20 @@ Do not claim that a check passed unless it was run and its result verified.
   modified content. Do not hard-code an organization in the template.
 - Preserve imported copyright and license notices. Do not bulk-rewrite
   upstream file headers or copy the example's company name and year.
+
+## 8. Bluetooth source retention boundary
+
+- The retention boundary follows the files originally imported from
+  `subsys/bluetooth/` to their current locations under `bluetooth/`.
+- The directory work branch removes the in-process `controller/` subtree.
+  Preserve every
+  other file and directory from the original Bluetooth subtree, including
+  Host, Classic, common, crypto, libraries, services, mesh, audio, shells,
+  headers, Kconfig files, and CMake files.
+- Excluding a feature from the first build does not authorize deleting its
+  source. A minimal compilation seed list is not a source-retention limit.
+- Required porting or controller-entry edits may change authorized files,
+  but must not remove non-controller files.
+- Scope decisions outside this retained source set require their own task
+  and dependency analysis; do not extend the controller deletion
+  authorization to them.
