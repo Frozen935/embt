@@ -416,19 +416,19 @@
 
 #else
 
-#if (defined(CONFIG_BIG_ENDIAN) && (__BYTE_ORDER__ != __ORDER_BIG_ENDIAN__)) || \
-    (defined(CONFIG_LITTLE_ENDIAN) && (__BYTE_ORDER__ != __ORDER_LITTLE_ENDIAN__))
+#if (defined(CONFIG_EMBT_BIG_ENDIAN) && (__BYTE_ORDER__ != __ORDER_BIG_ENDIAN__)) || \
+    (defined(CONFIG_EMBT_LITTLE_ENDIAN) && (__BYTE_ORDER__ != __ORDER_LITTLE_ENDIAN__))
 
 #  error "Kconfig/toolchain endianness mismatch:"
 
 #  if (__BYTE_ORDER__ != __ORDER_BIG_ENDIAN__) && (__BYTE_ORDER__ != __ORDER_LITTLE_ENDIAN__)
 #    error "Unknown __BYTE_ORDER__ value"
 #  else
-#    ifdef CONFIG_BIG_ENDIAN
-#      error "CONFIG_BIG_ENDIAN but __ORDER_LITTLE_ENDIAN__"
+#    ifdef CONFIG_EMBT_BIG_ENDIAN
+#      error "CONFIG_EMBT_BIG_ENDIAN but __ORDER_LITTLE_ENDIAN__"
 #    endif
-#    ifdef CONFIG_LITTLE_ENDIAN
-#      error "CONFIG_LITTLE_ENDIAN but __ORDER_BIG_ENDIAN__"
+#    ifdef CONFIG_EMBT_LITTLE_ENDIAN
+#      error "CONFIG_EMBT_LITTLE_ENDIAN but __ORDER_BIG_ENDIAN__"
 #   endif
 # endif
 

@@ -1,0 +1,164 @@
+# /****************************************************************************
+#  *  Copyright (C) 2026 EmBT contributors
+#  *
+#  * Licensed under the Apache License, Version 2.0 (the "License");
+#  * you may not use this file except in compliance with the License.
+#  * You may obtain a copy of the License at
+#  *
+#  *      http://www.apache.org/licenses/LICENSE-2.0
+#  *
+#  * Unless required by applicable law or agreed to in writing, software
+#  * distributed under the License is distributed on an "AS IS" BASIS,
+#  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  * See the License for the specific language governing permissions and
+#  * limitations under the License.
+#  ***************************************************************************/
+
+menu "Mbed TLS and PSA"
+
+config PSA_CRYPTO
+	bool
+	help
+	  Selected by features requiring PSA Crypto. CMake reports provider
+	  availability separately; this flag is not evidence of a linked library.
+
+config MBEDTLS
+	bool
+	default y if PSA_CRYPTO
+	help
+	  Indicates the requested Mbed TLS implementation. CMake separately
+	  validates the selected system, source or existing platform library.
+
+config PSA_CRYPTO_PROVIDER_MBEDTLS
+	bool
+	default y if PSA_CRYPTO
+	help
+	  The configured PSA implementation is Mbed TLS; this does not create
+	  a second crypto library or claim that library discovery succeeded.
+
+config EMBT_MBEDTLS_HELPERS
+	bool
+	select PSA_CRYPTO
+	help
+	  Require Mbed TLS helper interfaces used by OBEX authentication.
+
+if PSA_CRYPTO
+
+choice EMBT_CRYPTO_INTEGRATION
+	prompt "Mbed TLS integration"
+	default EMBT_CRYPTO_SYSTEM
+	help
+	  Use one Mbed TLS implementation. Select where its library comes from.
+
+config EMBT_CRYPTO_SYSTEM
+	bool "Installed system library"
+
+config EMBT_CRYPTO_SOURCE
+	bool "Build explicitly prepared source"
+
+config EMBT_CRYPTO_EXTERNAL
+	bool "Existing platform target"
+
+endchoice
+
+menu "Source-build options"
+	depends on EMBT_CRYPTO_SOURCE
+
+config MBEDTLS_AES_ROM_TABLES
+	bool "Store AES lookup tables in ROM"
+	depends on PSA_WANT_KEY_TYPE_AES
+	default y if BT_HOST_CRYPTO || BT_HOST_CCM || BT_CRYPTO || BT_GATT_CACHING || BT_MESH_CRYPTO_LIB
+	help
+	  Configure the actual Mbed TLS source build to use constant AES tables.
+	  Bluetooth AES consumers request this by default; it can be disabled.
+	  Installed or existing platform library configurations are unchanged.
+
+config MBEDTLS_AES_FEWER_TABLES
+	bool "Use fewer AES lookup tables"
+	depends on MBEDTLS_AES_ROM_TABLES
+	default y
+	help
+	  Reduce the AES table footprint at the cost of more arithmetic per
+	  lookup. This preserves the upstream default for ROM-based AES tables.
+
+config MBEDTLS_PSA_P256M_DRIVER_ENABLED
+	bool "Use the Mbed TLS p256-m PSA driver"
+	depends on PSA_WANT_ECC_SECP_R1_256
+	depends on !PSA_WANT_KEY_TYPE_ECC_KEY_PAIR_DERIVE
+	default y if BT_ECC
+	imply PSA_WANT_ALG_SHA_256
+	help
+	  Build the p256-m driver included in the pinned Mbed TLS source.
+	  Bluetooth ECDH requests this by default; it can be disabled.
+	  Its P-256 ECDH/key operations are validated by embt_crypto_check.
+	  This driver does not support key-pair derivation requests.
+
+config MBEDTLS_SHA256_SMALLER
+	bool "Use the smaller SHA-256 implementation"
+	depends on PSA_WANT_ALG_SHA_256
+	default y
+	help
+	  Preserve the upstream smaller SHA-256 implementation default.
+	  Disable to favor performance over code size.
+
+config MBEDTLS_ECP_NIST_OPTIM
+	bool "Use optimized reduction for NIST curves"
+	depends on PSA_WANT_ECC_SECP_R1_256
+	default y
+	help
+	  Preserve the upstream NIST-curve optimization in the built-in ECP
+	  implementation. This does not configure the separate p256-m driver.
+
+endmenu
+
+endif # PSA_CRYPTO
+
+
+# Algorithm and key-type requirements consumed by the Mbed TLS adapter.
+
+config PSA_WANT_ALG_CCM
+	bool
+
+config PSA_WANT_ALG_CMAC
+	bool
+
+config PSA_WANT_ALG_ECB_NO_PADDING
+	bool
+
+config PSA_WANT_ALG_ECDH
+	bool
+
+config PSA_WANT_ALG_HMAC
+	bool
+
+config PSA_WANT_ALG_MD5
+	bool
+
+config PSA_WANT_ALG_SHA_1
+	bool
+
+config PSA_WANT_ALG_SHA_256
+	bool
+
+config PSA_WANT_ECC_SECP_R1_256
+	bool
+
+config PSA_WANT_KEY_TYPE_AES
+	bool
+
+config PSA_WANT_KEY_TYPE_ECC_KEY_PAIR_DERIVE
+	bool
+
+config PSA_WANT_KEY_TYPE_ECC_KEY_PAIR_EXPORT
+	bool
+
+config PSA_WANT_KEY_TYPE_ECC_KEY_PAIR_GENERATE
+	bool
+
+config PSA_WANT_KEY_TYPE_ECC_KEY_PAIR_IMPORT
+	bool
+
+config PSA_WANT_KEY_TYPE_HMAC
+	bool
+
+endmenu

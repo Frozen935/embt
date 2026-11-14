@@ -1,0 +1,181 @@
+# /****************************************************************************
+#  *  Copyright (C) 2026 EmBT contributors
+#  *
+#  * Licensed under the Apache License, Version 2.0 (the "License");
+#  * you may not use this file except in compliance with the License.
+#  * You may obtain a copy of the License at
+#  *
+#  *      http://www.apache.org/licenses/LICENSE-2.0
+#  *
+#  * Unless required by applicable law or agreed to in writing, software
+#  * distributed under the License is distributed on an "AS IS" BASIS,
+#  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  * See the License for the specific language governing permissions and
+#  * limitations under the License.
+#  ***************************************************************************/
+
+mainmenu "EmBT Configuration"
+
+menuconfig EMBT_STACK
+	bool "EmBT stack"
+	help
+	  Enable the entire EmBT configuration tree and build targets.
+	  Disabling this option disables all component configuration choices.
+
+if EMBT_STACK
+
+menu "Build and target"
+
+config EMBT_64BIT
+	bool "64-bit pointer ABI"
+	default y
+	help
+	  Select the ABI of the compiler target, not the host running Python.
+	  Disable for a 32-bit target. CMake checks the actual pointer size.
+
+choice EMBT_BYTE_ORDER
+	prompt "Target byte order"
+	default EMBT_LITTLE_ENDIAN
+
+config EMBT_LITTLE_ENDIAN
+	bool "Little endian"
+
+config EMBT_BIG_ENDIAN
+	bool "Big endian"
+
+endchoice
+
+config EMBT_APP_VERSION
+	string "Application version"
+	default ""
+	help
+	  Optional application version used by the Device Information Service.
+
+config SOC
+	string
+	default "posix"
+
+choice EMBT_OPTIMIZATION
+	prompt "Optimization"
+	default NO_OPTIMIZATIONS
+
+config NO_OPTIMIZATIONS
+	bool "No optimization (-O0)"
+
+config SIZE_OPTIMIZATIONS
+	bool "Optimize for size (-Os)"
+
+config SPEED_OPTIMIZATIONS
+	bool "Optimize for speed (-O2)"
+
+endchoice
+
+config EMBT_EXPERIMENTAL
+	bool
+	help
+	  Set by selected experimental EmBT features.
+
+endmenu
+
+menu "Runtime interface requirements"
+
+config NUM_PREEMPT_PRIORITIES
+	int "Preemptible priority levels"
+	range 0 127
+	default 15
+
+config SYSTEM_WORKQUEUE_PRIORITY
+	int "System workqueue priority"
+	default -1
+	help
+	  Bluetooth adds a cooperative range when its workqueue needs it.
+	  POSIX priority mapping is a separate porting task.
+
+config SYSTEM_WORKQUEUE_STACK_SIZE
+	int "System workqueue stack requirement"
+	range 1 2147483647
+	default 1024
+	help
+	  Retains the upstream byte requirement. A POSIX implementation must
+	  also obey the host's minimum stack size and scheduling constraints.
+
+config ASSERT
+	bool "Assertions"
+	default y
+
+config PRINTK
+	bool "Require formatted console output"
+	default y
+	help
+	  Retained HFP and diagnostic interfaces need output support. This
+	  does not restore the retired Zephyr logging framework.
+
+config POLL
+	bool
+	help
+	  Requirement for the kernel-style poll interface, selected by Mesh.
+	  It does not imply that POSIX poll alone implements that contract.
+
+config EMBT_PORT_HAS_SHELL
+	bool
+	default n
+	help
+	  Enable only after a real shell implementation is integrated.
+
+config SHELL
+	bool
+
+config SHELL_GETOPT
+	bool
+
+config GETOPT_LONG
+	bool
+
+endmenu
+
+menu "External dependency requirements"
+
+rsource "third_party/mbedtls/Kconfig"
+
+config LIBSBC
+	bool "Require SBC codec support"
+	default n
+
+config LIBLC3
+	bool "Require LC3 codec support"
+	default n
+
+config HAS_RANDOM_GENERATOR
+	bool
+	default n
+	help
+	  Enable only when the random interface has a real implementation.
+
+endmenu
+
+# Legacy transport, board, memory and storage selectors; no providers.
+
+config BT_H4
+	bool
+	default n
+
+config BT_H5
+	bool
+	default n
+
+config BT_HCI_SET_PUBLIC_ADDR
+	bool
+	default n
+	help
+	  Enabled only by a transport implementing the public-address hook.
+
+config BT_HAS_HCI_VS
+	default n
+
+rsource "bluetooth/Kconfig.constants"
+rsource "lib/Kconfig"
+rsource "bluetooth/subsys/Kconfig"
+rsource "bluetooth/drivers/Kconfig"
+rsource "bluetooth/Kconfig"
+
+endif # EMBT_STACK

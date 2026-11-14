@@ -31,7 +31,7 @@ struct log_source_const_data {
 /** @brief Dynamic data associated with the source of log messages. */
 struct log_source_dynamic_data {
 	uint32_t filters;
-#if defined(CONFIG_64BIT)
+#if defined(CONFIG_EMBT_64BIT)
 	/* Workaround: Ensure that structure size is a multiple of 8 bytes. */
 	uint32_t dummy_64;
 #endif

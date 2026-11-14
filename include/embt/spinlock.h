@@ -111,7 +111,7 @@ extern const uint8_t z_spinlock_abort_sentinel;
 #ifdef CONFIG_TEST
 struct k_spinlock *z_spin_get_held_lock(void);
 #endif /* CONFIG_TEST */
-#if defined(CONFIG_64BIT)
+#if defined(CONFIG_EMBT_64BIT)
 BUILD_ASSERT(CONFIG_MP_MAX_NUM_CPUS <= 8, "Too many CPUs for mask");
 #else
 BUILD_ASSERT(CONFIG_MP_MAX_NUM_CPUS <= 4, "Too many CPUs for mask");

@@ -4,13 +4,13 @@
 # Copyright (c) 2021 Nordic Semiconductor ASA
 # SPDX-License-Identifier: Apache-2.0
 
-menuconfig BT
-	bool "Bluetooth"
+menuconfig EMBT
+	bool "EmBT Bluetooth Host"
 	select NET_BUF
 	help
 	  This option enables Bluetooth support.
 
-if BT
+if EMBT
 
 choice BT_STACK_SELECTION
 	prompt "Bluetooth Stack Selection"
@@ -211,13 +211,13 @@ config BT_FRAME_SPACE_UPDATE
 
 config BT_CHANNEL_SOUNDING
 	bool "Channel Sounding [EXPERIMENTAL]"
-	select EXPERIMENTAL
+	select EMBT_EXPERIMENTAL
 	help
 	  Enable support for Bluetooth 6.0 Channel Sounding feature.
 
 config BT_CHANNEL_SOUNDING_TEST
 	bool "Channel Sounding Test [EXPERIMENTAL]"
-	select EXPERIMENTAL
+	select EMBT_EXPERIMENTAL
 	depends on BT_CHANNEL_SOUNDING
 	help
 	  Enable support for Channel Sounding test mode.
@@ -397,6 +397,7 @@ rsource "crypto/Kconfig"
 rsource "lib/Kconfig"
 
 config BT_SHELL
+	depends on EMBT_PORT_HAS_SHELL
 	bool "Bluetooth shell"
 	select SHELL
 	select SHELL_GETOPT
@@ -421,4 +422,4 @@ config BT_COMPANY_ID
 	  Bluetooth Company Identifiers can be found here:
 	  https://www.bluetooth.com/specifications/assigned-numbers/company-identifiers
 
-endif # BT
+endif # EMBT

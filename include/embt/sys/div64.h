@@ -57,12 +57,12 @@ extern "C" {
 #endif
 
 /* Plain division for a constant divisor */
-#if defined(CONFIG_64BIT) || defined(CONFIG_NO_OPTIMIZATIONS) || defined(Z_DIV64_NO_BUILTINS)
+#if defined(CONFIG_EMBT_64BIT) || defined(CONFIG_NO_OPTIMIZATIONS) || defined(Z_DIV64_NO_BUILTINS)
 #define Z_DIV64_PLAIN
 #endif
 
 /* Plain division for a run-time divisor */
-#if defined(CONFIG_64BIT) || defined(Z_DIV64_NO_BUILTINS)
+#if defined(CONFIG_EMBT_64BIT) || defined(Z_DIV64_NO_BUILTINS)
 #define Z_DIV64_PLAIN_RECIP
 #endif
 

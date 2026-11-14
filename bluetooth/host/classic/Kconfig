@@ -14,7 +14,7 @@ config BT_CLASSIC
 	select BT_SMP
 	select BT_L2CAP_DYNAMIC_CHANNEL
 	select CRC
-	select EXPERIMENTAL
+	select EMBT_EXPERIMENTAL
 	help
 	  This option enables Bluetooth BR/EDR support
 
@@ -100,13 +100,13 @@ config BT_L2CAP_SIG_TX_BUF_COUNT
 
 config BT_L2CAP_CONNLESS
 	bool "Bluetooth L2CAP connectionless data reception [EXPERIMENTAL]"
-	select EXPERIMENTAL
+	select EMBT_EXPERIMENTAL
 	help
 	  This option enables Bluetooth L2CAP connectionless data reception
 
 config BT_L2CAP_QOS
 	bool "Bluetooth L2CAP QoS Option [EXPERIMENTAL]"
-	select EXPERIMENTAL
+	select EMBT_EXPERIMENTAL
 	help
 	  This option enables negotiation of the Bluetooth L2CAP QoS
 	  configuration option. Only the Best Effort service type is supported,
@@ -116,25 +116,25 @@ config BT_L2CAP_QOS
 
 config BT_L2CAP_RET
 	bool "Bluetooth L2CAP retransmission mode [EXPERIMENTAL]"
-	select EXPERIMENTAL
+	select EMBT_EXPERIMENTAL
 	help
 	  This option enables Bluetooth L2CAP retransmission mode
 
 config BT_L2CAP_FC
 	bool "Bluetooth L2CAP flow control mode [EXPERIMENTAL]"
-	select EXPERIMENTAL
+	select EMBT_EXPERIMENTAL
 	help
 	  This option enables Bluetooth L2CAP flow control mode
 
 config BT_L2CAP_ENH_RET
 	bool "Bluetooth L2CAP enhance retransmission [EXPERIMENTAL]"
-	select EXPERIMENTAL
+	select EMBT_EXPERIMENTAL
 	help
 	  This option enables Bluetooth L2CAP enhance retransmission
 
 config BT_L2CAP_STREAM
 	bool "Bluetooth L2CAP streaming mode [EXPERIMENTAL]"
-	select EXPERIMENTAL
+	select EMBT_EXPERIMENTAL
 	help
 	  This option enables Bluetooth L2CAP streaming mode
 
@@ -144,14 +144,14 @@ config BT_L2CAP_RET_FC
 if BT_L2CAP_RET_FC
 config BT_L2CAP_FCS
 	bool "Bluetooth L2CAP FCS Option [EXPERIMENTAL]"
-	select EXPERIMENTAL
+	select EMBT_EXPERIMENTAL
 	depends on BT_L2CAP_STREAM || BT_L2CAP_ENH_RET
 	help
 	  This option enables Bluetooth L2CAP FCS Option
 
 config BT_L2CAP_EXT_WIN_SIZE
 	bool "Bluetooth L2CAP Extended window size Option [EXPERIMENTAL]"
-	select EXPERIMENTAL
+	select EMBT_EXPERIMENTAL
 	depends on BT_L2CAP_STREAM || BT_L2CAP_ENH_RET
 	help
 	  This option enables Bluetooth L2CAP Extended window size Option
@@ -195,7 +195,7 @@ endif # BT_L2CAP_RET_FC
 
 config BT_RFCOMM
 	bool "Bluetooth RFCOMM protocol support [EXPERIMENTAL]"
-	select EXPERIMENTAL
+	select EMBT_EXPERIMENTAL
 	help
 	  This option enables Bluetooth RFCOMM support
 
@@ -221,7 +221,7 @@ config BT_HFP_HF
 	bool "Bluetooth Handsfree profile HF Role support [EXPERIMENTAL]"
 	depends on PRINTK
 	select BT_RFCOMM
-	select EXPERIMENTAL
+	select EMBT_EXPERIMENTAL
 	help
 	  This option enables Bluetooth HF support
 
@@ -229,7 +229,7 @@ config BT_HFP_AG
 	bool "Bluetooth Handsfree profile AG Role support [EXPERIMENTAL]"
 	depends on PRINTK
 	select BT_RFCOMM
-	select EXPERIMENTAL
+	select EMBT_EXPERIMENTAL
 	help
 	  This option enables Bluetooth AG support
 
@@ -496,7 +496,7 @@ endif # BT_HFP_AG
 
 config BT_AVDTP
 	bool "Bluetooth AVDTP protocol support [EXPERIMENTAL]"
-	select EXPERIMENTAL
+	select EMBT_EXPERIMENTAL
 	help
 	  This option enables Bluetooth AVDTP support
 
@@ -504,7 +504,7 @@ config BT_A2DP
 	bool "Bluetooth A2DP Profile [EXPERIMENTAL]"
 	select BT_AVDTP
 	imply LIBSBC
-	select EXPERIMENTAL
+	select EMBT_EXPERIMENTAL
 	help
 	  This option enables the A2DP profile
 
@@ -554,14 +554,14 @@ endif # BT_A2DP
 
 config BT_AVCTP
 	bool "Bluetooth AVCTP protocol support [EXPERIMENTAL]"
-	select EXPERIMENTAL
+	select EMBT_EXPERIMENTAL
 	help
 	  This option enables Bluetooth AVCTP support
 
 config BT_AVRCP
 	bool "Bluetooth AVRCP Profile [EXPERIMENTAL]"
 	select BT_AVCTP
-	select EXPERIMENTAL
+	select EMBT_EXPERIMENTAL
 	help
 	  This option enables the AVRCP profile
 
@@ -590,7 +590,7 @@ config BT_AVRCP_VD_RX_SIZE
 
 config BT_AVRCP_BROWSING
 	bool "Bluetooth AVRCP Browsing channel support [EXPERIMENTAL]"
-	select EXPERIMENTAL
+	select EMBT_EXPERIMENTAL
 	select BT_L2CAP_ENH_RET
 	help
 	  This option enables support for the AVRCP Browsing channel
@@ -614,7 +614,7 @@ endif # BT_AVRCP_BROWSING
 
 config BT_AVRCP_TG_COVER_ART
 	bool "Bluetooth AVRCP Target Cover Art support [EXPERIMENTAL]"
-	select EXPERIMENTAL
+	select EMBT_EXPERIMENTAL
 	select BT_BIP
 	depends on BT_AVRCP_TARGET
 	help
@@ -623,7 +623,7 @@ config BT_AVRCP_TG_COVER_ART
 
 config BT_AVRCP_CT_COVER_ART
 	bool
-	select EXPERIMENTAL
+	select EMBT_EXPERIMENTAL
 	select BT_BIP
 	depends on BT_AVRCP_CONTROLLER
 	help
@@ -632,7 +632,7 @@ config BT_AVRCP_CT_COVER_ART
 
 config BT_AVRCP_CT_COVER_ART_GET_IMAGE_PROPERTIES
 	bool "Bluetooth AVRCP Controller Cover Art Get Image Properties support [EXPERIMENTAL]"
-	select EXPERIMENTAL
+	select EMBT_EXPERIMENTAL
 	select BT_BIP
 	select BT_AVRCP_CT_COVER_ART
 	depends on BT_AVRCP_CONTROLLER
@@ -642,7 +642,7 @@ config BT_AVRCP_CT_COVER_ART_GET_IMAGE_PROPERTIES
 
 config BT_AVRCP_CT_COVER_ART_GET_IMAGE
 	bool "Bluetooth AVRCP Controller Cover Art Get Image support [EXPERIMENTAL]"
-	select EXPERIMENTAL
+	select EMBT_EXPERIMENTAL
 	select BT_BIP
 	select BT_AVRCP_CT_COVER_ART
 	depends on BT_AVRCP_CONTROLLER
@@ -652,7 +652,7 @@ config BT_AVRCP_CT_COVER_ART_GET_IMAGE
 
 config BT_AVRCP_CT_COVER_ART_GET_LINKED_THUMBNAIL
 	bool "Bluetooth AVRCP Controller Cover Art Get Linked Thumbnail support [EXPERIMENTAL]"
-	select EXPERIMENTAL
+	select EMBT_EXPERIMENTAL
 	select BT_BIP
 	select BT_AVRCP_CT_COVER_ART
 	depends on BT_AVRCP_CONTROLLER
@@ -664,7 +664,7 @@ endif # BT_AVRCP
 
 config BT_DID
 	bool "Bluetooth DID Profile [EXPERIMENTAL]"
-	select EXPERIMENTAL
+	select EMBT_EXPERIMENTAL
 	help
 	  This option enables the DID profile
 
@@ -694,14 +694,14 @@ endif # BT_DID
 
 config BT_HID_DEVICE
 	bool "Bluetooth HID Device Profile [EXPERIMENTAL]"
-	select EXPERIMENTAL
+	select EMBT_EXPERIMENTAL
 	select BT_DID
 	help
 	  This option enables the HID Device profile.
 
 config BT_HID_HOST
 	bool "Bluetooth HID Host Profile [EXPERIMENTAL]"
-	select EXPERIMENTAL
+	select EMBT_EXPERIMENTAL
 	help
 	  This option enables the HID Host profile.
 
@@ -738,7 +738,7 @@ config BT_GOEP
 	bool "Bluetooth GOEP Profile [EXPERIMENTAL]"
 	select BT_RFCOMM
 	select BT_L2CAP_ENH_RET
-	select EXPERIMENTAL
+	select EMBT_EXPERIMENTAL
 	help
 	  This option enables the GOEP profile
 
@@ -782,7 +782,7 @@ config BT_OEBX_RSP_CODE_TO_STR
 config BT_OBEX_AUTH
 	bool "Bluetooth OBEX Authentication support"
 	select PSA_WANT_ALG_MD5
-	select MBEDTLS
+	select EMBT_MBEDTLS_HELPERS
 	help
 	  This option enables OBEX authentication feature.
 	  OBEX authentication uses MD5, which is cryptographically weak.
@@ -801,7 +801,7 @@ endif # BT_GOEP
 config BT_BIP
 	bool "Bluetooth BIP Profile [EXPERIMENTAL]"
 	select BT_GOEP
-	select EXPERIMENTAL
+	select EMBT_EXPERIMENTAL
 	help
 	  This option enables the BIP profile
 
@@ -919,7 +919,7 @@ endif # BT_PBAP_PSE
 config BT_OPP
 	bool
 	select BT_GOEP
-	select EXPERIMENTAL
+	select EMBT_EXPERIMENTAL
 	help
 	  This option enables the OPP (Object Push Profile) core. [EXPERIMENTAL]
 	  Enabled automatically when BT_OPP_SERVER or BT_OPP_CLIENT is selected.
@@ -927,7 +927,7 @@ config BT_OPP
 config BT_OPP_SERVER
 	bool "Bluetooth OPP Push Server [EXPERIMENTAL]"
 	select BT_OPP
-	select EXPERIMENTAL
+	select EMBT_EXPERIMENTAL
 	help
 	  Enable the OPP Push Server role. The server can receive objects (vCard,
 	  vCalendar, vNote, vMessage) from a remote OPP Push Client and optionally
@@ -936,7 +936,7 @@ config BT_OPP_SERVER
 config BT_OPP_CLIENT
 	bool "Bluetooth OPP Push Client [EXPERIMENTAL]"
 	select BT_OPP
-	select EXPERIMENTAL
+	select EMBT_EXPERIMENTAL
 	help
 	  Enable the OPP Push Client role. The client can push objects to a remote
 	  OPP Push Server and optionally pull the server's default business card.
@@ -944,7 +944,7 @@ config BT_OPP_CLIENT
 config BT_MAP
 	bool
 	select BT_GOEP
-	select EXPERIMENTAL
+	select EMBT_EXPERIMENTAL
 	help
 	  This option enables the MAP profile
 
@@ -970,14 +970,14 @@ config BT_FTP
 config BT_FTP_CLIENT
 	bool "Bluetooth FTP Profile Client [EXPERIMENTAL]"
 	select BT_FTP
-	select EXPERIMENTAL
+	select EMBT_EXPERIMENTAL
 	help
 	  This option enables the FTP profile client function
 
 config BT_FTP_SERVER
 	bool "Bluetooth FTP Profile Server [EXPERIMENTAL]"
 	select BT_FTP
-	select EXPERIMENTAL
+	select EMBT_EXPERIMENTAL
 	help
 	  This option enables the FTP profile server function
 

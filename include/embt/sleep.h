@@ -104,7 +104,7 @@ static ALWAYS_INLINE int32_t z_sleep_ticks_to_int32_ms(k_ticks_t ticks)
 	uint32_t t = (uint32_t)ticks;
 
 	/* a split is not worth narrowing for where 64 bit division is cheap */
-	if (IS_ENABLED(CONFIG_64BIT) && !Z_SLEEP_IS_SIMPLE(MSEC_PER_SEC)) {
+	if (IS_ENABLED(CONFIG_EMBT_64BIT) && !Z_SLEEP_IS_SIMPLE(MSEC_PER_SEC)) {
 		return (int32_t)MIN(k_ticks_to_ms_ceil64(t), (uint64_t)INT32_MAX);
 	}
 
@@ -153,7 +153,7 @@ static ALWAYS_INLINE int32_t z_sleep_ticks_to_int32_us(k_ticks_t ticks)
 	uint32_t t = (uint32_t)ticks;
 
 	/* a split is not worth narrowing for where 64 bit division is cheap */
-	if (IS_ENABLED(CONFIG_64BIT) && !Z_SLEEP_IS_SIMPLE(USEC_PER_SEC)) {
+	if (IS_ENABLED(CONFIG_EMBT_64BIT) && !Z_SLEEP_IS_SIMPLE(USEC_PER_SEC)) {
 		return (int32_t)MIN(k_ticks_to_us_ceil64(t), (uint64_t)INT32_MAX);
 	}
 

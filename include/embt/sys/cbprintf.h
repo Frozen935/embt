@@ -68,7 +68,7 @@ union cbprintf_package_hdr {
 
 	void *raw;
 
-#if defined(CONFIG_CBPRINTF_PACKAGE_HEADER_STORE_CREATION_FLAGS) && !defined(CONFIG_64BIT)
+#if defined(CONFIG_CBPRINTF_PACKAGE_HEADER_STORE_CREATION_FLAGS) && !defined(CONFIG_EMBT_64BIT)
 	void *raw2[2];
 #endif
 

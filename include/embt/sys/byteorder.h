@@ -237,7 +237,7 @@
  *  @return 64-bit unsigned integer as byte array.
  */
 
-#ifdef CONFIG_LITTLE_ENDIAN
+#ifdef CONFIG_EMBT_LITTLE_ENDIAN
 #define sys_le16_to_cpu(val) (val)
 #define sys_cpu_to_le16(val) (val)
 #define sys_le24_to_cpu(val) (val)
@@ -749,7 +749,7 @@ static inline void sys_mem_swap(void *buf, size_t length)
  */
 static inline void sys_le_to_cpu(void *buf, size_t length)
 {
-	if (IS_ENABLED(CONFIG_BIG_ENDIAN)) {
+	if (IS_ENABLED(CONFIG_EMBT_BIG_ENDIAN)) {
 		sys_mem_swap(buf, length);
 	}
 }
@@ -762,7 +762,7 @@ static inline void sys_le_to_cpu(void *buf, size_t length)
  */
 static inline void sys_cpu_to_le(void *buf, size_t length)
 {
-	if (IS_ENABLED(CONFIG_BIG_ENDIAN)) {
+	if (IS_ENABLED(CONFIG_EMBT_BIG_ENDIAN)) {
 		sys_mem_swap(buf, length);
 	}
 }
@@ -775,7 +775,7 @@ static inline void sys_cpu_to_le(void *buf, size_t length)
  */
 static inline void sys_be_to_cpu(void *buf, size_t length)
 {
-	if (IS_ENABLED(CONFIG_LITTLE_ENDIAN)) {
+	if (IS_ENABLED(CONFIG_EMBT_LITTLE_ENDIAN)) {
 		sys_mem_swap(buf, length);
 	}
 }
@@ -788,7 +788,7 @@ static inline void sys_be_to_cpu(void *buf, size_t length)
  */
 static inline void sys_cpu_to_be(void *buf, size_t length)
 {
-	if (IS_ENABLED(CONFIG_LITTLE_ENDIAN)) {
+	if (IS_ENABLED(CONFIG_EMBT_LITTLE_ENDIAN)) {
 		sys_mem_swap(buf, length);
 	}
 }
@@ -805,7 +805,7 @@ static inline void sys_cpu_to_be(void *buf, size_t length)
  */
 static inline void sys_put_le(void *dst, const void *src, size_t length)
 {
-	if (IS_ENABLED(CONFIG_LITTLE_ENDIAN)) {
+	if (IS_ENABLED(CONFIG_EMBT_LITTLE_ENDIAN)) {
 		(void)memcpy(dst, src, length);
 	} else {
 		sys_memcpy_swap(dst, src, length);
@@ -824,7 +824,7 @@ static inline void sys_put_le(void *dst, const void *src, size_t length)
  */
 static inline void sys_put_be(void *dst, const void *src, size_t length)
 {
-	if (IS_ENABLED(CONFIG_LITTLE_ENDIAN)) {
+	if (IS_ENABLED(CONFIG_EMBT_LITTLE_ENDIAN)) {
 		sys_memcpy_swap(dst, src, length);
 	} else {
 		(void)memcpy(dst, src, length);
@@ -843,7 +843,7 @@ static inline void sys_put_be(void *dst, const void *src, size_t length)
  */
 static inline void sys_get_le(void *dst, const void *src, size_t length)
 {
-	if (IS_ENABLED(CONFIG_LITTLE_ENDIAN)) {
+	if (IS_ENABLED(CONFIG_EMBT_LITTLE_ENDIAN)) {
 		(void)memcpy(dst, src, length);
 	} else {
 		sys_memcpy_swap(dst, src, length);
@@ -862,7 +862,7 @@ static inline void sys_get_le(void *dst, const void *src, size_t length)
  */
 static inline void sys_get_be(void *dst, const void *src, size_t length)
 {
-	if (IS_ENABLED(CONFIG_LITTLE_ENDIAN)) {
+	if (IS_ENABLED(CONFIG_EMBT_LITTLE_ENDIAN)) {
 		sys_memcpy_swap(dst, src, length);
 	} else {
 		(void)memcpy(dst, src, length);
