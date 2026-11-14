@@ -1,3 +1,3 @@
 # SPDX-License-Identifier: Apache-2.0
 
-add_subdirectory_ifdef(CONFIG_BT bluetooth)
+embt_add_subdirectory_ifdef(CONFIG_EMBT bluetooth)

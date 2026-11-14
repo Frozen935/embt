@@ -5,7 +5,7 @@
 
 menuconfig BT_IAS
 	bool "Support for GATT Immediate Alert Service [EXPERIMENTAL]"
-	select EXPERIMENTAL
+	select EMBT_EXPERIMENTAL
 
 if BT_IAS
 
@@ -33,6 +33,6 @@ endif # BT_IAS
 config BT_IAS_CLIENT
 	bool "Immediate Alert Service Client [Experimental]"
 	select BT_GATT_CLIENT
-	select EXPERIMENTAL
+	select EMBT_EXPERIMENTAL
 	help
 	This option enables support for Immediate Alert Service Client

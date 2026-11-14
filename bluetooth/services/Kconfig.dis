@@ -133,7 +133,7 @@ config BT_DIS_FW_REV
 config BT_DIS_FW_REV_STR
 	string "Firmware revision"
 	depends on BT_DIS_FW_REV
-	default "$(APP_VERSION_TWEAK_STRING)" if "$(VERSION_MAJOR)" != ""
+	default EMBT_APP_VERSION if EMBT_APP_VERSION != ""
 	default "0.0.0+0"
 	help
 	  Enable firmware revision characteristic in Device Information Service.
@@ -191,7 +191,7 @@ endif # BT_DIS_UDI
 
 config BT_DIS_SYSTEM_ID
 	bool "DIS System ID characteristic [EXPERIMENTAL]"
-	select EXPERIMENTAL
+	select EMBT_EXPERIMENTAL
 	help
 	  Enable System ID characteristic in Device Information Service.
 	  The System ID characteristic is used to represent an extended unique identifier (EUI) of the system

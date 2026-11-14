@@ -279,7 +279,7 @@ enum z_log_msg_mode {
  * @retval 0 if message does not qualify.
  */
 #define LOG_MSG_SIMPLE_CHECK(...) \
-	COND_CODE_1(CONFIG_64BIT, (0), (\
+	COND_CODE_1(CONFIG_EMBT_64BIT, (0), (\
 		COND_CODE_1(LOG_MSG_SIMPLE_ARG_CNT_CHECK(__VA_ARGS__), ( \
 				LOG_MSG_SIMPLE_ARG_TYPE_CHECK(__VA_ARGS__)), (0))))
 

@@ -75,13 +75,13 @@ struct _thread_base {
 	 */
 	union {
 		struct {
-#ifdef CONFIG_BIG_ENDIAN
+#ifdef CONFIG_EMBT_BIG_ENDIAN
 			uint8_t sched_locked;
 			int8_t prio;
 #else /* Little Endian */
 			int8_t prio;
 			uint8_t sched_locked;
-#endif /* CONFIG_BIG_ENDIAN */
+#endif /* CONFIG_EMBT_BIG_ENDIAN */
 		};
 		uint16_t preempt;
 	};

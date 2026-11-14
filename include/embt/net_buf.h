@@ -1103,7 +1103,7 @@ struct net_buf {
 		atomic_t ref_word;
 		/** @endcond */
 		struct {
-#if defined(CONFIG_BIG_ENDIAN)
+#if defined(CONFIG_EMBT_BIG_ENDIAN)
 			/* atomic_t is typedef'd as long (BUILD_ASSERTed in
 			 * lib/net_buf/buf.c); on a 64-bit big-endian build
 			 * the byte struct needs 4 bytes of padding so that

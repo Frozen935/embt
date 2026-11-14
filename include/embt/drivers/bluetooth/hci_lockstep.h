@@ -59,7 +59,7 @@ extern "C" {
  * with a reset line while opening, calls bt_hci_lockstep_reset() after that
  * reset and before its first command.
  *
- * The helper is part of every build with @kconfig{CONFIG_BT} enabled.
+ * The helper is part of every build with @kconfig{CONFIG_EMBT} enabled.
  *
  * @note This is not an application API: the intended users are HCI drivers.
  *       Applications that need to send HCI commands alongside a running Host

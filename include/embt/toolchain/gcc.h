@@ -121,7 +121,7 @@
 /* The GNU assembler for Cortex-M3 uses # for immediate values, not
  * comments, so the @nobits# trick does not work.
  */
-#if defined(CONFIG_ARM) || defined(CONFIG_ARM64)
+#if defined(CONFIG_ARM) || defined(__aarch64__)
 #define _NODATA_SECTION(segment)  __attribute__((section(#segment)))
 #else
 #define _NODATA_SECTION(segment)				\
@@ -150,7 +150,7 @@ __extension__ ({							\
 #endif
 
 
-#if (__GNUC__ >= 7) && (defined(CONFIG_ARM) || defined(CONFIG_ARM64))
+#if (__GNUC__ >= 7) && (defined(CONFIG_ARM) || defined(__aarch64__))
 
 /* Version of UNALIGNED_PUT() which issues a compiler_barrier() after
  * the store. It is required to workaround an apparent optimization
@@ -427,7 +427,7 @@ do {                                                                    \
 #if defined(_ASMLANGUAGE)
 
 #if defined(CONFIG_ARM) || defined(CONFIG_RISCV) || defined(CONFIG_XTENSA) ||                      \
-	defined(CONFIG_ARM64) || defined(CONFIG_MIPS) || defined(CONFIG_RX) ||                     \
+	defined(__aarch64__) || defined(CONFIG_MIPS) || defined(CONFIG_RX) ||                     \
 	defined(CONFIG_OPENRISC) || defined(CONFIG_TRICORE)
 #define GTEXT(sym) .global sym; .type sym, %function
 #define GDATA(sym) .global sym; .type sym, %object
@@ -528,9 +528,9 @@ do {                                                                    \
 #else
 #define _ASM_FILE_PROLOGUE .text; .code 32
 #endif /* CONFIG_ASSEMBLER_ISA_THUMB2 */
-#elif defined(CONFIG_ARM64)
+#elif defined(__aarch64__)
 #define _ASM_FILE_PROLOGUE .text
-#endif /* CONFIG_ARM64 || CONFIG_ARM */
+#endif /* __aarch64__ || CONFIG_ARM */
 #endif /* _ASMLANGUAGE */
 
 /*
@@ -585,7 +585,7 @@ do {                                                                    \
 		"\n\t.equ\t" #name "," #value       \
 		"\n\t.type\t" #name ",%object")
 
-#elif defined(CONFIG_ARC) || defined(CONFIG_ARM64) \
+#elif defined(CONFIG_ARC) || defined(__aarch64__) \
 	|| defined(CONFIG_ARCH_POSIX) /*&& (__x86_64 or __i*86 or __aarch64__)*/ \
 	|| defined(CONFIG_X86)
 

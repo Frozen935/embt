@@ -93,7 +93,7 @@
 
 #if defined(_ASMLANGUAGE) && !defined(_LINKER)
 
-  #if defined(CONFIG_X86) || defined(CONFIG_ARM) || defined(CONFIG_ARM64) || \
+  #if defined(CONFIG_X86) || defined(CONFIG_ARM) || defined(__aarch64__) || \
 	defined(CONFIG_RISCV) || defined(CONFIG_XTENSA) || defined(CONFIG_MIPS) || \
 	defined(CONFIG_ARCH_POSIX) || defined(CONFIG_RX) || defined(CONFIG_OPENRISC)
     #define   ALIGN(x)    .balign   x
@@ -127,7 +127,7 @@
       #define PERFOPT_ALIGN .balign  1
     #endif
 
-  #elif defined(CONFIG_ARM) || defined(CONFIG_ARM64)
+  #elif defined(CONFIG_ARM) || defined(__aarch64__)
 
     #define PERFOPT_ALIGN .balign  4
 

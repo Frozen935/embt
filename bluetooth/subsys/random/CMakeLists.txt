@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 if(CONFIG_PSA_CSPRNG_GENERATOR)
-  zephyr_library()
-  zephyr_library_sources(random_psa.c)
+  embt_library(embt_random)
+  embt_library_link_libraries(EmBT::psa)
+  embt_library_sources(random_psa.c)
 endif()

@@ -93,7 +93,7 @@ endif
 config BT_CONN_TX_NOTIFY_WQ
 	bool "Use a separate workqueue for connection TX notify processing [EXPERIMENTAL]"
 	depends on BT_CONN_TX
-	select EXPERIMENTAL
+	select EMBT_EXPERIMENTAL
 	help
 	  Use a separate workqueue instead of system workqueue for
 	  bt_conn_tx_notify processing. The option can be used to make Bluetooth
@@ -162,7 +162,6 @@ config BT_HOST_CRYPTO
 	select PSA_CRYPTO
 	select PSA_WANT_KEY_TYPE_AES
 	select PSA_WANT_ALG_ECB_NO_PADDING
-	imply MBEDTLS_AES_ROM_TABLES if PSA_CRYPTO_PROVIDER_MBEDTLS
 	help
 	  The option adds the AES encryption support using PSA Crypto API
 	  library in the Bluetooth Host.
@@ -333,8 +332,8 @@ config BT_CONN_ACCEPT_TIMEOUT
 
 config BT_CONN_TX_USER_DATA_SIZE
 	int
-	default 32 if 64BIT && BT_CLASSIC
-	default 16 if 64BIT || BT_CLASSIC
+	default 32 if EMBT_64BIT && BT_CLASSIC
+	default 16 if EMBT_64BIT || BT_CLASSIC
 	default 8
 	help
 	  Necessary user_data size for stack usage. Mostly used for passing
@@ -473,7 +472,7 @@ if BT_SMP
 
 config BT_SECURITY_ERR_TO_STR
 	bool "Print security error codes as strings [EXPERIMENTAL]"
-	select EXPERIMENTAL
+	select EMBT_EXPERIMENTAL
 	help
 	  This configuration enables printing of security error
 	  codes represented as strings.
@@ -481,7 +480,7 @@ config BT_SECURITY_ERR_TO_STR
 
 config BT_SMP_ERR_TO_STR
 	bool "Print SMP error codes as strings [EXPERIMENTAL]"
-	select EXPERIMENTAL
+	select EMBT_EXPERIMENTAL
 	help
 	  This configuration enables printing of SMP error
 	  codes represented as strings.
@@ -489,7 +488,7 @@ config BT_SMP_ERR_TO_STR
 
 config BT_PASSKEY_KEYPRESS
 	bool "Passkey Keypress Notification support [EXPERIMENTAL]"
-	select EXPERIMENTAL
+	select EMBT_EXPERIMENTAL
 	help
 	  Enable support for receiving and sending Keypress Notifications during
 	  Passkey Entry during pairing.
@@ -1015,7 +1014,7 @@ config BT_ID_MAX
 
 config BT_DF
 	bool "Direction Finding support [EXPERIMENTAL]"
-	select EXPERIMENTAL
+	select EMBT_EXPERIMENTAL
 	help
 	  Enable support for Bluetooth 5.1 Direction Finding.
 	  It will allow to: get information about antennae, configure
@@ -1107,7 +1106,6 @@ config BT_ECC
 	select PSA_WANT_KEY_TYPE_ECC_KEY_PAIR_IMPORT
 	select PSA_WANT_KEY_TYPE_ECC_KEY_PAIR_EXPORT
 	select PSA_WANT_ECC_SECP_R1_256
-	imply MBEDTLS_PSA_P256M_DRIVER_ENABLED if PSA_CRYPTO_PROVIDER_MBEDTLS
 	help
 	  If this option is set, internal APIs will be available to perform ECDH operations through
 	  the long work queue (or system work queue). The operations are used e.g. by LE Secure
@@ -1120,11 +1118,10 @@ config BT_HOST_CCM
 	select PSA_CRYPTO
 	select PSA_WANT_KEY_TYPE_AES
 	select PSA_WANT_ALG_CCM
-	imply MBEDTLS_AES_ROM_TABLES if PSA_CRYPTO_PROVIDER_MBEDTLS
 	help
 	  Enables AES-CCM in the Bluetooth host using the PSA Crypto AEAD API.
 	  PSA Crypto must be initialized before the first call; with Mbed TLS
-	  as the provider, MBEDTLS_INIT does that at boot.
+	  as the provider, bt_crypto_init() initializes it explicitly.
 
 config BT_PER_ADV_SYNC_BUF_SIZE
 	int "Maximum periodic advertising report size"
