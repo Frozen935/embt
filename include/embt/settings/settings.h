@@ -9,9 +9,8 @@
 #define ZEPHYR_INCLUDE_SETTINGS_SETTINGS_H_
 
 #include <sys/types.h>
-#include <zephyr/sys/util.h>
-#include <zephyr/sys/slist.h>
-#include <zephyr/sys/iterable_sections.h>
+#include <embt/base/util.h>
+#include <embt/base/slist.h>
 #include <stdint.h>
 
 #ifdef __cplusplus
@@ -141,7 +140,8 @@ struct settings_handler {
 /**
  * @struct settings_handler_static
  * Config handlers without the node element, used for static handlers.
- * These are registered using a call to SETTINGS_STATIC_HANDLER_DEFINE().
+ * Define storage using SETTINGS_STATIC_HANDLER_DEFINE(), then register it with
+ * settings_register_static().
  */
 struct settings_handler_static {
 	/** Name of subtree. */
@@ -215,13 +215,14 @@ struct settings_handler_static {
  * @param _export export routine (can be NULL)
  * @param _cprio commit priority (lower value is higher priority)
  *
- * This creates a variable @c _hname prepended by @c settings_handler_.
+ * This creates a descriptor named settings_handler_ ## _hname.
+ * Call settings_register_static() with it after subsystem initialization.
  *
  */
 
 #define SETTINGS_STATIC_HANDLER_DEFINE_WITH_CPRIO(_hname, _tree, _get, _set, _commit, _export,     \
 						  _cprio)                                          \
-	const STRUCT_SECTION_ITERABLE(settings_handler_static, settings_handler_##_hname) = {      \
+	const struct settings_handler_static settings_handler_##_hname = {      \
 		.name = _tree,                                                                     \
 		.cprio = _cprio,                                                                   \
 		.h_get = _get,                                                                     \
@@ -279,6 +280,16 @@ int settings_register_with_cprio(struct settings_handler *cf, int cprio);
  * @return 0 on success, non-zero on failure.
  */
 int settings_register(struct settings_handler *cf);
+
+/**
+ * @brief Register a static process-lifetime settings descriptor explicitly.
+ * @param[in] handler Descriptor produced by SETTINGS_STATIC_HANDLER_DEFINE.
+ * @return Zero (also for the same descriptor registered again), -EEXIST for a
+ *   different descriptor with the same name, -ENOMEM or another negative errno.
+ * @pre Call after settings_subsys_init(); descriptor storage outlives all settings calls.
+ */
+int settings_register_static(const struct settings_handler_static *handler);
+
 
 /**
  * Load serialized items from registered persistence sources. Handlers for

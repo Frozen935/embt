@@ -5,10 +5,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <errno.h>
 #include <ctype.h>
 #include <string.h>
 
-#include <zephyr/settings/settings.h>
+#include <embt/settings/settings.h>
 #include "settings_priv.h"
 
 struct settings_io_cb_s {
@@ -16,10 +17,12 @@ struct settings_io_cb_s {
 	int (*write_cb)(void *ctx, off_t off, char const *buf, size_t len);
 	size_t (*get_len_cb)(void *ctx);
 	uint8_t rwbs;
-} static settings_io_cb;
+};
 
-int settings_line_write(const char *name, const char *value, size_t val_len,
-			off_t w_loc, void *cb_arg)
+static struct settings_io_cb_s settings_io_cb;
+
+int settings_line_write(const char *name, const char *value, size_t val_len, off_t w_loc,
+			void *cb_arg)
 {
 	size_t w_size, rem, add;
 
@@ -236,8 +239,8 @@ int settings_line_raw_read(off_t seek, char *out, size_t len_req,
 }
 
 /* off from value begin */
-int settings_line_val_read(off_t val_off, off_t off, char *out, size_t len_req,
-			   size_t *len_read, void *cb_arg)
+int settings_line_val_read(off_t val_off, off_t off, char *out, size_t len_req, size_t *len_read,
+			   void *cb_arg)
 {
 	return settings_line_raw_read(val_off + off, out, len_req, len_read,
 				      cb_arg);
@@ -343,8 +346,8 @@ static int settings_line_cmp(char const *val, size_t val_len,
 
 	for (rem = val_len; rem > 0; rem -= len_read) {
 		len_read = exp_len = MIN(sizeof(buf), rem);
-		rc = settings_line_val_read(val_off, off, buf, len_read,
-					    &len_read, val_read_cb_ctx);
+		rc = settings_line_val_read(val_off, off, buf, len_read, &len_read,
+					    val_read_cb_ctx);
 		if (rc) {
 			break;
 		}

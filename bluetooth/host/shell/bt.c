@@ -12,8 +12,8 @@
  */
 
 #include <stdio.h>
-#include <base/work.h>
-#include <embt/types/timeout.h>
+#include <embt/base/work.h>
+#include <embt/base/time.h>
 #include <shell/bt_shell.h>
 #include <getopt.h>
 #include <errno.h>
@@ -43,14 +43,12 @@
 #include <embt/bluetooth/uuid.h>
 #include <embt/net_buf.h>
 #include <embt/settings/settings.h>
-#include <base/assert.h>
-#include <base/atomic.h>
-#include <embt/sys/byteorder.h>
-#include <embt/sys/util.h>
-#include <embt/sys/util_macro.h>
+#include <embt/base/assert.h>
+#include <embt/base/atomic.h>
+#include <embt/base/byteorder.h>
+#include <embt/base/util.h>
+#include <embt/base/util_macro.h>
 #include <embt/compiler.h>
-#include <embt/types.h>
-
 #if defined(CONFIG_BT_AUDIO)
 #include "audio/shell/audio.h"
 #endif
@@ -1289,11 +1287,21 @@ static void bt_ready(int err)
 		return;
 	}
 
-	bt_shell_print("Bluetooth initialized");
-
 	if (IS_ENABLED(CONFIG_SETTINGS) && !no_settings_load) {
-		settings_load();
+		err = settings_load();
+		if (err) {
+			bt_shell_error("Settings load failed (err %d)", err);
+			if (IS_ENABLED(CONFIG_BT_SETTINGS)) {
+				bt_finalize_init(err);
+			}
+			return;
+		}
 		bt_shell_print("Settings Loaded");
+	}
+	if (IS_ENABLED(CONFIG_BT_SETTINGS) && !bt_is_ready()) {
+		bt_shell_print("Bluetooth initialization awaits settings-load");
+	} else {
+		bt_shell_print("Bluetooth initialized");
 	}
 
 	if (IS_ENABLED(CONFIG_BT_SMP_OOB_LEGACY_PAIR_ONLY)) {

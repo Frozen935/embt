@@ -4,22 +4,24 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <stdio.h>
+#include <embt/base/work.h>
+#include <embt/base/assert.h>
 #include <errno.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
 
-#include <zephyr/autoconf.h>
-#include <zephyr/bluetooth/addr.h>
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/hci.h>
-#include <zephyr/settings/settings.h>
-#include <zephyr/sys/atomic.h>
-#include <zephyr/sys/printk.h>
-#include <zephyr/sys/util.h>
-#include <zephyr/sys/util_macro.h>
-#include <zephyr/toolchain.h>
+#include <embt/autoconf.h>
+#include <embt/bluetooth/addr.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/hci.h>
+#include <embt/settings/settings.h>
+#include <embt/base/atomic.h>
+#include <embt/base/util.h>
+#include <embt/base/util_macro.h>
+#include <embt/compiler.h>
 
 #include "common/bt_settings_commit.h"
 #include "common/bt_str.h"
@@ -31,18 +33,18 @@
 
 LOG_MODULE_REGISTER(bt_settings, CONFIG_BT_SETTINGS_LOG_LEVEL);
 
-#if defined(CONFIG_BT_SETTINGS_USE_PRINTK)
+#if defined(CONFIG_BT_SETTINGS_USE_SNPRINTF)
 int bt_settings_encode_key(char *path, size_t path_size, const char *subsys,
 			    const bt_addr_le_t *addr, const char *key)
 {
 	int err;
 
 	if (key) {
-		err = snprintk(path, path_size, "bt/%s/%02x%02x%02x%02x%02x%02x%u/%s", subsys,
+		err = snprintf(path, path_size, "bt/%s/%02x%02x%02x%02x%02x%02x%u/%s", subsys,
 			       addr->a.val[5], addr->a.val[4], addr->a.val[3], addr->a.val[2],
 			       addr->a.val[1], addr->a.val[0], addr->type, key);
 	} else {
-		err = snprintk(path, path_size, "bt/%s/%02x%02x%02x%02x%02x%02x%u", subsys,
+		err = snprintf(path, path_size, "bt/%s/%02x%02x%02x%02x%02x%02x%u", subsys,
 			       addr->a.val[5], addr->a.val[4], addr->a.val[3], addr->a.val[2],
 			       addr->a.val[1], addr->a.val[0], addr->type);
 	}
@@ -61,7 +63,7 @@ static int bt_settings_encode_key_no_addr(char *path, size_t path_size, const ch
 {
 	int err;
 
-	err = snprintk(path, path_size, "bt/%s", key);
+	err = snprintf(path, path_size, "bt/%s", key);
 	if ((err < 0) || (err >= path_size)) {
 		/* Error or output was truncated */
 		return -EINVAL;
@@ -70,7 +72,7 @@ static int bt_settings_encode_key_no_addr(char *path, size_t path_size, const ch
 	return 0;
 }
 
-#else /* !CONFIG_BT_SETTINGS_USE_PRINTK */
+#else /* !CONFIG_BT_SETTINGS_USE_SNPRINTF */
 int bt_settings_encode_key(char *path, size_t path_size, const char *subsys,
 			   const bt_addr_le_t *addr, const char *key)
 {
@@ -164,7 +166,7 @@ static int bt_settings_encode_key_no_addr(char *path, size_t path_size, const ch
 
 	return 0;
 }
-#endif /* !CONFIG_BT_SETTINGS_USE_PRINTK */
+#endif /* !CONFIG_BT_SETTINGS_USE_SNPRINTF */
 
 int bt_settings_decode_key(const char *key, bt_addr_le_t *addr)
 {
@@ -195,7 +197,7 @@ static int set_setting(const char *name, size_t len_rd, settings_read_cb read_cb
 	ssize_t len;
 	const char *next;
 
-	if (!atomic_test_bit(bt_dev.flags, BT_DEV_OPEN)) {
+	if (!bt_atomic_test_bit(bt_dev.flags, BT_DEV_OPEN)) {
 		/* The Bluetooth settings loader needs to communicate with the Bluetooth
 		 * controller to setup identities. This will not work before
 		 * bt_enable(). The doc on @ref bt_enable requires the "bt/" settings
@@ -214,7 +216,7 @@ static int set_setting(const char *name, size_t len_rd, settings_read_cb read_cb
 
 	if ((len == 2) && (memcmp(name, "id", len) == 0)) {
 		/* Any previously provided identities supersede flash */
-		if (atomic_test_bit(bt_dev.flags, BT_DEV_PRESET_ID)) {
+		if (bt_atomic_test_bit(bt_dev.flags, BT_DEV_PRESET_ID)) {
 			LOG_WRN("Ignoring identities stored in flash");
 			return 0;
 		}
@@ -307,7 +309,7 @@ static int commit_settings(void)
 
 	LOG_DBG("");
 
-	if (!atomic_test_bit(bt_dev.flags, BT_DEV_OPEN)) {
+	if (!bt_atomic_test_bit(bt_dev.flags, BT_DEV_OPEN)) {
 		/* The Bluetooth settings loader needs to communicate with the Bluetooth
 		 * controller to setup identities. This will not work before
 		 * bt_enable(). The doc on @ref bt_enable requires the "bt/" settings
@@ -359,7 +361,7 @@ static int commit_settings(void)
 	/* If any part of the Identity Information of the device has been
 	 * generated this Identity needs to be saved persistently.
 	 */
-	if (atomic_test_and_clear_bit(bt_dev.flags, BT_DEV_STORE_ID)) {
+	if (bt_atomic_test_and_clear_bit(bt_dev.flags, BT_DEV_STORE_ID)) {
 		LOG_DBG("Storing Identity Information");
 		bt_settings_store_id();
 		bt_settings_store_irk();
@@ -376,16 +378,203 @@ finalize:
 SETTINGS_STATIC_HANDLER_DEFINE_WITH_CPRIO(bt, "bt", NULL, set_setting, commit_settings, NULL,
 					  BT_SETTINGS_CPRIO_0);
 
+#if defined(CONFIG_BT_CONN)
+extern const struct settings_handler_static settings_handler_bt_ccc;
+#if defined(CONFIG_BT_SMP)
+extern const struct settings_handler_static settings_handler_bt_keys;
+#endif
+#if defined(CONFIG_BT_GATT_SERVICE_CHANGED)
+extern const struct settings_handler_static settings_handler_bt_sc;
+#endif
+#if defined(CONFIG_BT_GATT_CACHING)
+extern const struct settings_handler_static settings_handler_bt_cf;
+extern const struct settings_handler_static settings_handler_bt_hash;
+#endif
+#endif
+#if defined(CONFIG_BT_CLASSIC)
+extern const struct settings_handler_static settings_handler_bt_link_key;
+#endif
+
+#if defined(CONFIG_BT_CSIP_SET_MEMBER) && ((defined(CONFIG_BT_SETTINGS)))
+extern const struct settings_handler_static settings_handler_bt_csip_set_member;
+#endif
+#if defined(CONFIG_BT_BAP_SCAN_DELEGATOR) && ((defined(CONFIG_BT_SETTINGS)))
+extern const struct settings_handler_static settings_handler_bt_bap_scan_delegator;
+#endif
+#if defined(CONFIG_BT_DIS) && ((defined(CONFIG_BT_DIS_SETTINGS)))
+extern const struct settings_handler_static settings_handler_bt_dis;
+#endif
+#if defined(CONFIG_BT_MESH)
+extern const struct settings_handler_static settings_handler_bt_mesh_pub;
+#endif
+#if defined(CONFIG_BT_MESH_PENDING_STORE) && ((defined(CONFIG_BT_SETTINGS)))
+extern const struct settings_handler_static settings_handler_bt_mesh;
+#endif
+#if defined(CONFIG_BT_MESH_RPL_STORAGE_MODE_SETTINGS)
+extern const struct settings_handler_static settings_handler_bt_mesh_rpl;
+#endif
+#if defined(CONFIG_BT_MESH)
+extern const struct settings_handler_static settings_handler_bt_mesh_net;
+#endif
+#if defined(CONFIG_BT_MESH)
+extern const struct settings_handler_static settings_handler_bt_mesh_iv;
+#endif
+#if defined(CONFIG_BT_MESH)
+extern const struct settings_handler_static settings_handler_bt_mesh_seq;
+#endif
+#if defined(CONFIG_BT_MESH) && ((defined(CONFIG_BT_MESH_RPR_SRV)))
+extern const struct settings_handler_static settings_handler_bt_mesh_dev_key;
+#endif
+#if defined(CONFIG_BT_MESH_BRG_CFG_SRV)
+extern const struct settings_handler_static settings_handler_bt_mesh_brg_en;
+#endif
+#if defined(CONFIG_BT_MESH_BRG_CFG_SRV)
+extern const struct settings_handler_static settings_handler_bt_mesh_brg_tbl;
+#endif
+#if defined(CONFIG_BT_MESH_CDB)
+extern const struct settings_handler_static settings_handler_bt_mesh_cdb;
+#endif
+#if defined(CONFIG_BT_MESH)
+extern const struct settings_handler_static settings_handler_bt_mesh_sig_mod;
+#endif
+#if defined(CONFIG_BT_MESH)
+extern const struct settings_handler_static settings_handler_bt_mesh_vnd_mod;
+#endif
+#if defined(CONFIG_BT_MESH)
+extern const struct settings_handler_static settings_handler_bt_mesh_comp;
+#endif
+#if defined(CONFIG_BT_MESH) && ((defined(CONFIG_BT_MESH_LARGE_COMP_DATA_SRV)))
+extern const struct settings_handler_static settings_handler_bt_mesh_metadata;
+#endif
+#if defined(CONFIG_BT_MESH)
+extern const struct settings_handler_static settings_handler_bt_mesh_app;
+#endif
+#if defined(CONFIG_BT_MESH_DFU_SLOTS)
+extern const struct settings_handler_static settings_handler_bt_mesh_dfu_slots;
+#endif
+#if defined(CONFIG_BT_MESH_SOLICITATION) && ((CONFIG_BT_MESH_PROXY_SOLICITATION))
+extern const struct settings_handler_static settings_handler_bt_mesh_sseq;
+#endif
+#if defined(CONFIG_BT_MESH_SOLICITATION) && ((CONFIG_BT_MESH_OD_PRIV_PROXY_SRV))
+extern const struct settings_handler_static settings_handler_bt_mesh_srpl;
+#endif
+#if defined(CONFIG_BT_MESH)
+extern const struct settings_handler_static settings_handler_bt_mesh_cfg;
+#endif
+#if defined(CONFIG_BT_MESH)
+extern const struct settings_handler_static settings_handler_bt_mesh_subnet;
+#endif
+#if defined(CONFIG_BT_MESH) && ((CONFIG_BT_MESH_LABEL_COUNT > 0))
+extern const struct settings_handler_static settings_handler_bt_mesh_va;
+#endif
+
 int bt_settings_init(void)
 {
-	int err;
+	static const struct settings_handler_static *const handlers[] = {
+		&settings_handler_bt,
+#if defined(CONFIG_BT_CONN)
+		&settings_handler_bt_ccc,
+#if defined(CONFIG_BT_SMP)
+		&settings_handler_bt_keys,
+#endif
+#if defined(CONFIG_BT_GATT_SERVICE_CHANGED)
+		&settings_handler_bt_sc,
+#endif
+#if defined(CONFIG_BT_GATT_CACHING)
+		&settings_handler_bt_cf,
+		&settings_handler_bt_hash,
+#endif
+#endif
+#if defined(CONFIG_BT_CLASSIC)
+		&settings_handler_bt_link_key,
+#endif
+#if defined(CONFIG_BT_CSIP_SET_MEMBER) && ((defined(CONFIG_BT_SETTINGS)))
+		&settings_handler_bt_csip_set_member,
+#endif
+#if defined(CONFIG_BT_BAP_SCAN_DELEGATOR) && ((defined(CONFIG_BT_SETTINGS)))
+		&settings_handler_bt_bap_scan_delegator,
+#endif
+#if defined(CONFIG_BT_DIS) && ((defined(CONFIG_BT_DIS_SETTINGS)))
+		&settings_handler_bt_dis,
+#endif
+#if defined(CONFIG_BT_MESH)
+		&settings_handler_bt_mesh_pub,
+#endif
+#if defined(CONFIG_BT_MESH_PENDING_STORE) && ((defined(CONFIG_BT_SETTINGS)))
+		&settings_handler_bt_mesh,
+#endif
+#if defined(CONFIG_BT_MESH_RPL_STORAGE_MODE_SETTINGS)
+		&settings_handler_bt_mesh_rpl,
+#endif
+#if defined(CONFIG_BT_MESH)
+		&settings_handler_bt_mesh_net,
+#endif
+#if defined(CONFIG_BT_MESH)
+		&settings_handler_bt_mesh_iv,
+#endif
+#if defined(CONFIG_BT_MESH)
+		&settings_handler_bt_mesh_seq,
+#endif
+#if defined(CONFIG_BT_MESH) && ((defined(CONFIG_BT_MESH_RPR_SRV)))
+		&settings_handler_bt_mesh_dev_key,
+#endif
+#if defined(CONFIG_BT_MESH_BRG_CFG_SRV)
+		&settings_handler_bt_mesh_brg_en,
+#endif
+#if defined(CONFIG_BT_MESH_BRG_CFG_SRV)
+		&settings_handler_bt_mesh_brg_tbl,
+#endif
+#if defined(CONFIG_BT_MESH_CDB)
+		&settings_handler_bt_mesh_cdb,
+#endif
+#if defined(CONFIG_BT_MESH)
+		&settings_handler_bt_mesh_sig_mod,
+#endif
+#if defined(CONFIG_BT_MESH)
+		&settings_handler_bt_mesh_vnd_mod,
+#endif
+#if defined(CONFIG_BT_MESH)
+		&settings_handler_bt_mesh_comp,
+#endif
+#if defined(CONFIG_BT_MESH) && ((defined(CONFIG_BT_MESH_LARGE_COMP_DATA_SRV)))
+		&settings_handler_bt_mesh_metadata,
+#endif
+#if defined(CONFIG_BT_MESH)
+		&settings_handler_bt_mesh_app,
+#endif
+#if defined(CONFIG_BT_MESH_DFU_SLOTS)
+		&settings_handler_bt_mesh_dfu_slots,
+#endif
+#if defined(CONFIG_BT_MESH_SOLICITATION) && ((CONFIG_BT_MESH_PROXY_SOLICITATION))
+		&settings_handler_bt_mesh_sseq,
+#endif
+#if defined(CONFIG_BT_MESH_SOLICITATION) && ((CONFIG_BT_MESH_OD_PRIV_PROXY_SRV))
+		&settings_handler_bt_mesh_srpl,
+#endif
+#if defined(CONFIG_BT_MESH)
+		&settings_handler_bt_mesh_cfg,
+#endif
+#if defined(CONFIG_BT_MESH)
+		&settings_handler_bt_mesh_subnet,
+#endif
+#if defined(CONFIG_BT_MESH) && ((CONFIG_BT_MESH_LABEL_COUNT > 0))
+		&settings_handler_bt_mesh_va,
+#endif
+
+	};
+	int err = settings_subsys_init();
 
 	LOG_DBG("");
 
-	err = settings_subsys_init();
 	if (err) {
 		LOG_ERR("settings_subsys_init failed (err %d)", err);
 		return err;
+	}
+	for (size_t i = 0; i < ARRAY_SIZE(handlers); i++) {
+		err = settings_register_static(handlers[i]);
+		if (err) {
+			return err;
+		}
 	}
 
 	return 0;
@@ -522,7 +711,7 @@ int bt_settings_delete_appearance(void)
 	return bt_settings_delete("appearance", 0, NULL);
 }
 
-static void do_store_id(struct k_work *work)
+static void do_store_id(struct bt_work *work)
 {
 	int err = bt_settings_store("id", 0, NULL, &bt_dev.id_addr, ID_DATA_LEN(bt_dev.id_addr));
 
@@ -531,11 +720,11 @@ static void do_store_id(struct k_work *work)
 	}
 }
 
-K_WORK_DEFINE(store_id_work, do_store_id);
+BT_WORK_DEFINE(store_id_work, do_store_id);
 
 int bt_settings_store_id(void)
 {
-	bt_work_submit(&store_id_work);
+	bt_host_work_submit(&store_id_work);
 
 	return 0;
 }
@@ -545,7 +734,7 @@ int bt_settings_delete_id(void)
 	return bt_settings_delete("id", 0, NULL);
 }
 
-static void do_store_irk(struct k_work *work)
+static void do_store_irk(struct bt_work *work)
 {
 #if defined(CONFIG_BT_PRIVACY)
 	int err = bt_settings_store("irk", 0, NULL, bt_dev.irk, ID_DATA_LEN(bt_dev.irk));
@@ -556,12 +745,12 @@ static void do_store_irk(struct k_work *work)
 #endif
 }
 
-K_WORK_DEFINE(store_irk_work, do_store_irk);
+BT_WORK_DEFINE(store_irk_work, do_store_irk);
 
 int bt_settings_store_irk(void)
 {
 #if defined(CONFIG_BT_PRIVACY)
-	bt_work_submit(&store_irk_work);
+	bt_host_work_submit(&store_irk_work);
 #endif /* defined(CONFIG_BT_PRIVACY) */
 	return 0;
 }
@@ -573,7 +762,7 @@ int bt_settings_delete_irk(void)
 
 void bt_settings_flush(void)
 {
-	struct k_work_sync sync;
+	struct bt_work_sync sync;
 
 	/* The store handlers read the identity state that bt_disable() is
 	 * about to reset. Running after the reset they would persist empty or
@@ -581,8 +770,8 @@ void bt_settings_flush(void)
 	 * identity update. Complete any pending stores now, while the state
 	 * is still valid.
 	 */
-	(void)k_work_flush(&store_id_work, &sync);
-	(void)k_work_flush(&store_irk_work, &sync);
+	(void)bt_work_flush(&store_id_work, &sync);
+	(void)bt_work_flush(&store_irk_work, &sync);
 }
 
 int bt_settings_store_link_key(const bt_addr_le_t *addr, const void *value, size_t val_len)
