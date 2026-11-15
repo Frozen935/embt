@@ -1,0 +1,838 @@
+{
+  "baseline": "f8da8ea370508f274685a25ff19dbe5a9ff54790",
+  "directories": [
+    {
+      "source": "tests/bluetooth/addr",
+      "decision": "cmocka",
+      "reason": "Imported C suite; execution status is recorded separately.",
+      "upstream_ztest_declarations": 61,
+      "upstream_scenarios": 2
+    },
+    {
+      "source": "tests/bluetooth/adv",
+      "decision": "hardware",
+      "reason": "Imported five-minute advertising regression executed on Linux hci0.",
+      "upstream_ztest_declarations": 1,
+      "upstream_scenarios": 1
+    },
+    {
+      "source": "tests/bluetooth/at",
+      "decision": "cmocka",
+      "reason": "Imported C suite; execution status is recorded separately.",
+      "upstream_ztest_declarations": 1,
+      "upstream_scenarios": 1
+    },
+    {
+      "source": "tests/bluetooth/audio/aics_client",
+      "decision": "cmocka",
+      "reason": "Imported C suite; execution status is recorded separately.",
+      "upstream_ztest_declarations": 11,
+      "upstream_scenarios": 1
+    },
+    {
+      "source": "tests/bluetooth/audio/ascs",
+      "decision": "cmocka",
+      "reason": "Imported C suite; execution status is recorded separately.",
+      "upstream_ztest_declarations": 148,
+      "upstream_scenarios": 5
+    },
+    {
+      "source": "tests/bluetooth/audio/bap_base",
+      "decision": "cmocka",
+      "reason": "Imported C suite; execution status is recorded separately.",
+      "upstream_ztest_declarations": 41,
+      "upstream_scenarios": 1
+    },
+    {
+      "source": "tests/bluetooth/audio/bap_broadcast_source",
+      "decision": "cmocka",
+      "reason": "Imported C suite; execution status is recorded separately.",
+      "upstream_ztest_declarations": 65,
+      "upstream_scenarios": 1
+    },
+    {
+      "source": "tests/bluetooth/audio/cap_commander",
+      "decision": "cmocka",
+      "reason": "Imported C suite; execution status is recorded separately.",
+      "upstream_ztest_declarations": 96,
+      "upstream_scenarios": 1
+    },
+    {
+      "source": "tests/bluetooth/audio/cap_handover",
+      "decision": "cmocka",
+      "reason": "Imported C suite; execution status is recorded separately.",
+      "upstream_ztest_declarations": 40,
+      "upstream_scenarios": 1
+    },
+    {
+      "source": "tests/bluetooth/audio/cap_initiator",
+      "decision": "cmocka",
+      "reason": "Imported C suite; execution status is recorded separately.",
+      "upstream_ztest_declarations": 60,
+      "upstream_scenarios": 1
+    },
+    {
+      "source": "tests/bluetooth/audio/ccid",
+      "decision": "cmocka",
+      "reason": "Imported C suite; execution status is recorded separately.",
+      "upstream_ztest_declarations": 4,
+      "upstream_scenarios": 1
+    },
+    {
+      "source": "tests/bluetooth/audio/ccp_call_control_client",
+      "decision": "cmocka",
+      "reason": "Imported C suite; execution status is recorded separately.",
+      "upstream_ztest_declarations": 26,
+      "upstream_scenarios": 1
+    },
+    {
+      "source": "tests/bluetooth/audio/ccp_call_control_server",
+      "decision": "cmocka",
+      "reason": "Imported C suite; execution status is recorded separately.",
+      "upstream_ztest_declarations": 47,
+      "upstream_scenarios": 1
+    },
+    {
+      "source": "tests/bluetooth/audio/codec",
+      "decision": "cmocka",
+      "reason": "Imported C suite; execution status is recorded separately.",
+      "upstream_ztest_declarations": 141,
+      "upstream_scenarios": 1
+    },
+    {
+      "source": "tests/bluetooth/audio/pacs",
+      "decision": "cmocka",
+      "reason": "Imported C suite; execution status is recorded separately.",
+      "upstream_ztest_declarations": 21,
+      "upstream_scenarios": 13
+    },
+    {
+      "source": "tests/bluetooth/audio/vocs_client",
+      "decision": "cmocka",
+      "reason": "Imported C suite; execution status is recorded separately.",
+      "upstream_ztest_declarations": 3,
+      "upstream_scenarios": 1
+    },
+    {
+      "source": "tests/bluetooth/bluetooth",
+      "decision": "cmocka",
+      "reason": "Imported C suite; execution status is recorded separately.",
+      "upstream_ztest_declarations": 1,
+      "upstream_scenarios": 1
+    },
+    {
+      "source": "tests/bluetooth/bt_crypto",
+      "decision": "cmocka",
+      "reason": "Imported C suite; execution status is recorded separately.",
+      "upstream_ztest_declarations": 8,
+      "upstream_scenarios": 2
+    },
+    {
+      "source": "tests/bluetooth/bt_crypto_ccm",
+      "decision": "cmocka",
+      "reason": "Imported C suite; execution status is recorded separately.",
+      "upstream_ztest_declarations": 2,
+      "upstream_scenarios": 1
+    },
+    {
+      "source": "tests/bluetooth/buf",
+      "decision": "cmocka",
+      "reason": "Imported C suite; execution status is recorded separately.",
+      "upstream_ztest_declarations": 1,
+      "upstream_scenarios": 3
+    },
+    {
+      "source": "tests/bluetooth/classic/a2dp_sink",
+      "decision": "classic_integration",
+      "reason": "Imported Classic application or paired C program; pytest/Bumble execution is recorded separately.",
+      "upstream_ztest_declarations": 0,
+      "upstream_scenarios": 2
+    },
+    {
+      "source": "tests/bluetooth/classic/a2dp_source",
+      "decision": "classic_integration",
+      "reason": "Imported Classic application or paired C program; pytest/Bumble execution is recorded separately.",
+      "upstream_ztest_declarations": 0,
+      "upstream_scenarios": 2
+    },
+    {
+      "source": "tests/bluetooth/classic/bumble/acl_conn",
+      "decision": "classic_integration",
+      "reason": "Imported Classic application or paired C program; pytest/Bumble execution is recorded separately.",
+      "upstream_ztest_declarations": 2,
+      "upstream_scenarios": 1
+    },
+    {
+      "source": "tests/bluetooth/classic/bumble/gap_discovery",
+      "decision": "classic_integration",
+      "reason": "Imported Classic application or paired C program; pytest/Bumble execution is recorded separately.",
+      "upstream_ztest_declarations": 4,
+      "upstream_scenarios": 2
+    },
+    {
+      "source": "tests/bluetooth/classic/gap_c",
+      "decision": "classic_integration",
+      "reason": "Imported Classic application or paired C program; pytest/Bumble execution is recorded separately.",
+      "upstream_ztest_declarations": 0,
+      "upstream_scenarios": 2
+    },
+    {
+      "source": "tests/bluetooth/classic/gap_s",
+      "decision": "classic_integration",
+      "reason": "Imported Classic application or paired C program; pytest/Bumble execution is recorded separately.",
+      "upstream_ztest_declarations": 0,
+      "upstream_scenarios": 2
+    },
+    {
+      "source": "tests/bluetooth/classic/l2cap_c",
+      "decision": "classic_integration",
+      "reason": "Imported Classic application or paired C program; pytest/Bumble execution is recorded separately.",
+      "upstream_ztest_declarations": 0,
+      "upstream_scenarios": 2
+    },
+    {
+      "source": "tests/bluetooth/classic/l2cap_s",
+      "decision": "classic_integration",
+      "reason": "Imported Classic application or paired C program; pytest/Bumble execution is recorded separately.",
+      "upstream_ztest_declarations": 0,
+      "upstream_scenarios": 2
+    },
+    {
+      "source": "tests/bluetooth/classic/rfcomm_c",
+      "decision": "classic_integration",
+      "reason": "Imported Classic application or paired C program; pytest/Bumble execution is recorded separately.",
+      "upstream_ztest_declarations": 0,
+      "upstream_scenarios": 2
+    },
+    {
+      "source": "tests/bluetooth/classic/rfcomm_s",
+      "decision": "classic_integration",
+      "reason": "Imported Classic application or paired C program; pytest/Bumble execution is recorded separately.",
+      "upstream_ztest_declarations": 0,
+      "upstream_scenarios": 2
+    },
+    {
+      "source": "tests/bluetooth/classic/sdp_c",
+      "decision": "classic_integration",
+      "reason": "Imported Classic application or paired C program; pytest/Bumble execution is recorded separately.",
+      "upstream_ztest_declarations": 0,
+      "upstream_scenarios": 2
+    },
+    {
+      "source": "tests/bluetooth/classic/sdp_s",
+      "decision": "classic_integration",
+      "reason": "Imported Classic application or paired C program; pytest/Bumble execution is recorded separately.",
+      "upstream_ztest_declarations": 0,
+      "upstream_scenarios": 2
+    },
+    {
+      "source": "tests/bluetooth/classic/smp_bonding",
+      "decision": "classic_integration",
+      "reason": "Imported Classic application or paired C program; pytest/Bumble execution is recorded separately.",
+      "upstream_ztest_declarations": 0,
+      "upstream_scenarios": 2
+    },
+    {
+      "source": "tests/bluetooth/classic/smp_general",
+      "decision": "classic_integration",
+      "reason": "Imported Classic application or paired C program; pytest/Bumble execution is recorded separately.",
+      "upstream_ztest_declarations": 0,
+      "upstream_scenarios": 4
+    },
+    {
+      "source": "tests/bluetooth/classic/smp_io_cap",
+      "decision": "classic_integration",
+      "reason": "Imported Classic application or paired C program; pytest/Bumble execution is recorded separately.",
+      "upstream_ztest_declarations": 0,
+      "upstream_scenarios": 2
+    },
+    {
+      "source": "tests/bluetooth/classic/smp_key_persist",
+      "decision": "classic_integration",
+      "reason": "Imported Classic application or paired C program; pytest/Bumble execution is recorded separately.",
+      "upstream_ztest_declarations": 0,
+      "upstream_scenarios": 2
+    },
+    {
+      "source": "tests/bluetooth/classic/smp_sc_only",
+      "decision": "classic_integration",
+      "reason": "Imported Classic application or paired C program; pytest/Bumble execution is recorded separately.",
+      "upstream_ztest_declarations": 0,
+      "upstream_scenarios": 2
+    },
+    {
+      "source": "tests/bluetooth/controller/ctrl_api",
+      "decision": "excluded",
+      "reason": "Zephyr Controller implementation and its tests are outside the retained Host scope.",
+      "upstream_ztest_declarations": 13,
+      "upstream_scenarios": 1
+    },
+    {
+      "source": "tests/bluetooth/controller/ctrl_chmu",
+      "decision": "excluded",
+      "reason": "Zephyr Controller implementation and its tests are outside the retained Host scope.",
+      "upstream_ztest_declarations": 5,
+      "upstream_scenarios": 1
+    },
+    {
+      "source": "tests/bluetooth/controller/ctrl_cis_create",
+      "decision": "excluded",
+      "reason": "Zephyr Controller implementation and its tests are outside the retained Host scope.",
+      "upstream_ztest_declarations": 10,
+      "upstream_scenarios": 1
+    },
+    {
+      "source": "tests/bluetooth/controller/ctrl_cis_terminate",
+      "decision": "excluded",
+      "reason": "Zephyr Controller implementation and its tests are outside the retained Host scope.",
+      "upstream_ztest_declarations": 4,
+      "upstream_scenarios": 1
+    },
+    {
+      "source": "tests/bluetooth/controller/ctrl_collision",
+      "decision": "excluded",
+      "reason": "Zephyr Controller implementation and its tests are outside the retained Host scope.",
+      "upstream_ztest_declarations": 4,
+      "upstream_scenarios": 1
+    },
+    {
+      "source": "tests/bluetooth/controller/ctrl_conn_update",
+      "decision": "excluded",
+      "reason": "Zephyr Controller implementation and its tests are outside the retained Host scope.",
+      "upstream_ztest_declarations": 40,
+      "upstream_scenarios": 3
+    },
+    {
+      "source": "tests/bluetooth/controller/ctrl_cte_req",
+      "decision": "excluded",
+      "reason": "Zephyr Controller implementation and its tests are outside the retained Host scope.",
+      "upstream_ztest_declarations": 22,
+      "upstream_scenarios": 1
+    },
+    {
+      "source": "tests/bluetooth/controller/ctrl_data_length_update",
+      "decision": "excluded",
+      "reason": "Zephyr Controller implementation and its tests are outside the retained Host scope.",
+      "upstream_ztest_declarations": 11,
+      "upstream_scenarios": 3
+    },
+    {
+      "source": "tests/bluetooth/controller/ctrl_encrypt",
+      "decision": "excluded",
+      "reason": "Zephyr Controller implementation and its tests are outside the retained Host scope.",
+      "upstream_ztest_declarations": 18,
+      "upstream_scenarios": 1
+    },
+    {
+      "source": "tests/bluetooth/controller/ctrl_feature_exchange",
+      "decision": "excluded",
+      "reason": "Zephyr Controller implementation and its tests are outside the retained Host scope.",
+      "upstream_ztest_declarations": 9,
+      "upstream_scenarios": 1
+    },
+    {
+      "source": "tests/bluetooth/controller/ctrl_hci",
+      "decision": "excluded",
+      "reason": "Zephyr Controller implementation and its tests are outside the retained Host scope.",
+      "upstream_ztest_declarations": 12,
+      "upstream_scenarios": 1
+    },
+    {
+      "source": "tests/bluetooth/controller/ctrl_invalid",
+      "decision": "excluded",
+      "reason": "Zephyr Controller implementation and its tests are outside the retained Host scope.",
+      "upstream_ztest_declarations": 1,
+      "upstream_scenarios": 1
+    },
+    {
+      "source": "tests/bluetooth/controller/ctrl_isoal",
+      "decision": "excluded",
+      "reason": "Zephyr Controller implementation and its tests are outside the retained Host scope.",
+      "upstream_ztest_declarations": 90,
+      "upstream_scenarios": 1
+    },
+    {
+      "source": "tests/bluetooth/controller/ctrl_le_ping",
+      "decision": "excluded",
+      "reason": "Zephyr Controller implementation and its tests are outside the retained Host scope.",
+      "upstream_ztest_declarations": 5,
+      "upstream_scenarios": 1
+    },
+    {
+      "source": "tests/bluetooth/controller/ctrl_min_used_chans",
+      "decision": "excluded",
+      "reason": "Zephyr Controller implementation and its tests are outside the retained Host scope.",
+      "upstream_ztest_declarations": 3,
+      "upstream_scenarios": 1
+    },
+    {
+      "source": "tests/bluetooth/controller/ctrl_periodic_sync",
+      "decision": "excluded",
+      "reason": "Zephyr Controller implementation and its tests are outside the retained Host scope.",
+      "upstream_ztest_declarations": 6,
+      "upstream_scenarios": 1
+    },
+    {
+      "source": "tests/bluetooth/controller/ctrl_phy_update",
+      "decision": "excluded",
+      "reason": "Zephyr Controller implementation and its tests are outside the retained Host scope.",
+      "upstream_ztest_declarations": 18,
+      "upstream_scenarios": 2
+    },
+    {
+      "source": "tests/bluetooth/controller/ctrl_sca_update",
+      "decision": "excluded",
+      "reason": "Zephyr Controller implementation and its tests are outside the retained Host scope.",
+      "upstream_ztest_declarations": 6,
+      "upstream_scenarios": 1
+    },
+    {
+      "source": "tests/bluetooth/controller/ctrl_sw_privacy",
+      "decision": "excluded",
+      "reason": "Zephyr Controller implementation and its tests are outside the retained Host scope.",
+      "upstream_ztest_declarations": 1,
+      "upstream_scenarios": 1
+    },
+    {
+      "source": "tests/bluetooth/controller/ctrl_sw_privacy_unit",
+      "decision": "excluded",
+      "reason": "Zephyr Controller implementation and its tests are outside the retained Host scope.",
+      "upstream_ztest_declarations": 3,
+      "upstream_scenarios": 1
+    },
+    {
+      "source": "tests/bluetooth/controller/ctrl_terminate",
+      "decision": "excluded",
+      "reason": "Zephyr Controller implementation and its tests are outside the retained Host scope.",
+      "upstream_ztest_declarations": 4,
+      "upstream_scenarios": 1
+    },
+    {
+      "source": "tests/bluetooth/controller/ctrl_tx_buffer_alloc",
+      "decision": "excluded",
+      "reason": "Zephyr Controller implementation and its tests are outside the retained Host scope.",
+      "upstream_ztest_declarations": 1,
+      "upstream_scenarios": 6
+    },
+    {
+      "source": "tests/bluetooth/controller/ctrl_tx_queue",
+      "decision": "excluded",
+      "reason": "Zephyr Controller implementation and its tests are outside the retained Host scope.",
+      "upstream_ztest_declarations": 9,
+      "upstream_scenarios": 1
+    },
+    {
+      "source": "tests/bluetooth/controller/ctrl_unsupported",
+      "decision": "excluded",
+      "reason": "Zephyr Controller implementation and its tests are outside the retained Host scope.",
+      "upstream_ztest_declarations": 12,
+      "upstream_scenarios": 2
+    },
+    {
+      "source": "tests/bluetooth/controller/ctrl_user_ext",
+      "decision": "excluded",
+      "reason": "Zephyr Controller implementation and its tests are outside the retained Host scope.",
+      "upstream_ztest_declarations": 1,
+      "upstream_scenarios": 1
+    },
+    {
+      "source": "tests/bluetooth/controller/ctrl_version",
+      "decision": "excluded",
+      "reason": "Zephyr Controller implementation and its tests are outside the retained Host scope.",
+      "upstream_ztest_declarations": 6,
+      "upstream_scenarios": 1
+    },
+    {
+      "source": "tests/bluetooth/controller/ll_settings",
+      "decision": "excluded",
+      "reason": "Zephyr Controller implementation and its tests are outside the retained Host scope.",
+      "upstream_ztest_declarations": 2,
+      "upstream_scenarios": 1
+    },
+    {
+      "source": "tests/bluetooth/df/connection_cte_req",
+      "decision": "external_requirements",
+      "reason": "Original tests exercise Zephyr Controller LL/HCI implementation and internal state with radio_df_stub.c. Physical radio hardware is not inherently required, but the removed Controller implementation is the UUT.",
+      "upstream_ztest_declarations": 19,
+      "upstream_scenarios": 1
+    },
+    {
+      "source": "tests/bluetooth/df/connection_cte_tx_params",
+      "decision": "external_requirements",
+      "reason": "Original tests exercise Zephyr Controller LL/HCI implementation and internal state with radio_df_stub.c. Physical radio hardware is not inherently required, but the removed Controller implementation is the UUT.",
+      "upstream_ztest_declarations": 10,
+      "upstream_scenarios": 1
+    },
+    {
+      "source": "tests/bluetooth/df/connectionless_cte_chains",
+      "decision": "external_requirements",
+      "reason": "Original tests exercise Zephyr Controller LL/HCI implementation and internal state with radio_df_stub.c. Physical radio hardware is not inherently required, but the removed Controller implementation is the UUT.",
+      "upstream_ztest_declarations": 13,
+      "upstream_scenarios": 1
+    },
+    {
+      "source": "tests/bluetooth/df/connectionless_cte_rx",
+      "decision": "external_requirements",
+      "reason": "Original tests exercise Zephyr Controller LL/HCI implementation and internal state with radio_df_stub.c. Physical radio hardware is not inherently required, but the removed Controller implementation is the UUT.",
+      "upstream_ztest_declarations": 13,
+      "upstream_scenarios": 1
+    },
+    {
+      "source": "tests/bluetooth/df/connectionless_cte_tx",
+      "decision": "external_requirements",
+      "reason": "Original tests exercise Zephyr Controller LL/HCI implementation and internal state with radio_df_stub.c. Physical radio hardware is not inherently required, but the removed Controller implementation is the UUT.",
+      "upstream_ztest_declarations": 20,
+      "upstream_scenarios": 1
+    },
+    {
+      "source": "tests/bluetooth/gap",
+      "decision": "cmocka",
+      "reason": "Imported C suite; execution status is recorded separately.",
+      "upstream_ztest_declarations": 1,
+      "upstream_scenarios": 1
+    },
+    {
+      "source": "tests/bluetooth/gatt",
+      "decision": "cmocka",
+      "reason": "Imported C suite; execution status is recorded separately.",
+      "upstream_ztest_declarations": 12,
+      "upstream_scenarios": 4
+    },
+    {
+      "source": "tests/bluetooth/hci",
+      "decision": "cmocka",
+      "reason": "Retain the Host HCI error-string case. The ten driver extended-advertising report cases and their dedicated driver UUT were removed at the user request.",
+      "upstream_ztest_declarations": 11,
+      "upstream_scenarios": 1
+    },
+    {
+      "source": "tests/bluetooth/hci_codecs_info",
+      "decision": "external_requirements",
+      "reason": "Original tests exercise Zephyr Controller HCI codec/delay handlers through test-defined hci_vendor_* hooks. Physical hardware is not required; replacing those handlers with canned Host-side HCI responses changes the UUT.",
+      "upstream_ztest_declarations": 4,
+      "upstream_scenarios": 1
+    },
+    {
+      "source": "tests/bluetooth/hci_pkt",
+      "decision": "cmocka",
+      "reason": "Imported C suite; execution status is recorded separately.",
+      "upstream_ztest_declarations": 52,
+      "upstream_scenarios": 1
+    },
+    {
+      "source": "tests/bluetooth/hci_prop_evt",
+      "decision": "cmocka",
+      "reason": "Imported C suite; execution status is recorded separately.",
+      "upstream_ztest_declarations": 1,
+      "upstream_scenarios": 1
+    },
+    {
+      "source": "tests/bluetooth/hci_uart_async",
+      "decision": "removed_driver_tests",
+      "reason": "The retired Zephyr UART driver test was never imported and is removed from the migration worklist at the user request.",
+      "upstream_ztest_declarations": 1,
+      "upstream_scenarios": 1
+    },
+    {
+      "source": "tests/bluetooth/host/adv/pawr_rsp_reassembly",
+      "decision": "cmocka",
+      "reason": "Imported C suite; execution status is recorded separately.",
+      "upstream_ztest_declarations": 13,
+      "upstream_scenarios": 1
+    },
+    {
+      "source": "tests/bluetooth/host/crypto/bt_encrypt_be",
+      "decision": "cmocka",
+      "reason": "Imported C suite; execution status is recorded separately.",
+      "upstream_ztest_declarations": 6,
+      "upstream_scenarios": 1
+    },
+    {
+      "source": "tests/bluetooth/host/crypto/bt_encrypt_le",
+      "decision": "cmocka",
+      "reason": "Imported C suite; execution status is recorded separately.",
+      "upstream_ztest_declarations": 6,
+      "upstream_scenarios": 1
+    },
+    {
+      "source": "tests/bluetooth/host/crypto/bt_rand",
+      "decision": "cmocka",
+      "reason": "Imported C suite; execution status is recorded separately.",
+      "upstream_ztest_declarations": 6,
+      "upstream_scenarios": 2
+    },
+    {
+      "source": "tests/bluetooth/host/cs/bt_le_cs_parse_pct",
+      "decision": "cmocka",
+      "reason": "Imported C suite; execution status is recorded separately.",
+      "upstream_ztest_declarations": 0,
+      "upstream_scenarios": 1
+    },
+    {
+      "source": "tests/bluetooth/host/cs/bt_le_cs_set_valid_chmap_bits",
+      "decision": "cmocka",
+      "reason": "Imported C suite; execution status is recorded separately.",
+      "upstream_ztest_declarations": 1,
+      "upstream_scenarios": 1
+    },
+    {
+      "source": "tests/bluetooth/host/cs/bt_le_cs_step_data_parse",
+      "decision": "cmocka",
+      "reason": "Imported C suite; execution status is recorded separately.",
+      "upstream_ztest_declarations": 4,
+      "upstream_scenarios": 1
+    },
+    {
+      "source": "tests/bluetooth/host/data/bt_data_parse",
+      "decision": "cmocka",
+      "reason": "Imported C suite; execution status is recorded separately.",
+      "upstream_ztest_declarations": 5,
+      "upstream_scenarios": 1
+    },
+    {
+      "source": "tests/bluetooth/host/monitor_buffer",
+      "decision": "cmocka",
+      "reason": "Imported C suite; execution status is recorded separately.",
+      "upstream_ztest_declarations": 7,
+      "upstream_scenarios": 1
+    },
+    {
+      "source": "tests/bluetooth/host_adv_dir_timeout",
+      "decision": "cmocka",
+      "reason": "Imported C suite; execution status is recorded separately.",
+      "upstream_ztest_declarations": 5,
+      "upstream_scenarios": 3
+    },
+    {
+      "source": "tests/bluetooth/host_adv_sid",
+      "decision": "cmocka",
+      "reason": "Imported C suite; execution status is recorded separately.",
+      "upstream_ztest_declarations": 4,
+      "upstream_scenarios": 1
+    },
+    {
+      "source": "tests/bluetooth/host_br_acl_recv",
+      "decision": "cmocka",
+      "reason": "Imported C suite; execution status is recorded separately.",
+      "upstream_ztest_declarations": 5,
+      "upstream_scenarios": 2
+    },
+    {
+      "source": "tests/bluetooth/host_config_variants",
+      "decision": "harness_not_imported",
+      "reason": "Original Zephyr configuration or CLI harness; standalone build, OSI and shell regressions provide separate evidence.",
+      "upstream_ztest_declarations": 0,
+      "upstream_scenarios": 2
+    },
+    {
+      "source": "tests/bluetooth/host_direct_adv_recv",
+      "decision": "cmocka",
+      "reason": "Imported C suite; execution status is recorded separately.",
+      "upstream_ztest_declarations": 12,
+      "upstream_scenarios": 4
+    },
+    {
+      "source": "tests/bluetooth/host_disable",
+      "decision": "cmocka",
+      "reason": "Imported C suite; execution status is recorded separately.",
+      "upstream_ztest_declarations": 13,
+      "upstream_scenarios": 5
+    },
+    {
+      "source": "tests/bluetooth/host_id",
+      "decision": "cmocka",
+      "reason": "Imported C suite; execution status is recorded separately.",
+      "upstream_ztest_declarations": 18,
+      "upstream_scenarios": 6
+    },
+    {
+      "source": "tests/bluetooth/host_iso_tx",
+      "decision": "cmocka",
+      "reason": "Imported C suite; execution status is recorded separately.",
+      "upstream_ztest_declarations": 4,
+      "upstream_scenarios": 1
+    },
+    {
+      "source": "tests/bluetooth/host_keys",
+      "decision": "cmocka",
+      "reason": "Imported C suite; execution status is recorded separately.",
+      "upstream_ztest_declarations": 17,
+      "upstream_scenarios": 3
+    },
+    {
+      "source": "tests/bluetooth/host_l2cap_br_echo",
+      "decision": "cmocka",
+      "reason": "Imported C suite; execution status is recorded separately.",
+      "upstream_ztest_declarations": 8,
+      "upstream_scenarios": 1
+    },
+    {
+      "source": "tests/bluetooth/host_l2cap_br_recv",
+      "decision": "cmocka",
+      "reason": "Imported C suite; execution status is recorded separately.",
+      "upstream_ztest_declarations": 4,
+      "upstream_scenarios": 2
+    },
+    {
+      "source": "tests/bluetooth/host_l2cap_br_ret_fc",
+      "decision": "cmocka",
+      "reason": "Imported C suite; execution status is recorded separately.",
+      "upstream_ztest_declarations": 5,
+      "upstream_scenarios": 2
+    },
+    {
+      "source": "tests/bluetooth/host_l2cap_br_send",
+      "decision": "cmocka",
+      "reason": "Imported C suite; execution status is recorded separately.",
+      "upstream_ztest_declarations": 2,
+      "upstream_scenarios": 1
+    },
+    {
+      "source": "tests/bluetooth/host_l2cap_br_sig",
+      "decision": "cmocka",
+      "reason": "Imported C suite; execution status is recorded separately.",
+      "upstream_ztest_declarations": 3,
+      "upstream_scenarios": 1
+    },
+    {
+      "source": "tests/bluetooth/host_l2cap_le_tx",
+      "decision": "cmocka",
+      "reason": "Imported C suite; execution status is recorded separately.",
+      "upstream_ztest_declarations": 1,
+      "upstream_scenarios": 1
+    },
+    {
+      "source": "tests/bluetooth/host_long_adv_recv",
+      "decision": "cmocka",
+      "reason": "Imported C suite; execution status is recorded separately.",
+      "upstream_ztest_declarations": 4,
+      "upstream_scenarios": 3
+    },
+    {
+      "source": "tests/bluetooth/host_tx_disconnect",
+      "decision": "cmocka",
+      "reason": "Imported C suite; execution status is recorded separately.",
+      "upstream_ztest_declarations": 4,
+      "upstream_scenarios": 1
+    },
+    {
+      "source": "tests/bluetooth/host_tx_share",
+      "decision": "cmocka",
+      "reason": "Imported C suite; execution status is recorded separately.",
+      "upstream_ztest_declarations": 2,
+      "upstream_scenarios": 2
+    },
+    {
+      "source": "tests/bluetooth/init",
+      "decision": "harness_not_imported",
+      "reason": "Original Zephyr configuration or CLI harness; standalone build, OSI and shell regressions provide separate evidence.",
+      "upstream_ztest_declarations": 1,
+      "upstream_scenarios": 47
+    },
+    {
+      "source": "tests/bluetooth/l2cap",
+      "decision": "cmocka",
+      "reason": "Imported C suite; execution status is recorded separately.",
+      "upstream_ztest_declarations": 2,
+      "upstream_scenarios": 1
+    },
+    {
+      "source": "tests/bluetooth/mesh/basic",
+      "decision": "harness_not_imported",
+      "reason": "All nine upstream scenarios are build_only configuration checks, requiring no running Controller or peers. The example application and its configuration matrix have not been imported.",
+      "upstream_ztest_declarations": 0,
+      "upstream_scenarios": 9
+    },
+    {
+      "source": "tests/bluetooth/mesh/blob_io_flash",
+      "decision": "removed_provider_tests",
+      "reason": "Removed from the local test tree at the user request: the Zephyr UART/flash provider is outside the platform scope. Original upstream files remain in Git history.",
+      "upstream_ztest_declarations": 2,
+      "upstream_scenarios": 2
+    },
+    {
+      "source": "tests/bluetooth/mesh/brg",
+      "decision": "cmocka",
+      "reason": "Imported C suite; execution status is recorded separately.",
+      "upstream_ztest_declarations": 6,
+      "upstream_scenarios": 1
+    },
+    {
+      "source": "tests/bluetooth/mesh/delayable_msg",
+      "decision": "cmocka",
+      "reason": "Imported C suite; execution status is recorded separately.",
+      "upstream_ztest_declarations": 10,
+      "upstream_scenarios": 1
+    },
+    {
+      "source": "tests/bluetooth/mesh/net",
+      "decision": "cmocka",
+      "reason": "Imported C suite; execution status is recorded separately.",
+      "upstream_ztest_declarations": 1,
+      "upstream_scenarios": 1
+    },
+    {
+      "source": "tests/bluetooth/mesh/rpl",
+      "decision": "cmocka",
+      "reason": "Imported C suite; execution status is recorded separately.",
+      "upstream_ztest_declarations": 8,
+      "upstream_scenarios": 1
+    },
+    {
+      "source": "tests/bluetooth/mesh/settings",
+      "decision": "cmocka",
+      "reason": "Imported C suite; execution status is recorded separately.",
+      "upstream_ztest_declarations": 10,
+      "upstream_scenarios": 2
+    },
+    {
+      "source": "tests/bluetooth/mesh_shell",
+      "decision": "external_requirements",
+      "reason": "Requires the original interactive Mesh harness and peers.",
+      "upstream_ztest_declarations": 0,
+      "upstream_scenarios": 1
+    },
+    {
+      "source": "tests/bluetooth/monitor",
+      "decision": "cmocka",
+      "reason": "Restored as a real monitor producer integration test with bounded memory and temporary-file sinks; no UART or ISR provider is required.",
+      "upstream_ztest_declarations": 3,
+      "upstream_scenarios": 1
+    },
+    {
+      "source": "tests/bluetooth/nus",
+      "decision": "cmocka",
+      "reason": "Imported C suite; execution status is recorded separately.",
+      "upstream_ztest_declarations": 3,
+      "upstream_scenarios": 3
+    },
+    {
+      "source": "tests/bluetooth/shell",
+      "decision": "harness_not_imported",
+      "reason": "Original Zephyr configuration or CLI harness; standalone build, OSI and shell regressions provide separate evidence.",
+      "upstream_ztest_declarations": 0,
+      "upstream_scenarios": 79
+    },
+    {
+      "source": "tests/bluetooth/smp",
+      "decision": "cmocka",
+      "reason": "Imported C suite; execution status is recorded separately.",
+      "upstream_ztest_declarations": 2,
+      "upstream_scenarios": 1
+    },
+    {
+      "source": "tests/bluetooth/tester",
+      "decision": "external_requirements",
+      "reason": "Requires the external BTP tester client and protocol harness.",
+      "upstream_ztest_declarations": 0,
+      "upstream_scenarios": 9
+    },
+    {
+      "source": "tests/bluetooth/uuid",
+      "decision": "cmocka",
+      "reason": "Imported C suite; execution status is recorded separately.",
+      "upstream_ztest_declarations": 25,
+      "upstream_scenarios": 1
+    }
+  ]
+}
