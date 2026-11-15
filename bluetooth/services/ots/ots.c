@@ -4,6 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#undef LOG_TAG
+#define LOG_TAG "bt_ots"
+#include <base/log.h>
+#include <base/base.h>
 #include <zephyr/types.h>
 #include <stddef.h>
 #include <string.h>
@@ -21,8 +25,6 @@
 #include "ots_internal.h"
 #include "ots_obj_manager_internal.h"
 #include "ots_dir_list_internal.h"
-
-LOG_MODULE_REGISTER(bt_ots, CONFIG_BT_OTS_LOG_LEVEL);
 
 #if defined(CONFIG_BT_OTS_OACP_CREATE_SUPPORT)
 #define OACP_FEAT_BIT_CREATE BIT(BT_OTS_OACP_FEAT_CREATE)

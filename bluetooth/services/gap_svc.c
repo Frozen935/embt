@@ -9,11 +9,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <base/base.h>
 #include <string.h>
 
-#include <zephyr/sys/byteorder.h>
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/gatt.h>
+#include <embt/sys/byteorder.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/gatt.h>
 
 #define BT_GATT_CENTRAL_ADDR_RES_NOT_SUPP	0
 #define BT_GATT_CENTRAL_ADDR_RES_SUPP		1

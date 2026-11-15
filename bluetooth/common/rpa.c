@@ -10,14 +10,18 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#undef LOG_TAG
+#define LOG_TAG "bt_rpa"
+#include <base/log.h>
+#include <base/base.h>
 #include <stddef.h>
 #include <errno.h>
 #include <string.h>
 
 #include "common/bt_str.h"
 
-#include <zephyr/bluetooth/addr.h>
-#include <zephyr/bluetooth/crypto.h>
+#include <embt/bluetooth/addr.h>
+#include <embt/bluetooth/crypto.h>
 
 static int ah(const uint8_t irk[16], const uint8_t r[3], uint8_t out[3])
 {

@@ -6,19 +6,20 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
+#include <base/base.h>
 #include <stdbool.h>
 #include <stdint.h>
 
-#include <zephyr/autoconf.h>
-#include <zephyr/bluetooth/addr.h>
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/hci_types.h>
-#include <zephyr/devicetree.h>
-#include <zephyr/net_buf.h>
-#include <zephyr/sys/atomic.h>
-#include <zephyr/sys/slist.h>
-#include <zephyr/sys/util_macro.h>
+#include <embt/autoconf.h>
+#include <embt/bluetooth/addr.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/hci_types.h>
+#include <embt/drivers/bluetooth.h>
+
+#include <embt/net_buf.h>
+#include <embt/sys/slist.h>
+#include <embt/sys/util_macro.h>
 
 /* LL connection parameters */
 #define LE_CONN_LATENCY		0x0000
@@ -225,7 +226,7 @@ struct bt_le_ext_adv {
 	/* Current target address */
 	bt_addr_le_t            target_addr;
 
-	ATOMIC_DEFINE(flags, BT_ADV_NUM_FLAGS);
+	BT_ATOMIC_DEFINE(flags, BT_ADV_NUM_FLAGS);
 
 #if defined(CONFIG_BT_LIM_ADV)
 	struct k_work_delayable	lim_adv_timeout_work;
@@ -305,7 +306,7 @@ struct bt_le_per_adv_sync {
 	bool report_truncated;
 
 	/** Flags */
-	ATOMIC_DEFINE(flags, BT_PER_ADV_SYNC_NUM_FLAGS);
+	BT_ATOMIC_DEFINE(flags, BT_PER_ADV_SYNC_NUM_FLAGS);
 
 #if defined(CONFIG_BT_PER_ADV_SYNC_RSP)
 	/** Number of subevents */
@@ -462,10 +463,10 @@ struct bt_dev {
 
 	struct k_work           init;
 
-	ATOMIC_DEFINE(flags, BT_DEV_NUM_FLAGS);
+	BT_ATOMIC_DEFINE(flags, BT_DEV_NUM_FLAGS);
 
 	/* Supported commands, one bit per enum bt_dev_cmd */
-	ATOMIC_DEFINE(supported_commands, BT_DEV_CMD_NUM);
+	BT_ATOMIC_DEFINE(supported_commands, BT_DEV_CMD_NUM);
 
 	/* LE controller specific features */
 	struct bt_dev_le	le;
@@ -487,7 +488,7 @@ struct bt_dev {
 	/* Queue for outgoing HCI commands */
 	struct k_fifo		cmd_tx_queue;
 
-	const struct device *hci;
+	const struct bt_hci_transport *hci;
 
 #if defined(CONFIG_BT_PRIVACY)
 	/* Local Identity Resolving Key */
@@ -527,19 +528,20 @@ extern struct bt_dev bt_dev;
 /* Check if the controller supports one of the commands that the host checks */
 static inline bool bt_dev_cmd_supported(enum bt_dev_cmd cmd)
 {
-	return atomic_test_bit(bt_dev.supported_commands, cmd);
+	return bt_atomic_test_bit(bt_dev.supported_commands, cmd);
 }
 
 /* Assert that the current thread holds the host lock. k_mutex resets the
  * owner on the final unlock, so the owner check alone is exact.
  */
 #define BT_DEV_LOCK_ASSERT()                                                                       \
-	__ASSERT(bt_dev.lock.owner == k_current_get(), "host lock not held by %p", k_current_get())
+	__ASSERT(bt_dev_lock_is_held(), "host lock not held by %p", k_current_get())
 
 /* Lock/unlock the host lock. k_mutex is recursive, so nested lock/unlock
  * pairs on the same thread are legal (needed e.g. for the
  * bt_att_req_send() -> bt_att_chan_req_send() nesting).
  */
+bool bt_dev_lock_is_held(void);
 void bt_dev_lock(void);
 
 void bt_dev_unlock(void);
@@ -565,7 +567,7 @@ bool bt_is_work_thread(void);
  */
 struct bt_hci_cmd_state_set {
 	/* Target memory to be updated */
-	atomic_t *target;
+	bt_atomic_t *target;
 	/* Bit number to be updated in target memory */
 	int bit;
 	/* Value to determine if enable or disable bit */
@@ -575,7 +577,7 @@ struct bt_hci_cmd_state_set {
 /* Set command state related with the command buffer */
 void bt_hci_cmd_state_set_init(struct net_buf *buf,
 			       struct bt_hci_cmd_state_set *state,
-			       atomic_t *target, int bit, bool val);
+			       bt_atomic_t *target, int bit, bool val);
 
 int bt_hci_disconnect(uint16_t handle, uint8_t reason);
 
@@ -696,11 +698,16 @@ int bt_hci_le_read_max_data_len(uint16_t *tx_octets, uint16_t *tx_time);
 
 bool bt_drv_quirk_no_auto_dle(void);
 
+/**
+ * @brief Translate an HCI or LMP Core version code for diagnostics.
+ * @param[in] core_version Version code returned by Read Local Version Information.
+ * @return Version string, or "unknown" for a code outside the supported table.
+ */
+const char *bt_hci_get_ver_str(uint8_t core_version);
+
 static inline bool bt_drv_quirk_no_adv_term_on_dir_timeout(void)
 {
-	/* A build-time constant, so the code it guards is left out of builds without the quirk */
-	return DT_ENUM_HAS_VALUE(DT_CHOSEN(zephyr_bt_hci), bt_hci_quirks,
-				 no_adv_term_on_dir_timeout);
+	return bt_dev.hci && (bt_dev.hci->quirks & BT_HCI_QUIRK_NO_ADV_TERM_ON_DIR_TIMEOUT);
 }
 
 void bt_tx_irq_raise(void);

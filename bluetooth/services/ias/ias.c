@@ -8,6 +8,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#undef LOG_TAG
+#define LOG_TAG "ias"
+#include <base/log.h>
+#include <base/base.h>
 #include <errno.h>
 #include <stdint.h>
 #include <zephyr/net_buf.h>
@@ -16,9 +20,7 @@
 #include <zephyr/bluetooth/services/ias.h>
 #include <zephyr/sys/iterable_sections.h>
 
-#define LOG_LEVEL CONFIG_BT_IAS_LOG_LEVEL
-LOG_MODULE_REGISTER(ias);
-
+#define LOG_LEVEL CONFIG_EMBT_LOG_LEVEL
 #define BT_IAS_ALERT_LVL_LEN 1
 
 #if defined(CONFIG_BT_IAS_SEC_AUTH)

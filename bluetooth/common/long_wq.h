@@ -6,6 +6,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <base/base.h>
+#include <embt/storage.h>
+
 int bt_long_wq_schedule(struct k_work_delayable *dwork, k_timeout_t timeout);
 int bt_long_wq_reschedule(struct k_work_delayable *dwork, k_timeout_t timeout);
 int bt_long_wq_submit(struct k_work *dwork);

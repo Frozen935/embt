@@ -9,10 +9,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <base/base.h>
 #include <stdalign.h>
 
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/buf.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/buf.h>
 
 /*
  * The unpacked structs below are used inside __packed structures that reflect

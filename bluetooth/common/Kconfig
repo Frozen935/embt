@@ -281,7 +281,7 @@ endif # BT_ASSERT
 
 config BT_HCI_ERR_TO_STR
 	bool "Print HCI error codes as strings [EXPERIMENTAL]"
-	select EXPERIMENTAL
+	select EMBT_EXPERIMENTAL
 	help
 	  This configuration enables printing of HCI error
 	  codes represented as strings.

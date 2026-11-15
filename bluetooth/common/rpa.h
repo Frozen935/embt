@@ -9,7 +9,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/hci.h>
+#include <base/base.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/hci.h>
 
 int bt_rpa_create(const uint8_t irk[16], bt_addr_t *rpa);

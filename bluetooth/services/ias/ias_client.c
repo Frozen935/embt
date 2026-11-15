@@ -4,10 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#undef LOG_TAG
+#define LOG_TAG "bt_ias_client"
+#include <base/log.h>
 #include <errno.h>
 #include <stdint.h>
-
-LOG_MODULE_REGISTER(bt_ias_client, CONFIG_BT_IAS_CLIENT_LOG_LEVEL);
 
 #include <zephyr/bluetooth/gatt.h>
 #include <zephyr/bluetooth/conn.h>
@@ -24,7 +25,7 @@ struct bt_ias_client {
 	uint16_t alert_level_handle;
 
 	/** Internal flags **/
-	ATOMIC_DEFINE(flags, IAS_NUM_FLAGS);
+	BT_ATOMIC_DEFINE(flags, IAS_NUM_FLAGS);
 
 	/* Gatt discover procedure parameters */
 	struct bt_gatt_discover_params discover;
@@ -98,7 +99,7 @@ static uint8_t bt_ias_alert_lvl_disc_cb(struct bt_conn *conn,
 {
 	const struct bt_gatt_chrc *chrc;
 
-	atomic_clear_bit(client_by_conn(conn)->flags, IAS_DISCOVER_IN_PROGRESS);
+	bt_atomic_clear_bit(client_by_conn(conn)->flags, IAS_DISCOVER_IN_PROGRESS);
 
 	if (attr == NULL) {
 		discover_complete(conn, -ENOENT);
@@ -153,12 +154,12 @@ int bt_ias_discover(struct bt_conn *conn)
 		return -EINVAL;
 	}
 
-	if (atomic_test_bit(client->flags, IAS_DISCOVER_IN_PROGRESS)) {
+	if (bt_atomic_test_bit(client->flags, IAS_DISCOVER_IN_PROGRESS)) {
 		return -EBUSY;
 	}
 
 	client_cleanup(client);
-	atomic_set_bit(client->flags, IAS_DISCOVER_IN_PROGRESS);
+	bt_atomic_set_bit(client->flags, IAS_DISCOVER_IN_PROGRESS);
 
 	client->discover.uuid = ias_uuid;
 	client->discover.func = bt_ias_prim_disc_cb;

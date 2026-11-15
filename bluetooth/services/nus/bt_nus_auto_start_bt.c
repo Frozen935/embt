@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <base/base.h>
 #include <zephyr/bluetooth/bluetooth.h>
 #include <zephyr/bluetooth/services/nus.h>
 

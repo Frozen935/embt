@@ -6,6 +6,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#undef LOG_TAG
+#define LOG_TAG "bt_otc"
+#include <base/log.h>
+#include <base/base.h>
 #include <zephyr/bluetooth/uuid.h>
 #include <zephyr/net_buf.h>
 #include <zephyr/types.h>
@@ -25,9 +29,7 @@
 #include "ots_oacp_internal.h"
 #include "ots_olcp_internal.h"
 
-#define LOG_LEVEL CONFIG_BT_OTS_CLIENT_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_otc);
-
+#define LOG_LEVEL CONFIG_EMBT_LOG_LEVEL
 /* TODO: KConfig options */
 #define OTS_CLIENT_INST_COUNT     1
 
@@ -1620,7 +1622,7 @@ static int decode_record(struct net_buf_simple *buf,
 
 	rec->metadata.id = net_buf_simple_pull_le48(buf);
 
-	if (IS_ENABLED(CONFIG_BT_OTS_CLIENT_LOG_LEVEL_DBG)) {
+	if ((CONFIG_EMBT_LOG_LEVEL >= 4)) {
 		char t[BT_OTS_OBJ_ID_STR_LEN];
 
 		(void)bt_ots_obj_id_to_str(rec->metadata.id, t, sizeof(t));

@@ -5,7 +5,7 @@
 
 menuconfig BT_ETS
 	bool "GATT Elapsed Time service [EXPERIMENTAL]"
-	select EXPERIMENTAL
+	select EMBT_EXPERIMENTAL
 	help
 	  Enable Bluetooth Elapsed Time Service (ETS).
 	  This service provides a time service for embedded devices that either:
