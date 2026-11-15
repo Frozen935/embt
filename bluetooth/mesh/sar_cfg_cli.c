@@ -4,8 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <zephyr/bluetooth/mesh.h>
-#include <zephyr/bluetooth/mesh/access.h>
+#include <errno.h>
+#include <embt/base/time.h>
+#include <embt/bluetooth/mesh.h>
+#include <embt/bluetooth/mesh/access.h>
 
 #include <common/bt_str.h>
 
@@ -145,7 +147,7 @@ int bt_mesh_sar_cfg_cli_transmitter_get(uint16_t net_idx, uint16_t addr,
 		return err;
 	}
 
-	return bt_mesh_msg_ack_ctx_wait(&cli->ack_ctx, K_MSEC(cli->timeout));
+	return bt_mesh_msg_ack_ctx_wait(&cli->ack_ctx, BT_MSEC(cli->timeout));
 }
 
 int bt_mesh_sar_cfg_cli_transmitter_set(uint16_t net_idx, uint16_t addr,
@@ -171,7 +173,7 @@ int bt_mesh_sar_cfg_cli_transmitter_set(uint16_t net_idx, uint16_t addr,
 		return err;
 	}
 
-	return bt_mesh_msg_ack_ctx_wait(&cli->ack_ctx, K_MSEC(cli->timeout));
+	return bt_mesh_msg_ack_ctx_wait(&cli->ack_ctx, BT_MSEC(cli->timeout));
 }
 
 int bt_mesh_sar_cfg_cli_receiver_get(uint16_t net_idx, uint16_t addr,
@@ -195,7 +197,7 @@ int bt_mesh_sar_cfg_cli_receiver_get(uint16_t net_idx, uint16_t addr,
 		return err;
 	}
 
-	return bt_mesh_msg_ack_ctx_wait(&cli->ack_ctx, K_MSEC(cli->timeout));
+	return bt_mesh_msg_ack_ctx_wait(&cli->ack_ctx, BT_MSEC(cli->timeout));
 }
 
 int bt_mesh_sar_cfg_cli_receiver_set(uint16_t net_idx, uint16_t addr,
@@ -221,5 +223,5 @@ int bt_mesh_sar_cfg_cli_receiver_set(uint16_t net_idx, uint16_t addr,
 		return err;
 	}
 
-	return bt_mesh_msg_ack_ctx_wait(&cli->ack_ctx, K_MSEC(cli->timeout));
+	return bt_mesh_msg_ack_ctx_wait(&cli->ack_ctx, BT_MSEC(cli->timeout));
 }

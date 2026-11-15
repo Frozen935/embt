@@ -7,13 +7,14 @@
 #ifndef ZEPHYR_SUBSYS_BLUETOOTH_MESH_SUBNET_H_
 #define ZEPHYR_SUBSYS_BLUETOOTH_MESH_SUBNET_H_
 
+#include <string.h>
+#include <embt/base/assert.h>
+#include <embt/base/util_macro.h>
 #include <stdint.h>
 #include <sys/types.h>
 
-#include <zephyr/bluetooth/mesh/keys.h>
-#include <zephyr/net_buf.h>
-#include <zephyr/sys/iterable_sections.h>
-
+#include <embt/bluetooth/mesh/keys.h>
+#include <embt/net_buf.h>
 #define BT_MESH_NET_FLAG_KR       BIT(0)
 #define BT_MESH_NET_FLAG_IVU      BIT(1)
 
@@ -92,6 +93,7 @@ struct bt_mesh_subnet {
 
 /** Subnet callback structure. Instantiate with @ref BT_MESH_SUBNET_CB */
 struct bt_mesh_subnet_cb {
+	struct bt_mesh_subnet_cb *next;
 	void (*evt_handler)(struct bt_mesh_subnet *subnet,
 			    enum bt_mesh_key_evt evt);
 };
@@ -101,9 +103,11 @@ struct bt_mesh_subnet_cb {
  *
  *  @param _name Handler name.
  */
-#define BT_MESH_SUBNET_CB_DEFINE(_name)                                    \
-	static const STRUCT_SECTION_ITERABLE(                               \
-		bt_mesh_subnet_cb, _CONCAT(bt_mesh_subnet_cb_, _name))
+#define BT_MESH_SUBNET_CB_DEFINE(_name) \
+	struct bt_mesh_subnet_cb bt_mesh_subnet_cb_##_name
+
+/** @brief Register retained internal key callbacks before Mesh operation. */
+void bt_mesh_key_callbacks_init(void);
 
 /** @brief Reset all Network keys. */
 void bt_mesh_net_keys_reset(void);

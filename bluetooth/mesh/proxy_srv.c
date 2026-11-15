@@ -5,16 +5,20 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <zephyr/sys/byteorder.h>
-#include <zephyr/sys/iterable_sections.h>
-#include <zephyr/net_buf.h>
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/gatt.h>
-#include <zephyr/bluetooth/mesh.h>
-#include <zephyr/sys/util.h>
+#include <errno.h>
+#include <embt/base/work.h>
+#include <embt/base/time.h>
+#include <string.h>
+#include <embt/base/assert.h>
+#include <embt/base/byteorder.h>
+#include <embt/net_buf.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/gatt.h>
+#include <embt/bluetooth/mesh.h>
+#include <embt/base/util.h>
 
-#include <zephyr/bluetooth/hci.h>
+#include <embt/bluetooth/hci.h>
 
 #include "common/bt_str.h"
 
@@ -33,6 +37,8 @@
 
 LOG_MODULE_REGISTER(bt_mesh_gatt, CONFIG_BT_MESH_PROXY_LOG_LEVEL);
 
+static struct bt_mesh_proxy_cb *callbacks;
+
 /* Interval to update random value in (10 minutes).
  *
  * Defined in the Bluetooth Mesh Specification v1.1, Section 7.2.2.2.4.
@@ -45,7 +51,7 @@ LOG_MODULE_REGISTER(bt_mesh_gatt, CONFIG_BT_MESH_PROXY_LOG_LEVEL);
 #define ADV_OPT_PROXY(private)                                                                     \
 	(BT_LE_ADV_OPT_CONN | BT_LE_ADV_OPT_SCANNABLE | ADV_OPT_ADDR(private))
 
-static void proxy_send_beacons(struct k_work *work);
+static void proxy_send_beacons(struct bt_work *work);
 static int proxy_send(struct bt_conn *conn,
 		      const void *data, uint16_t len,
 		      bt_gatt_complete_func_t end, void *user_data);
@@ -58,13 +64,13 @@ static struct bt_mesh_proxy_client {
 		ACCEPT,
 		REJECT,
 	} filter_type;
-	struct k_work send_beacons;
+	struct bt_work send_beacons;
 #if defined(CONFIG_BT_MESH_PRIV_BEACONS)
 	bool privacy;
 #endif
 } clients[CONFIG_BT_MAX_CONN] = {
 	[0 ... (CONFIG_BT_MAX_CONN - 1)] = {
-		.send_beacons = Z_WORK_INITIALIZER(proxy_send_beacons),
+		.send_beacons = BT_WORK_INITIALIZER(proxy_send_beacons),
 	},
 };
 
@@ -341,7 +347,7 @@ static bool send_beacon_cb(struct bt_mesh_subnet *sub, void *cb_data)
 	return beacon_send(client, sub) != 0;
 }
 
-static void proxy_send_beacons(struct k_work *work)
+static void proxy_send_beacons(struct bt_work *work)
 {
 	struct bt_mesh_proxy_client *client;
 
@@ -370,9 +376,9 @@ void bt_mesh_proxy_beacon_send(struct bt_mesh_subnet *sub)
 static void identity_enabled(struct bt_mesh_subnet *sub)
 {
 	sub->node_id = BT_MESH_NODE_IDENTITY_RUNNING;
-	sub->node_id_start = k_uptime_get_32();
+	sub->node_id_start = bt_uptime_get_ms_32();
 
-	STRUCT_SECTION_FOREACH(bt_mesh_proxy_cb, cb) {
+	for (struct bt_mesh_proxy_cb *cb = callbacks; cb; cb = cb->next) {
 		if (cb->identity_enabled) {
 			cb->identity_enabled(sub->net_idx);
 		}
@@ -414,7 +420,7 @@ void bt_mesh_proxy_identity_stop(struct bt_mesh_subnet *sub)
 	sub->node_id = BT_MESH_NODE_IDENTITY_STOPPED;
 	sub->node_id_start = 0U;
 
-	STRUCT_SECTION_FOREACH(bt_mesh_proxy_cb, cb) {
+	for (struct bt_mesh_proxy_cb *cb = callbacks; cb; cb = cb->next) {
 		if (cb->identity_disabled) {
 			cb->identity_disabled(sub->net_idx);
 		}
@@ -665,7 +671,7 @@ static void proxy_adv_timeout_eval(struct bt_mesh_subnet *sub)
 	int32_t time_passed;
 
 	if (sub->node_id == BT_MESH_NODE_IDENTITY_RUNNING) {
-		time_passed = k_uptime_get_32() - sub->node_id_start;
+		time_passed = bt_uptime_get_ms_32() - sub->node_id_start;
 		if (time_passed > (NODE_ID_TIMEOUT - MSEC_PER_SEC)) {
 			bt_mesh_proxy_identity_stop(sub);
 			LOG_DBG("Node ID stopped for subnet %d after %dms", sub->net_idx,
@@ -675,7 +681,7 @@ static void proxy_adv_timeout_eval(struct bt_mesh_subnet *sub)
 
 #if defined(CONFIG_BT_MESH_OD_PRIV_PROXY_SRV)
 	if (bt_mesh_od_priv_proxy_get() > 0 && sub->solicited && sub->priv_net_id_sent) {
-		time_passed = k_uptime_get_32() - sub->priv_net_id_sent;
+		time_passed = bt_uptime_get_ms_32() - sub->priv_net_id_sent;
 		if (time_passed > ((MSEC_PER_SEC * bt_mesh_od_priv_proxy_get()) - MSEC_PER_SEC)) {
 			sub->priv_net_id_sent = 0;
 			sub->solicited = false;
@@ -724,13 +730,13 @@ static bool proxy_adv_request_get(struct bt_mesh_subnet *sub, struct proxy_adv_r
 		request->evt = OD_PRIV_NET_ID;
 		request->duration = !sub->priv_net_id_sent
 					    ? timeout
-					    : timeout - (k_uptime_get_32() - sub->priv_net_id_sent);
+					    : timeout - (bt_uptime_get_ms_32() - sub->priv_net_id_sent);
 		return true;
 	}
 #endif
 
 	if (sub->node_id == BT_MESH_NODE_IDENTITY_RUNNING) {
-		request->duration = NODE_ID_TIMEOUT - (k_uptime_get_32() - sub->node_id_start);
+		request->duration = NODE_ID_TIMEOUT - (bt_uptime_get_ms_32() - sub->node_id_start);
 		request->evt =
 #if defined(CONFIG_BT_MESH_PRIV_BEACONS)
 			sub->priv_beacon_ctx.node_id ? PRIV_NODE_ID :
@@ -817,7 +823,7 @@ static int gatt_proxy_advertise(void)
 		if ((sub_adv.request.duration != SYS_FOREVER_MS) &&
 		    proxy_adv_request_get(sub_adv.sub, &request) &&
 		    (sub_adv.request.evt == request.evt)) {
-			int32_t time_passed = k_uptime_get_32() - sub_adv.start;
+			int32_t time_passed = bt_uptime_get_ms_32() - sub_adv.start;
 
 			if (time_passed < sub_adv.request.duration &&
 			    ((sub_adv.request.duration - time_passed) >= MSEC_PER_SEC)) {
@@ -841,7 +847,7 @@ end:
 	}
 
 	/* Save current state for next iteration */
-	sub_adv.start = k_uptime_get_32();
+	sub_adv.start = bt_uptime_get_ms_32();
 	sub_adv.sub = sub;
 	sub_adv.request = request;
 
@@ -852,7 +858,7 @@ end:
 #if defined(CONFIG_BT_MESH_OD_PRIV_PROXY_SRV)
 	case OD_PRIV_NET_ID:
 		if (!sub->priv_net_id_sent) {
-			sub->priv_net_id_sent = k_uptime_get();
+			sub->priv_net_id_sent = bt_uptime_get_ms();
 		}
 		/* Fall through */
 #endif
@@ -1235,4 +1241,31 @@ uint8_t bt_mesh_proxy_srv_connected_cnt(void)
 	}
 
 	return cnt;
+}
+
+int bt_mesh_proxy_cb_register(struct bt_mesh_proxy_cb *cb)
+{
+	if (!cb) {
+		return -EINVAL;
+	}
+	for (struct bt_mesh_proxy_cb *entry = callbacks; entry; entry = entry->next) {
+		if (entry == cb) {
+			return -EALREADY;
+		}
+	}
+	cb->next = callbacks;
+	callbacks = cb;
+	return 0;
+}
+
+/** @brief Register callbacks during explicit component initialization. */
+int bt_mesh_proxy_srv_callbacks_init(void)
+{
+	int err = 0;
+
+	err = bt_conn_cb_register(&bt_conn_cb_conn_callbacks);
+	if (err && err != -EEXIST) {
+		return err;
+	}
+	return 0;
 }

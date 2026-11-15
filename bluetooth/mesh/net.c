@@ -4,17 +4,21 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <embt/base/mem_slab.h>
+#include <embt/base/work.h>
+#include <embt/base/time.h>
+#include <embt/base/assert.h>
 #include <string.h>
 #include <errno.h>
 #include <stdbool.h>
-#include <zephyr/sys/atomic.h>
-#include <zephyr/sys/util.h>
-#include <zephyr/sys/byteorder.h>
+#include <embt/base/atomic.h>
+#include <embt/base/util.h>
+#include <embt/base/byteorder.h>
 
-#include <zephyr/net_buf.h>
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/mesh.h>
+#include <embt/net_buf.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/mesh.h>
 
 #include "common/bt_str.h"
 
@@ -55,13 +59,13 @@ struct pdu_ctx {
 /* Suppress `net_val is less aligned than bt_mesh_key` clang warning.
  * dev_key is handled in the source code according to it's alignment
  */
-TOOLCHAIN_DISABLE_CLANG_WARNING(TOOLCHAIN_WARNING_UNALIGNED_ACCESS)
+EMBT_CLANG_DIAGNOSTIC_IGNORE("-Wunaligned-access")
 /* Mesh network information for persistent storage. */
 struct net_val {
 	uint16_t primary_addr;
 	struct bt_mesh_key dev_key;
 } __packed;
-TOOLCHAIN_ENABLE_CLANG_WARNING(TOOLCHAIN_WARNING_UNALIGNED_ACCESS)
+EMBT_CLANG_DIAGNOSTIC_POP()
 
 /* Sequence number information for persistent storage. */
 struct seq_val {
@@ -108,7 +112,7 @@ struct loopback_buf {
 	uint8_t data[LOOPBACK_MAX_PDU_LEN];
 };
 
-K_MEM_SLAB_DEFINE_TYPE(loopback_buf_pool, struct loopback_buf,
+BT_MEM_SLAB_DEFINE_STATIC_TYPE(loopback_buf_pool, struct loopback_buf,
 		       CONFIG_BT_MESH_LOOPBACK_BUFS);
 
 static uint32_t dup_cache[CONFIG_BT_MESH_MSG_CACHE_SIZE];
@@ -252,7 +256,7 @@ int bt_mesh_net_create(uint16_t idx, uint8_t flags, const struct bt_mesh_key *ke
 	msg_cache_next = 0U;
 
 	bt_mesh.iv_index = iv_index;
-	atomic_set_bit_to(bt_mesh.flags, BT_MESH_IVU_IN_PROGRESS,
+	bt_atomic_set_bit_to(bt_mesh.flags, BT_MESH_IVU_IN_PROGRESS,
 			  BT_MESH_IV_UPDATE(flags));
 
 	/* If the node is added to a network when the network is in Normal
@@ -281,7 +285,7 @@ int bt_mesh_net_create(uint16_t idx, uint8_t flags, const struct bt_mesh_key *ke
 #if defined(CONFIG_BT_MESH_IV_UPDATE_TEST)
 void bt_mesh_iv_update_test(bool enable)
 {
-	atomic_set_bit_to(bt_mesh.flags, BT_MESH_IVU_TEST, enable);
+	bt_atomic_set_bit_to(bt_mesh.flags, BT_MESH_IVU_TEST, enable);
 	/* Reset the duration variable - needed for some PTS tests */
 	bt_mesh.ivu_duration = 0U;
 	/* ivu_refresh() drops the beacon cache when the 96-hour limit expires. Test mode
@@ -298,13 +302,13 @@ bool bt_mesh_iv_update(void)
 		return false;
 	}
 
-	if (atomic_test_bit(bt_mesh.flags, BT_MESH_IVU_IN_PROGRESS)) {
+	if (bt_atomic_test_bit(bt_mesh.flags, BT_MESH_IVU_IN_PROGRESS)) {
 		bt_mesh_net_iv_update(bt_mesh.iv_index, false);
 	} else {
 		bt_mesh_net_iv_update(bt_mesh.iv_index + 1, true);
 	}
 
-	return atomic_test_bit(bt_mesh.flags, BT_MESH_IVU_IN_PROGRESS);
+	return bt_atomic_test_bit(bt_mesh.flags, BT_MESH_IVU_IN_PROGRESS);
 }
 #endif /* CONFIG_BT_MESH_IV_UPDATE_TEST */
 
@@ -325,7 +329,7 @@ bool bt_mesh_net_iv_update(uint32_t iv_index, bool iv_update)
 
 	if ((iv_index > bt_mesh.iv_index + 1) ||
 	    (iv_index == bt_mesh.iv_index + 1 &&
-	     (atomic_test_bit(bt_mesh.flags, BT_MESH_IVU_IN_PROGRESS) || !iv_update))) {
+	     (bt_atomic_test_bit(bt_mesh.flags, BT_MESH_IVU_IN_PROGRESS) || !iv_update))) {
 		if (ivi_was_recovered &&
 		    (bt_mesh.ivu_duration < (2 * BT_MESH_IVU_MIN_HOURS))) {
 			LOG_ERR("IV Index Recovery before minimum delay");
@@ -353,13 +357,13 @@ bool bt_mesh_net_iv_update(uint32_t iv_index, bool iv_update)
 		goto do_update;
 	}
 
-	if (atomic_test_bit(bt_mesh.flags, BT_MESH_IVU_IN_PROGRESS) == iv_update) {
+	if (bt_atomic_test_bit(bt_mesh.flags, BT_MESH_IVU_IN_PROGRESS) == iv_update) {
 		LOG_DBG("No change for IV Update procedure");
 		return false;
 	}
 
 	if (!(IS_ENABLED(CONFIG_BT_MESH_IV_UPDATE_TEST) &&
-	      atomic_test_bit(bt_mesh.flags, BT_MESH_IVU_TEST))) {
+	      bt_atomic_test_bit(bt_mesh.flags, BT_MESH_IVU_TEST))) {
 		if (bt_mesh.ivu_duration < BT_MESH_IVU_MIN_HOURS) {
 			LOG_WRN("IV Update before minimum duration");
 			return false;
@@ -369,7 +373,7 @@ bool bt_mesh_net_iv_update(uint32_t iv_index, bool iv_update)
 	/* Defer change to Normal Operation if there are pending acks */
 	if (!iv_update && bt_mesh_tx_in_progress()) {
 		LOG_WRN("IV Update deferred because of pending transfer");
-		atomic_set_bit(bt_mesh.flags, BT_MESH_IVU_PENDING);
+		bt_atomic_set_bit(bt_mesh.flags, BT_MESH_IVU_PENDING);
 		return false;
 	}
 
@@ -385,10 +389,10 @@ bool bt_mesh_net_iv_update(uint32_t iv_index, bool iv_update)
 	}
 
 do_update:
-	atomic_set_bit_to(bt_mesh.flags, BT_MESH_IVU_IN_PROGRESS, iv_update);
+	bt_atomic_set_bit_to(bt_mesh.flags, BT_MESH_IVU_IN_PROGRESS, iv_update);
 	bt_mesh.ivu_duration = 0U;
 
-	k_work_reschedule(&bt_mesh.ivu_timer, BT_MESH_IVU_TIMEOUT);
+	bt_work_reschedule(&bt_mesh.ivu_timer, BT_MESH_IVU_TIMEOUT);
 
 	/* Notify other modules */
 	if (IS_ENABLED(CONFIG_BT_MESH_FRIEND)) {
@@ -422,7 +426,7 @@ uint32_t bt_mesh_next_seq(void)
 		bt_mesh_net_seq_store(false);
 	}
 
-	if (!atomic_test_bit(bt_mesh.flags, BT_MESH_IVU_IN_PROGRESS) &&
+	if (!bt_atomic_test_bit(bt_mesh.flags, BT_MESH_IVU_IN_PROGRESS) &&
 	    bt_mesh.seq > IV_UPDATE_SEQ_LIMIT &&
 	    bt_mesh_subnet_get(BT_MESH_KEY_PRIMARY)) {
 		bt_mesh_beacon_ivu_initiator(true);
@@ -432,7 +436,7 @@ uint32_t bt_mesh_next_seq(void)
 	return seq;
 }
 
-static void bt_mesh_net_local(struct k_work *work)
+static void bt_mesh_net_local(struct bt_work *work)
 {
 	struct net_buf_simple sbuf;
 	sys_snode_t *node;
@@ -466,7 +470,7 @@ static void bt_mesh_net_local(struct k_work *work)
 
 		net_buf_simple_init_with_data(&sbuf, buf->data, buf->len);
 		(void)bt_mesh_trans_recv(&sbuf, &rx);
-		k_mem_slab_free(&loopback_buf_pool, (void *)buf);
+		bt_mem_slab_free(&loopback_buf_pool, (void *)buf);
 	}
 }
 
@@ -548,7 +552,7 @@ static int net_loopback(const struct bt_mesh_net_tx *tx, const uint8_t *data,
 	int err;
 	struct loopback_buf *buf;
 
-	err = k_mem_slab_alloc(&loopback_buf_pool, (void **)&buf, K_NO_WAIT);
+	err = bt_mem_slab_alloc(&loopback_buf_pool, (void **)&buf, BT_NO_WAIT);
 	if (err) {
 		LOG_WRN("Unable to allocate loopback");
 		return -ENOMEM;
@@ -561,7 +565,7 @@ static int net_loopback(const struct bt_mesh_net_tx *tx, const uint8_t *data,
 
 	sys_slist_append(&bt_mesh.local_queue, &buf->node);
 
-	k_work_submit(&bt_mesh.local_work);
+	bt_work_submit(&bt_mesh.local_work);
 
 	return 0;
 }
@@ -648,7 +652,7 @@ void bt_mesh_net_loopback_clear(uint16_t net_idx)
 
 		if (net_idx == BT_MESH_KEY_ANY || net_idx == buf->sub->net_idx) {
 			LOG_DBG("Dropped 0x%06x", pdu_seq(buf->data));
-			k_mem_slab_free(&loopback_buf_pool, (void *)buf);
+			bt_mem_slab_free(&loopback_buf_pool, (void *)buf);
 		} else {
 			sys_slist_append(&new_list, &buf->node);
 		}
@@ -749,7 +753,7 @@ static void bt_mesh_net_relay(struct net_buf_simple *sbuf, struct bt_mesh_net_rx
 	}
 
 	adv = bt_mesh_adv_create(BT_MESH_ADV_DATA, BT_MESH_ADV_TAG_RELAY,
-				 transmit, K_NO_WAIT);
+				 transmit, BT_NO_WAIT);
 	if (!adv) {
 		LOG_DBG("Out of relay advs");
 		return;
@@ -990,7 +994,7 @@ void bt_mesh_net_recv(struct net_buf_simple *data, int8_t rssi,
 #endif
 }
 
-static void ivu_refresh(struct k_work *work)
+static void ivu_refresh(struct bt_work *work)
 {
 	uint8_t prev_duration;
 
@@ -1003,7 +1007,7 @@ static void ivu_refresh(struct k_work *work)
 	       bt_mesh.ivu_duration + BT_MESH_IVU_HOURS);
 
 	LOG_DBG("%s for %u hour%s",
-		atomic_test_bit(bt_mesh.flags, BT_MESH_IVU_IN_PROGRESS) ? "IVU in Progress"
+		bt_atomic_test_bit(bt_mesh.flags, BT_MESH_IVU_IN_PROGRESS) ? "IVU in Progress"
 									: "IVU Normal mode",
 		bt_mesh.ivu_duration, bt_mesh.ivu_duration == 1U ? "" : "s");
 
@@ -1025,7 +1029,7 @@ static void ivu_refresh(struct k_work *work)
 		bt_mesh_subnet_foreach(bt_mesh_beacon_cache_clear);
 	}
 
-	if (atomic_test_bit(bt_mesh.flags, BT_MESH_IVU_IN_PROGRESS)) {
+	if (bt_atomic_test_bit(bt_mesh.flags, BT_MESH_IVU_IN_PROGRESS)) {
 		bt_mesh_beacon_ivu_initiator(true);
 		bt_mesh_net_iv_update(bt_mesh.iv_index, false);
 	} else if (IS_ENABLED(CONFIG_BT_SETTINGS)) {
@@ -1033,14 +1037,15 @@ static void ivu_refresh(struct k_work *work)
 	}
 
 end:
-	k_work_reschedule(&bt_mesh.ivu_timer, BT_MESH_IVU_TIMEOUT);
+	bt_work_reschedule(&bt_mesh.ivu_timer, BT_MESH_IVU_TIMEOUT);
 }
 
 void bt_mesh_net_init(void)
 {
-	k_work_init_delayable(&bt_mesh.ivu_timer, ivu_refresh);
+	bt_mem_slab_init(&loopback_buf_pool);
+	bt_work_init_delayable(&bt_mesh.ivu_timer, ivu_refresh);
 
-	k_work_init(&bt_mesh.local_work, bt_mesh_net_local);
+	bt_work_init(&bt_mesh.local_work, bt_mesh_net_local);
 }
 
 static int net_set(const char *name, size_t len_rd, settings_read_cb read_cb,
@@ -1099,7 +1104,7 @@ static int iv_set(const char *name, size_t len_rd, settings_read_cb read_cb,
 		LOG_DBG("IV deleted");
 
 		bt_mesh.iv_index = 0U;
-		atomic_clear_bit(bt_mesh.flags, BT_MESH_IVU_IN_PROGRESS);
+		bt_atomic_clear_bit(bt_mesh.flags, BT_MESH_IVU_IN_PROGRESS);
 		return 0;
 	}
 
@@ -1110,7 +1115,7 @@ static int iv_set(const char *name, size_t len_rd, settings_read_cb read_cb,
 	}
 
 	bt_mesh.iv_index = iv.iv_index;
-	atomic_set_bit_to(bt_mesh.flags, BT_MESH_IVU_IN_PROGRESS, iv.iv_update);
+	bt_atomic_set_bit_to(bt_mesh.flags, BT_MESH_IVU_IN_PROGRESS, iv.iv_update);
 	bt_mesh.ivu_duration = iv.iv_duration;
 
 	LOG_DBG("IV Index 0x%04x (IV Update Flag %u) duration %u hours", iv.iv_index, iv.iv_update,
@@ -1185,7 +1190,7 @@ static int dev_key_cand_set(const char *name, size_t len_rd, settings_read_cb re
 	err = bt_mesh_settings_set(read_cb, cb_arg, &key, sizeof(struct bt_mesh_key));
 	if (!err) {
 		LOG_DBG("DevKey candidate recovered from storage");
-		atomic_set_bit(bt_mesh.flags, BT_MESH_DEVKEY_CAND);
+		bt_atomic_set_bit(bt_mesh.flags, BT_MESH_DEVKEY_CAND);
 		bt_mesh_key_assign(&bt_mesh.dev_key_cand, &key);
 	}
 
@@ -1200,7 +1205,7 @@ void bt_mesh_net_pending_dev_key_cand_store(void)
 #if defined(CONFIG_BT_MESH_RPR_SRV)
 	int err;
 
-	if (atomic_test_bit(bt_mesh.flags, BT_MESH_DEVKEY_CAND)) {
+	if (bt_atomic_test_bit(bt_mesh.flags, BT_MESH_DEVKEY_CAND)) {
 		err = settings_save_one("bt/mesh/DevKeyC", &bt_mesh.dev_key_cand,
 					sizeof(struct bt_mesh_key));
 	} else {
@@ -1238,7 +1243,7 @@ static void store_pending_iv(void)
 	int err;
 
 	iv.iv_index = bt_mesh.iv_index;
-	iv.iv_update = atomic_test_bit(bt_mesh.flags, BT_MESH_IVU_IN_PROGRESS);
+	iv.iv_update = bt_atomic_test_bit(bt_mesh.flags, BT_MESH_IVU_IN_PROGRESS);
 	iv.iv_duration = bt_mesh.ivu_duration;
 
 	err = settings_save_one("bt/mesh/IV", &iv, sizeof(iv));
@@ -1251,7 +1256,7 @@ static void store_pending_iv(void)
 
 void bt_mesh_net_pending_iv_store(void)
 {
-	if (atomic_test_bit(bt_mesh.flags, BT_MESH_VALID)) {
+	if (bt_atomic_test_bit(bt_mesh.flags, BT_MESH_VALID)) {
 		store_pending_iv();
 	} else {
 		clear_iv();
@@ -1291,7 +1296,7 @@ static void store_pending_net(void)
 
 void bt_mesh_net_pending_net_store(void)
 {
-	if (atomic_test_bit(bt_mesh.flags, BT_MESH_VALID)) {
+	if (bt_atomic_test_bit(bt_mesh.flags, BT_MESH_VALID)) {
 		store_pending_net();
 	} else {
 		clear_net();
@@ -1303,7 +1308,7 @@ void bt_mesh_net_pending_seq_store(void)
 	struct seq_val seq;
 	int err;
 
-	if (atomic_test_bit(bt_mesh.flags, BT_MESH_VALID)) {
+	if (bt_atomic_test_bit(bt_mesh.flags, BT_MESH_VALID)) {
 		sys_put_le24(bt_mesh.seq, seq.val);
 
 		err = settings_save_one("bt/mesh/Seq", &seq, sizeof(seq));
@@ -1338,6 +1343,6 @@ void bt_mesh_net_clear(void)
 void bt_mesh_net_settings_commit(void)
 {
 	if (bt_mesh.ivu_duration < BT_MESH_IVU_MIN_HOURS) {
-		k_work_reschedule(&bt_mesh.ivu_timer, BT_MESH_IVU_TIMEOUT);
+		bt_work_reschedule(&bt_mesh.ivu_timer, BT_MESH_IVU_TIMEOUT);
 	}
 }

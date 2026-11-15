@@ -13,6 +13,7 @@
 #ifndef ZEPHYR_INCLUDE_BLUETOOTH_MESH_BLOB_CLI_H_
 #define ZEPHYR_INCLUDE_BLUETOOTH_MESH_BLOB_CLI_H_
 
+#include <embt/base/work.h>
 #include <sys/types.h>
 
 #include <embt/bluetooth/mesh/access.h>
@@ -308,10 +309,10 @@ struct bt_mesh_blob_cli {
 	struct {
 		struct bt_mesh_blob_target *target;
 		struct blob_cli_broadcast_ctx ctx;
-		struct k_work_delayable retry;
+		struct bt_work_delayable retry;
 		/* Represents Client Timeout timer in a timestamp. Used in Pull mode only. */
 		int64_t cli_timestamp;
-		struct k_work_delayable complete;
+		struct bt_work_delayable complete;
 		uint16_t pending;
 		uint8_t retries;
 		uint8_t sending : 1,

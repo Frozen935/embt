@@ -4,14 +4,19 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <embt/base/work.h>
+#include <embt/base/time.h>
+#include <embt/base/time.h>
+#include <embt/base/atomic.h>
+#include <string.h>
+#include <embt/base/assert.h>
 #include <errno.h>
-#include <zephyr/sys/util.h>
-#include <zephyr/sys/byteorder.h>
-#include <zephyr/sys/iterable_sections.h>
-#include <zephyr/net_buf.h>
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/mesh.h>
+#include <embt/base/util.h>
+#include <embt/base/byteorder.h>
+#include <embt/net_buf.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/mesh.h>
 
 #include "common/bt_str.h"
 
@@ -24,7 +29,9 @@
 
 LOG_MODULE_REGISTER(bt_mesh_beacon, CONFIG_BT_MESH_BEACON_LOG_LEVEL);
 
-#define PROVISIONED_INTERVAL       K_SECONDS(10)
+static struct bt_mesh_beacon_cb *callbacks;
+
+#define PROVISIONED_INTERVAL       BT_SECONDS(10)
 
 #define BEACON_TYPE_UNPROVISIONED  0x00
 #define BEACON_TYPE_SECURE         0x01
@@ -36,7 +43,7 @@ LOG_MODULE_REGISTER(bt_mesh_beacon, CONFIG_BT_MESH_BEACON_LOG_LEVEL);
 /* 1 transmission, 20ms interval */
 #define PROV_XMIT                  BT_MESH_TRANSMIT(0, 20)
 
-static struct k_work_delayable beacon_timer;
+static struct bt_work_delayable beacon_timer;
 static struct bt_mesh_subnet *beacon_send_sub_curr;
 
 #if defined(CONFIG_BT_MESH_PRIV_BEACONS)
@@ -115,7 +122,7 @@ static void beacon_start(uint16_t duration, int err, void *user_data)
 	if (err) {
 		LOG_ERR("Failed to send beacon: err %d", err);
 		if (beacon_send_sub_curr) {
-			k_work_reschedule(&beacon_timer, K_NO_WAIT);
+			bt_work_reschedule(&beacon_timer, BT_NO_WAIT);
 		}
 	}
 }
@@ -125,10 +132,10 @@ static void beacon_complete(int err, void *user_data)
 	struct bt_mesh_beacon *beacon = user_data;
 
 	LOG_DBG("err %d", err);
-	beacon->sent = k_uptime_get_32();
+	beacon->sent = bt_uptime_get_ms_32();
 
 	if (beacon_send_sub_curr) {
-		k_work_reschedule(&beacon_timer, K_MSEC(20));
+		bt_work_reschedule(&beacon_timer, BT_MSEC(20));
 	}
 }
 
@@ -163,7 +170,7 @@ static int secure_beacon_create(struct bt_mesh_subnet *sub,
 static int private_random_update(void)
 {
 	uint8_t interval = bt_mesh_priv_beacon_update_interval_get();
-	uint64_t uptime = k_uptime_get();
+	uint64_t uptime = bt_uptime_get_ms();
 	int err;
 
 	/* The Private beacon random value should change every N seconds to maintain privacy.
@@ -256,7 +263,7 @@ int bt_mesh_beacon_create(struct bt_mesh_subnet *sub, struct net_buf_simple *buf
 static bool secure_beacon_is_running(void)
 {
 	return bt_mesh_beacon_enabled() ||
-	       atomic_test_bit(bt_mesh.flags, BT_MESH_IVU_INITIATOR);
+	       bt_atomic_test_bit(bt_mesh.flags, BT_MESH_IVU_INITIATOR);
 }
 
 static int net_beacon_send(struct bt_mesh_subnet *sub, struct bt_mesh_beacon *beacon,
@@ -267,7 +274,7 @@ static int net_beacon_send(struct bt_mesh_subnet *sub, struct bt_mesh_beacon *be
 		.start = beacon_start,
 		.end = beacon_complete,
 	};
-	uint32_t now = k_uptime_get_32();
+	uint32_t now = bt_uptime_get_ms_32();
 	struct bt_mesh_adv *adv;
 	uint32_t time_diff;
 	uint32_t time_since_last_recv;
@@ -284,7 +291,7 @@ static int net_beacon_send(struct bt_mesh_subnet *sub, struct bt_mesh_beacon *be
 	}
 
 	adv = bt_mesh_adv_create(BT_MESH_ADV_BEACON, BT_MESH_ADV_TAG_LOCAL,
-				 PROV_XMIT, K_NO_WAIT);
+				 PROV_XMIT, BT_NO_WAIT);
 	if (!adv) {
 		LOG_ERR("Unable to allocate beacon adv");
 		return -ENOMEM; /* Bail out */
@@ -348,7 +355,7 @@ static int unprovisioned_beacon_send(void)
 	LOG_DBG("");
 
 	adv = bt_mesh_adv_create(BT_MESH_ADV_BEACON, BT_MESH_ADV_TAG_LOCAL,
-				 UNPROV_XMIT, K_NO_WAIT);
+				 UNPROV_XMIT, BT_NO_WAIT);
 	if (!adv) {
 		LOG_ERR("Unable to allocate beacon adv");
 		return -ENOBUFS;
@@ -375,7 +382,7 @@ static int unprovisioned_beacon_send(void)
 		size_t len;
 
 		adv = bt_mesh_adv_create(BT_MESH_ADV_URI, BT_MESH_ADV_TAG_LOCAL,
-					 UNPROV_XMIT, K_NO_WAIT);
+					 UNPROV_XMIT, BT_NO_WAIT);
 		if (!adv) {
 			LOG_ERR("Unable to allocate URI adv");
 			return -ENOBUFS;
@@ -486,7 +493,7 @@ static bool beacons_send_next(void)
 	return true;
 }
 
-static void beacon_send(struct k_work *work)
+static void beacon_send(struct bt_work *work)
 {
 	LOG_DBG("");
 
@@ -500,7 +507,7 @@ static void beacon_send(struct k_work *work)
 		}
 
 		if (!beacons_send_next()) {
-			k_work_schedule(&beacon_timer, PROVISIONED_INTERVAL);
+			bt_work_schedule(&beacon_timer, PROVISIONED_INTERVAL);
 		}
 
 		return;
@@ -512,7 +519,7 @@ static void beacon_send(struct k_work *work)
 			unprovisioned_beacon_send();
 		}
 
-		k_work_schedule(&beacon_timer, K_SECONDS(CONFIG_BT_MESH_UNPROV_BEACON_INT));
+		bt_work_schedule(&beacon_timer, BT_SECONDS(CONFIG_BT_MESH_UNPROV_BEACON_INT));
 	}
 }
 
@@ -554,7 +561,7 @@ static bool secure_beacon_authenticate(struct bt_mesh_subnet *sub, void *cb_data
 			beacon_info.iv_idx = params->iv_index;
 			memcpy(&beacon_info.auth_val, params->auth, 8);
 
-			STRUCT_SECTION_FOREACH(bt_mesh_beacon_cb, cb) {
+			for (struct bt_mesh_beacon_cb *cb = callbacks; cb; cb = cb->next) {
 				if (cb->snb_received) {
 					cb->snb_received(&beacon_info);
 				}
@@ -594,7 +601,7 @@ static bool priv_beacon_decrypt(struct bt_mesh_subnet *sub, void *cb_data)
 			beacon_info.iv_idx = params->iv_index;
 			memcpy(&beacon_info.auth_tag, params->auth, 8);
 
-			STRUCT_SECTION_FOREACH(bt_mesh_beacon_cb, cb) {
+			for (struct bt_mesh_beacon_cb *cb = callbacks; cb; cb = cb->next) {
 				if (cb->priv_received) {
 					cb->priv_received(&beacon_info);
 				}
@@ -612,7 +619,7 @@ static void net_beacon_register(struct bt_mesh_beacon *beacon, bool priv)
 	if (((priv && bt_mesh_priv_beacon_get() == BT_MESH_PRIV_GATT_PROXY_ENABLED) ||
 	     bt_mesh_beacon_enabled()) && beacon->cur < 0xff) {
 		beacon->cur++;
-		beacon->recv = k_uptime_get_32();
+		beacon->recv = bt_uptime_get_ms_32();
 	}
 }
 
@@ -633,8 +640,8 @@ static void net_beacon_recv(struct bt_mesh_subnet *sub,
 		"current iv_index 0x%08x",
 		sub->net_idx, params->flags, params->iv_index, bt_mesh.iv_index);
 
-	if (atomic_test_bit(bt_mesh.flags, BT_MESH_IVU_INITIATOR) &&
-	    (atomic_test_bit(bt_mesh.flags, BT_MESH_IVU_IN_PROGRESS) ==
+	if (bt_atomic_test_bit(bt_mesh.flags, BT_MESH_IVU_INITIATOR) &&
+	    (bt_atomic_test_bit(bt_mesh.flags, BT_MESH_IVU_IN_PROGRESS) ==
 	     BT_MESH_IV_UPDATE(params->flags))) {
 		bt_mesh_beacon_ivu_initiator(false);
 	}
@@ -777,7 +784,7 @@ BT_MESH_SUBNET_CB_DEFINE(beacon) = {
 
 void bt_mesh_beacon_init(void)
 {
-	k_work_init_delayable(&beacon_timer, beacon_send);
+	bt_work_init_delayable(&beacon_timer, beacon_send);
 
 #if defined(CONFIG_BT_MESH_PRIV_BEACONS)
 	private_random_update();
@@ -786,7 +793,7 @@ void bt_mesh_beacon_init(void)
 
 void bt_mesh_beacon_ivu_initiator(bool enable)
 {
-	atomic_set_bit_to(bt_mesh.flags, BT_MESH_IVU_INITIATOR, enable);
+	bt_atomic_set_bit_to(bt_mesh.flags, BT_MESH_IVU_INITIATOR, enable);
 
 	/* Fire the beacon handler straight away if it's not already pending -
 	 * in which case we'll fire according to the ongoing periodic sending.
@@ -798,7 +805,7 @@ void bt_mesh_beacon_ivu_initiator(bool enable)
 	 * just use this every time.
 	 */
 	beacon_send_sub_curr = NULL;
-	k_work_schedule(&beacon_timer, K_NO_WAIT);
+	bt_work_schedule(&beacon_timer, BT_NO_WAIT);
 }
 
 static void subnet_beacon_enable(struct bt_mesh_subnet *sub)
@@ -821,12 +828,31 @@ void bt_mesh_beacon_enable(void)
 	}
 
 	beacon_send_sub_curr = NULL;
-	k_work_reschedule(&beacon_timer, K_NO_WAIT);
+	bt_work_reschedule(&beacon_timer, BT_NO_WAIT);
 }
 
 void bt_mesh_beacon_disable(void)
 {
 	/* If this fails, we'll do an early exit in the work handler. */
 	beacon_send_sub_curr = NULL;
-	(void)k_work_cancel_delayable(&beacon_timer);
+	(void)bt_work_cancel_delayable(&beacon_timer);
 }
+
+#if defined(CONFIG_BT_TESTING)
+
+int bt_mesh_beacon_cb_register(struct bt_mesh_beacon_cb *cb)
+{
+	if (!cb) {
+		return -EINVAL;
+	}
+	for (struct bt_mesh_beacon_cb *entry = callbacks; entry; entry = entry->next) {
+		if (entry == cb) {
+			return -EALREADY;
+		}
+	}
+	cb->next = callbacks;
+	callbacks = cb;
+	return 0;
+}
+
+#endif

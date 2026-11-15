@@ -4,10 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <errno.h>
+#include <embt/osi/sync.h>
+#include <embt/base/time.h>
 #include <string.h>
-#include <zephyr/bluetooth/mesh.h>
-#include <zephyr/bluetooth/crypto.h>
-#include <zephyr/settings/settings.h>
+#include <embt/bluetooth/mesh.h>
+#include <embt/bluetooth/crypto.h>
+#include <embt/settings/settings.h>
 #include "access.h"
 #include "dfu.h"
 #include "blob.h"
@@ -147,11 +150,11 @@ static int req_setup(struct bt_mesh_dfu_cli *cli, enum req type, uint16_t addr,
 	return 0;
 }
 
-static int req_wait(struct bt_mesh_dfu_cli *cli, k_timeout_t timeout)
+static int req_wait(struct bt_mesh_dfu_cli *cli, bt_timeout_t timeout)
 {
 	int err;
 
-	err = k_sem_take(&cli->req.sem, timeout);
+	err = osi_sem_take(&cli->req.sem, timeout);
 	cli->req.type = REQ_NONE;
 
 	return err;
@@ -773,7 +776,7 @@ static int handle_status(const struct bt_mesh_model *mod, struct bt_mesh_msg_ctx
 			rsp->blob_id = 0U;
 			rsp->img_idx = 0U;
 		}
-		k_sem_give(&cli->req.sem);
+		osi_sem_give(&cli->req.sem);
 	}
 	if (cli->op != BT_MESH_DFU_OP_UPDATE_STATUS) {
 		return 0;
@@ -947,7 +950,7 @@ static int handle_info_status(const struct bt_mesh_model *mod, struct bt_mesh_ms
 				     cli->req.params);
 		if (it != BT_MESH_DFU_ITER_CONTINUE) {
 			if (cli->req.type == REQ_IMG) {
-				k_sem_give(&cli->req.sem);
+				osi_sem_give(&cli->req.sem);
 			}
 
 			return 0;
@@ -965,7 +968,7 @@ static int handle_info_status(const struct bt_mesh_model *mod, struct bt_mesh_ms
 	}
 
 	if (cli->req.type == REQ_IMG) {
-		k_sem_give(&cli->req.sem);
+		osi_sem_give(&cli->req.sem);
 		return 0;
 	}
 
@@ -1007,7 +1010,7 @@ static int handle_metadata_status(const struct bt_mesh_model *mod, struct bt_mes
 
 	rsp->status = hdr & BIT_MASK(3);
 	rsp->effect = (hdr >> 3);
-	k_sem_give(&cli->req.sem);
+	osi_sem_give(&cli->req.sem);
 
 	return 0;
 }
@@ -1039,7 +1042,7 @@ static int dfu_cli_init(const struct bt_mesh_model *mod)
 		return err;
 	}
 
-	k_sem_init(&cli->req.sem, 0, 1);
+	osi_sem_init(&cli->req.sem, 0, 1);
 
 	return 0;
 }
@@ -1164,7 +1167,7 @@ int bt_mesh_dfu_cli_cancel(struct bt_mesh_dfu_cli *cli,
 			return err;
 		}
 
-		return req_wait(cli, K_MSEC(dfu_cli_timeout));
+		return req_wait(cli, BT_MSEC(dfu_cli_timeout));
 	}
 
 	if (cli->xfer.state == STATE_IDLE) {
@@ -1253,7 +1256,7 @@ int bt_mesh_dfu_cli_imgs_get(struct bt_mesh_dfu_cli *cli,
 		return err;
 	}
 
-	err = req_wait(cli, K_MSEC(dfu_cli_timeout));
+	err = req_wait(cli, BT_MSEC(dfu_cli_timeout));
 
 	cli->req.img_cb = NULL;
 
@@ -1291,7 +1294,7 @@ int bt_mesh_dfu_cli_metadata_check(struct bt_mesh_dfu_cli *cli,
 		return err;
 	}
 
-	return req_wait(cli, K_MSEC(dfu_cli_timeout));
+	return req_wait(cli, BT_MSEC(dfu_cli_timeout));
 }
 
 int bt_mesh_dfu_cli_status_get(struct bt_mesh_dfu_cli *cli,
@@ -1314,7 +1317,7 @@ int bt_mesh_dfu_cli_status_get(struct bt_mesh_dfu_cli *cli,
 		return err;
 	}
 
-	return req_wait(cli, K_MSEC(dfu_cli_timeout));
+	return req_wait(cli, BT_MSEC(dfu_cli_timeout));
 }
 
 int32_t bt_mesh_dfu_cli_timeout_get(void)

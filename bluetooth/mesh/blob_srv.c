@@ -3,8 +3,12 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
+#include <errno.h>
+#include <embt/base/work.h>
+#include <embt/base/time.h>
+#include <embt/base/atomic.h>
 #include <string.h>
-#include <zephyr/bluetooth/mesh.h>
+#include <embt/bluetooth/mesh.h>
 #include <common/bt_str.h>
 #include "net.h"
 #include "access.h"
@@ -20,7 +24,7 @@ LOG_MODULE_REGISTER(bt_mesh_blob_srv, CONFIG_BT_MESH_MODEL_LOG_LEVEL);
 /* The Receive BLOB Timeout Timer */
 #define SERVER_TIMEOUT_SECS(srv) (10 * (1 + (srv)->state.timeout_base))
 /* The initial timer value used by an instance of the Pull BLOB State machine - T_BPI */
-#define REPORT_TIMER_TIMEOUT K_SECONDS(CONFIG_BT_MESH_BLOB_REPORT_TIMEOUT)
+#define REPORT_TIMER_TIMEOUT BT_SECONDS(CONFIG_BT_MESH_BLOB_REPORT_TIMEOUT)
 
 BUILD_ASSERT(BLOB_BLOCK_SIZE_LOG_MIN <= BLOB_BLOCK_SIZE_LOG_MAX,
 	     "The must be at least one number between the min and "
@@ -114,7 +118,7 @@ static void reset_timer(struct bt_mesh_blob_srv *srv)
 			MAX(SERVER_TIMEOUT_SECS(srv),
 			    CONFIG_BT_MESH_BLOB_REPORT_TIMEOUT + 1) :
 			SERVER_TIMEOUT_SECS(srv);
-	k_work_reschedule(&srv->rx_timeout, K_SECONDS(timeout_secs));
+	bt_work_reschedule(&srv->rx_timeout, BT_SECONDS(timeout_secs));
 }
 
 static void buf_chunk_index_add(struct net_buf_simple *buf, uint16_t chunk)
@@ -165,8 +169,8 @@ static void report_sent(int err, void *cb_data)
 		bt_mesh_lpn_poll();
 	}
 
-	if (k_work_delayable_is_pending(&srv->rx_timeout)) {
-		k_work_reschedule(&srv->pull.report, REPORT_TIMER_TIMEOUT);
+	if (bt_work_delayable_is_pending(&srv->rx_timeout)) {
+		bt_work_reschedule(&srv->pull.report, REPORT_TIMER_TIMEOUT);
 	}
 }
 
@@ -181,7 +185,7 @@ static void block_report(struct bt_mesh_blob_srv *srv)
 	size_t chunk;
 	int count;
 
-	LOG_DBG("rx BLOB Timeout Timer: %i", k_work_delayable_is_pending(&srv->rx_timeout));
+	LOG_DBG("rx BLOB Timeout Timer: %i", bt_work_delayable_is_pending(&srv->rx_timeout));
 
 	BT_MESH_MODEL_BUF_DEFINE(buf, BT_MESH_BLOB_OP_BLOCK_REPORT,
 				 BLOB_BLOCK_REPORT_STATUS_MSG_MAXLEN);
@@ -219,8 +223,8 @@ static void cancel(struct bt_mesh_blob_srv *srv)
 	srv->block.number = 0xffff;
 	memset(srv->block.missing, 0, sizeof(srv->block.missing));
 	srv->state.xfer.chunk_size = 0xffff;
-	k_work_cancel_delayable(&srv->rx_timeout);
-	k_work_cancel_delayable(&srv->pull.report);
+	bt_work_cancel_delayable(&srv->rx_timeout);
+	bt_work_cancel_delayable(&srv->pull.report);
 	io_close(srv);
 	erase_state(srv);
 
@@ -232,8 +236,8 @@ static void cancel(struct bt_mesh_blob_srv *srv)
 static void suspend(struct bt_mesh_blob_srv *srv)
 {
 	LOG_DBG("");
-	k_work_cancel_delayable(&srv->rx_timeout);
-	k_work_cancel_delayable(&srv->pull.report);
+	bt_work_cancel_delayable(&srv->rx_timeout);
+	bt_work_cancel_delayable(&srv->pull.report);
 	phase_set(srv, BT_MESH_BLOB_XFER_PHASE_SUSPENDED);
 	if (srv->cb && srv->cb->suspended) {
 		srv->cb->suspended(srv);
@@ -251,8 +255,8 @@ static void resume(struct bt_mesh_blob_srv *srv)
 static void end(struct bt_mesh_blob_srv *srv)
 {
 	phase_set(srv, BT_MESH_BLOB_XFER_PHASE_COMPLETE);
-	k_work_cancel_delayable(&srv->rx_timeout);
-	k_work_cancel_delayable(&srv->pull.report);
+	bt_work_cancel_delayable(&srv->rx_timeout);
+	bt_work_cancel_delayable(&srv->pull.report);
 	io_close(srv);
 	erase_state(srv);
 
@@ -279,7 +283,7 @@ static bool pull_mode_xfer_complete(struct bt_mesh_blob_srv *srv)
 	       all_blocks_received(srv);
 }
 
-static void timeout(struct k_work *work)
+static void timeout(struct bt_work *work)
 {
 	struct bt_mesh_blob_srv *srv =
 		CONTAINER_OF(work, struct bt_mesh_blob_srv, rx_timeout.work);
@@ -295,7 +299,7 @@ static void timeout(struct k_work *work)
 	}
 }
 
-static void report_timeout(struct k_work *work)
+static void report_timeout(struct bt_work *work)
 {
 	struct bt_mesh_blob_srv *srv =
 		CONTAINER_OF(work, struct bt_mesh_blob_srv, pull.report.work);
@@ -532,7 +536,7 @@ static int handle_xfer_start(const struct bt_mesh_model *mod, struct bt_mesh_msg
 
 	memset(srv->state.blocks, 0, sizeof(srv->state.blocks));
 	for (int i = 0; i < block_count; i++) {
-		atomic_set_bit(srv->state.blocks, i);
+		bt_atomic_set_bit(srv->state.blocks, i);
 	}
 
 	err = io_open(srv);
@@ -677,7 +681,7 @@ static int handle_block_start(const struct bt_mesh_model *mod, struct bt_mesh_ms
 	srv->block.offset = block_number * (1UL << srv->state.xfer.block_size_log);
 
 	if (srv->phase == BT_MESH_BLOB_XFER_PHASE_COMPLETE ||
-	    !atomic_test_bit(srv->state.blocks, block_number)) {
+	    !bt_atomic_test_bit(srv->state.blocks, block_number)) {
 		memset(srv->block.missing, 0, sizeof(srv->block.missing));
 		status = BT_MESH_BLOB_SUCCESS;
 		goto rsp;
@@ -707,7 +711,7 @@ static int handle_block_start(const struct bt_mesh_model *mod, struct bt_mesh_ms
 
 	if (srv->state.xfer.mode == BT_MESH_BLOB_XFER_MODE_PULL) {
 		/* Wait for the client to send the first chunk */
-		k_work_reschedule(&srv->pull.report, REPORT_TIMER_TIMEOUT);
+		bt_work_reschedule(&srv->pull.report, REPORT_TIMER_TIMEOUT);
 	}
 
 	status = BT_MESH_BLOB_SUCCESS;
@@ -757,7 +761,7 @@ static int handle_chunk(const struct bt_mesh_model *mod, struct bt_mesh_msg_ctx 
 
 	reset_timer(srv);
 	if (srv->state.xfer.mode == BT_MESH_BLOB_XFER_MODE_PULL) {
-		k_work_reschedule(&srv->pull.report, REPORT_TIMER_TIMEOUT);
+		bt_work_reschedule(&srv->pull.report, REPORT_TIMER_TIMEOUT);
 	}
 
 	if (!blob_chunk_missing_get(srv->block.missing, idx)) {
@@ -783,7 +787,7 @@ static int handle_chunk(const struct bt_mesh_model *mod, struct bt_mesh_msg_ctx 
 		srv->io->block_end(srv->io, &srv->state.xfer, &srv->block);
 	}
 
-	atomic_clear_bit(srv->state.blocks, srv->block.number);
+	bt_atomic_clear_bit(srv->state.blocks, srv->block.number);
 
 	if (!all_blocks_received(srv)) {
 		phase_set(srv, BT_MESH_BLOB_XFER_PHASE_WAITING_FOR_BLOCK);
@@ -873,8 +877,8 @@ static int blob_srv_init(const struct bt_mesh_model *mod)
 	srv->state.ttl = BT_MESH_TTL_DEFAULT;
 	srv->block.number = 0xffff;
 	srv->state.xfer.chunk_size = 0xffff;
-	k_work_init_delayable(&srv->rx_timeout, timeout);
-	k_work_init_delayable(&srv->pull.report, report_timeout);
+	bt_work_init_delayable(&srv->rx_timeout, timeout);
+	bt_work_init_delayable(&srv->pull.report, report_timeout);
 
 	return 0;
 }
@@ -955,8 +959,8 @@ static void blob_srv_reset(const struct bt_mesh_model *mod)
 
 	phase_set(srv, BT_MESH_BLOB_XFER_PHASE_INACTIVE);
 	srv->state.xfer.mode = BT_MESH_BLOB_XFER_MODE_NONE;
-	k_work_cancel_delayable(&srv->rx_timeout);
-	k_work_cancel_delayable(&srv->pull.report);
+	bt_work_cancel_delayable(&srv->rx_timeout);
+	bt_work_cancel_delayable(&srv->pull.report);
 	erase_state(srv);
 }
 
@@ -1023,7 +1027,7 @@ uint8_t bt_mesh_blob_srv_progress(const struct bt_mesh_blob_srv *srv)
 
 	received = 0;
 	for (int i = 0; i < total; ++i) {
-		if (!atomic_test_bit(srv->state.blocks, i)) {
+		if (!bt_atomic_test_bit(srv->state.blocks, i)) {
 			received++;
 		}
 	}

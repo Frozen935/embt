@@ -13,7 +13,7 @@
 #ifndef ZEPHYR_INCLUDE_BLUETOOTH_MESH_RPR_CLI_H_
 #define ZEPHYR_INCLUDE_BLUETOOTH_MESH_RPR_CLI_H_
 
-#include <embt/storage.h>
+#include <embt/base/work.h>
 #include <embt/bluetooth/mesh/access.h>
 #include <embt/bluetooth/mesh/rpr.h>
 
@@ -89,7 +89,7 @@ struct bt_mesh_rpr_cli {
 	struct bt_mesh_msg_ack_ctx prov_ack_ctx;
 
 	struct {
-		struct k_work_delayable timeout;
+		struct bt_work_delayable timeout;
 		struct bt_mesh_rpr_node srv;
 		uint8_t time;
 		uint8_t tx_pdu;

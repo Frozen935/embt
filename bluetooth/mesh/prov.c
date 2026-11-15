@@ -5,16 +5,18 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <string.h>
+#include <embt/base/assert.h>
 #include <errno.h>
-#include <zephyr/sys/atomic.h>
-#include <zephyr/sys/util.h>
-#include <zephyr/sys/byteorder.h>
+#include <embt/base/atomic.h>
+#include <embt/base/util.h>
+#include <embt/base/byteorder.h>
 
-#include <zephyr/net_buf.h>
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/mesh.h>
-#include <zephyr/bluetooth/uuid.h>
+#include <embt/net_buf.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/mesh.h>
+#include <embt/bluetooth/uuid.h>
 
 #include "crypto.h"
 #include "mesh.h"
@@ -41,7 +43,7 @@ int bt_mesh_prov_reset_state(void)
 	int err;
 	const size_t offset = offsetof(struct bt_mesh_prov_link, addr);
 
-	atomic_clear(bt_mesh_prov_link.flags);
+	bt_atomic_clear(bt_mesh_prov_link.flags);
 	(void)memset((uint8_t *)&bt_mesh_prov_link + offset, 0,
 		     sizeof(bt_mesh_prov_link) - offset);
 
@@ -256,7 +258,7 @@ int bt_mesh_prov_auth(bool is_provisioner, uint8_t method, uint8_t action, size_
 			return -EINVAL;
 		}
 
-		atomic_set_bit(bt_mesh_prov_link.flags, OOB_STATIC_KEY);
+		bt_atomic_set_bit(bt_mesh_prov_link.flags, OOB_STATIC_KEY);
 
 		return 0;
 
@@ -270,16 +272,16 @@ int bt_mesh_prov_auth(bool is_provisioner, uint8_t method, uint8_t action, size_
 		if (is_provisioner) {
 			if (output == BT_MESH_DISPLAY_STRING) {
 				input = BT_MESH_ENTER_STRING;
-				atomic_set_bit(bt_mesh_prov_link.flags, WAIT_STRING);
+				bt_atomic_set_bit(bt_mesh_prov_link.flags, WAIT_STRING);
 			} else {
 				input = BT_MESH_ENTER_NUMBER;
-				atomic_set_bit(bt_mesh_prov_link.flags, WAIT_NUMBER);
+				bt_atomic_set_bit(bt_mesh_prov_link.flags, WAIT_NUMBER);
 			}
 
 			return bt_mesh_prov->input(input, size);
 		}
 
-		atomic_set_bit(bt_mesh_prov_link.flags, NOTIFY_INPUT_COMPLETE);
+		bt_atomic_set_bit(bt_mesh_prov_link.flags, NOTIFY_INPUT_COMPLETE);
 
 		if (output == BT_MESH_DISPLAY_STRING) {
 			get_auth_string(rand_bytes, MIN(size, auth_size));
@@ -298,15 +300,15 @@ int bt_mesh_prov_auth(bool is_provisioner, uint8_t method, uint8_t action, size_
 
 		if (!is_provisioner) {
 			if (input == BT_MESH_ENTER_STRING) {
-				atomic_set_bit(bt_mesh_prov_link.flags, WAIT_STRING);
+				bt_atomic_set_bit(bt_mesh_prov_link.flags, WAIT_STRING);
 			} else {
-				atomic_set_bit(bt_mesh_prov_link.flags, WAIT_NUMBER);
+				bt_atomic_set_bit(bt_mesh_prov_link.flags, WAIT_NUMBER);
 			}
 
 			return bt_mesh_prov->input(input, size);
 		}
 
-		atomic_set_bit(bt_mesh_prov_link.flags, NOTIFY_INPUT_COMPLETE);
+		bt_atomic_set_bit(bt_mesh_prov_link.flags, NOTIFY_INPUT_COMPLETE);
 
 		if (input == BT_MESH_ENTER_STRING) {
 			get_auth_string(rand_bytes, MIN(size, auth_size));
@@ -332,7 +334,7 @@ int bt_mesh_input_numeric(uint8_t *numeric, size_t size)
 		return -ENOTSUP;
 	}
 
-	if (!atomic_test_and_clear_bit(bt_mesh_prov_link.flags, WAIT_NUMBER)) {
+	if (!bt_atomic_test_and_clear_bit(bt_mesh_prov_link.flags, WAIT_NUMBER)) {
 		return -EINVAL;
 	}
 
@@ -354,7 +356,7 @@ int bt_mesh_input_string(const char *str)
 		return -ENOTSUP;
 	}
 
-	if (!atomic_test_and_clear_bit(bt_mesh_prov_link.flags, WAIT_STRING)) {
+	if (!bt_atomic_test_and_clear_bit(bt_mesh_prov_link.flags, WAIT_STRING)) {
 		return -EINVAL;
 	}
 
@@ -373,7 +375,7 @@ const struct bt_mesh_prov *bt_mesh_prov_get(void)
 
 bool bt_mesh_prov_active(void)
 {
-	return atomic_test_bit(bt_mesh_prov_link.flags, LINK_ACTIVE);
+	return bt_atomic_test_bit(bt_mesh_prov_link.flags, LINK_ACTIVE);
 }
 
 static void prov_recv(const struct prov_bearer *bearer, void *cb_data,
@@ -427,7 +429,7 @@ static void prov_recv(const struct prov_bearer *bearer, void *cb_data,
 
 static void prov_link_opened(const struct prov_bearer *bearer, void *cb_data)
 {
-	atomic_set_bit(bt_mesh_prov_link.flags, LINK_ACTIVE);
+	bt_atomic_set_bit(bt_mesh_prov_link.flags, LINK_ACTIVE);
 
 	if (bt_mesh_prov->link_open) {
 		bt_mesh_prov->link_open(bearer->type);

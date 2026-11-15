@@ -5,13 +5,23 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <zephyr/sys/util.h>
+#include <errno.h>
+#include <embt/base/work.h>
+#include <embt/base/time.h>
+#include <embt/base/time.h>
+#include <embt/base/atomic.h>
+#include <embt/osi/thread.h>
+#include <embt/osi/time.h>
+#include <string.h>
+#include <embt/base/assert.h>
+#include <embt/base/util_macro.h>
+#include <embt/base/util.h>
 
-#include <zephyr/net_buf.h>
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/hci.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/mesh.h>
+#include <embt/net_buf.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/hci.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/mesh.h>
 
 #include "common/bt_str.h"
 
@@ -32,13 +42,13 @@ LOG_MODULE_REGISTER(bt_mesh_adv_legacy, CONFIG_BT_MESH_ADV_LOG_LEVEL);
 #define ADV_INT_DEFAULT_MS 100
 #define ADV_INT_FAST_MS    20
 
-static struct k_thread adv_thread_data;
-static K_KERNEL_STACK_DEFINE(adv_thread_stack, CONFIG_BT_MESH_ADV_STACK_SIZE);
+static os_thread_t adv_thread_data;
+static bool adv_thread_started;
 static int32_t adv_timeout;
 
 static bool is_mesh_suspended(void)
 {
-	return atomic_test_bit(bt_mesh.flags, BT_MESH_SUSPENDED);
+	return bt_atomic_test_bit(bt_mesh.flags, BT_MESH_SUSPENDED);
 }
 
 static int bt_data_send(uint8_t num_events, uint16_t adv_int,
@@ -46,7 +56,7 @@ static int bt_data_send(uint8_t num_events, uint16_t adv_int,
 			struct bt_mesh_adv_ctx *ctx)
 {
 	struct bt_le_adv_param param = {};
-	uint64_t uptime = k_uptime_get();
+	uint64_t uptime = bt_uptime_get_ms();
 	uint16_t duration;
 	int err;
 	const int32_t adv_int_min =
@@ -58,14 +68,7 @@ static int bt_data_send(uint8_t num_events, uint16_t adv_int,
 
 	ARG_UNUSED(uptime);
 
-	/* Zephyr Bluetooth Low Energy Controller for mesh stack uses
-	 * pre-emptible continuous scanning, allowing advertising events to be
-	 * transmitted without delay when advertising is enabled. No need to
-	 * compensate with scan window duration.
-	 * An advertising event could be delayed by upto one interval when
-	 * advertising is stopped and started in quick succession, hence add
-	 * advertising interval to the total advertising duration.
-	 */
+
 	duration = adv_int + num_events * (adv_int + 10);
 
 	/* Zephyr Bluetooth Low Energy Controller built for nRF51x SoCs use
@@ -75,9 +78,7 @@ static int bt_data_send(uint8_t num_events, uint16_t adv_int,
 	 * amount of scan window duration to compensate for the blocked
 	 * advertising events.
 	 */
-	if (IS_ENABLED(CONFIG_BT_CTLR_LOW_LAT)) {
-		duration += BT_MESH_SCAN_WINDOW_MS;
-	}
+
 
 	LOG_DBG("count %u interval %ums duration %ums",
 		num_events, adv_int, duration);
@@ -106,7 +107,7 @@ static int bt_data_send(uint8_t num_events, uint16_t adv_int,
 	}
 
 	if (!is_mesh_suspended()) {
-		k_sleep(K_MSEC(duration));
+		osi_sleep_ms(BT_MSEC(duration));
 	}
 
 	err = bt_le_adv_stop();
@@ -115,7 +116,7 @@ static int bt_data_send(uint8_t num_events, uint16_t adv_int,
 		return err;
 	}
 
-	LOG_DBG("Advertising stopped (%u ms)", (uint32_t) k_uptime_delta(&uptime));
+	LOG_DBG("Advertising stopped (%u ms)", (uint32_t) (bt_uptime_get_ms() - uptime));
 
 	return 0;
 }
@@ -144,14 +145,14 @@ static inline void adv_send(struct bt_mesh_adv *adv)
 	bt_data_send(num_events, adv_int, &ad, 1, &adv->ctx);
 }
 
-static void adv_thread(void *p1, void *p2, void *p3)
+static void adv_thread(void *p1)
 {
 	LOG_DBG("started");
 	struct bt_mesh_adv *adv;
 
 	while (!is_mesh_suspended()) {
 		if (IS_ENABLED(CONFIG_BT_MESH_GATT_SERVER)) {
-			adv = bt_mesh_adv_get(K_NO_WAIT);
+			adv = bt_mesh_adv_get(BT_NO_WAIT);
 			if (IS_ENABLED(CONFIG_BT_MESH_PROXY_SOLICITATION) && !adv) {
 				(void)bt_mesh_sol_send();
 			}
@@ -172,7 +173,7 @@ static void adv_thread(void *p1, void *p2, void *p3)
 				}
 			}
 		} else {
-			adv = bt_mesh_adv_get(K_FOREVER);
+			adv = bt_mesh_adv_get(BT_FOREVER);
 		}
 
 		if (!adv) {
@@ -192,11 +193,11 @@ static void adv_thread(void *p1, void *p2, void *p3)
 		bt_mesh_adv_send_end(0, &ctx);
 
 		/* Give other threads a chance to run */
-		k_yield();
+		osi_thread_yield();
 	}
 
 	/* Empty the advertising pool when advertising is disabled */
-	while ((adv = bt_mesh_adv_get(K_NO_WAIT))) {
+	while ((adv = bt_mesh_adv_get(BT_NO_WAIT))) {
 		bt_mesh_adv_send_start(0, -ENODEV, &adv->ctx);
 		bt_mesh_adv_unref(adv);
 	}
@@ -226,45 +227,45 @@ int bt_mesh_adv_terminate(struct bt_mesh_adv *adv)
 
 void bt_mesh_adv_init(void)
 {
-	k_thread_create(&adv_thread_data, adv_thread_stack,
-			K_KERNEL_STACK_SIZEOF(adv_thread_stack), adv_thread,
-			NULL, NULL, NULL, K_PRIO_COOP(CONFIG_BT_MESH_ADV_PRIO),
-			0, K_FOREVER);
-	k_thread_name_set(&adv_thread_data, "BT Mesh adv");
+	/* Native worker creation is deferred until advertising is enabled. */
 }
 
 int bt_mesh_adv_enable(void)
 {
-	/* The advertiser thread relies on BT_MESH_SUSPENDED flag. No point in starting the
-	 * advertiser thread if the flag is not set.
-	 */
+	int err;
+
 	if (is_mesh_suspended()) {
 		return -EINVAL;
 	}
-
-	k_thread_start(&adv_thread_data);
-	return 0;
+	if (adv_thread_started) {
+		return 0;
+	}
+	err = osi_thread_create(&adv_thread_data, adv_thread, NULL, "BT Mesh adv",
+				CONFIG_BT_MESH_ADV_PRIO, CONFIG_BT_MESH_ADV_STACK_SIZE);
+	if (!err) {
+		adv_thread_started = true;
+	}
+	return err;
 }
 
 int bt_mesh_adv_disable(void)
 {
 	int err;
 
-	/* k_thread_join will sleep forever if BT_MESH_SUSPENDED flag is not set. The advertiser
-	 * thread will exit once the flag is set. The flag is set by the higher layer function. Here
-	 * we need to check that the flag is dropped and ensure that the thread is stopped.
-	 */
 	if (!is_mesh_suspended()) {
 		return -EINVAL;
 	}
-
-	err = k_thread_join(&adv_thread_data, K_FOREVER);
+	if (!adv_thread_started) {
+		return 0;
+	}
+	/* Wake a blocked consumer so it can observe the suspended state. */
+	bt_mesh_adv_get_cancel();
+	err = osi_thread_join(&adv_thread_data);
 	LOG_DBG("Advertising disabled: %d", err);
-
-	/* Since the thread will immediately stop after this function call and won’t perform any
-	 * further operations, it’s safe to ignore the deadlock error (EDEADLK).
-	 */
-	return err == -EDEADLK ? 0 : err;
+	if (!err) {
+		adv_thread_started = false;
+	}
+	return err;
 }
 
 int bt_mesh_adv_gatt_start(const struct bt_le_adv_param *param, int32_t duration,
@@ -275,7 +276,7 @@ int bt_mesh_adv_gatt_start(const struct bt_le_adv_param *param, int32_t duration
 	return bt_le_adv_start(param, ad, ad_len, sd, sd_len);
 }
 
-int bt_mesh_wq_submit(struct k_work *work)
+int bt_mesh_wq_submit(struct bt_work *work)
 {
-	return k_work_submit(work);
+	return bt_work_submit(work);
 }

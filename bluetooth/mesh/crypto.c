@@ -8,8 +8,8 @@
 #include <string.h>
 #include <stdbool.h>
 #include <errno.h>
-#include <zephyr/sys/byteorder.h>
-#include <zephyr/bluetooth/mesh.h>
+#include <embt/base/byteorder.h>
+#include <embt/bluetooth/mesh.h>
 
 #include "common/bt_str.h"
 

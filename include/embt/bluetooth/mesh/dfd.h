@@ -13,7 +13,7 @@
 #ifndef ZEPHYR_INCLUDE_BLUETOOTH_MESH_DFD_H__
 #define ZEPHYR_INCLUDE_BLUETOOTH_MESH_DFD_H__
 
-#include <embt/bluetooth/mesh.h>
+#include <embt/bluetooth/mesh/dfu.h>
 
 #ifdef __cplusplus
 extern "C" {

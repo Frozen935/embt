@@ -17,6 +17,7 @@
  * @{
  */
 
+#include <embt/base/work.h>
 #include <embt/bluetooth/mesh.h>
 #include <embt/bluetooth/byteorder.h>
 
@@ -155,7 +156,7 @@ struct bt_mesh_health_srv {
 	const struct bt_mesh_health_srv_cb *cb;
 
 	/** Attention Timer state */
-	struct k_work_delayable attn_timer;
+	struct bt_work_delayable attn_timer;
 };
 
 /**

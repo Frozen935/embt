@@ -4,15 +4,19 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <embt/base/work.h>
+#include <embt/base/time.h>
+#include <embt/base/assert.h>
 #include <string.h>
 #include <errno.h>
 #include <stdbool.h>
-#include <zephyr/types.h>
-#include <zephyr/sys/byteorder.h>
-#include <zephyr/sys/util.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <embt/base/byteorder.h>
+#include <embt/base/util.h>
 
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/mesh.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/mesh.h>
 
 #include "mesh.h"
 #include "net.h"
@@ -233,8 +237,7 @@ static int send_attention_status(const struct bt_mesh_model *model,
 	struct bt_mesh_health_srv *srv = model->rt->user_data;
 	uint8_t time;
 
-	time = k_ticks_to_ms_floor32(
-		k_work_delayable_remaining_get(&srv->attn_timer)) / 1000U;
+	time = (uint32_t)(bt_work_delayable_remaining_get(&srv->attn_timer)) / 1000U;
 	LOG_DBG("%u second%s", time, (time == 1U) ? "" : "s");
 
 	bt_mesh_model_msg_init(&msg, OP_ATTENTION_STATUS);
@@ -402,9 +405,9 @@ int bt_mesh_health_srv_fault_update(const struct bt_mesh_elem *elem)
 	return bt_mesh_model_publish(mod);
 }
 
-static void attention_off(struct k_work *work)
+static void attention_off(struct bt_work *work)
 {
-	struct k_work_delayable *dwork = k_work_delayable_from_work(work);
+	struct bt_work_delayable *dwork = bt_work_delayable_from_work(work);
 	struct bt_mesh_health_srv *srv = CONTAINER_OF(dwork,
 						      struct bt_mesh_health_srv,
 						      attn_timer);
@@ -431,7 +434,7 @@ static int health_srv_init(const struct bt_mesh_model *model)
 
 	model->pub->update = health_pub_update;
 
-	k_work_init_delayable(&srv->attn_timer, attention_off);
+	bt_work_init_delayable(&srv->attn_timer, attention_off);
 
 	srv->model = model;
 
@@ -466,5 +469,5 @@ void bt_mesh_attention(const struct bt_mesh_model *model, uint8_t time)
 		srv->cb->attn_on(model);
 	}
 
-	k_work_reschedule(&srv->attn_timer, K_SECONDS(time));
+	bt_work_reschedule(&srv->attn_timer, BT_SECONDS(time));
 }

@@ -12,9 +12,9 @@
 
 #include <stdint.h>
 
-#include <zephyr/bluetooth/mesh.h>
-#include <zephyr/bluetooth/mesh/access.h>
-#include <zephyr/sys/slist.h>
+#include <embt/bluetooth/mesh.h>
+#include <embt/bluetooth/mesh/access.h>
+#include <embt/base/slist.h>
 
 /** @brief Bluetooth Testing callbacks structure.
  *

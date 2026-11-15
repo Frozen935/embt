@@ -10,7 +10,9 @@
 #ifndef ZEPHYR_SUBSYS_BLUETOOTH_MESH_PROXY_MSG_H_
 #define ZEPHYR_SUBSYS_BLUETOOTH_MESH_PROXY_MSG_H_
 
-#include <zephyr/bluetooth/gatt.h>
+#include <embt/base/fifo.h>
+#include <embt/base/work.h>
+#include <embt/bluetooth/gatt.h>
 
 #define PDU_TYPE(data)     (data[0] & BIT_MASK(6))
 #define CFG_FILTER_SET     0x00
@@ -37,15 +39,15 @@ struct bt_mesh_proxy_role {
 	struct bt_conn *conn;
 	uint8_t msg_type;
 
-	struct k_fifo pending;
-	struct k_work work;
+	struct bt_fifo pending;
+	struct bt_work work;
 
 	struct {
 		proxy_send_cb_t send;
 		proxy_recv_cb_t recv;
 	} cb;
 
-	struct k_work_delayable sar_timer;
+	struct bt_work_delayable sar_timer;
 	struct net_buf_simple buf;
 };
 

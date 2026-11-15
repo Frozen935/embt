@@ -4,8 +4,12 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-#include <zephyr/bluetooth/mesh.h>
-#include <zephyr/bluetooth/conn.h>
+#include <errno.h>
+#include <embt/base/work.h>
+#include <embt/base/time.h>
+#include <embt/base/atomic.h>
+#include <embt/bluetooth/mesh.h>
+#include <embt/bluetooth/conn.h>
 #include "net.h"
 #include "proxy.h"
 #include "prov.h"
@@ -14,7 +18,7 @@
 #include "pb_gatt_srv.h"
 #include "pb_gatt_cli.h"
 
-#include <zephyr/bluetooth/hci.h>
+#include <embt/bluetooth/hci.h>
 
 #include "common/bt_str.h"
 #include <embt/base/log.h>
@@ -31,7 +35,7 @@ struct prov_link {
 	const struct prov_bearer_cb *cb;
 	void *cb_data;
 	struct prov_bearer_send_cb comp;
-	struct k_work_delayable prot_timer;
+	struct bt_work_delayable prot_timer;
 };
 
 static struct prov_link link;
@@ -41,7 +45,7 @@ static void reset_state(void)
 	bt_conn_drop(&link.conn);
 
 	/* If this fails, the protocol timeout handler will exit early. */
-	(void)k_work_cancel_delayable(&link.prot_timer);
+	(void)bt_work_cancel_delayable(&link.prot_timer);
 }
 
 static void link_closed(enum prov_bearer_link_status status)
@@ -54,15 +58,15 @@ static void link_closed(enum prov_bearer_link_status status)
 	cb->link_closed(&bt_mesh_pb_gatt, cb_data, status);
 }
 
-static void protocol_timeout(struct k_work *work)
+static void protocol_timeout(struct bt_work *work)
 {
-	if (!atomic_test_bit(bt_mesh_prov_link.flags, LINK_ACTIVE)) {
+	if (!bt_atomic_test_bit(bt_mesh_prov_link.flags, LINK_ACTIVE)) {
 		return;
 	}
 
 	/* If connection failed or timeout, not allow establish connection */
 	if (IS_ENABLED(CONFIG_BT_MESH_PB_GATT_CLIENT) &&
-	    atomic_test_bit(bt_mesh_prov_link.flags, PROVISIONER)) {
+	    bt_atomic_test_bit(bt_mesh_prov_link.flags, PROVISIONER)) {
 		if (link.conn) {
 			(void)bt_conn_disconnect(link.conn,
 						 BT_HCI_ERR_REMOTE_USER_TERM_CONN);
@@ -90,7 +94,7 @@ int bt_mesh_pb_gatt_recv(struct bt_conn *conn, struct net_buf_simple *buf)
 		return -EINVAL;
 	}
 
-	k_work_reschedule(&link.prot_timer, bt_mesh_prov_protocol_timeout_get());
+	bt_work_reschedule(&link.prot_timer, bt_mesh_prov_protocol_timeout_get());
 
 	link.cb->recv(&bt_mesh_pb_gatt, link.cb_data, buf);
 
@@ -106,7 +110,7 @@ int bt_mesh_pb_gatt_start(struct bt_conn *conn)
 	}
 
 	link.conn = bt_conn_ref(conn);
-	k_work_reschedule(&link.prot_timer, bt_mesh_prov_protocol_timeout_get());
+	bt_work_reschedule(&link.prot_timer, bt_mesh_prov_protocol_timeout_get());
 
 	link.cb->link_opened(&bt_mesh_pb_gatt, link.cb_data);
 
@@ -137,7 +141,7 @@ int bt_mesh_pb_gatt_cli_start(struct bt_conn *conn)
 	}
 
 	link.conn = bt_conn_ref(conn);
-	k_work_reschedule(&link.prot_timer, bt_mesh_prov_protocol_timeout_get());
+	bt_work_reschedule(&link.prot_timer, bt_mesh_prov_protocol_timeout_get());
 
 	return 0;
 }
@@ -164,7 +168,7 @@ static int prov_link_open(const uint8_t uuid[16], uint8_t timeout,
 	link.cb = cb;
 	link.cb_data = cb_data;
 
-	k_work_reschedule(&link.prot_timer, K_SECONDS(timeout));
+	bt_work_reschedule(&link.prot_timer, BT_SECONDS(timeout));
 
 	return bt_mesh_pb_gatt_cli_setup(uuid);
 }
@@ -218,7 +222,7 @@ static int buf_send(struct net_buf_simple *buf, prov_bearer_send_complete_t cb,
 	link.comp.cb = cb;
 	link.comp.cb_data = cb_data;
 
-	k_work_reschedule(&link.prot_timer, bt_mesh_prov_protocol_timeout_get());
+	bt_work_reschedule(&link.prot_timer, bt_mesh_prov_protocol_timeout_get());
 
 	return bt_mesh_proxy_msg_send(link.conn, BT_MESH_PROXY_PROV,
 				      buf, buf_send_end, NULL);
@@ -231,7 +235,7 @@ static void clear_tx(void)
 
 void bt_mesh_pb_gatt_init(void)
 {
-	k_work_init_delayable(&link.prot_timer, protocol_timeout);
+	bt_work_init_delayable(&link.prot_timer, protocol_timeout);
 }
 
 void bt_mesh_pb_gatt_reset(void)

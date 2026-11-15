@@ -5,18 +5,19 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <stdio.h>
+#include <embt/base/assert.h>
 #include <string.h>
 #include <errno.h>
 #include <stdbool.h>
 #include <stdlib.h>
-#include <zephyr/sys/atomic.h>
-#include <zephyr/sys/util.h>
-#include <zephyr/sys/byteorder.h>
-#include <zephyr/sys/iterable_sections.h>
-#include <zephyr/net_buf.h>
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/mesh.h>
+#include <embt/base/atomic.h>
+#include <embt/base/util.h>
+#include <embt/base/byteorder.h>
+#include <embt/net_buf.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/mesh.h>
 
 #include "common/bt_str.h"
 
@@ -35,6 +36,11 @@
 #include <embt/base/log.h>
 
 LOG_MODULE_REGISTER(bt_mesh_net_keys, CONFIG_BT_MESH_KEYS_LOG_LEVEL);
+
+static struct bt_mesh_subnet_cb *subnet_callbacks;
+
+void bt_mesh_cfg_app_key_cb_init(void);
+void bt_mesh_cdb_app_key_cb_init(void);
 
 /* Tracking of what storage changes are pending for Net Keys. We track this in
  * a separate array here instead of within the respective bt_mesh_subnet
@@ -64,7 +70,7 @@ static struct bt_mesh_subnet subnets[CONFIG_BT_MESH_SUBNET_COUNT] = {
 
 static void subnet_evt(struct bt_mesh_subnet *sub, enum bt_mesh_key_evt evt)
 {
-	STRUCT_SECTION_FOREACH(bt_mesh_subnet_cb, cb) {
+	for (struct bt_mesh_subnet_cb *cb = subnet_callbacks; cb; cb = cb->next) {
 		cb->evt_handler(sub, evt);
 	}
 }
@@ -76,7 +82,7 @@ static void clear_net_key(uint16_t net_idx)
 
 	LOG_DBG("NetKeyIndex 0x%03x", net_idx);
 
-	snprintk(path, sizeof(path), "bt/mesh/NetKey/%x", net_idx);
+	snprintf(path, sizeof(path), "bt/mesh/NetKey/%x", net_idx);
 	err = settings_delete(path);
 	if (err) {
 		LOG_ERR("Failed to clear NetKeyIndex 0x%03x", net_idx);
@@ -100,7 +106,7 @@ static void store_subnet(uint16_t net_idx)
 
 	LOG_DBG("NetKeyIndex 0x%03x", net_idx);
 
-	snprintk(path, sizeof(path), "bt/mesh/NetKey/%x", net_idx);
+	snprintf(path, sizeof(path), "bt/mesh/NetKey/%x", net_idx);
 
 	memcpy(&key.val[0], &sub->keys[0].net, sizeof(struct bt_mesh_key));
 	memcpy(&key.val[1], &sub->keys[1].net, sizeof(struct bt_mesh_key));
@@ -148,7 +154,7 @@ uint8_t bt_mesh_net_flags(struct bt_mesh_subnet *sub)
 		flags |= BT_MESH_NET_FLAG_KR;
 	}
 
-	if (atomic_test_bit(bt_mesh.flags, BT_MESH_IVU_IN_PROGRESS)) {
+	if (bt_atomic_test_bit(bt_mesh.flags, BT_MESH_IVU_IN_PROGRESS)) {
 		flags |= BT_MESH_NET_FLAG_IVU;
 	}
 
@@ -1017,4 +1023,96 @@ void bt_mesh_subnet_pending_store(void)
 			store_subnet(update->key_idx);
 		}
 	}
+}
+
+void bt_mesh_key_callbacks_init(void)
+{
+	static bool initialized;
+	struct bt_mesh_subnet_cb **tail = &subnet_callbacks;
+
+	if (initialized) {
+		return;
+	}
+	{
+		extern struct bt_mesh_subnet_cb bt_mesh_subnet_cb_app_keys;
+
+		bt_mesh_subnet_cb_app_keys.next = NULL;
+		*tail = &bt_mesh_subnet_cb_app_keys;
+		tail = &bt_mesh_subnet_cb_app_keys.next;
+	}
+	{
+		extern struct bt_mesh_subnet_cb bt_mesh_subnet_cb_beacon;
+
+		bt_mesh_subnet_cb_beacon.next = NULL;
+		*tail = &bt_mesh_subnet_cb_beacon;
+		tail = &bt_mesh_subnet_cb_beacon.next;
+	}
+#if defined(CONFIG_BT_MESH_CDB_KEY_SYNC)
+	{
+		extern struct bt_mesh_subnet_cb bt_mesh_subnet_cb_cdb;
+
+		bt_mesh_subnet_cb_cdb.next = NULL;
+		*tail = &bt_mesh_subnet_cb_cdb;
+		tail = &bt_mesh_subnet_cb_cdb.next;
+	}
+#endif
+#if defined(CONFIG_BT_MESH_FRIEND)
+	{
+		extern struct bt_mesh_subnet_cb bt_mesh_subnet_cb_friend;
+
+		bt_mesh_subnet_cb_friend.next = NULL;
+		*tail = &bt_mesh_subnet_cb_friend;
+		tail = &bt_mesh_subnet_cb_friend.next;
+	}
+#endif
+#if defined(CONFIG_BT_MESH_GATT_PROXY)
+	{
+		extern struct bt_mesh_subnet_cb bt_mesh_subnet_cb_gatt_services;
+
+		bt_mesh_subnet_cb_gatt_services.next = NULL;
+		*tail = &bt_mesh_subnet_cb_gatt_services;
+		tail = &bt_mesh_subnet_cb_gatt_services.next;
+	}
+#endif
+#if defined(CONFIG_BT_MESH_LOW_POWER)
+	{
+		extern struct bt_mesh_subnet_cb bt_mesh_subnet_cb_lpn;
+
+		bt_mesh_subnet_cb_lpn.next = NULL;
+		*tail = &bt_mesh_subnet_cb_lpn;
+		tail = &bt_mesh_subnet_cb_lpn.next;
+	}
+#endif
+#if defined(CONFIG_BT_MESH_PROXY_CLIENT)
+	{
+		extern struct bt_mesh_subnet_cb bt_mesh_subnet_cb_proxy_cli;
+
+		bt_mesh_subnet_cb_proxy_cli.next = NULL;
+		*tail = &bt_mesh_subnet_cb_proxy_cli;
+		tail = &bt_mesh_subnet_cb_proxy_cli.next;
+	}
+#endif
+#if defined(CONFIG_BT_MESH_RPR_SRV)
+	{
+		extern struct bt_mesh_subnet_cb bt_mesh_subnet_cb_rpr_srv;
+
+		bt_mesh_subnet_cb_rpr_srv.next = NULL;
+		*tail = &bt_mesh_subnet_cb_rpr_srv;
+		tail = &bt_mesh_subnet_cb_rpr_srv.next;
+	}
+#endif
+#if defined(CONFIG_BT_MESH_BRG_CFG_SRV)
+	{
+		extern struct bt_mesh_subnet_cb bt_mesh_subnet_cb_sbr;
+
+		bt_mesh_subnet_cb_sbr.next = NULL;
+		*tail = &bt_mesh_subnet_cb_sbr;
+		tail = &bt_mesh_subnet_cb_sbr.next;
+	}
+#endif
+	bt_mesh_cfg_app_key_cb_init();
+#if defined(CONFIG_BT_MESH_CDB_KEY_SYNC)
+	bt_mesh_cdb_app_key_cb_init();
+#endif
+	initialized = true;
 }

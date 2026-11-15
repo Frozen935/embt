@@ -4,15 +4,18 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <embt/base/work.h>
+#include <string.h>
+#include <embt/base/assert.h>
 #include <stdint.h>
 
 #include "adv.h"
 #include "subnet.h"
-#include <zephyr/bluetooth/mesh/keys.h>
-#include <zephyr/bluetooth/mesh/sar_cfg.h>
-#include <zephyr/net_buf.h>
-#include <zephyr/sys/atomic.h>
-#include <zephyr/sys/slist.h>
+#include <embt/bluetooth/mesh/keys.h>
+#include <embt/bluetooth/mesh/sar_cfg.h>
+#include <embt/net_buf.h>
+#include <embt/base/atomic.h>
+#include <embt/base/slist.h>
 
 #define BT_MESH_IV_UPDATE(flags)   ((flags >> 1) & 0x01)
 #define BT_MESH_KEY_REFRESH(flags) (flags & 0x01)
@@ -21,7 +24,7 @@
 #define BT_MESH_IVU_MIN_HOURS      96
 #define BT_MESH_IVU_HOURS          (BT_MESH_IVU_MIN_HOURS /     \
 				    CONFIG_BT_MESH_IVU_DIVIDER)
-#define BT_MESH_IVU_TIMEOUT        K_HOURS(BT_MESH_IVU_HOURS)
+#define BT_MESH_IVU_TIMEOUT        BT_MINUTES(INT64_C(60) * BT_MESH_IVU_HOURS)
 
 /* Minimum valid Mesh Network PDU length. The Network headers
  * themselves take up 9 bytes. After that there is a minimum of 1 byte
@@ -74,7 +77,7 @@ struct bt_mesh_friend {
 
 	uint16_t sub_list[FRIEND_SUB_LIST_SIZE];
 
-	struct k_work_delayable timer;
+	struct bt_work_delayable timer;
 
 	struct bt_mesh_friend_seg {
 		sys_slist_t queue;
@@ -93,7 +96,7 @@ struct bt_mesh_friend {
 
 	/* Friend Clear Procedure / Friend Clear Confirm */
 	struct {
-		struct k_work_delayable timer;
+		struct bt_work_delayable timer;
 		union {
 			/* Friend Clear Procedure context */
 			struct {
@@ -182,7 +185,7 @@ struct bt_mesh_lpn {
 	uint32_t adv_start_time;
 
 	/* Next LPN related action timer */
-	struct k_work_delayable timer;
+	struct bt_work_delayable timer;
 
 	/* Subscribed groups */
 	uint16_t groups[LPN_GROUPS];
@@ -192,9 +195,9 @@ struct bt_mesh_lpn {
 	struct bt_mesh_net_cred cred[2];
 
 	/* Bit fields for tracking which groups the Friend knows about */
-	ATOMIC_DEFINE(added, LPN_GROUPS);
-	ATOMIC_DEFINE(pending, LPN_GROUPS);
-	ATOMIC_DEFINE(to_remove, LPN_GROUPS);
+	BT_ATOMIC_DEFINE(added, LPN_GROUPS);
+	BT_ATOMIC_DEFINE(pending, LPN_GROUPS);
+	BT_ATOMIC_DEFINE(to_remove, LPN_GROUPS);
 };
 
 /* bt_mesh_net.flags */
@@ -227,10 +230,10 @@ struct bt_mesh_net {
 	uint32_t iv_index; /* Current IV Index */
 	uint32_t seq;      /* Next outgoing sequence number (24 bits) */
 
-	ATOMIC_DEFINE(flags, BT_MESH_FLAG_COUNT);
+	BT_ATOMIC_DEFINE(flags, BT_MESH_FLAG_COUNT);
 
 	/* Local network interface */
-	struct k_work local_work;
+	struct bt_work local_work;
 	sys_slist_t local_queue;
 
 #if defined(CONFIG_BT_MESH_FRIEND)
@@ -254,7 +257,7 @@ struct bt_mesh_net {
 #endif
 
 	/* Timer to track duration in current IV Update state */
-	struct k_work_delayable ivu_timer;
+	struct bt_work_delayable ivu_timer;
 
 	struct bt_mesh_key dev_key;
 
@@ -304,7 +307,7 @@ struct bt_mesh_net_tx {
 extern struct bt_mesh_net bt_mesh;
 
 #define BT_MESH_NET_IVI_TX (bt_mesh.iv_index - \
-			    atomic_test_bit(bt_mesh.flags, \
+			    bt_atomic_test_bit(bt_mesh.flags, \
 					    BT_MESH_IVU_IN_PROGRESS))
 #define BT_MESH_NET_IVI_RX(rx) (bt_mesh.iv_index - (rx)->old_iv)
 

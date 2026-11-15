@@ -4,13 +4,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <zephyr/bluetooth/mesh.h>
-#include <zephyr/sys/byteorder.h>
+#include <errno.h>
+#include <stdio.h>
+#include <embt/base/atomic.h>
+#include <embt/bluetooth/mesh.h>
+#include <embt/base/byteorder.h>
 #include <stdlib.h>
 
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/hci.h>
-#include <zephyr/bluetooth/uuid.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/hci.h>
+#include <embt/bluetooth/uuid.h>
 #include "access.h"
 #include "cfg.h"
 #include "crypto.h"
@@ -32,8 +35,8 @@ static struct srpl_entry {
 	uint16_t ssrc;
 } sol_pdu_rpl[CONFIG_BT_MESH_PROXY_SRPL_SIZE];
 
-static ATOMIC_DEFINE(store, CONFIG_BT_MESH_PROXY_SRPL_SIZE);
-static atomic_t clear;
+static BT_ATOMIC_DEFINE(store, CONFIG_BT_MESH_PROXY_SRPL_SIZE);
+static bt_atomic_t clear;
 #endif
 #if CONFIG_BT_MESH_PROXY_SOLICITATION
 static uint32_t sseq_out;
@@ -85,7 +88,7 @@ static int srpl_entry_save(struct bt_mesh_subnet *sub, uint32_t sseq, uint16_t s
 	LOG_DBG("Added: SSRC %d SSEQ %d to SRPL", entry->ssrc, entry->sseq);
 
 	if (IS_ENABLED(CONFIG_BT_SETTINGS)) {
-		atomic_set_bit(store, entry - &sol_pdu_rpl[0]);
+		bt_atomic_set_bit(store, entry - &sol_pdu_rpl[0]);
 		bt_mesh_settings_store_schedule(BT_MESH_SETTINGS_SRPL_PENDING);
 	}
 
@@ -411,12 +414,12 @@ static void srpl_entry_clear(int i)
 	sol_pdu_rpl[i].ssrc = 0;
 	sol_pdu_rpl[i].sseq = 0;
 
-	atomic_clear_bit(store, i);
+	bt_atomic_clear_bit(store, i);
 
 	if (IS_ENABLED(CONFIG_BT_SETTINGS)) {
 		char path[18];
 
-		snprintk(path, sizeof(path), "bt/mesh/SRPL/%x", addr);
+		snprintf(path, sizeof(path), "bt/mesh/SRPL/%x", addr);
 
 		settings_delete(path);
 	}
@@ -429,7 +432,7 @@ static void srpl_store(struct srpl_entry *entry)
 
 	LOG_DBG("src 0x%04x seq 0x%06x", entry->ssrc, entry->sseq);
 
-	snprintk(path, sizeof(path), "bt/mesh/SRPL/%x", entry->ssrc);
+	snprintf(path, sizeof(path), "bt/mesh/SRPL/%x", entry->ssrc);
 
 	err = settings_save_one(path, &entry->sseq, sizeof(entry->sseq));
 	if (err) {
@@ -445,14 +448,14 @@ void bt_mesh_srpl_pending_store(void)
 #if CONFIG_BT_MESH_OD_PRIV_PROXY_SRV
 	bool clr;
 
-	clr = atomic_cas(&clear, 1, 0);
+	clr = bt_atomic_cas(&clear, 1, 0);
 
 	for (int i = 0; i < ARRAY_SIZE(sol_pdu_rpl); i++) {
 		LOG_DBG("src 0x%04x seq 0x%06x", sol_pdu_rpl[i].ssrc, sol_pdu_rpl[i].sseq);
 
 		if (clr) {
 			srpl_entry_clear(i);
-		} else if (atomic_test_and_clear_bit(store, i)) {
+		} else if (bt_atomic_test_and_clear_bit(store, i)) {
 			srpl_store(&sol_pdu_rpl[i]);
 		}
 	}
@@ -490,7 +493,7 @@ void bt_mesh_sol_reset(void)
 
 #if CONFIG_BT_MESH_OD_PRIV_PROXY_SRV
 	if (IS_ENABLED(CONFIG_BT_SETTINGS)) {
-		(void)atomic_cas(&clear, 0, 1);
+		(void)bt_atomic_cas(&clear, 0, 1);
 
 		bt_mesh_settings_store_schedule(BT_MESH_SETTINGS_SRPL_PENDING);
 	}

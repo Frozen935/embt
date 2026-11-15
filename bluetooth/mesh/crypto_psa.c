@@ -4,10 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <embt/base/atomic.h>
 #include <errno.h>
 
-#include <zephyr/bluetooth/mesh.h>
-#include <zephyr/psa/key_ids.h>
+#include <embt/bluetooth/mesh.h>
 
 #include "mesh.h"
 #include "crypto.h"
@@ -26,11 +26,13 @@ LOG_MODULE_REGISTER(bt_mesh_crypto_psa, CONFIG_BT_MESH_CRYPTO_LOG_LEVEL);
 #define BT_MESH_CDB_KEY_ID_RANGE_SIZE  0
 #endif
 
-#define BT_MESH_PSA_KEY_ID_MIN ZEPHYR_PSA_BT_MESH_KEY_ID_RANGE_BEGIN
+/* Preserve the upstream persistent Mesh key range. */
+#define BT_MESH_PSA_KEY_ID_MIN ((psa_key_id_t)0x20000000)
+#define BT_MESH_PSA_KEY_ID_CAPACITY 0xC000
 
 #define BT_MESH_PSA_KEY_ID_RANGE_SIZE (2 * CONFIG_BT_MESH_SUBNET_COUNT + \
 		2 * CONFIG_BT_MESH_APP_KEY_COUNT + 2 + BT_MESH_CDB_KEY_ID_RANGE_SIZE)
-BUILD_ASSERT(BT_MESH_PSA_KEY_ID_RANGE_SIZE <= ZEPHYR_PSA_BT_MESH_KEY_ID_RANGE_SIZE,
+BUILD_ASSERT(BT_MESH_PSA_KEY_ID_RANGE_SIZE <= BT_MESH_PSA_KEY_ID_CAPACITY,
 	"PSA key ID range exceeds officially allocated range.");
 
 BUILD_ASSERT(PSA_MAC_LENGTH(PSA_KEY_TYPE_AES, 128, PSA_ALG_CMAC) == 16,
@@ -45,7 +47,7 @@ static struct {
 	uint8_t public_key_be[PUB_KEY_SIZE + 1];
 } dh_pair;
 
-static ATOMIC_DEFINE(pst_keys, BT_MESH_PSA_KEY_ID_RANGE_SIZE);
+static BT_ATOMIC_DEFINE(pst_keys, BT_MESH_PSA_KEY_ID_RANGE_SIZE);
 
 int bt_mesh_crypto_init(void)
 {
@@ -59,7 +61,7 @@ int bt_mesh_crypto_init(void)
 int bt_mesh_encrypt(const struct bt_mesh_key *key, const uint8_t plaintext[16],
 		    uint8_t enc_data[16])
 {
-	uint32_t output_len;
+	size_t output_len;
 	psa_status_t status;
 	int err = 0;
 
@@ -79,7 +81,7 @@ int bt_mesh_ccm_encrypt(const struct bt_mesh_key *key, uint8_t nonce[13],
 			const uint8_t *plaintext, size_t len, const uint8_t *aad,
 			size_t aad_len, uint8_t *enc_data, size_t mic_size)
 {
-	uint32_t output_len;
+	size_t output_len;
 	psa_status_t status;
 	int err = 0;
 	psa_algorithm_t alg = PSA_ALG_AEAD_WITH_SHORTENED_TAG(PSA_ALG_CCM, mic_size);
@@ -102,7 +104,7 @@ int bt_mesh_ccm_decrypt(const struct bt_mesh_key *key, uint8_t nonce[13],
 			const uint8_t *enc_data, size_t len, const uint8_t *aad,
 			size_t aad_len, uint8_t *plaintext, size_t mic_size)
 {
-	uint32_t output_len;
+	size_t output_len;
 	psa_status_t status;
 	int err = 0;
 	psa_algorithm_t alg = PSA_ALG_AEAD_WITH_SHORTENED_TAG(PSA_ALG_CCM, mic_size);
@@ -354,8 +356,8 @@ end:
 static psa_key_id_t keyid_alloc(void)
 {
 	for (int i = 0; i < BT_MESH_PSA_KEY_ID_RANGE_SIZE; i++) {
-		if (!atomic_test_bit(pst_keys, i)) {
-			atomic_set_bit(pst_keys, i);
+		if (!bt_atomic_test_bit(pst_keys, i)) {
+			bt_atomic_set_bit(pst_keys, i);
 			return BT_MESH_PSA_KEY_ID_MIN + i;
 		}
 	}
@@ -367,7 +369,7 @@ static int keyid_free(psa_key_id_t key_id)
 {
 	if (IN_RANGE(key_id, BT_MESH_PSA_KEY_ID_MIN,
 			BT_MESH_PSA_KEY_ID_MIN + BT_MESH_PSA_KEY_ID_RANGE_SIZE - 1)) {
-		atomic_clear_bit(pst_keys, key_id - BT_MESH_PSA_KEY_ID_MIN);
+		bt_atomic_clear_bit(pst_keys, key_id - BT_MESH_PSA_KEY_ID_MIN);
 		return 0;
 	}
 
@@ -378,7 +380,7 @@ static void keyid_assign(psa_key_id_t key_id)
 {
 	if (IN_RANGE(key_id, BT_MESH_PSA_KEY_ID_MIN,
 				BT_MESH_PSA_KEY_ID_MIN + BT_MESH_PSA_KEY_ID_RANGE_SIZE - 1)) {
-		atomic_set_bit(pst_keys, key_id - BT_MESH_PSA_KEY_ID_MIN);
+		bt_atomic_set_bit(pst_keys, key_id - BT_MESH_PSA_KEY_ID_MIN);
 	}
 }
 

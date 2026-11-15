@@ -11,6 +11,7 @@
 #ifndef ZEPHYR_INCLUDE_BLUETOOTH_MESH_STATISTIC_H_
 #define ZEPHYR_INCLUDE_BLUETOOTH_MESH_STATISTIC_H_
 
+#include <embt/base/time.h>
 #include <stdint.h>
 
 /**
@@ -102,7 +103,7 @@ struct bt_mesh_lpn_timing {
  *
  *  Returns timestamp-derived measurements of actual ReceiveDelay and
  *  ReceiveWindow observed on-air. Timestamps are captured using
- *  k_uptime_get() at poll TX completion, scanner enable, and response RX.
+ *  bt_uptime_get_ms() at poll TX completion, scanner enable, and response RX.
  *
  *  @param timing  Pointer to structure to populate.
  *

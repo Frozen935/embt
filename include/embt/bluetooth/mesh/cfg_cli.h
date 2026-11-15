@@ -20,6 +20,9 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#include <embt/bluetooth/mesh/msg.h>
+#include <embt/bluetooth/mesh/access.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif

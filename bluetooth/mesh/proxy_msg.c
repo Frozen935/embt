@@ -7,15 +7,21 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <zephyr/sys/byteorder.h>
+#include <errno.h>
+#include <embt/base/fifo.h>
+#include <embt/base/work.h>
+#include <embt/base/time.h>
+#include <string.h>
+#include <embt/base/assert.h>
+#include <embt/base/byteorder.h>
 
-#include <zephyr/net_buf.h>
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/gatt.h>
-#include <zephyr/bluetooth/mesh.h>
+#include <embt/net_buf.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/gatt.h>
+#include <embt/bluetooth/mesh.h>
 
-#include <zephyr/bluetooth/hci.h>
+#include <embt/bluetooth/hci.h>
 
 #include "common/bt_str.h"
 
@@ -39,7 +45,7 @@ LOG_MODULE_REGISTER(bt_mesh_proxy, CONFIG_BT_MESH_PROXY_LOG_LEVEL);
  * "The timeout for the SAR transfer is 20 seconds. When the timeout
  *  expires, the Proxy Server shall disconnect."
  */
-#define PROXY_SAR_TIMEOUT  K_SECONDS(20)
+#define PROXY_SAR_TIMEOUT  BT_SECONDS(20)
 
 #define SAR_COMPLETE       0x00
 #define SAR_FIRST          0x01
@@ -48,7 +54,7 @@ LOG_MODULE_REGISTER(bt_mesh_proxy, CONFIG_BT_MESH_PROXY_LOG_LEVEL);
 
 #define PDU_HDR(sar, type) (sar << 6 | (type & BIT_MASK(6)))
 
-static uint8_t __noinit bufs[CONFIG_BT_MAX_CONN * CONFIG_BT_MESH_PROXY_MSG_LEN];
+static uint8_t bufs[CONFIG_BT_MAX_CONN * CONFIG_BT_MESH_PROXY_MSG_LEN];
 
 static struct bt_mesh_proxy_role roles[CONFIG_BT_MAX_CONN];
 
@@ -56,14 +62,14 @@ static int conn_count;
 
 static void proxy_queue_put(struct bt_mesh_proxy_role *role, struct bt_mesh_adv *adv)
 {
-	k_fifo_put(&role->pending, &(adv->gatt_bearer[bt_conn_index(role->conn)]));
+	bt_fifo_put(&role->pending, &(adv->gatt_bearer[bt_conn_index(role->conn)]));
 }
 
 static struct bt_mesh_adv *proxy_queue_get(struct bt_mesh_proxy_role *role)
 {
 	void *gatt_bearer;
 
-	gatt_bearer = k_fifo_get(&role->pending, K_NO_WAIT);
+	gatt_bearer = bt_fifo_get(&role->pending, BT_NO_WAIT);
 	if (!gatt_bearer) {
 		return NULL;
 	}
@@ -72,16 +78,16 @@ static struct bt_mesh_adv *proxy_queue_get(struct bt_mesh_proxy_role *role)
 			    gatt_bearer[bt_conn_index(role->conn)]);
 }
 
-static void proxy_sar_timeout(struct k_work *work)
+static void proxy_sar_timeout(struct bt_work *work)
 {
 	struct bt_mesh_proxy_role *role;
-	struct k_work_delayable *dwork = k_work_delayable_from_work(work);
+	struct bt_work_delayable *dwork = bt_work_delayable_from_work(work);
 
 	LOG_WRN("Proxy SAR timeout");
 
 	role = CONTAINER_OF(dwork, struct bt_mesh_proxy_role, sar_timer);
 
-	while (!k_fifo_is_empty(&role->pending)) {
+	while (!bt_fifo_is_empty(&role->pending)) {
 		struct bt_mesh_adv *adv = proxy_queue_get(role);
 
 		__ASSERT_NO_MSG(adv);
@@ -125,7 +131,7 @@ ssize_t bt_mesh_proxy_msg_recv(struct bt_conn *conn,
 			return -EINVAL;
 		}
 
-		k_work_reschedule(&role->sar_timer, PROXY_SAR_TIMEOUT);
+		bt_work_reschedule(&role->sar_timer, PROXY_SAR_TIMEOUT);
 		role->msg_type = PDU_TYPE(data);
 		net_buf_simple_add_mem(&role->buf, data + 1, len - 1);
 		break;
@@ -141,7 +147,7 @@ ssize_t bt_mesh_proxy_msg_recv(struct bt_conn *conn,
 			return -EINVAL;
 		}
 
-		k_work_reschedule(&role->sar_timer, PROXY_SAR_TIMEOUT);
+		bt_work_reschedule(&role->sar_timer, PROXY_SAR_TIMEOUT);
 		net_buf_simple_add_mem(&role->buf, data + 1, len - 1);
 		break;
 
@@ -159,7 +165,7 @@ ssize_t bt_mesh_proxy_msg_recv(struct bt_conn *conn,
 		/* If this fails, the work handler exits early, as there's no
 		 * active SAR buffer.
 		 */
-		(void)k_work_cancel_delayable(&role->sar_timer);
+		(void)bt_work_cancel_delayable(&role->sar_timer);
 		net_buf_simple_add_mem(&role->buf, data + 1, len - 1);
 		role->cb.recv(role);
 		net_buf_simple_reset(&role->buf);
@@ -272,7 +278,7 @@ int bt_mesh_proxy_relay_send(struct bt_conn *conn, struct bt_mesh_adv *adv)
 	return 0;
 }
 
-static void proxy_msg_send_pending(struct k_work *work)
+static void proxy_msg_send_pending(struct bt_work *work)
 {
 	struct bt_mesh_proxy_role *role = CONTAINER_OF(work, struct bt_mesh_proxy_role, work);
 	struct bt_mesh_adv *adv;
@@ -289,7 +295,7 @@ static void proxy_msg_send_pending(struct k_work *work)
 	(void)proxy_relay_send(role->conn, adv);
 	bt_mesh_adv_unref(adv);
 
-	if (!k_fifo_is_empty(&role->pending)) {
+	if (!bt_fifo_is_empty(&role->pending)) {
 		bt_mesh_wq_submit(&role->work);
 	}
 }
@@ -311,10 +317,10 @@ static void proxy_msg_init(struct bt_mesh_proxy_role *role)
 
 	net_buf_simple_reset(&role->buf);
 
-	k_fifo_init(&role->pending);
-	k_work_init(&role->work, proxy_msg_send_pending);
+	bt_fifo_init(&role->pending);
+	bt_work_init(&role->work, proxy_msg_send_pending);
 
-	k_work_init_delayable(&role->sar_timer, proxy_sar_timeout);
+	bt_work_init_delayable(&role->sar_timer, proxy_sar_timeout);
 }
 
 struct bt_mesh_proxy_role *bt_mesh_proxy_role_setup(struct bt_conn *conn,
@@ -341,7 +347,7 @@ void bt_mesh_proxy_role_cleanup(struct bt_mesh_proxy_role *role)
 	/* If this fails, the work handler exits early, as
 	 * there's no active connection.
 	 */
-	(void)k_work_cancel_delayable(&role->sar_timer);
+	(void)bt_work_cancel_delayable(&role->sar_timer);
 	bt_conn_drop(&role->conn);
 
 	conn_count--;

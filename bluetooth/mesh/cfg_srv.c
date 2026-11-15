@@ -4,16 +4,21 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <embt/base/work.h>
+#include <embt/base/time.h>
+#include <embt/base/atomic.h>
+#include <embt/base/assert.h>
 #include <string.h>
 #include <errno.h>
 #include <stdbool.h>
-#include <zephyr/types.h>
-#include <zephyr/sys/util.h>
-#include <zephyr/sys/byteorder.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <embt/base/util.h>
+#include <embt/base/byteorder.h>
 
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/mesh.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/mesh.h>
 
 #include "common/bt_str.h"
 
@@ -39,12 +44,12 @@
 
 LOG_MODULE_REGISTER(bt_mesh_cfg_srv, CONFIG_BT_MESH_MODEL_LOG_LEVEL);
 
-static void node_reset_pending_handler(struct k_work *work)
+static void node_reset_pending_handler(struct bt_work *work)
 {
 	bt_mesh_reset();
 }
 
-static K_WORK_DEFINE(node_reset_pending, node_reset_pending_handler);
+static BT_WORK_DEFINE(node_reset_pending, node_reset_pending_handler);
 
 static int dev_comp_data_get(const struct bt_mesh_model *model,
 			     struct bt_mesh_msg_ctx *ctx,
@@ -64,7 +69,7 @@ static int dev_comp_data_get(const struct bt_mesh_model *model,
 
 	net_buf_simple_add_u8(&sdu, page);
 
-	if (atomic_test_bit(bt_mesh.flags, BT_MESH_COMP_DIRTY) && page < 128) {
+	if (bt_atomic_test_bit(bt_mesh.flags, BT_MESH_COMP_DIRTY) && page < 128) {
 		sdu.size -= BT_MESH_MIC_SHORT;
 		err = bt_mesh_comp_read(&sdu, page);
 		sdu.size += BT_MESH_MIC_SHORT;
@@ -145,7 +150,7 @@ static uint8_t _mod_pub_set(const struct bt_mesh_model *model, uint16_t pub_addr
 			/* If this fails, the timer will check pub->addr and
 			 * exit without transmitting.
 			 */
-			(void)k_work_cancel_delayable(&model->pub->timer);
+			(void)bt_work_cancel_delayable(&model->pub->timer);
 		}
 
 		if (IS_ENABLED(CONFIG_BT_SETTINGS) && store) {
@@ -180,13 +185,13 @@ static uint8_t _mod_pub_set(const struct bt_mesh_model *model, uint16_t pub_addr
 		LOG_DBG("period %u ms", period_ms);
 
 		if (period_ms > 0) {
-			k_work_reschedule(&model->pub->timer,
-					  K_MSEC(period_ms));
+			bt_work_reschedule(&model->pub->timer,
+					  BT_MSEC(period_ms));
 		} else {
 			/* If this fails, publication will stop after the
 			 * ongoing set of retransmits.
 			 */
-			(void)k_work_cancel_delayable(&model->pub->timer);
+			(void)bt_work_cancel_delayable(&model->pub->timer);
 		}
 	}
 
@@ -350,6 +355,11 @@ static void app_key_evt(struct bt_mesh_app_key *app, enum bt_mesh_key_evt evt)
 }
 
 BT_MESH_APP_KEY_CB_DEFINE(app_key_evt);
+
+void bt_mesh_cfg_app_key_cb_init(void)
+{
+	bt_mesh_app_key_cb_register(&bt_mesh_app_key_cb_app_key_evt);
+}
 
 static int app_key_del(const struct bt_mesh_model *model,
 		       struct bt_mesh_msg_ctx *ctx,
@@ -2039,13 +2049,13 @@ static void reset_send_start(uint16_t duration, int err, void *cb_data)
 {
 	if (err) {
 		LOG_ERR("Sending Node Reset Status failed (err %d)", err);
-		k_work_submit(&node_reset_pending);
+		bt_work_submit(&node_reset_pending);
 	}
 }
 
 static void reset_send_end(int err, void *cb_data)
 {
-	k_work_submit(&node_reset_pending);
+	bt_work_submit(&node_reset_pending);
 }
 
 static int node_reset(const struct bt_mesh_model *model, struct bt_mesh_msg_ctx *ctx,

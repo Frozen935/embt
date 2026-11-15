@@ -10,7 +10,8 @@
 #ifndef ZEPHYR_INCLUDE_BLUETOOTH_MESH_ACCESS_H_
 #define ZEPHYR_INCLUDE_BLUETOOTH_MESH_ACCESS_H_
 
-#include <embt/sys/util.h>
+#include <embt/base/work.h>
+#include <embt/base/util.h>
 #include <embt/settings/settings.h>
 #include <embt/bluetooth/assigned_numbers.h>
 #include <embt/bluetooth/mesh/msg.h>
@@ -579,7 +580,7 @@ struct bt_mesh_model_pub {
 	int (*update)(const struct bt_mesh_model *mod);
 
 	/** Publish Period Timer. Only for stack-internal use. */
-	struct k_work_delayable timer;
+	struct bt_work_delayable timer;
 };
 
 /**

@@ -8,6 +8,8 @@
 #ifndef ZEPHYR_SUBSYS_BLUETOOTH_MESH_PROV_H_
 #define ZEPHYR_SUBSYS_BLUETOOTH_MESH_PROV_H_
 
+#include <embt/base/time.h>
+#include <embt/base/atomic.h>
 #include "prov_bearer.h"
 
 #define PROV_ERR_NONE          0x00
@@ -117,7 +119,7 @@ struct bt_mesh_prov_role {
 };
 
 struct bt_mesh_prov_link {
-	ATOMIC_DEFINE(flags, NUM_FLAGS);
+	BT_ATOMIC_DEFINE(flags, NUM_FLAGS);
 
 	const struct prov_bearer *bearer;
 	const struct bt_mesh_prov_role *role;
@@ -174,7 +176,7 @@ static inline uint8_t bt_mesh_prov_auth_size_get(void)
 	}
 }
 
-static inline k_timeout_t bt_mesh_prov_protocol_timeout_get(void)
+static inline bt_timeout_t bt_mesh_prov_protocol_timeout_get(void)
 {
 	return (bt_mesh_prov_link.oob_method == AUTH_METHOD_INPUT ||
 		bt_mesh_prov_link.oob_method == AUTH_METHOD_OUTPUT)

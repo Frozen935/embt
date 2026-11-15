@@ -3,9 +3,12 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
+#include <errno.h>
+#include <embt/base/work.h>
+#include <embt/base/time.h>
 #include <string.h>
-#include <zephyr/bluetooth/mesh.h>
-#include <zephyr/bluetooth/conn.h>
+#include <embt/bluetooth/mesh.h>
+#include <embt/bluetooth/conn.h>
 #include <common/bt_str.h>
 #include "access.h"
 #include "prov.h"
@@ -144,7 +147,7 @@ static int handle_link_report(const struct bt_mesh_model *mod, struct bt_mesh_ms
 		return 0;
 	}
 
-	k_work_reschedule(&cli->link.timeout, K_SECONDS(cli->link.time));
+	bt_work_reschedule(&cli->link.timeout, BT_SECONDS(cli->link.time));
 
 	cli->link.state = link.state;
 
@@ -181,7 +184,7 @@ static int handle_link_status(const struct bt_mesh_model *mod, struct bt_mesh_ms
 	}
 
 	if (cli->link.srv.addr == srv.addr) {
-		k_work_reschedule(&cli->link.timeout, K_SECONDS(cli->link.time));
+		bt_work_reschedule(&cli->link.timeout, BT_SECONDS(cli->link.time));
 
 		cli->link.state = link.state;
 		if (link.state == BT_MESH_RPR_LINK_IDLE) {
@@ -211,7 +214,7 @@ static int handle_pdu_outbound_report(const struct bt_mesh_model *mod, struct bt
 
 	LOG_DBG("0x%04x: %u", srv.addr, num);
 
-	k_work_reschedule(&cli->link.timeout, K_SECONDS(cli->link.time));
+	bt_work_reschedule(&cli->link.timeout, BT_SECONDS(cli->link.time));
 
 	if (!bt_mesh_msg_ack_ctx_match(&cli->prov_ack_ctx, RPR_OP_PDU_OUTBOUND_REPORT,
 				       srv.addr, &cb_data) ||
@@ -241,7 +244,7 @@ static int handle_pdu_report(const struct bt_mesh_model *mod, struct bt_mesh_msg
 		return 0;
 	}
 
-	k_work_reschedule(&cli->link.timeout, K_SECONDS(cli->link.time));
+	bt_work_reschedule(&cli->link.timeout, BT_SECONDS(cli->link.time));
 
 	pdu = net_buf_simple_pull_u8(buf);
 	if (pdu <= cli->link.rx_pdu) {
@@ -349,9 +352,9 @@ const struct bt_mesh_model_op _bt_mesh_rpr_cli_op[] = {
 	BT_MESH_MODEL_OP_END,
 };
 
-static void link_timeout(struct k_work *work)
+static void link_timeout(struct bt_work *work)
 {
-	struct bt_mesh_rpr_cli *cli = CONTAINER_OF(k_work_delayable_from_work(work),
+	struct bt_mesh_rpr_cli *cli = CONTAINER_OF(bt_work_delayable_from_work(work),
 						   struct bt_mesh_rpr_cli, link.timeout);
 
 	if (bearer.link != BEARER_LINK_IDLE) {
@@ -375,7 +378,7 @@ static int rpr_cli_init(const struct bt_mesh_model *mod)
 
 	bt_mesh_msg_ack_ctx_init(&cli->scan_ack_ctx);
 	bt_mesh_msg_ack_ctx_init(&cli->prov_ack_ctx);
-	k_work_init_delayable(&cli->link.timeout, link_timeout);
+	bt_work_init_delayable(&cli->link.timeout, link_timeout);
 	mod->keys[0] = BT_MESH_KEY_DEV_ANY;
 	mod->rt->flags |= BT_MESH_MOD_DEVKEY_ONLY;
 
@@ -410,7 +413,7 @@ static void pdu_send_end(int err, void *cb_data)
 		return;
 	}
 
-	k_work_reschedule(&cli->link.timeout, K_SECONDS(cli->link.time));
+	bt_work_reschedule(&cli->link.timeout, BT_SECONDS(cli->link.time));
 }
 
 static const struct bt_mesh_send_cb pdu_send_cb = {
@@ -437,7 +440,7 @@ static int tx_wait(struct bt_mesh_rpr_cli *cli,
 		return err;
 	}
 
-	err = bt_mesh_msg_ack_ctx_wait(ack_ctx, K_MSEC(tx_timeout));
+	err = bt_mesh_msg_ack_ctx_wait(ack_ctx, BT_MSEC(tx_timeout));
 
 	bt_mesh_msg_ack_ctx_clear(ack_ctx);
 	return err;
@@ -450,12 +453,12 @@ static void link_init(struct bt_mesh_rpr_cli *cli,
 	cli->link.state = BT_MESH_RPR_LINK_IDLE;
 	cli->link.rx_pdu = 0;
 	cli->link.tx_pdu = 1;
-	k_work_reschedule(&cli->link.timeout, K_SECONDS(cli->link.time));
+	bt_work_reschedule(&cli->link.timeout, BT_SECONDS(cli->link.time));
 }
 
 static void link_reset(struct bt_mesh_rpr_cli *cli)
 {
-	k_work_cancel_delayable(&cli->link.timeout);
+	bt_work_cancel_delayable(&cli->link.timeout);
 	cli->link.srv.addr = BT_MESH_ADDR_UNASSIGNED;
 	cli->link.state = BT_MESH_RPR_LINK_IDLE;
 	bt_mesh_msg_ack_ctx_clear(&cli->prov_ack_ctx);
@@ -631,7 +634,7 @@ static int link_close(struct bt_mesh_rpr_cli *cli,
 		link_reset(cli);
 	}
 
-	k_work_reschedule(&cli->link.timeout, K_SECONDS(cli->link.time));
+	bt_work_reschedule(&cli->link.timeout, BT_SECONDS(cli->link.time));
 	return err;
 }
 

@@ -4,8 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <errno.h>
 #include <string.h>
-#include <zephyr/bluetooth/mesh.h>
+#include <embt/bluetooth/mesh.h>
 #include <common/bt_str.h>
 #include "dfu_slot.h"
 #include "dfd.h"
@@ -18,7 +19,6 @@
 
 LOG_MODULE_REGISTER(bt_mesh_dfd_srv, CONFIG_BT_MESH_DFU_LOG_LEVEL);
 
-#define ERASE_BLOCK_SIZE DT_PROP(DT_CHOSEN(zephyr_flash), erase_block_size)
 
 #define DFD_UPLOAD_STATUS_MSG_MAXLEN (5 + CONFIG_BT_MESH_DFU_FWID_MAXLEN)
 

@@ -15,6 +15,7 @@
 #ifndef ZEPHYR_INCLUDE_BLUETOOTH_MESH_DFU_CLI_H__
 #define ZEPHYR_INCLUDE_BLUETOOTH_MESH_DFU_CLI_H__
 
+#include <embt/osi/sync.h>
 #include <embt/bluetooth/mesh/access.h>
 #include <embt/bluetooth/mesh/blob_cli.h>
 #include <embt/bluetooth/mesh/dfu.h>
@@ -205,7 +206,7 @@ struct bt_mesh_dfu_cli {
 		uint8_t type;
 		uint8_t img_cnt;
 		uint16_t addr;
-		struct k_sem sem;
+		os_sem_t sem;
 		void *params;
 		bt_mesh_dfu_img_cb_t img_cb;
 	} req;

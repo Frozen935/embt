@@ -11,9 +11,7 @@
 #define ZEPHYR_INCLUDE_BLUETOOTH_MESH_HEARTBEAT_H_
 
 #include <stdint.h>
-
-#include <embt/sys/iterable_sections.h>
-#include <embt/sys/slist.h>
+#include <embt/base/slist.h>
 
 /**
  * @brief Heartbeat
@@ -77,6 +75,7 @@ struct bt_mesh_hb_sub {
 
 /** Heartbeat callback structure */
 struct bt_mesh_hb_cb {
+	struct bt_mesh_hb_cb *next; /**< Internal registration link; do not modify. */
 	/** @brief Receive callback for heartbeats.
 	 *
 	 *  Gets called on every received Heartbeat that matches the current
@@ -113,15 +112,21 @@ struct bt_mesh_hb_cb {
 };
 
 /**
- *  @brief Register a callback structure for Heartbeat events.
+ *  @brief Define callback storage for explicit Heartbeat registration.
  *
- *  Registers a callback structure that will be called whenever Heartbeat
- *  events occur
+ *  Call bt_mesh_hb_cb_register() before enabling Mesh to receive events.
  *
  *  @param _name Name of callback structure.
  */
-#define BT_MESH_HB_CB_DEFINE(_name)                                            \
-	static const STRUCT_SECTION_ITERABLE(bt_mesh_hb_cb, _name)
+#define BT_MESH_HB_CB_DEFINE(_name) static struct bt_mesh_hb_cb _name
+
+/**
+ * @brief Register a persistent callback before Mesh is enabled.
+ * @param[in,out] cb Callback storage that outlives all Mesh operations.
+ * @return Zero, -EINVAL for NULL, or -EALREADY for duplicate registration.
+ * @note The caller serializes registration against callback dispatch.
+ */
+int bt_mesh_hb_cb_register(struct bt_mesh_hb_cb *cb);
 
 /** @brief Get the current Heartbeat publication parameters.
  *

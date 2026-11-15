@@ -4,7 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <zephyr/bluetooth/mesh.h>
+#include <errno.h>
+#include <embt/base/time.h>
+#include <string.h>
+#include <embt/base/assert.h>
+#include <embt/base/util_macro.h>
+#include <embt/bluetooth/mesh.h>
 
 #include "net.h"
 #include "statistic.h"
@@ -66,26 +71,26 @@ void bt_mesh_stat_rx(enum bt_mesh_net_if net_if)
 
 static struct bt_mesh_lpn_timing lpn_timing;
 
-static int64_t poll_tx_end_ts;
-static int64_t scan_start_ts;
+static uint64_t poll_tx_end_us;
+static uint64_t scan_start_us;
 
 void bt_mesh_stat_lpn_timing_update_poll_tx(void)
 {
-	poll_tx_end_ts = k_uptime_ticks();
+	poll_tx_end_us = bt_uptime_get_us();
 }
 
 void bt_mesh_stat_lpn_timing_update_scan_start(void)
 {
-	int64_t now = k_uptime_ticks();
+	uint64_t now = bt_uptime_get_us();
 	uint32_t delay;
 
-	scan_start_ts = now;
+	scan_start_us = now;
 
-	if (poll_tx_end_ts == 0) {
+	if (poll_tx_end_us == 0) {
 		return;
 	}
 
-	delay = k_ticks_to_us_floor32(now - poll_tx_end_ts);
+	delay = (uint32_t)(now - poll_tx_end_us);
 	lpn_timing.recv_delay_us = delay;
 
 	if (lpn_timing.cnt == 0 && lpn_timing.recv_delay_min_us == 0) {
@@ -103,14 +108,14 @@ void bt_mesh_stat_lpn_timing_update_scan_start(void)
 
 void bt_mesh_stat_lpn_timing_update_response_rx(void)
 {
-	int64_t now = k_uptime_ticks();
+	uint64_t now = bt_uptime_get_us();
 	uint32_t win;
 
-	if (scan_start_ts == 0) {
+	if (scan_start_us == 0) {
 		return;
 	}
 
-	win = k_ticks_to_us_floor32(now - scan_start_ts);
+	win = (uint32_t)(now - scan_start_us);
 	lpn_timing.recv_win_us = win;
 
 	if (lpn_timing.cnt == 0) {
@@ -130,13 +135,13 @@ void bt_mesh_stat_lpn_timing_update_response_rx(void)
 
 void bt_mesh_stat_lpn_timing_update_win_expired(void)
 {
-	int64_t now = k_uptime_ticks();
+	uint64_t now = bt_uptime_get_us();
 
-	if (scan_start_ts == 0) {
+	if (scan_start_us == 0) {
 		return;
 	}
 
-	lpn_timing.recv_win_expected_us = k_ticks_to_us_floor32(now - scan_start_ts);
+	lpn_timing.recv_win_expected_us = (uint32_t)(now - scan_start_us);
 	lpn_timing.cnt_failed++;
 }
 
@@ -153,8 +158,8 @@ int bt_mesh_stat_lpn_timing_get(struct bt_mesh_lpn_timing *timing)
 void bt_mesh_stat_lpn_timing_reset(void)
 {
 	memset(&lpn_timing, 0, sizeof(lpn_timing));
-	poll_tx_end_ts = 0;
-	scan_start_ts = 0;
+	poll_tx_end_us = 0;
+	scan_start_us = 0;
 }
 
 #else /* !CONFIG_BT_MESH_LOW_POWER */

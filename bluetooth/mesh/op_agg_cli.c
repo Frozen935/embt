@@ -4,7 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <zephyr/bluetooth/mesh.h>
+#include <errno.h>
+#include <embt/base/time.h>
+#include <embt/bluetooth/mesh.h>
 
 #include <common/bt_str.h>
 
@@ -174,7 +176,7 @@ int bt_mesh_op_agg_cli_seq_send(void)
 		return err;
 	}
 
-	return bt_mesh_msg_ack_ctx_wait(&cli.ack_ctx, K_MSEC(msg_timeout));
+	return bt_mesh_msg_ack_ctx_wait(&cli.ack_ctx, BT_MSEC(msg_timeout));
 }
 
 void bt_mesh_op_agg_cli_seq_abort(void)

@@ -13,8 +13,12 @@
 #ifndef ZEPHYR_INCLUDE_BLUETOOTH_MESH_BLOB_H__
 #define ZEPHYR_INCLUDE_BLUETOOTH_MESH_BLOB_H__
 
-#include <embt/storage.h>
 #include <sys/types.h>
+
+#include <stdint.h>
+#include <stdbool.h>
+#include <stddef.h>
+#include <embt/base/util.h>
 
 #ifdef __cplusplus
 extern "C" {

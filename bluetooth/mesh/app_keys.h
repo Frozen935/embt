@@ -7,8 +7,8 @@
 #ifndef ZEPHYR_SUBSYS_BLUETOOTH_MESH_APP_KEYS_H_
 #define ZEPHYR_SUBSYS_BLUETOOTH_MESH_APP_KEYS_H_
 
-#include <zephyr/sys/iterable_sections.h>
-#include <zephyr/bluetooth/mesh.h>
+#include <embt/base/util_macro.h>
+#include <embt/bluetooth/mesh.h>
 #include "subnet.h"
 
 /** Mesh Application Key. */
@@ -29,6 +29,7 @@ struct bt_mesh_app_key {
 
 /** Appkey callback. Instantiate with @ref BT_MESH_APP_KEY_CB_DEFINE */
 struct bt_mesh_app_key_cb {
+	struct bt_mesh_app_key_cb *next;
 	void (*evt_handler)(struct bt_mesh_app_key *app, enum bt_mesh_key_evt evt);
 };
 
@@ -37,12 +38,13 @@ struct bt_mesh_app_key_cb {
  *
  *  @param _handler Handler function, see @ref bt_mesh_app_key_cb::evt_handler.
  */
-#define BT_MESH_APP_KEY_CB_DEFINE(_handler)                                    \
-	static const STRUCT_SECTION_ITERABLE(bt_mesh_app_key_cb,               \
-					     _CONCAT(bt_mesh_app_key_cb_,      \
-						       _handler)) = {          \
-		.evt_handler = (_handler),                                     \
+#define BT_MESH_APP_KEY_CB_DEFINE(_handler) \
+	static struct bt_mesh_app_key_cb bt_mesh_app_key_cb_##_handler = { \
+		.evt_handler = (_handler), \
 	}
+
+/** @brief Register a key callback during serialized Mesh initialization. */
+void bt_mesh_app_key_cb_register(struct bt_mesh_app_key_cb *cb);
 
 /** @brief Reset the app keys module. */
 void bt_mesh_app_keys_reset(void);

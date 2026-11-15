@@ -13,7 +13,6 @@
 #ifndef ZEPHYR_INCLUDE_BLUETOOTH_MESH_RPR_H_
 #define ZEPHYR_INCLUDE_BLUETOOTH_MESH_RPR_H_
 
-#include <embt/storage.h>
 #include <embt/bluetooth/mesh/main.h>
 
 #ifdef __cplusplus

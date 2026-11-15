@@ -4,12 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <zephyr/settings/settings.h>
+#include <errno.h>
+#include <embt/settings/settings.h>
 #include "dfu_slot.h"
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include <zephyr/sys/util.h>
+#include <embt/base/util.h>
 #include <common/bt_str.h>
 #include <embt/base/log.h>
 

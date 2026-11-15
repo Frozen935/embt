@@ -3,9 +3,10 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-#include <zephyr/bluetooth/mesh.h>
-#include <zephyr/sys/iterable_sections.h>
-
+#include <errno.h>
+#include <embt/base/work.h>
+#include <embt/base/time.h>
+#include <embt/bluetooth/mesh.h>
 #include "net.h"
 #include "rpl.h"
 #include "access.h"
@@ -19,6 +20,8 @@
 
 LOG_MODULE_REGISTER(bt_mesh_hb, CONFIG_BT_MESH_TRANS_LOG_LEVEL);
 
+static struct bt_mesh_hb_cb *hb_callbacks;
+
 /* Heartbeat Publication information for persistent storage. */
 struct hb_pub_val {
 	uint16_t dst;
@@ -31,12 +34,12 @@ struct hb_pub_val {
 
 static struct bt_mesh_hb_pub pub;
 static struct bt_mesh_hb_sub sub;
-static struct k_work_delayable sub_timer;
-static struct k_work_delayable pub_timer;
+static struct bt_work_delayable sub_timer;
+static struct bt_work_delayable pub_timer;
 
 static void notify_pub_sent(void)
 {
-	STRUCT_SECTION_FOREACH(bt_mesh_hb_cb, cb) {
+	for (struct bt_mesh_hb_cb *cb = hb_callbacks; cb; cb = cb->next) {
 		if (cb->pub_sent) {
 			cb->pub_sent(&pub);
 		}
@@ -49,8 +52,7 @@ static int64_t sub_remaining(void)
 		return 0U;
 	}
 
-	uint32_t rem_ms = k_ticks_to_ms_floor32(
-		k_work_delayable_remaining_get(&sub_timer));
+	uint32_t rem_ms = (uint32_t)(bt_work_delayable_remaining_get(&sub_timer));
 
 	return rem_ms / MSEC_PER_SEC;
 }
@@ -58,7 +60,7 @@ static int64_t sub_remaining(void)
 static void hb_publish_end_cb(int err, void *cb_data)
 {
 	if (pub.period && pub.count > 1) {
-		k_work_reschedule(&pub_timer, K_SECONDS(pub.period));
+		bt_work_reschedule(&pub_timer, BT_SECONDS(pub.period));
 	}
 
 	if (pub.count != 0xffff) {
@@ -74,7 +76,7 @@ static void notify_recv(uint8_t hops, uint16_t feat)
 {
 	sub.remaining = sub_remaining();
 
-	STRUCT_SECTION_FOREACH(bt_mesh_hb_cb, cb) {
+	for (struct bt_mesh_hb_cb *cb = hb_callbacks; cb; cb = cb->next) {
 		if (cb->recv) {
 			cb->recv(&sub, hops, feat);
 		}
@@ -85,14 +87,14 @@ static void notify_sub_end(void)
 {
 	sub.remaining = 0;
 
-	STRUCT_SECTION_FOREACH(bt_mesh_hb_cb, cb) {
+	for (struct bt_mesh_hb_cb *cb = hb_callbacks; cb; cb = cb->next) {
 		if (cb->sub_end) {
 			cb->sub_end(&sub);
 		}
 	}
 }
 
-static void sub_end(struct k_work *work)
+static void sub_end(struct bt_work *work)
 {
 	notify_sub_end();
 }
@@ -157,7 +159,7 @@ static void hb_publish_start_cb(uint16_t duration, int err, void *cb_data)
 	}
 }
 
-static void hb_publish(struct k_work *work)
+static void hb_publish(struct bt_work *work)
 {
 	static const struct bt_mesh_send_cb publish_cb = {
 		.start = hb_publish_start_cb,
@@ -206,7 +208,7 @@ int bt_mesh_hb_recv(struct bt_mesh_net_rx *rx, struct net_buf_simple *buf)
 		return 0;
 	}
 
-	if (!k_work_delayable_is_pending(&sub_timer)) {
+	if (!bt_work_delayable_is_pending(&sub_timer)) {
 		LOG_DBG("Heartbeat subscription inactive");
 		return 0;
 	}
@@ -241,7 +243,7 @@ static void pub_disable(void)
 	 * running) as the handler will be a no-op if it hasn't
 	 * already checked period for being non-zero.
 	 */
-	(void)k_work_cancel_delayable(&pub_timer);
+	(void)bt_work_cancel_delayable(&pub_timer);
 }
 
 uint8_t bt_mesh_hb_pub_set(struct bt_mesh_hb_pub *new_pub)
@@ -277,7 +279,7 @@ uint8_t bt_mesh_hb_pub_set(struct bt_mesh_hb_pub *new_pub)
 	 * If the new configuration disables publishing this flushes
 	 * the work item.
 	 */
-	k_work_reschedule(&pub_timer, K_NO_WAIT);
+	bt_work_reschedule(&pub_timer, BT_NO_WAIT);
 
 	if (IS_ENABLED(CONFIG_BT_SETTINGS)) {
 		bt_mesh_settings_store_schedule(
@@ -337,7 +339,7 @@ uint8_t bt_mesh_hb_sub_set(uint16_t src, uint16_t dst, uint32_t period)
 	/* Start the timer, which notifies immediately if the new
 	 * configuration disables the subscription.
 	 */
-	k_work_reschedule(&sub_timer, K_SECONDS(sub.period));
+	bt_work_reschedule(&sub_timer, BT_SECONDS(sub.period));
 
 	return STATUS_SUCCESS;
 }
@@ -380,15 +382,15 @@ void bt_mesh_hb_feature_changed(uint16_t features)
 void bt_mesh_hb_init(void)
 {
 	pub.net_idx = BT_MESH_KEY_UNUSED;
-	k_work_init_delayable(&pub_timer, hb_publish);
-	k_work_init_delayable(&sub_timer, sub_end);
+	bt_work_init_delayable(&pub_timer, hb_publish);
+	bt_work_init_delayable(&sub_timer, sub_end);
 }
 
 void bt_mesh_hb_start(void)
 {
 	if (pub.count && pub.period) {
 		LOG_DBG("Starting heartbeat publication");
-		k_work_reschedule(&pub_timer, K_NO_WAIT);
+		bt_work_reschedule(&pub_timer, BT_NO_WAIT);
 	}
 }
 
@@ -397,14 +399,14 @@ void bt_mesh_hb_suspend(void)
 	/* Best-effort suspend.  This cannot guarantee that an
 	 * in-progress publish will not complete.
 	 */
-	(void)k_work_cancel_delayable(&pub_timer);
+	(void)bt_work_cancel_delayable(&pub_timer);
 }
 
 void bt_mesh_hb_resume(void)
 {
 	if (pub.period && pub.count) {
 		LOG_DBG("Starting heartbeat publication");
-		k_work_reschedule(&pub_timer, K_NO_WAIT);
+		bt_work_reschedule(&pub_timer, BT_NO_WAIT);
 	}
 }
 
@@ -471,4 +473,19 @@ void bt_mesh_hb_pub_pending_store(void)
 	} else {
 		LOG_DBG("Stored Heartbeat Publication");
 	}
+}
+
+int bt_mesh_hb_cb_register(struct bt_mesh_hb_cb *cb)
+{
+	if (!cb) {
+		return -EINVAL;
+	}
+	for (struct bt_mesh_hb_cb *entry = hb_callbacks; entry; entry = entry->next) {
+		if (entry == cb) {
+			return -EALREADY;
+		}
+	}
+	cb->next = hb_callbacks;
+	hb_callbacks = cb;
+	return 0;
 }

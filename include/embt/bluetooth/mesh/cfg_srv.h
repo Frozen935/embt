@@ -17,6 +17,8 @@
  * @{
  */
 
+#include <embt/bluetooth/mesh/access.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif

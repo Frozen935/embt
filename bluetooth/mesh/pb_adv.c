@@ -4,11 +4,17 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
+#include <errno.h>
+#include <embt/base/work.h>
+#include <embt/base/time.h>
+#include <embt/base/time.h>
+#include <embt/base/atomic.h>
 #include <stdint.h>
+#include <embt/base/math.h>
 #include <string.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/mesh.h>
-#include <zephyr/net_buf.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/mesh.h>
+#include <embt/net_buf.h>
 #include "testing.h"
 #include "net.h"
 #include "crypto.h"
@@ -46,8 +52,8 @@ LOG_MODULE_REGISTER(bt_mesh_pb_adv, CONFIG_BT_MESH_PROV_LOG_LEVEL);
 #define XACT_ID_NVAL 0xff
 #define SEG_NVAL     0xff
 
-#define RETRANSMIT_TIMEOUT  K_MSEC(CONFIG_BT_MESH_PB_ADV_RETRANS_TIMEOUT)
-#define BUF_TIMEOUT         K_MSEC(400)
+#define RETRANSMIT_TIMEOUT  BT_MSEC(CONFIG_BT_MESH_PB_ADV_RETRANS_TIMEOUT)
+#define BUF_TIMEOUT         BT_MSEC(400)
 #define TRANSACTION_TIMEOUT 30
 
 /* Acked messages, will do retransmissions manually, taking acks into account:
@@ -74,7 +80,7 @@ enum {
 struct pb_adv {
 	uint32_t id; /* Link ID */
 
-	ATOMIC_DEFINE(flags, ADV_NUM_FLAGS);
+	BT_ATOMIC_DEFINE(flags, ADV_NUM_FLAGS);
 
 	const struct prov_bearer_cb *cb;
 	void *cb_data;
@@ -111,7 +117,7 @@ struct pb_adv {
 		void *cb_data;
 
 		/* Retransmit timer */
-		struct k_work_delayable retransmit;
+		struct bt_work_delayable retransmit;
 
 		/* Unacked adv buffers (Link Ack, Link Close and Gen Trans Ack). Array size is
 		 * hardcoded to 2 allowing to send Gen Trans Ack and Link Close at the same time.
@@ -127,7 +133,7 @@ struct pb_adv {
 	} tx;
 
 	/* Protocol timeout */
-	struct k_work_delayable prot_timer;
+	struct bt_work_delayable prot_timer;
 };
 
 struct prov_rx {
@@ -147,14 +153,14 @@ static void link_close(struct prov_rx *rx, struct net_buf_simple *buf);
 static void prov_link_close(enum prov_bearer_link_status status);
 static void close_link(enum prov_bearer_link_status status);
 
-static void tx_work_handler(struct k_work *work);
-static K_WORK_DELAYABLE_DEFINE(tx_work, tx_work_handler);
+static void tx_work_handler(struct bt_work *work);
+static BT_WORK_DELAYABLE_DEFINE(tx_work, tx_work_handler);
 
 static void tx_schedule(void)
 {
 	uint16_t random_delay;
 
-	if (atomic_test_bit(link.flags, ADV_SENDING)) {
+	if (bt_atomic_test_bit(link.flags, ADV_SENDING)) {
 		LOG_DBG("Another tx is in progress");
 		return;
 	}
@@ -164,7 +170,7 @@ static void tx_schedule(void)
 
 	LOG_DBG("Next PDU delayed by %ums", random_delay);
 
-	(void)k_work_schedule(&tx_work, K_MSEC(random_delay));
+	(void)bt_work_schedule(&tx_work, BT_MSEC(random_delay));
 }
 
 static int send_unacked(struct bt_mesh_adv *adv, prov_bearer_send_complete_t cb,
@@ -210,7 +216,7 @@ static void delayed_adv_send_end(int err, void *user_data)
 		unacked_adv->adv = NULL;
 	}
 
-	atomic_clear_bit(link.flags, ADV_SENDING);
+	bt_atomic_clear_bit(link.flags, ADV_SENDING);
 	tx_schedule();
 }
 
@@ -226,7 +232,7 @@ static const struct bt_mesh_send_cb delayed_adv_send_cb = {
 	.end = delayed_adv_send_end,
 };
 
-static void tx_work_handler(struct k_work *work)
+static void tx_work_handler(struct bt_work *work)
 {
 	int i;
 
@@ -239,7 +245,7 @@ static void tx_work_handler(struct k_work *work)
 			continue;
 		}
 
-		atomic_set_bit(link.flags, ADV_SENDING);
+		bt_atomic_set_bit(link.flags, ADV_SENDING);
 		bt_mesh_adv_send(unacked->adv, &delayed_adv_send_cb, (void *)true);
 
 		link.tx.last_unacked = idx;
@@ -253,7 +259,7 @@ static void tx_work_handler(struct k_work *work)
 		return;
 	}
 
-	atomic_set_bit(link.flags, ADV_SENDING);
+	bt_atomic_set_bit(link.flags, ADV_SENDING);
 	bt_mesh_adv_send(link.tx.adv[link.tx.next], &delayed_adv_send_cb, (void *)false);
 
 	link.tx.next++;
@@ -261,7 +267,7 @@ static void tx_work_handler(struct k_work *work)
 	if (link.tx.next == ARRAY_SIZE(link.tx.adv) || link.tx.adv[link.tx.next] == NULL) {
 		/* All ack-able PDUs are sent. Now we can run the retransmit timer. */
 		LOG_DBG("Starting retransmit timer");
-		k_work_reschedule(&link.tx.retransmit, RETRANSMIT_TIMEOUT);
+		bt_work_reschedule(&link.tx.retransmit, RETRANSMIT_TIMEOUT);
 	}
 }
 
@@ -307,7 +313,7 @@ static void free_segments(void)
 	}
 
 	if (canceled) {
-		atomic_clear_bit(link.flags, ADV_SENDING);
+		bt_atomic_clear_bit(link.flags, ADV_SENDING);
 		tx_schedule();
 	}
 }
@@ -326,7 +332,7 @@ static void prov_clear_tx(void)
 	 * LINK_ACTIVE flag, so if this call is part of reset_adv_link, it'll
 	 * exit early.
 	 */
-	(void)k_work_cancel_delayable(&link.tx.retransmit);
+	(void)bt_work_cancel_delayable(&link.tx.retransmit);
 
 	free_segments();
 }
@@ -339,9 +345,9 @@ static void reset_adv_link(void)
 	/* If this fails, the work handler will exit early on the LINK_ACTIVE
 	 * check.
 	 */
-	(void)k_work_cancel_delayable(&link.prot_timer);
+	(void)bt_work_cancel_delayable(&link.prot_timer);
 
-	if (atomic_test_bit(link.flags, ADV_PROVISIONER)) {
+	if (bt_atomic_test_bit(link.flags, ADV_PROVISIONER)) {
 		/* Clear everything except the retransmit and protocol timer
 		 * delayed work objects.
 		 */
@@ -356,7 +362,7 @@ static void reset_adv_link(void)
 		}
 
 		link.id = 0;
-		atomic_clear(link.flags);
+		bt_atomic_clear(link.flags);
 		link.rx.id = XACT_ID_MAX;
 		link.tx.id = XACT_ID_NVAL;
 	}
@@ -393,19 +399,19 @@ static struct bt_mesh_adv *adv_create(uint8_t retransmits)
 static void ack_complete(int err, void *user_data)
 {
 	LOG_DBG("xact 0x%x complete", (uint8_t)link.tx.pending_ack);
-	atomic_clear_bit(link.flags, ADV_ACK_PENDING);
+	bt_atomic_clear_bit(link.flags, ADV_ACK_PENDING);
 }
 
 static bool ack_pending(void)
 {
-	return atomic_test_bit(link.flags, ADV_ACK_PENDING);
+	return bt_atomic_test_bit(link.flags, ADV_ACK_PENDING);
 }
 
 static void prov_failed(uint8_t err)
 {
 	LOG_DBG("%u", err);
 	link.cb->error(&bt_mesh_pb_adv, link.cb_data, err);
-	atomic_set_bit(link.flags, ADV_LINK_INVALID);
+	bt_atomic_set_bit(link.flags, ADV_LINK_INVALID);
 }
 
 static void prov_msg_recv(void)
@@ -417,19 +423,19 @@ static void prov_msg_recv(void)
 
 	gen_prov_ack_send(link.rx.id);
 
-	if (atomic_test_bit(link.flags, ADV_LINK_INVALID)) {
+	if (bt_atomic_test_bit(link.flags, ADV_LINK_INVALID)) {
 		LOG_WRN("Unexpected msg 0x%02x on invalidated link", link.rx.buf->data[0]);
 		prov_failed(PROV_ERR_UNEXP_PDU);
 		return;
 	}
 
-	k_work_reschedule(&link.prot_timer, bt_mesh_prov_protocol_timeout_get());
+	bt_work_reschedule(&link.prot_timer, bt_mesh_prov_protocol_timeout_get());
 	link.cb->recv(&bt_mesh_pb_adv, link.cb_data, link.rx.buf);
 }
 
-static void protocol_timeout(struct k_work *work)
+static void protocol_timeout(struct bt_work *work)
 {
-	if (!atomic_test_bit(link.flags, ADV_LINK_ACTIVE)) {
+	if (!bt_atomic_test_bit(link.flags, ADV_LINK_ACTIVE)) {
 		return;
 	}
 
@@ -445,7 +451,7 @@ static void protocol_timeout(struct k_work *work)
 static void gen_prov_ack_send(uint8_t xact_id)
 {
 	struct bt_mesh_adv *adv;
-	bool pending = atomic_test_and_set_bit(link.flags, ADV_ACK_PENDING);
+	bool pending = bt_atomic_test_and_set_bit(link.flags, ADV_ACK_PENDING);
 	int err;
 
 	LOG_DBG("xact_id 0x%x", xact_id);
@@ -457,7 +463,7 @@ static void gen_prov_ack_send(uint8_t xact_id)
 
 	adv = adv_create(RETRANSMITS_ACK);
 	if (!adv) {
-		atomic_clear_bit(link.flags, ADV_ACK_PENDING);
+		bt_atomic_clear_bit(link.flags, ADV_ACK_PENDING);
 		return;
 	}
 
@@ -471,7 +477,7 @@ static void gen_prov_ack_send(uint8_t xact_id)
 
 	err = send_unacked(adv, pending ? NULL : ack_complete, NULL);
 	if (err) {
-		atomic_clear_bit(link.flags, ADV_ACK_PENDING);
+		bt_atomic_clear_bit(link.flags, ADV_ACK_PENDING);
 	}
 }
 
@@ -565,7 +571,7 @@ static void gen_prov_ack(struct prov_rx *rx, struct net_buf_simple *buf)
 
 	if (rx->xact_id == link.tx.id) {
 		/* Don't clear resending of link_close messages */
-		if (!atomic_test_bit(link.flags, ADV_LINK_CLOSING)) {
+		if (!bt_atomic_test_bit(link.flags, ADV_LINK_CLOSING)) {
 			prov_clear_tx();
 		}
 
@@ -663,7 +669,7 @@ static void gen_prov_start(struct prov_rx *rx, struct net_buf_simple *buf)
 	 */
 	if ((link.rx.seg & BIT(0)) &&
 	    ((link.rx.seg & SEG_NVAL) != SEG_NVAL) &&
-	    (find_msb_set((~link.rx.seg) & SEG_NVAL) - 1 > link.rx.last_seg)) {
+	    ((32 - (int)u32_count_leading_zeros((~link.rx.seg) & SEG_NVAL)) - 1 > link.rx.last_seg)) {
 		LOG_ERR("Invalid segment index %u", seg);
 		prov_failed(PROV_ERR_NVAL_FMT);
 		return;
@@ -691,14 +697,14 @@ static void gen_prov_ctl(struct prov_rx *rx, struct net_buf_simple *buf)
 		link_open(rx, buf);
 		break;
 	case LINK_ACK:
-		if (!atomic_test_bit(link.flags, ADV_LINK_ACTIVE)) {
+		if (!bt_atomic_test_bit(link.flags, ADV_LINK_ACTIVE)) {
 			return;
 		}
 
 		link_ack(rx, buf);
 		break;
 	case LINK_CLOSE:
-		if (!atomic_test_bit(link.flags, ADV_LINK_ACTIVE)) {
+		if (!bt_atomic_test_bit(link.flags, ADV_LINK_ACTIVE)) {
 			return;
 		}
 
@@ -733,7 +739,7 @@ static void gen_prov_recv(struct prov_rx *rx, struct net_buf_simple *buf)
 		return;
 	}
 
-	if (!atomic_test_bit(link.flags, ADV_LINK_ACTIVE) &&
+	if (!bt_atomic_test_bit(link.flags, ADV_LINK_ACTIVE) &&
 	    gen_prov[GPCF(rx->gpc)].require_link) {
 		LOG_DBG("Ignoring message that requires active link");
 		return;
@@ -746,16 +752,16 @@ static void gen_prov_recv(struct prov_rx *rx, struct net_buf_simple *buf)
  * TX
  ******************************************************************************/
 
-static void prov_retransmit(struct k_work *work)
+static void prov_retransmit(struct bt_work *work)
 {
 	LOG_DBG("");
 
-	if (!atomic_test_bit(link.flags, ADV_LINK_ACTIVE)) {
+	if (!bt_atomic_test_bit(link.flags, ADV_LINK_ACTIVE)) {
 		LOG_WRN("Link not active");
 		return;
 	}
 
-	if (k_uptime_get() - link.tx.start > link.tx.timeout * MSEC_PER_SEC) {
+	if (bt_uptime_get_ms() - link.tx.start > link.tx.timeout * MSEC_PER_SEC) {
 		LOG_WRN("Giving up transaction");
 		prov_link_close(PROV_BEARER_LINK_STATUS_TIMEOUT);
 		return;
@@ -792,9 +798,9 @@ static int bearer_ctl_send(struct bt_mesh_adv *adv)
 	}
 
 	prov_clear_tx();
-	k_work_reschedule(&link.prot_timer, bt_mesh_prov_protocol_timeout_get());
+	bt_work_reschedule(&link.prot_timer, bt_mesh_prov_protocol_timeout_get());
 
-	link.tx.start = k_uptime_get();
+	link.tx.start = bt_uptime_get_ms();
 	link.tx.adv[0] = adv;
 	send_reliable();
 
@@ -805,9 +811,9 @@ static void buf_sent(int err, void *user_data)
 {
 	enum prov_bearer_link_status reason = (enum prov_bearer_link_status)(int)user_data;
 
-	atomic_clear_bit(link.flags, ADV_LINK_ACK_SENDING);
+	bt_atomic_clear_bit(link.flags, ADV_LINK_ACK_SENDING);
 
-	if (atomic_test_and_clear_bit(link.flags, ADV_LINK_CLOSING)) {
+	if (bt_atomic_test_and_clear_bit(link.flags, ADV_LINK_CLOSING)) {
 		close_link(reason);
 		return;
 	}
@@ -822,7 +828,7 @@ static int bearer_ctl_send_unacked(struct bt_mesh_adv *adv, void *user_data)
 	}
 
 	prov_clear_tx();
-	k_work_reschedule(&link.prot_timer, bt_mesh_prov_protocol_timeout_get());
+	bt_work_reschedule(&link.prot_timer, bt_mesh_prov_protocol_timeout_get());
 
 	err = send_unacked(adv, &buf_sent, user_data);
 	if (err) {
@@ -839,7 +845,7 @@ static int prov_send_adv(struct net_buf_simple *msg,
 	uint8_t seg_len, seg_id;
 
 	prov_clear_tx();
-	k_work_reschedule(&link.prot_timer, bt_mesh_prov_protocol_timeout_get());
+	bt_work_reschedule(&link.prot_timer, bt_mesh_prov_protocol_timeout_get());
 
 	start = adv_create(RETRANSMITS_RELIABLE);
 	if (!start) {
@@ -857,7 +863,7 @@ static int prov_send_adv(struct net_buf_simple *msg,
 	link.tx.adv[0] = start;
 	link.tx.cb = cb;
 	link.tx.cb_data = cb_data;
-	link.tx.start = k_uptime_get();
+	link.tx.start = bt_uptime_get_ms();
 
 	LOG_DBG("xact_id: 0x%x len: %u", link.tx.id, msg->len);
 
@@ -913,20 +919,20 @@ static void link_open(struct prov_rx *rx, struct net_buf_simple *buf)
 		return;
 	}
 
-	if (atomic_test_bit(link.flags, ADV_LINK_ACTIVE)) {
+	if (bt_atomic_test_bit(link.flags, ADV_LINK_ACTIVE)) {
 		/* Send another link ack if the provisioner missed the last */
 		if (link.id != rx->link_id) {
 			LOG_DBG("Ignoring bearer open: link already active");
 			return;
 		}
 
-		if (atomic_test_bit(link.flags, ADV_LINK_ACK_SENDING)) {
+		if (bt_atomic_test_bit(link.flags, ADV_LINK_ACK_SENDING)) {
 			LOG_DBG("Still sending Link Ack");
 			return;
 		}
 
 		/* Ignore errors, message will be attempted again if we keep receiving link open: */
-		atomic_set_bit(link.flags, ADV_LINK_ACK_SENDING);
+		bt_atomic_set_bit(link.flags, ADV_LINK_ACK_SENDING);
 		(void)bearer_ctl_send_unacked(
 			ctl_adv_create(LINK_ACK, NULL, 0, RETRANSMITS_ACK),
 			(void *)PROV_BEARER_LINK_STATUS_SUCCESS);
@@ -939,10 +945,10 @@ static void link_open(struct prov_rx *rx, struct net_buf_simple *buf)
 	}
 
 	link.id = rx->link_id;
-	atomic_set_bit(link.flags, ADV_LINK_ACTIVE);
+	bt_atomic_set_bit(link.flags, ADV_LINK_ACTIVE);
 	net_buf_simple_reset(link.rx.buf);
 
-	atomic_set_bit(link.flags, ADV_LINK_ACK_SENDING);
+	bt_atomic_set_bit(link.flags, ADV_LINK_ACK_SENDING);
 	err = bearer_ctl_send_unacked(
 		ctl_adv_create(LINK_ACK, NULL, 0, RETRANSMITS_ACK),
 		(void *)PROV_BEARER_LINK_STATUS_SUCCESS);
@@ -958,8 +964,8 @@ static void link_ack(struct prov_rx *rx, struct net_buf_simple *buf)
 {
 	LOG_DBG("len %u", buf->len);
 
-	if (atomic_test_bit(link.flags, ADV_PROVISIONER)) {
-		if (atomic_test_and_set_bit(link.flags, ADV_LINK_ACK_RECVD)) {
+	if (bt_atomic_test_bit(link.flags, ADV_PROVISIONER)) {
+		if (bt_atomic_test_and_set_bit(link.flags, ADV_LINK_ACK_RECVD)) {
 			return;
 		}
 
@@ -1003,7 +1009,7 @@ void bt_mesh_pb_adv_recv(struct net_buf_simple *buf)
 	rx.xact_id = net_buf_simple_pull_u8(buf);
 	rx.gpc = net_buf_simple_pull_u8(buf);
 
-	if (atomic_test_bit(link.flags, ADV_LINK_ACTIVE) && link.id != rx.link_id) {
+	if (bt_atomic_test_bit(link.flags, ADV_LINK_ACTIVE) && link.id != rx.link_id) {
 		return;
 	}
 
@@ -1025,11 +1031,11 @@ static int prov_link_open(const uint8_t uuid[16], uint8_t timeout,
 		return err;
 	}
 
-	if (atomic_test_and_set_bit(link.flags, ADV_LINK_ACTIVE)) {
+	if (bt_atomic_test_and_set_bit(link.flags, ADV_LINK_ACTIVE)) {
 		return -EBUSY;
 	}
 
-	atomic_set_bit(link.flags, ADV_PROVISIONER);
+	bt_atomic_set_bit(link.flags, ADV_PROVISIONER);
 
 	bt_rand(&link.id, sizeof(link.id));
 	link.tx.id = XACT_ID_MAX;
@@ -1057,7 +1063,7 @@ static int prov_link_accept(const struct prov_bearer_cb *cb, void *cb_data)
 		return err;
 	}
 
-	if (atomic_test_bit(link.flags, ADV_LINK_ACTIVE)) {
+	if (bt_atomic_test_bit(link.flags, ADV_LINK_ACTIVE)) {
 		return -EBUSY;
 	}
 
@@ -1085,7 +1091,7 @@ static void prov_link_close(enum prov_bearer_link_status status)
 {
 	int err;
 
-	if (atomic_test_and_set_bit(link.flags, ADV_LINK_CLOSING)) {
+	if (bt_atomic_test_and_set_bit(link.flags, ADV_LINK_CLOSING)) {
 		return;
 	}
 
@@ -1100,8 +1106,8 @@ static void prov_link_close(enum prov_bearer_link_status status)
 
 void bt_mesh_pb_adv_init(void)
 {
-	k_work_init_delayable(&link.prot_timer, protocol_timeout);
-	k_work_init_delayable(&link.tx.retransmit, prov_retransmit);
+	bt_work_init_delayable(&link.prot_timer, protocol_timeout);
+	bt_work_init_delayable(&link.tx.retransmit, prov_retransmit);
 }
 
 void bt_mesh_pb_adv_reset(void)

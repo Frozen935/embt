@@ -5,12 +5,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <errno.h>
+#include <stdio.h>
+#include <embt/base/atomic.h>
 #include <string.h>
 #include <stdlib.h>
-#include <zephyr/bluetooth/mesh.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/sys/iterable_sections.h>
-
+#include <embt/bluetooth/mesh.h>
+#include <embt/bluetooth/conn.h>
 #include "mesh.h"
 #include "net.h"
 #include "app_keys.h"
@@ -26,6 +27,8 @@
 #include <embt/base/log.h>
 
 LOG_MODULE_REGISTER(bt_mesh_app_keys, CONFIG_BT_MESH_KEYS_LOG_LEVEL);
+
+static struct bt_mesh_app_key_cb *app_key_callbacks;
 
 /* Tracking of what storage changes are pending for App Keys. We track this in
  * a separate array here instead of within the respective bt_mesh_app_key
@@ -70,7 +73,7 @@ static void clear_app_key(uint16_t app_idx)
 	char path[20];
 	int err;
 
-	snprintk(path, sizeof(path), "bt/mesh/AppKey/%x", app_idx);
+	snprintf(path, sizeof(path), "bt/mesh/AppKey/%x", app_idx);
 	err = settings_delete(path);
 	if (err) {
 		LOG_ERR("Failed to clear AppKeyIndex 0x%03x", app_idx);
@@ -86,7 +89,7 @@ static void store_app_key(uint16_t app_idx)
 	char path[20];
 	int err;
 
-	snprintk(path, sizeof(path), "bt/mesh/AppKey/%x", app_idx);
+	snprintf(path, sizeof(path), "bt/mesh/AppKey/%x", app_idx);
 
 	app = app_get(app_idx);
 	if (!app) {
@@ -166,7 +169,7 @@ static void update_app_key_settings(uint16_t app_idx, bool store)
 
 static void app_key_evt(struct bt_mesh_app_key *app, enum bt_mesh_key_evt evt)
 {
-	STRUCT_SECTION_FOREACH(bt_mesh_app_key_cb, cb) {
+	for (struct bt_mesh_app_key_cb *cb = app_key_callbacks; cb; cb = cb->next) {
 		cb->evt_handler(app, evt);
 	}
 }
@@ -553,7 +556,7 @@ uint16_t bt_mesh_app_key_find(bool dev_key, uint8_t aid,
 			}
 
 #if defined(CONFIG_BT_MESH_RPR_SRV)
-			if (atomic_test_bit(bt_mesh.flags, BT_MESH_DEVKEY_CAND)) {
+			if (bt_atomic_test_bit(bt_mesh.flags, BT_MESH_DEVKEY_CAND)) {
 				err = cb(rx, &bt_mesh.dev_key_cand, cb_data);
 				if (!err) {
 					/* MshPRTv1.1: 3.6.4.2:
@@ -712,4 +715,10 @@ void bt_mesh_app_key_pending_store(void)
 			store_app_key(update->key_idx);
 		}
 	}
+}
+
+void bt_mesh_app_key_cb_register(struct bt_mesh_app_key_cb *cb)
+{
+	cb->next = app_key_callbacks;
+	app_key_callbacks = cb;
 }

@@ -165,7 +165,7 @@ void bt_mesh_model_reset(void);
 
 void bt_mesh_attention(const struct bt_mesh_model *model, uint8_t time);
 
-#include <zephyr/sys/byteorder.h>
+#include <embt/base/byteorder.h>
 
 static inline void key_idx_pack_pair(struct net_buf_simple *buf, uint16_t idx1, uint16_t idx2)
 {

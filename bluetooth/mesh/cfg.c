@@ -4,8 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <zephyr/bluetooth/mesh.h>
-#include <zephyr/bluetooth/bluetooth.h>
+#include <errno.h>
+#include <embt/base/atomic.h>
+#include <embt/bluetooth/mesh.h>
+#include <embt/bluetooth/bluetooth.h>
 
 #include "mesh.h"
 #include "net.h"
@@ -34,11 +36,11 @@ struct cfg_val {
 
 void bt_mesh_beacon_set(bool beacon)
 {
-	if (atomic_test_bit(bt_mesh.flags, BT_MESH_BEACON) == beacon) {
+	if (bt_atomic_test_bit(bt_mesh.flags, BT_MESH_BEACON) == beacon) {
 		return;
 	}
 
-	atomic_set_bit_to(bt_mesh.flags, BT_MESH_BEACON, beacon);
+	bt_atomic_set_bit_to(bt_mesh.flags, BT_MESH_BEACON, beacon);
 
 	if (beacon) {
 		bt_mesh_beacon_enable();
@@ -47,14 +49,14 @@ void bt_mesh_beacon_set(bool beacon)
 	}
 
 	if (IS_ENABLED(CONFIG_BT_SETTINGS) &&
-	    atomic_test_bit(bt_mesh.flags, BT_MESH_VALID)) {
+	    bt_atomic_test_bit(bt_mesh.flags, BT_MESH_VALID)) {
 		bt_mesh_settings_store_schedule(BT_MESH_SETTINGS_CFG_PENDING);
 	}
 }
 
 bool bt_mesh_beacon_enabled(void)
 {
-	return atomic_test_bit(bt_mesh.flags, BT_MESH_BEACON);
+	return bt_atomic_test_bit(bt_mesh.flags, BT_MESH_BEACON);
 }
 
 static int feature_set(int feature_flag, enum bt_mesh_feat_state state)
@@ -64,12 +66,12 @@ static int feature_set(int feature_flag, enum bt_mesh_feat_state state)
 		return -EINVAL;
 	}
 
-	if (atomic_test_bit(bt_mesh.flags, feature_flag) ==
+	if (bt_atomic_test_bit(bt_mesh.flags, feature_flag) ==
 	    (state == BT_MESH_FEATURE_ENABLED)) {
 		return -EALREADY;
 	}
 
-	atomic_set_bit_to(bt_mesh.flags, feature_flag,
+	bt_atomic_set_bit_to(bt_mesh.flags, feature_flag,
 			  (state == BT_MESH_FEATURE_ENABLED));
 
 	return 0;
@@ -77,7 +79,7 @@ static int feature_set(int feature_flag, enum bt_mesh_feat_state state)
 
 static enum bt_mesh_feat_state feature_get(int feature_flag)
 {
-	return atomic_test_bit(bt_mesh.flags, feature_flag) ?
+	return bt_atomic_test_bit(bt_mesh.flags, feature_flag) ?
 		       BT_MESH_FEATURE_ENABLED :
 		       BT_MESH_FEATURE_DISABLED;
 }
@@ -102,7 +104,7 @@ int bt_mesh_priv_beacon_set(enum bt_mesh_feat_state priv_beacon)
 	}
 
 	if (IS_ENABLED(CONFIG_BT_SETTINGS) && IS_ENABLED(CONFIG_BT_MESH_PRIV_BEACON_SRV) &&
-	    atomic_test_bit(bt_mesh.flags, BT_MESH_VALID)) {
+	    bt_atomic_test_bit(bt_mesh.flags, BT_MESH_VALID)) {
 		bt_mesh_priv_beacon_srv_store_schedule();
 	}
 
@@ -154,7 +156,7 @@ int bt_mesh_od_priv_proxy_set(uint8_t on_demand_proxy)
 	}
 
 	if (IS_ENABLED(CONFIG_BT_SETTINGS) && IS_ENABLED(CONFIG_BT_MESH_OD_PRIV_PROXY_SRV) &&
-	    atomic_test_bit(bt_mesh.flags, BT_MESH_VALID)) {
+	    bt_atomic_test_bit(bt_mesh.flags, BT_MESH_VALID)) {
 		bt_mesh_od_priv_proxy_srv_store_schedule();
 	}
 	return 0;
@@ -195,7 +197,7 @@ int bt_mesh_gatt_proxy_set(enum bt_mesh_feat_state gatt_proxy)
 	bt_mesh_hb_feature_changed(BT_MESH_FEAT_PROXY);
 
 	if (IS_ENABLED(CONFIG_BT_SETTINGS) &&
-	    atomic_test_bit(bt_mesh.flags, BT_MESH_VALID)) {
+	    bt_atomic_test_bit(bt_mesh.flags, BT_MESH_VALID)) {
 		bt_mesh_settings_store_schedule(BT_MESH_SETTINGS_CFG_PENDING);
 	}
 
@@ -237,7 +239,7 @@ int bt_mesh_priv_gatt_proxy_set(enum bt_mesh_feat_state priv_gatt_proxy)
 	}
 
 	if (IS_ENABLED(CONFIG_BT_SETTINGS) && IS_ENABLED(CONFIG_BT_MESH_PRIV_BEACON_SRV) &&
-	    atomic_test_bit(bt_mesh.flags, BT_MESH_VALID)) {
+	    bt_atomic_test_bit(bt_mesh.flags, BT_MESH_VALID)) {
 		bt_mesh_priv_beacon_srv_store_schedule();
 	}
 
@@ -266,7 +268,7 @@ int bt_mesh_default_ttl_set(uint8_t default_ttl)
 	bt_mesh.default_ttl = default_ttl;
 
 	if (IS_ENABLED(CONFIG_BT_SETTINGS) &&
-	    atomic_test_bit(bt_mesh.flags, BT_MESH_VALID)) {
+	    bt_atomic_test_bit(bt_mesh.flags, BT_MESH_VALID)) {
 		bt_mesh_settings_store_schedule(BT_MESH_SETTINGS_CFG_PENDING);
 	}
 
@@ -294,7 +296,7 @@ int bt_mesh_friend_set(enum bt_mesh_feat_state friendship)
 	bt_mesh_hb_feature_changed(BT_MESH_FEAT_FRIEND);
 
 	if (IS_ENABLED(CONFIG_BT_SETTINGS) &&
-	    atomic_test_bit(bt_mesh.flags, BT_MESH_VALID)) {
+	    bt_atomic_test_bit(bt_mesh.flags, BT_MESH_VALID)) {
 		bt_mesh_settings_store_schedule(BT_MESH_SETTINGS_CFG_PENDING);
 	}
 
@@ -323,7 +325,7 @@ void bt_mesh_net_transmit_set(uint8_t xmit)
 	bt_mesh.net_xmit = xmit;
 
 	if (IS_ENABLED(CONFIG_BT_SETTINGS) &&
-	    atomic_test_bit(bt_mesh.flags, BT_MESH_VALID)) {
+	    bt_atomic_test_bit(bt_mesh.flags, BT_MESH_VALID)) {
 		bt_mesh_settings_store_schedule(BT_MESH_SETTINGS_CFG_PENDING);
 	}
 }
@@ -354,7 +356,7 @@ int bt_mesh_relay_set(enum bt_mesh_feat_state relay, uint8_t xmit)
 	bt_mesh_hb_feature_changed(BT_MESH_FEAT_RELAY);
 
 	if (IS_ENABLED(CONFIG_BT_SETTINGS) &&
-	    atomic_test_bit(bt_mesh.flags, BT_MESH_VALID)) {
+	    bt_atomic_test_bit(bt_mesh.flags, BT_MESH_VALID)) {
 		bt_mesh_settings_store_schedule(BT_MESH_SETTINGS_CFG_PENDING);
 	}
 
@@ -406,19 +408,19 @@ void bt_mesh_cfg_default_set(void)
 #endif
 
 	if (IS_ENABLED(CONFIG_BT_MESH_RELAY_ENABLED)) {
-		atomic_set_bit(bt_mesh.flags, BT_MESH_RELAY);
+		bt_atomic_set_bit(bt_mesh.flags, BT_MESH_RELAY);
 	}
 
 	if (IS_ENABLED(CONFIG_BT_MESH_BEACON_ENABLED)) {
-		atomic_set_bit(bt_mesh.flags, BT_MESH_BEACON);
+		bt_atomic_set_bit(bt_mesh.flags, BT_MESH_BEACON);
 	}
 
 	if (IS_ENABLED(CONFIG_BT_MESH_GATT_PROXY_ENABLED)) {
-		atomic_set_bit(bt_mesh.flags, BT_MESH_GATT_PROXY);
+		bt_atomic_set_bit(bt_mesh.flags, BT_MESH_GATT_PROXY);
 	}
 
 	if (IS_ENABLED(CONFIG_BT_MESH_FRIEND_ENABLED)) {
-		atomic_set_bit(bt_mesh.flags, BT_MESH_FRIEND);
+		bt_atomic_set_bit(bt_mesh.flags, BT_MESH_FRIEND);
 	}
 }
 
@@ -493,7 +495,7 @@ static void store_pending_cfg(void)
 
 void bt_mesh_cfg_pending_store(void)
 {
-	if (atomic_test_bit(bt_mesh.flags, BT_MESH_VALID)) {
+	if (bt_atomic_test_bit(bt_mesh.flags, BT_MESH_VALID)) {
 		store_pending_cfg();
 	} else {
 		clear_cfg();

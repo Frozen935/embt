@@ -4,7 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <zephyr/bluetooth/mesh.h>
+#include <embt/base/time.h>
+#include <embt/osi/sync.h>
+#include <embt/base/base.h>
+#include <errno.h>
+#include <embt/bluetooth/mesh.h>
 
 #include "msg.h"
 #include <embt/base/log.h>
@@ -58,17 +62,54 @@ int bt_mesh_msg_ack_ctx_prepare(struct bt_mesh_msg_ack_ctx *ack,
 	return 0;
 }
 
-int bt_mesh_msg_ack_ctx_wait(struct bt_mesh_msg_ack_ctx *ack, k_timeout_t timeout)
+void bt_mesh_msg_ack_ctx_init(struct bt_mesh_msg_ack_ctx *ack)
+{
+	bt_base_require(osi_mutex_init(&ack->lock, OS_MUTEX_NORMAL));
+	bt_base_require(osi_sem_init(&ack->sem, 0, 1));
+	ack->waiting = false;
+	ack->cancelled = false;
+}
+
+void bt_mesh_msg_ack_ctx_reset(struct bt_mesh_msg_ack_ctx *ack)
+{
+	bt_base_require(osi_mutex_lock(&ack->lock, OS_TIMEOUT_FOREVER));
+	if (ack->waiting) {
+		ack->cancelled = true;
+		bt_base_require(osi_sem_give(&ack->sem));
+	} else {
+		bt_base_require(osi_sem_reset(&ack->sem));
+	}
+	bt_base_require(osi_mutex_unlock(&ack->lock));
+}
+
+void bt_mesh_msg_ack_ctx_rx(struct bt_mesh_msg_ack_ctx *ack)
+{
+	bt_base_require(osi_mutex_lock(&ack->lock, OS_TIMEOUT_FOREVER));
+	bt_base_require(osi_sem_give(&ack->sem));
+	bt_base_require(osi_mutex_unlock(&ack->lock));
+}
+
+int bt_mesh_msg_ack_ctx_wait(struct bt_mesh_msg_ack_ctx *ack, bt_timeout_t timeout)
 {
 	int err;
 
-	err = k_sem_take(&ack->sem, timeout);
-	bt_mesh_msg_ack_ctx_clear(ack);
-
-	if (err == -EAGAIN) {
-		return -ETIMEDOUT;
+	bt_base_require(osi_mutex_lock(&ack->lock, OS_TIMEOUT_FOREVER));
+	if (ack->waiting) {
+		bt_base_require(osi_mutex_unlock(&ack->lock));
+		return -EBUSY;
 	}
-
+	ack->waiting = true;
+	ack->cancelled = false;
+	bt_base_require(osi_mutex_unlock(&ack->lock));
+	err = osi_sem_take(&ack->sem, timeout);
+	bt_base_require(osi_mutex_lock(&ack->lock, OS_TIMEOUT_FOREVER));
+	if (ack->cancelled || err == -EAGAIN) {
+		err = -ETIMEDOUT;
+	}
+	ack->waiting = false;
+	bt_base_require(osi_sem_reset(&ack->sem));
+	bt_mesh_msg_ack_ctx_clear(ack);
+	bt_base_require(osi_mutex_unlock(&ack->lock));
 	return err;
 }
 
@@ -124,7 +165,7 @@ int bt_mesh_msg_ackd_send(const struct bt_mesh_model *model, struct bt_mesh_msg_
 	}
 
 	if (!err) {
-		return bt_mesh_msg_ack_ctx_wait(rsp->ack, K_MSEC(rsp->timeout));
+		return bt_mesh_msg_ack_ctx_wait(rsp->ack, BT_MSEC(rsp->timeout));
 	}
 
 	bt_mesh_msg_ack_ctx_clear(rsp->ack);

@@ -5,14 +5,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <stdio.h>
+#include <embt/base/assert.h>
 #include <errno.h>
 #include <string.h>
 #include <stdlib.h>
 
-#include <zephyr/settings/settings.h>
-#include <zephyr/net_buf.h>
+#include <embt/settings/settings.h>
+#include <embt/net_buf.h>
 
-#include <zephyr/bluetooth/mesh.h>
+#include <embt/bluetooth/mesh.h>
 
 #include "common/bt_str.h"
 
@@ -277,7 +279,7 @@ void bt_mesh_va_pending_store(void)
 
 		lab->changed = 0U;
 
-		snprintk(path, sizeof(path), "bt/mesh/Va/%x", i);
+		snprintf(path, sizeof(path), "bt/mesh/Va/%x", i);
 
 		if (IS_VA_DEL(lab)) {
 			err = settings_delete(path);

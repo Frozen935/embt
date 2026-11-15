@@ -12,6 +12,8 @@
 
 #include <embt/bluetooth/mesh/brg_cfg.h>
 
+#include <embt/bluetooth/mesh/access.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif

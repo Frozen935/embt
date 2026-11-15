@@ -10,12 +10,10 @@
 #ifndef ZEPHYR_INCLUDE_BLUETOOTH_MESH_MAIN_H_
 #define ZEPHYR_INCLUDE_BLUETOOTH_MESH_MAIN_H_
 
-#include <embt/storage.h>
+#include <embt/base/util_macro.h>
 #include <stdbool.h>
 #include <stdint.h>
-
-#include <embt/sys/iterable_sections.h>
-
+#include <stddef.h>
 /**
  * @brief Provisioning
  * @defgroup bt_mesh_prov Provisioning
@@ -672,6 +670,7 @@ int bt_mesh_lpn_poll(void);
 
 /** Low Power Node callback functions. */
 struct bt_mesh_lpn_cb {
+	struct bt_mesh_lpn_cb *next; /**< Internal explicit-registration link. */
 	/** @brief Friendship established.
 	 *
 	 *  This callback notifies the application that friendship has
@@ -716,13 +715,19 @@ struct bt_mesh_lpn_cb {
  *
  *  @param _name Name of callback structure.
  */
-#define BT_MESH_LPN_CB_DEFINE(_name)                                  \
-	static const STRUCT_SECTION_ITERABLE(bt_mesh_lpn_cb,          \
-					     _CONCAT(bt_mesh_lpn_cb_, \
-						     _name))
+/**
+ * @brief Register persistent callback storage before enabling the component.
+ * @param[in,out] cb Callback object that outlives all component operations.
+ * @return Zero, -EINVAL for NULL, or -EALREADY for duplicate registration.
+ * @note The owner serializes registration against callback dispatch.
+ */
+int bt_mesh_lpn_cb_register(struct bt_mesh_lpn_cb *cb);
+
+#define BT_MESH_LPN_CB_DEFINE(_name) static struct bt_mesh_lpn_cb bt_mesh_lpn_cb_ ## _name
 
 /** Friend Node callback functions. */
 struct bt_mesh_friend_cb {
+	struct bt_mesh_friend_cb *next; /**< Internal explicit-registration link. */
 	/** @brief Friendship established.
 	 *
 	 *  This callback notifies the application that friendship has
@@ -768,10 +773,15 @@ struct bt_mesh_friend_cb {
  *
  *  @param _name Name of callback structure.
  */
-#define BT_MESH_FRIEND_CB_DEFINE(_name)                                  \
-	static const STRUCT_SECTION_ITERABLE(bt_mesh_friend_cb,          \
-					     _CONCAT(bt_mesh_friend_cb_, \
-						     _name))
+/**
+ * @brief Register persistent callback storage before enabling the component.
+ * @param[in,out] cb Callback object that outlives all component operations.
+ * @return Zero, -EINVAL for NULL, or -EALREADY for duplicate registration.
+ * @note The owner serializes registration against callback dispatch.
+ */
+int bt_mesh_friend_cb_register(struct bt_mesh_friend_cb *cb);
+
+#define BT_MESH_FRIEND_CB_DEFINE(_name) static struct bt_mesh_friend_cb bt_mesh_friend_cb_ ## _name
 #if defined(CONFIG_BT_TESTING)
 struct bt_mesh_snb {
 	/** Flags */
@@ -803,6 +813,7 @@ struct bt_mesh_prb {
 
 /** Beacon callback functions. */
 struct bt_mesh_beacon_cb {
+	struct bt_mesh_beacon_cb *next; /**< Internal explicit-registration link. */
 	/** @brief Secure Network Beacon received.
 	 *
 	 *  This callback notifies the application that Secure Network Beacon
@@ -830,10 +841,15 @@ struct bt_mesh_beacon_cb {
  *
  *  @param _name Name of callback structure.
  */
-#define BT_MESH_BEACON_CB_DEFINE(_name)                                  \
-	static const STRUCT_SECTION_ITERABLE(bt_mesh_beacon_cb,          \
-					     _CONCAT(bt_mesh_beacon_cb_, \
-						     _name))
+/**
+ * @brief Register persistent callback storage before enabling the component.
+ * @param[in,out] cb Callback object that outlives all component operations.
+ * @return Zero, -EINVAL for NULL, or -EALREADY for duplicate registration.
+ * @note The owner serializes registration against callback dispatch.
+ */
+int bt_mesh_beacon_cb_register(struct bt_mesh_beacon_cb *cb);
+
+#define BT_MESH_BEACON_CB_DEFINE(_name) static struct bt_mesh_beacon_cb bt_mesh_beacon_cb_ ## _name
 #endif
 
 /** @brief Terminate Friendship.

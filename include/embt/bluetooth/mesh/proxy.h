@@ -10,11 +10,8 @@
 #ifndef ZEPHYR_INCLUDE_BLUETOOTH_MESH_PROXY_H_
 #define ZEPHYR_INCLUDE_BLUETOOTH_MESH_PROXY_H_
 
-#include <embt/storage.h>
+#include <embt/base/util_macro.h>
 #include <stdint.h>
-
-#include <embt/sys/iterable_sections.h>
-
 /**
  * @brief Proxy
  * @defgroup bt_mesh_proxy Proxy
@@ -31,6 +28,7 @@ extern "C" {
  *  Should be instantiated with @ref BT_MESH_PROXY_CB_DEFINE.
  */
 struct bt_mesh_proxy_cb {
+	struct bt_mesh_proxy_cb *next; /**< Internal explicit-registration link. */
 	/** @brief Started sending Node Identity beacons on the given subnet.
 	 *
 	 *  @param net_idx Network index the Node Identity beacons are running
@@ -53,9 +51,15 @@ struct bt_mesh_proxy_cb {
  *
  *  @param _name Name of callback structure.
  */
-#define BT_MESH_PROXY_CB_DEFINE(_name)                                         \
-	static const STRUCT_SECTION_ITERABLE(                                  \
-		bt_mesh_proxy_cb, _CONCAT(bt_mesh_proxy_cb_, _name))
+/**
+ * @brief Register persistent callback storage before enabling the component.
+ * @param[in,out] cb Callback object that outlives all component operations.
+ * @return Zero, -EINVAL for NULL, or -EALREADY for duplicate registration.
+ * @note The owner serializes registration against callback dispatch.
+ */
+int bt_mesh_proxy_cb_register(struct bt_mesh_proxy_cb *cb);
+
+#define BT_MESH_PROXY_CB_DEFINE(_name) static struct bt_mesh_proxy_cb bt_mesh_proxy_cb_ ## _name
 
 /** @brief Enable advertising with Node Identity.
  *

@@ -13,7 +13,6 @@
 #ifndef ZEPHYR_INCLUDE_BLUETOOTH_MESH_DFU_H__
 #define ZEPHYR_INCLUDE_BLUETOOTH_MESH_DFU_H__
 
-#include <embt/storage.h>
 #include <sys/types.h>
 
 #include <embt/bluetooth/mesh/blob.h>

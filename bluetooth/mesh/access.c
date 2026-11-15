@@ -4,14 +4,21 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <stdio.h>
+#include <embt/base/work.h>
+#include <embt/base/time.h>
+#include <embt/base/time.h>
+#include <embt/base/atomic.h>
+#include <string.h>
+#include <embt/base/assert.h>
 #include <errno.h>
 #include <stdlib.h>
-#include <zephyr/sys/util.h>
-#include <zephyr/sys/byteorder.h>
+#include <embt/base/util.h>
+#include <embt/base/byteorder.h>
 
-#include <zephyr/net_buf.h>
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/mesh.h>
+#include <embt/net_buf.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/mesh.h>
 
 #include "common/bt_str.h"
 
@@ -752,7 +759,7 @@ static int32_t next_period(const struct bt_mesh_model *mod)
 	uint32_t period = 0;
 	uint32_t elapsed;
 
-	elapsed = k_uptime_get_32() - pub->period_start;
+	elapsed = bt_uptime_get_ms_32() - pub->period_start;
 	LOG_DBG("Publishing took %ums", elapsed);
 
 	if (mod->pub->count) {
@@ -803,7 +810,7 @@ static void publish_sent(int err, void *user_data)
 	const struct bt_mesh_model *mod = user_data;
 	int32_t delay;
 
-	LOG_DBG("err %d, time %u", err, k_uptime_get_32());
+	LOG_DBG("err %d, time %u", err, bt_uptime_get_ms_32());
 
 	delay = next_period(mod);
 
@@ -812,7 +819,7 @@ static void publish_sent(int err, void *user_data)
 		/* Using schedule() in case the application has already called
 		 * bt_mesh_publish, and a publication is pending.
 		 */
-		k_work_schedule(&mod->pub->timer, K_MSEC(delay));
+		bt_work_schedule(&mod->pub->timer, BT_MSEC(delay));
 	}
 }
 
@@ -858,7 +865,7 @@ static int pub_period_start(struct bt_mesh_model_pub *pub)
 
 	err = pub->update(pub->mod);
 
-	pub->period_start = k_uptime_get_32();
+	pub->period_start = bt_uptime_get_ms_32();
 
 	if (err) {
 		/* Skip this publish attempt. */
@@ -894,7 +901,7 @@ static int pub_delay_schedule(struct bt_mesh_model_pub *pub, int delay)
 	}
 
 	random = pub_delay_get(delay);
-	err = k_work_reschedule(&pub->timer, K_MSEC(random));
+	err = bt_work_reschedule(&pub->timer, BT_MSEC(random));
 	if (err < 0) {
 		LOG_ERR("Unable to delay publication (err %d)", err);
 		return err;
@@ -904,23 +911,23 @@ static int pub_delay_schedule(struct bt_mesh_model_pub *pub, int delay)
 	return 0;
 }
 
-static void mod_publish(struct k_work *work)
+static void mod_publish(struct bt_work *work)
 {
-	struct k_work_delayable *dwork = k_work_delayable_from_work(work);
+	struct bt_work_delayable *dwork = bt_work_delayable_from_work(work);
 	struct bt_mesh_model_pub *pub = CONTAINER_OF(dwork,
 						     struct bt_mesh_model_pub,
 						     timer);
 	int err;
 
 	if (pub->addr == BT_MESH_ADDR_UNASSIGNED ||
-	    atomic_test_bit(bt_mesh.flags, BT_MESH_SUSPENDED)) {
+	    bt_atomic_test_bit(bt_mesh.flags, BT_MESH_SUSPENDED)) {
 		/* Publication is no longer active, but the cancellation of the
 		 * delayed work failed. Abandon recurring timer.
 		 */
 		return;
 	}
 
-	LOG_DBG("timestamp: %u", k_uptime_get_32());
+	LOG_DBG("timestamp: %u", bt_uptime_get_ms_32());
 
 	if (pub->count) {
 		pub->count--;
@@ -1022,7 +1029,7 @@ static void mod_init(const struct bt_mesh_model *mod, const struct bt_mesh_elem 
 
 	if (mod->pub) {
 		mod->pub->mod = mod;
-		k_work_init_delayable(&mod->pub->timer, mod_publish);
+		bt_work_init_delayable(&mod->pub->timer, mod_publish);
 	}
 
 	for (i = 0; i < mod->keys_cnt; i++) {
@@ -1628,7 +1635,7 @@ int bt_mesh_model_publish(const struct bt_mesh_model *model)
 
 	/* Account for initial transmission */
 	pub->count = BT_MESH_PUB_MSG_TOTAL(pub);
-	pub->period_start = k_uptime_get_32();
+	pub->period_start = bt_uptime_get_ms_32();
 
 	LOG_DBG("Publish Retransmit Count %u Interval %ums", pub->count,
 		BT_MESH_PUB_TRANSMIT_INT(pub->retransmit));
@@ -1645,7 +1652,7 @@ int bt_mesh_model_publish(const struct bt_mesh_model *model)
 		return 0;
 	}
 
-	k_work_reschedule(&pub->timer, K_NO_WAIT);
+	bt_work_reschedule(&pub->timer, BT_NO_WAIT);
 
 	return 0;
 }
@@ -2087,7 +2094,7 @@ static int comp_set(const char *name, size_t len_rd, settings_read_cb read_cb,
 	 * demand.
 	 */
 	if (len_rd > 0) {
-		atomic_set_bit(bt_mesh.flags, BT_MESH_COMP_DIRTY);
+		bt_atomic_set_bit(bt_mesh.flags, BT_MESH_COMP_DIRTY);
 	}
 
 	return 0;
@@ -2100,9 +2107,9 @@ static void encode_mod_path(const struct bt_mesh_model *mod, bool vnd,
 	uint16_t mod_key = (((uint16_t)mod->rt->elem_idx << 8) | mod->rt->mod_idx);
 
 	if (vnd) {
-		snprintk(path, path_len, "bt/mesh/v/%x/%s", mod_key, key);
+		snprintf(path, path_len, "bt/mesh/v/%x/%s", mod_key, key);
 	} else {
-		snprintk(path, path_len, "bt/mesh/s/%x/%s", mod_key, key);
+		snprintf(path, path_len, "bt/mesh/s/%x/%s", mod_key, key);
 	}
 }
 
@@ -2407,7 +2414,7 @@ static void comp_data_clear(void)
 		}
 	}
 
-	atomic_clear_bit(bt_mesh.flags, BT_MESH_COMP_DIRTY);
+	bt_atomic_clear_bit(bt_mesh.flags, BT_MESH_COMP_DIRTY);
 }
 
 static int read_comp_cb(const char *key, size_t len, settings_read_cb read_cb,
@@ -2493,7 +2500,7 @@ static int metadata_set(const char *name, size_t len_rd, settings_read_cb read_c
 	 * demand.
 	 */
 	if (len_rd > 0) {
-		atomic_set_bit(bt_mesh.flags, BT_MESH_METADATA_DIRTY);
+		bt_atomic_set_bit(bt_mesh.flags, BT_MESH_METADATA_DIRTY);
 	}
 
 	return 0;
@@ -2585,7 +2592,7 @@ static void models_metadata_clear(void)
 		LOG_DBG("Cleared models metadata");
 	}
 
-	atomic_clear_bit(bt_mesh.flags, BT_MESH_METADATA_DIRTY);
+	bt_atomic_clear_bit(bt_mesh.flags, BT_MESH_METADATA_DIRTY);
 }
 
 void bt_mesh_comp_data_pending_clear(void)
@@ -2630,7 +2637,7 @@ static void commit_mod(const struct bt_mesh_model *mod, const struct bt_mesh_ele
 			random = !!mod->pub->delayable ? pub_delay_get(RANDOM_DELAY_LONG) : 0;
 
 			LOG_DBG("Starting publish timer (period %u ms, delay %u ms)", ms, random);
-			k_work_schedule(&mod->pub->timer, K_MSEC(ms + random));
+			bt_work_schedule(&mod->pub->timer, BT_MSEC(ms + random));
 		}
 	}
 
@@ -2661,14 +2668,14 @@ uint8_t bt_mesh_comp_parse_page(struct net_buf_simple *buf)
 	uint8_t page = net_buf_simple_pull_u8(buf);
 
 	if (page >= 130U && IS_ENABLED(CONFIG_BT_MESH_COMP_PAGE_2) &&
-	    (atomic_test_bit(bt_mesh.flags, BT_MESH_COMP_DIRTY) ||
+	    (bt_atomic_test_bit(bt_mesh.flags, BT_MESH_COMP_DIRTY) ||
 	     IS_ENABLED(CONFIG_BT_MESH_RPR_SRV))) {
 		page = 130U;
 	} else if (page >= 129U && IS_ENABLED(CONFIG_BT_MESH_COMP_PAGE_1) &&
-		   (atomic_test_bit(bt_mesh.flags, BT_MESH_COMP_DIRTY) ||
+		   (bt_atomic_test_bit(bt_mesh.flags, BT_MESH_COMP_DIRTY) ||
 		    IS_ENABLED(CONFIG_BT_MESH_RPR_SRV))) {
 		page = 129U;
-	} else if (page >= 128U && (atomic_test_bit(bt_mesh.flags, BT_MESH_COMP_DIRTY) ||
+	} else if (page >= 128U && (bt_atomic_test_bit(bt_mesh.flags, BT_MESH_COMP_DIRTY) ||
 				    IS_ENABLED(CONFIG_BT_MESH_RPR_SRV))) {
 		page = 128U;
 	} else if (page >= 2U && IS_ENABLED(CONFIG_BT_MESH_COMP_PAGE_2)) {
