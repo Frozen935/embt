@@ -3,6 +3,9 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
+#undef LOG_TAG
+#define LOG_TAG "bt_mesh_priv_beacon_srv"
+#include <base/log.h>
 #include <zephyr/bluetooth/mesh.h>
 #include "net.h"
 #include <zephyr/bluetooth/conn.h>
@@ -12,9 +15,7 @@
 #include "cfg.h"
 #include "settings.h"
 
-#define LOG_LEVEL CONFIG_BT_MESH_MODEL_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_mesh_priv_beacon_srv);
-
+#define LOG_LEVEL CONFIG_EMBT_LOG_LEVEL
 static const struct bt_mesh_model *priv_beacon_srv;
 
 /* Private Beacon configuration server model states */

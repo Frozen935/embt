@@ -115,6 +115,22 @@ config PRINTK
 	  Retained HFP and diagnostic interfaces need output support. This
 	  does not restore the retired Zephyr logging framework.
 
+config EMBT_LOG_LEVEL
+	int "Maximum log level (0=off, 1=error, 2=warning, 3=info, 4=debug)"
+	range 0 4
+	default 3
+	help
+	  Preserve LOG_* call sites using the internal synchronous logger.
+	  This maximum also bounds runtime filtering and hexadecimal dumps.
+
+config EMBT_LOG_SNIFFER_INFO
+	bool "Bluetooth sniffer information"
+	default n
+	depends on EMBT_LOG_LEVEL >= 3
+	help
+	  Enable the original identity and pairing-key diagnostics for sniffers.
+	  Disabled by default, independently of the general debug log level.
+
 config POLL
 	bool
 	help

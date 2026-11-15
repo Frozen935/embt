@@ -4,15 +4,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#undef LOG_TAG
+#define LOG_TAG "bt_mesh_dfu_srv"
+#include <base/log.h>
 #include <zephyr/bluetooth/mesh.h>
 #include "dfu.h"
 #include "blob.h"
 #include "access.h"
 #include "dfd_srv_internal.h"
 
-#define LOG_LEVEL CONFIG_BT_MESH_DFU_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_mesh_dfu_srv);
-
+#define LOG_LEVEL CONFIG_EMBT_LOG_LEVEL
 #define UPDATE_IDX_NONE 0xff
 
 BUILD_ASSERT((DFU_UPDATE_START_MSG_MAXLEN + BT_MESH_MODEL_OP_LEN(BT_MESH_DFU_OP_UPDATE_START) +

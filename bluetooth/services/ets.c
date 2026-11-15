@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#undef LOG_TAG
+#define LOG_TAG "bt_ets"
+#include <base/log.h>
 #include <errno.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -14,8 +17,6 @@
 #include <zephyr/bluetooth/gatt.h>
 #include <zephyr/bluetooth/uuid.h>
 #include <zephyr/bluetooth/services/ets.h>
-
-LOG_MODULE_REGISTER(bt_ets, CONFIG_BT_ETS_LOG_LEVEL);
 
 /* ETS epoch: 2000-01-01 00:00:00
  * Unix epoch: 1970-01-01 00:00:00

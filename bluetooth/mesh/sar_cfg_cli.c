@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#undef LOG_TAG
+#define LOG_TAG "bt_mesh_sar_cfg_cli"
+#include <base/log.h>
 #include <zephyr/bluetooth/mesh.h>
 #include <zephyr/bluetooth/mesh/access.h>
 
@@ -15,9 +18,7 @@
 #include "mesh.h"
 #include "sar_cfg_internal.h"
 
-#define LOG_LEVEL CONFIG_BT_MESH_MODEL_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_mesh_sar_cfg_cli);
-
+#define LOG_LEVEL CONFIG_EMBT_LOG_LEVEL
 static struct bt_mesh_sar_cfg_cli *cli;
 
 static int transmitter_status(const struct bt_mesh_model *model,

@@ -4,13 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#undef LOG_TAG
+#define LOG_TAG "bt_mesh_msg"
+#include <base/log.h>
 #include <zephyr/bluetooth/mesh.h>
 
 #include "msg.h"
 
-#define LOG_LEVEL CONFIG_BT_MESH_ACCESS_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_mesh_msg);
-
+#define LOG_LEVEL CONFIG_EMBT_LOG_LEVEL
 void bt_mesh_model_msg_init(struct net_buf_simple *msg, uint32_t opcode)
 {
 	net_buf_simple_init(msg, 0);

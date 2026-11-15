@@ -23,3 +23,10 @@ foreach(case atomic queue queue_cancel semaphore slab arena netbuf work work_can
   add_test(NAME "bringup.base.${case}" COMMAND test_base "${case}")
   set_tests_properties("bringup.base.${case}" PROPERTIES LABELS bringup TIMEOUT 10)
 endforeach()
+
+add_executable(test_log test_log.c)
+target_link_libraries(test_log PRIVATE EmBT::embt EmBT::cmocka embt_internal)
+target_compile_options(test_log PRIVATE -Werror)
+embt_test_instrument(test_log)
+add_test(NAME bringup.base.logging COMMAND test_log)
+set_tests_properties(bringup.base.logging PROPERTIES LABELS bringup TIMEOUT 10)

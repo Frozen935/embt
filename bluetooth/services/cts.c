@@ -12,6 +12,9 @@
 #define _POSIX_C_SOURCE 200809L /* To get gmtime_r()'s prototype */
 
 #ifdef CONFIG_BT_CTS_HELPER_API
+#undef LOG_TAG
+#define LOG_TAG "cts"
+#include <base/log.h>
 #include <time.h>
 #include <zephyr/sys/timeutil.h>
 #endif
@@ -24,8 +27,6 @@
 #include <zephyr/bluetooth/gatt.h>
 #include <zephyr/bluetooth/uuid.h>
 #include <zephyr/bluetooth/services/cts.h>
-
-LOG_MODULE_REGISTER(cts, CONFIG_BT_CTS_LOG_LEVEL);
 
 static const struct bt_cts_cb *cts_cb;
 

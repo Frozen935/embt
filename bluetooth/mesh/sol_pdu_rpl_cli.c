@@ -4,14 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#undef LOG_TAG
+#define LOG_TAG "bt_mesh_sol_pdu_rpl_cli"
+#include <base/log.h>
 #include <zephyr/bluetooth/mesh.h>
 
 #include "foundation.h"
 #include "msg.h"
 
-#define LOG_LEVEL CONFIG_BT_MESH_MODEL_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_mesh_sol_pdu_rpl_cli);
-
+#define LOG_LEVEL CONFIG_EMBT_LOG_LEVEL
 static struct bt_mesh_sol_pdu_rpl_cli *cli;
 
 static int32_t msg_timeout;

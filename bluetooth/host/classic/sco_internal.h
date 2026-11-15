@@ -144,7 +144,7 @@ void bt_sco_disconnected(struct bt_conn *sco);
 
 uint8_t bt_esco_conn_req(struct bt_hci_evt_conn_request *evt);
 
-#if defined(CONFIG_BT_CONN_LOG_LEVEL_DBG)
+#if (CONFIG_EMBT_LOG_LEVEL >= 4)
 void bt_sco_chan_set_state_debug(struct bt_sco_chan *chan,
 				 enum bt_sco_state state,
 				 const char *func, int line);
@@ -152,7 +152,7 @@ void bt_sco_chan_set_state_debug(struct bt_sco_chan *chan,
 	bt_sco_chan_set_state_debug(_chan, _state, __func__, __LINE__)
 #else
 void bt_sco_chan_set_state(struct bt_sco_chan *chan, enum bt_sco_state state);
-#endif /* CONFIG_BT_CONN_LOG_LEVEL_DBG */
+#endif /* (CONFIG_EMBT_LOG_LEVEL >= 4) */
 
 /** @brief SCO connection callback structure.
  *

@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#undef LOG_TAG
+#define LOG_TAG "bt_mesh_blob_io_flash"
+#include <base/log.h>
 #include <zephyr/bluetooth/mesh.h>
 #include <zephyr/storage/flash_map.h>
 #include <zephyr/drivers/flash.h>
@@ -12,9 +15,7 @@
 #include "net.h"
 #include "transport.h"
 
-#define LOG_LEVEL CONFIG_BT_MESH_MODEL_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_mesh_blob_io_flash);
-
+#define LOG_LEVEL CONFIG_EMBT_LOG_LEVEL
 #define FLASH_IO(_io) CONTAINER_OF(_io, struct bt_mesh_blob_io_flash, io)
 
 static int test_flash_area(uint8_t area_id, off_t offset)

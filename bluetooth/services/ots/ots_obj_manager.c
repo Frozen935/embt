@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#undef LOG_TAG
+#define LOG_TAG "bt_ots"
+#include <base/log.h>
 #include <zephyr/types.h>
 #include <stddef.h>
 #include <string.h>
@@ -13,8 +16,6 @@
 
 #include <zephyr/bluetooth/services/ots.h>
 #include "ots_internal.h"
-
-LOG_MODULE_DECLARE(bt_ots, CONFIG_BT_OTS_LOG_LEVEL);
 
 
 struct bt_gatt_ots_pool_item {

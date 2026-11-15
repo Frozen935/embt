@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#undef LOG_TAG
+#define LOG_TAG "bt_mesh_brg_cfg_srv"
+#include <base/log.h>
 #include <zephyr/bluetooth/mesh.h>
 #include <zephyr/bluetooth/mesh/brg_cfg.h>
 #include "access.h"
@@ -11,9 +14,7 @@
 #include "foundation.h"
 #include "subnet.h"
 
-#define LOG_LEVEL CONFIG_BT_MESH_MODEL_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_mesh_brg_cfg_srv);
-
+#define LOG_LEVEL CONFIG_EMBT_LOG_LEVEL
 static void bridge_status_send(const struct bt_mesh_model *model, struct bt_mesh_msg_ctx *ctx)
 {
 	BT_MESH_MODEL_BUF_DEFINE(msg, OP_SUBNET_BRIDGE_STATUS, 1);

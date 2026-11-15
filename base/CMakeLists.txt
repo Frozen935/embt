@@ -16,4 +16,4 @@
 #
 
 embt_library(embt_base)
-embt_library_sources(core.c work.c diagnostic.c)
+embt_library_sources(core.c work.c diagnostic.c log.c)

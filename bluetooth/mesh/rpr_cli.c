@@ -3,6 +3,9 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
+#undef LOG_TAG
+#define LOG_TAG "bt_mesh_rpr_cli"
+#include <base/log.h>
 #include <string.h>
 #include <zephyr/bluetooth/mesh.h>
 #include <zephyr/bluetooth/conn.h>
@@ -11,9 +14,7 @@
 #include "prov.h"
 #include "rpr.h"
 
-#define LOG_LEVEL CONFIG_BT_MESH_MODEL_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_mesh_rpr_cli);
-
+#define LOG_LEVEL CONFIG_EMBT_LOG_LEVEL
 #define LINK_TIMEOUT_SECONDS_DEFAULT 10
 
 BUILD_ASSERT(BT_MESH_MODEL_OP_LEN(RPR_OP_PDU_SEND) == 2, "Assumes PDU send is a 2 byte opcode");
@@ -297,7 +298,7 @@ static int handle_scan_report(const struct bt_mesh_model *mod, struct bt_mesh_ms
 		return -EINVAL;
 	}
 
-	if (IS_ENABLED(CONFIG_BT_MESH_MODEL_LOG_LEVEL_DBG)) {
+	if ((CONFIG_EMBT_LOG_LEVEL >= 4)) {
 		struct bt_uuid_128 uuid_repr = { .uuid = { BT_UUID_TYPE_128 } };
 
 		memcpy(uuid_repr.val, dev.uuid, 16);

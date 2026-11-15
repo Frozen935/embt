@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#undef LOG_TAG
+#define LOG_TAG "bt_mesh_od_priv_proxy_srv"
+#include <base/log.h>
 #include <zephyr/bluetooth/mesh.h>
 
 #include "access.h"
@@ -11,10 +14,7 @@
 #include "foundation.h"
 #include "settings.h"
 
-#define LOG_LEVEL CONFIG_BT_MESH_MODEL_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_mesh_od_priv_proxy_srv);
-
-
+#define LOG_LEVEL CONFIG_EMBT_LOG_LEVEL
 static const struct bt_mesh_model *od_priv_proxy_srv;
 static uint8_t on_demand_state;
 
