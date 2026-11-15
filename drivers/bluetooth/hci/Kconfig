@@ -1,10 +1,11 @@
 # Copyright (c) 2016 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
-config BT_USERCHAN
-	bool "Linux HCI user-channel transport"
+config EMBT_HCI_SOCKET
+	bool "POSIX HCI socket transport"
+	default y
 	depends on BT_DRIVERS && BT_HCI
 	help
-	  Retain the Linux HCI user-channel transport sources for POSIX
-	  porting. The native simulator and device-tree integration in
-	  these sources still requires replacement before standalone use.
+	  Build one socket backend supporting TCP H4, Unix stream H4 and
+	  Linux HCI_CHANNEL_USER. Select the endpoint explicitly at runtime
+	  with bt_hci_socket_configure() before enabling the Host.

@@ -9,6 +9,7 @@
  * runner context with the host libC, but it's functionality can be called from the "embedded" side
  */
 
+#include <base/base.h>
 #include <stdbool.h>
 #include <string.h>
 #include <errno.h>

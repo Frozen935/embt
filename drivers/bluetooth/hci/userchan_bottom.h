@@ -7,6 +7,7 @@
 #ifndef DRIVERS_BLUETOOTH_HCI_USERCHAN_BOTTOM_H
 #define DRIVERS_BLUETOOTH_HCI_USERCHAN_BOTTOM_H
 
+#include <base/base.h>
 #include <stdbool.h>
 
 #ifdef __cplusplus
