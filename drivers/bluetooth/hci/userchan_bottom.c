@@ -9,6 +9,7 @@
  * runner context with the host libC, but it's functionality can be called from the "embedded" side
  */
 
+#include <embt/base/assert.h>
 #include <stdbool.h>
 #include <string.h>
 #include <errno.h>
@@ -19,8 +20,6 @@
 #include <limits.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
-#include <nsi_errno.h>
-#include <nsi_tracing.h>
 
 #define BTPROTO_HCI      1
 #define HCI_CHANNEL_USER 1
@@ -52,7 +51,7 @@ int user_chan_socket_open(unsigned short bt_dev_index)
 
 	fd = socket(PF_BLUETOOTH, SOCK_RAW | SOCK_CLOEXEC | SOCK_NONBLOCK, BTPROTO_HCI);
 	if (fd < 0) {
-		return -nsi_errno_to_mid(errno);
+		return -errno;
 	}
 
 	(void)memset(&addr, 0, sizeof(addr));
@@ -61,7 +60,7 @@ int user_chan_socket_open(unsigned short bt_dev_index)
 	addr.hci_channel = HCI_CHANNEL_USER;
 
 	if (bind(fd, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
-		int err = -nsi_errno_to_mid(errno);
+		int err = -errno;
 
 		close(fd);
 		return err;
@@ -78,20 +77,20 @@ int user_chan_net_connect(char ip_addr[], unsigned int port)
 
 	fd = socket(AF_INET, SOCK_STREAM, 0);
 	if (fd < 0) {
-		return -nsi_errno_to_mid(errno);
+		return -errno;
 	}
 
 	addr.sin_family = AF_INET;
 	addr.sin_port = htons(port);
 	if (inet_pton(AF_INET, ip_addr, &(addr.sin_addr)) <= 0) {
-		int err = -nsi_errno_to_mid(errno);
+		int err = -EINVAL;
 
 		close(fd);
 		return err;
 	}
 
 	if (connect(fd, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
-		int err = -nsi_errno_to_mid(errno);
+		int err = -errno;
 
 		close(fd);
 		return err;
@@ -107,20 +106,19 @@ int user_chan_unix_connect(char socket_path[])
 	size_t socket_path_size = strlen(socket_path);
 
 	if (socket_path_size >= sizeof(addr.sun_path)) {
-		nsi_print_error_and_exit("Unix socket path too long (%zu>=%zu)\n",
-					 socket_path_size, sizeof(addr.sun_path));
+		return -ENAMETOOLONG;
 	}
 
 	fd = socket(AF_UNIX, SOCK_STREAM, 0);
 	if (fd < 0) {
-		return -nsi_errno_to_mid(errno);
+		return -errno;
 	}
 
 	addr.sun_family = AF_UNIX;
 	strcpy(addr.sun_path, socket_path);
 
 	if (connect(fd, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
-		int err = -nsi_errno_to_mid(errno);
+		int err = -errno;
 
 		close(fd);
 		return err;

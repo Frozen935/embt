@@ -47,6 +47,17 @@ embt_test_instrument(test_compiler)
 add_test(NAME bringup.base.compiler COMMAND test_compiler)
 set_tests_properties(bringup.base.compiler PROPERTIES LABELS bringup TIMEOUT 10)
 
+add_executable(test_transport test_transport.c)
+target_include_directories(test_transport PRIVATE "${EMBT_SOURCE_DIR}/drivers/bluetooth/hci")
+target_link_libraries(test_transport PRIVATE EmBT::embt EmBT::cmocka embt_internal)
+target_link_options(test_transport PRIVATE "-Wl,--wrap=socket" "-Wl,--wrap=bind" "-Wl,--wrap=ioctl")
+target_compile_options(test_transport PRIVATE -Werror)
+embt_test_instrument(test_transport)
+foreach(case tcp unix user_model close_exhausted bad_packet open_failure device_down_failure stream_backpressure)
+  add_test(NAME "bringup.transport.${case}" COMMAND test_transport "${case}")
+  set_tests_properties("bringup.transport.${case}" PROPERTIES LABELS bringup TIMEOUT 10)
+endforeach()
+
 add_executable(test_queue_memory test_queue_memory.c)
 target_link_libraries(test_queue_memory PRIVATE EmBT::embt EmBT::cmocka embt_internal)
 target_link_options(test_queue_memory PRIVATE "-Wl,--wrap=osi_sem_init"

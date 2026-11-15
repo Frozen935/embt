@@ -6,16 +6,19 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <base/base.h>
 #include <errno.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
-#include <zephyr/bluetooth/hci_pkt.h>
-#include <zephyr/bluetooth/hci_types.h>
-#include <zephyr/drivers/bluetooth/hci_lockstep.h>
-#include <zephyr/net_buf.h>
-#include <zephyr/sys/util.h>
+#include <embt/bluetooth/hci_pkt.h>
+#include <embt/bluetooth/hci_types.h>
+
+#include "common/hci_lockstep.h"
+
+#include <embt/net_buf.h>
+#include <embt/sys/util.h>
 #include <embt/base/log.h>
 
 LOG_MODULE_REGISTER(bt_hci_lockstep, CONFIG_BT_HCI_DRIVER_LOG_LEVEL);
@@ -52,7 +55,7 @@ static void lockstep_state_reset(struct bt_hci_lockstep *ls)
 	ls->status = BT_HCI_ERR_SUCCESS;
 }
 
-void bt_hci_lockstep_init(struct bt_hci_lockstep *ls, const struct device *dev,
+void bt_hci_lockstep_init(struct bt_hci_lockstep *ls, const struct bt_hci_transport *dev,
 			  bt_hci_lockstep_send_t send)
 {
 	*ls = (struct bt_hci_lockstep){

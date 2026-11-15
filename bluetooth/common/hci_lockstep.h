@@ -11,12 +11,16 @@
 #ifndef ZEPHYR_INCLUDE_DRIVERS_BLUETOOTH_HCI_LOCKSTEP_H_
 #define ZEPHYR_INCLUDE_DRIVERS_BLUETOOTH_HCI_LOCKSTEP_H_
 
+#include <base/base.h>
+#include <embt/drivers/bluetooth.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
-#include <zephyr/bluetooth/hci_pkt.h>
-#include <zephyr/net_buf.h>
+#include <embt/bluetooth/hci_pkt.h>
+
+
+#include <embt/net_buf.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -57,7 +61,7 @@ extern "C" {
  * with a reset line while opening, calls bt_hci_lockstep_reset() after that
  * reset and before its first command.
  *
- * The helper is part of every build with @kconfig{CONFIG_BT} enabled.
+ * The helper is part of every build with @kconfig{CONFIG_EMBT} enabled.
  *
  * @note This is not an application API: the intended users are HCI drivers.
  *       Applications that need to send HCI commands alongside a running Host
@@ -86,7 +90,7 @@ extern "C" {
  *          submitted; propagated to the caller of
  *          bt_hci_lockstep_cmd_send_sync().
  */
-typedef int (*bt_hci_lockstep_send_t)(const struct device *dev, const uint8_t *pkt, size_t len);
+typedef int (*bt_hci_lockstep_send_t)(const struct bt_hci_transport *dev, const uint8_t *pkt, size_t len);
 
 /** @brief Lockstep helper.
  *
@@ -94,7 +98,7 @@ typedef int (*bt_hci_lockstep_send_t)(const struct device *dev, const uint8_t *p
  */
 struct bt_hci_lockstep {
 	/** @cond INTERNAL_HIDDEN */
-	const struct device *dev;
+	const struct bt_hci_transport *dev;
 	bt_hci_lockstep_send_t send;
 	struct k_sem changed;
 	struct k_spinlock lock;
@@ -126,7 +130,7 @@ struct bt_hci_lockstep {
  *  @param dev  HCI device, passed to @p send.
  *  @param send Transport send function.
  */
-void bt_hci_lockstep_init(struct bt_hci_lockstep *ls, const struct device *dev,
+void bt_hci_lockstep_init(struct bt_hci_lockstep *ls, const struct bt_hci_transport *dev,
 			  bt_hci_lockstep_send_t send);
 
 /** @brief Restore the initial state of a lockstep helper.

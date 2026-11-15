@@ -27,15 +27,27 @@
  */
 
 #include <stdbool.h>
+#include <errno.h>
 #include <stdint.h>
-#include <zephyr/net_buf.h>
-#include <zephyr/bluetooth/buf.h>
-#include <zephyr/bluetooth/addr.h>
-#include <zephyr/bluetooth/hci_vs.h>
+#include <embt/net_buf.h>
+#include <embt/bluetooth/buf.h>
+#include <embt/bluetooth/addr.h>
+#include <embt/bluetooth/hci_vs.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+struct bt_hci_driver_api;
+
+/** @brief HCI transport descriptor; lifecycle is owned by the stack. */
+struct bt_hci_transport {
+	const char *name; /**< Transport name for diagnostics. */
+	uint8_t bus; /**< HCI bus identifier. */
+	uint32_t quirks; /**< Explicit controller quirks. */
+	const struct bt_hci_driver_api *api; /**< Implemented operations. */
+	void *data; /**< Driver-owned state. */
+};
 
 /** @brief Parameters of the setup() driver API op.
  *
@@ -90,58 +102,6 @@ enum {
 	BT_HCI_QUIRK_NO_ADV_TERM_ON_DIR_TIMEOUT = BIT(3),
 };
 
-#define BT_DT_HCI_QUIRK_OR(node_id, prop, idx) \
-	UTIL_CAT(BT_HCI_QUIRK_, DT_STRING_UPPER_TOKEN_BY_IDX(node_id, prop, idx))
-#define BT_DT_HCI_QUIRKS_GET(node_id) (COND_CODE_1(DT_NODE_HAS_PROP(node_id, bt_hci_quirks), \
-						   (DT_FOREACH_PROP_ELEM_SEP(node_id, \
-									     bt_hci_quirks, \
-									     BT_DT_HCI_QUIRK_OR, \
-									     (|))), \
-						   (0)))
-#define BT_DT_HCI_QUIRKS_INST_GET(inst) BT_DT_HCI_QUIRKS_GET(DT_DRV_INST(inst))
-
-#define BT_DT_HCI_NAME_GET(node_id) DT_PROP_OR(node_id, bt_hci_name, "HCI")
-#define BT_DT_HCI_NAME_INST_GET(inst) BT_DT_HCI_NAME_GET(DT_DRV_INST(inst))
-
-/* Fallback default when there's no property, same as "virtual" */
-#define BT_PRIV_HCI_BUS_DEFAULT (0)
-#define BT_DT_HCI_BUS_GET(node_id) DT_ENUM_IDX_OR(node_id, bt_hci_bus, BT_PRIV_HCI_BUS_DEFAULT)
-
-#define BT_DT_HCI_BUS_INST_GET(inst) BT_DT_HCI_BUS_GET(DT_DRV_INST(inst))
-
-/**
- * @brief Common Bluetooth HCI driver configuration.
- *
- * This structure is common to all Bluetooth HCI drivers and must be the first member
- * in the object pointed to by the config field in the device
- * structure.
- */
-struct bt_hci_driver_config {
-	/** Quirks for this HCI device instance */
-	uint32_t quirks;
-};
-
-/**
- * @brief Static initializer for @p bt_hci_driver_config struct
- *
- * @param node_id Devicetree node identifier
- */
-#define BT_DT_HCI_DRIVER_CONFIG_GET(node_id)                                                    \
-	{                                                                                       \
-		.quirks = (uint32_t)BT_DT_HCI_QUIRKS_GET(node_id),                                \
-	}
-
-/**
- * @brief Static initializer for @p bt_hci_driver_config struct from
- * @c DT_DRV_COMPAT instance.
- *
- * @param inst @c DT_DRV_COMPAT instance number
- * @see BT_DT_HCI_DRIVER_CONFIG_GET()
- */
-
-#define BT_DT_HCI_DRIVER_CONFIG_INST_GET(inst)                                                  \
-	BT_DT_HCI_DRIVER_CONFIG_GET(DT_DRV_INST(inst))
-
 /**
  * @def_driverbackendgroup{Bluetooth HCI,bt_hci_api}
  * @{
@@ -154,7 +114,7 @@ struct bt_hci_driver_config {
  * It may do so already before bt_hci_open() returns, and does not do so any more once
  * bt_hci_close() has returned successfully.
  */
-typedef int (*bt_hci_recv_t)(const struct device *dev, struct net_buf *buf);
+typedef int (*bt_hci_recv_t)(const struct bt_hci_transport *dev, struct net_buf *buf);
 
 /**
  * @brief Common Bluetooth HCI driver data.
@@ -185,19 +145,19 @@ struct bt_hci_driver_data {
  * @brief Callback API to open the HCI transport.
  * See bt_hci_open() for argument description
  */
-typedef int (*bt_hci_api_open_t)(const struct device *dev);
+typedef int (*bt_hci_api_open_t)(const struct bt_hci_transport *dev);
 
 /**
  * @brief Callback API to close the HCI transport.
  * See bt_hci_close() for argument description
  */
-typedef int (*bt_hci_api_close_t)(const struct device *dev);
+typedef int (*bt_hci_api_close_t)(const struct bt_hci_transport *dev);
 
 /**
  * @brief Callback API to send an HCI buffer to the controller.
  * See bt_hci_send() for argument description
  */
-typedef int (*bt_hci_api_send_t)(const struct device *dev, struct net_buf *buf);
+typedef int (*bt_hci_api_send_t)(const struct bt_hci_transport *dev, struct net_buf *buf);
 
 /**
  * @brief Callback API for HCI vendor-specific setup.
@@ -205,7 +165,7 @@ typedef int (*bt_hci_api_send_t)(const struct device *dev, struct net_buf *buf);
  *
  * @deprecated See bt_hci_setup().
  */
-typedef int (*bt_hci_api_setup_t)(const struct device *dev,
+typedef int (*bt_hci_api_setup_t)(const struct bt_hci_transport *dev,
 				  const struct bt_hci_setup_params *param);
 
 /**
@@ -228,7 +188,7 @@ typedef int (*bt_hci_api_setup_t)(const struct device *dev,
  * makes its calls one at a time and within the limits that the three functions
  * document, and a driver need not defend against anything else.
  */
-__subsystem struct bt_hci_driver_api {
+struct bt_hci_driver_api {
 	/**
 	 * @driver_ops_mandatory @copybrief bt_hci_open
 	 */
@@ -273,9 +233,9 @@ __subsystem struct bt_hci_driver_api {
  * @return 0 on success or negative POSIX error number on failure.
  * @retval -ENOTCONN The HCI transport is not open.
  */
-static inline int bt_hci_recv_err(const struct device *dev, struct net_buf *buf)
+static inline int bt_hci_recv_err(const struct bt_hci_transport *dev, struct net_buf *buf)
 {
-	struct bt_hci_driver_data *data = dev->data;
+	struct bt_hci_driver_data *data = (struct bt_hci_driver_data *)dev->data;
 
 	if (data->recv == NULL) {
 		return -ENOTCONN;
@@ -293,7 +253,7 @@ static inline int bt_hci_recv_err(const struct device *dev, struct net_buf *buf)
  * @param dev  HCI device
  * @param buf  Buffer containing data received from the controller.
  */
-static inline void bt_hci_recv(const struct device *dev, struct net_buf *buf)
+static inline void bt_hci_recv(const struct bt_hci_transport *dev, struct net_buf *buf)
 {
 	int err;
 
@@ -330,9 +290,9 @@ static inline void bt_hci_recv(const struct device *dev, struct net_buf *buf)
  * @return 0 on success or negative POSIX error number on failure.
  * @retval -EALREADY The HCI transport is already open.
  */
-static inline int bt_hci_open(const struct device *dev, bt_hci_recv_t recv)
+static inline int bt_hci_open(const struct bt_hci_transport *dev, bt_hci_recv_t recv)
 {
-	struct bt_hci_driver_data *data = dev->data;
+	struct bt_hci_driver_data *data = (struct bt_hci_driver_data *)dev->data;
 	int err;
 
 	if (data->recv != NULL) {
@@ -341,7 +301,7 @@ static inline int bt_hci_open(const struct device *dev, bt_hci_recv_t recv)
 
 	data->recv = recv;
 
-	err = DEVICE_API_GET(bt_hci, dev)->open(dev);
+	err = (dev->api)->open(dev);
 	if (err != 0) {
 		data->recv = NULL;
 	}
@@ -361,9 +321,9 @@ static inline int bt_hci_open(const struct device *dev, bt_hci_recv_t recv)
  * @retval true  The driver supports closing the transport.
  * @retval false The driver does not support closing the transport.
  */
-static inline bool bt_hci_can_close(const struct device *dev)
+static inline bool bt_hci_can_close(const struct bt_hci_transport *dev)
 {
-	return DEVICE_API_GET(bt_hci, dev)->close != NULL;
+	return (dev->api)->close != NULL;
 }
 
 /**
@@ -387,16 +347,16 @@ static inline bool bt_hci_can_close(const struct device *dev)
  * @return 0 on success or negative POSIX error number on failure.
  * @retval -ENOSYS The driver does not support closing the transport.
  */
-static inline int bt_hci_close(const struct device *dev)
+static inline int bt_hci_close(const struct bt_hci_transport *dev)
 {
-	struct bt_hci_driver_data *data = dev->data;
+	struct bt_hci_driver_data *data = (struct bt_hci_driver_data *)dev->data;
 	int err = 0;
 
 	if (!bt_hci_can_close(dev)) {
 		return -ENOSYS;
 	}
 
-	err = DEVICE_API_GET(bt_hci, dev)->close(dev);
+	err = (dev->api)->close(dev);
 	if (err == 0) {
 		data->recv = NULL;
 	}
@@ -431,9 +391,9 @@ static inline int bt_hci_close(const struct device *dev)
  *
  * @return 0 on success or negative POSIX error number on failure.
  */
-static inline int bt_hci_send(const struct device *dev, struct net_buf *buf)
+static inline int bt_hci_send(const struct bt_hci_transport *dev, struct net_buf *buf)
 {
-	return DEVICE_API_GET(bt_hci, dev)->send(dev, buf);
+	return (dev->api)->send(dev, buf);
 }
 
 #if defined(CONFIG_BT_HCI_SETUP) || defined(__DOXYGEN__)
@@ -452,9 +412,9 @@ static inline int bt_hci_send(const struct device *dev, struct net_buf *buf)
  *
  * @return 0 on success or negative POSIX error number on failure.
  */
-static inline int bt_hci_setup(const struct device *dev, struct bt_hci_setup_params *params)
+static inline int bt_hci_setup(const struct bt_hci_transport *dev, struct bt_hci_setup_params *params)
 {
-	const struct bt_hci_driver_api *api = DEVICE_API_GET(bt_hci, dev);
+	const struct bt_hci_driver_api *api = (dev->api);
 
 	if (api->setup == NULL) {
 		return -ENOSYS;
@@ -482,7 +442,7 @@ static inline int bt_hci_setup(const struct device *dev, struct bt_hci_setup_par
  * @param addr Public address, or @ref BT_ADDR_ANY to clear a previously set one.
  *             @ref BT_ADDR_NONE does not clear it, see bt_hci_get_public_addr().
  */
-void bt_hci_set_public_addr(const struct device *dev, const bt_addr_t *addr);
+void bt_hci_set_public_addr(const struct bt_hci_transport *dev, const bt_addr_t *addr);
 
 /**
  * @brief Get the public identity address the driver is to configure.
@@ -511,14 +471,14 @@ void bt_hci_set_public_addr(const struct device *dev, const bt_addr_t *addr);
  *         @ref BT_ADDR_ANY when no public address has been set, or it has been
  *         cleared.
  */
-const bt_addr_t *bt_hci_get_public_addr(const struct device *dev);
+const bt_addr_t *bt_hci_get_public_addr(const struct bt_hci_transport *dev);
 
 /**
  * @}
  */
 
 /* The following functions are not strictly part of the HCI driver API, in that
- * they do not take as input a struct device which implements the HCI driver API.
+ * they do not take as input a struct bt_hci_transport which implements the HCI driver API.
  */
 
 /**
@@ -532,7 +492,7 @@ const bt_addr_t *bt_hci_get_public_addr(const struct device *dev);
  *
  * @return 0 on success, negative error value on failure
  */
-int bt_hci_transport_setup(const struct device *dev);
+int bt_hci_transport_setup(const struct bt_hci_transport *dev);
 
 /**
  * @brief Teardown the HCI transport.
@@ -545,7 +505,7 @@ int bt_hci_transport_setup(const struct device *dev);
  *
  * @return 0 on success, negative error value on failure
  */
-int bt_hci_transport_teardown(const struct device *dev);
+int bt_hci_transport_teardown(const struct bt_hci_transport *dev);
 
 /** Allocate an HCI event buffer.
  *

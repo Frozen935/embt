@@ -6,30 +6,39 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <zephyr/sys/util.h>
+
+
+#include <embt/base/time.h>
+#include <embt/osi/thread.h>
+#include <embt/osi/time.h>
+#include <embt/base/assert.h>
+#include <embt/base/util.h>
 
 #include <errno.h>
+#include <limits.h>
+#include <unistd.h>
+#if defined(CONFIG_BT_HCI_RAW)
+#include <embt/bluetooth/hci_raw.h>
+#include "host/hci_raw_internal.h"
+#else
+#include "host/hci_core.h"
+#endif
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
-#include <zephyr/sys/byteorder.h>
+#include <embt/base/byteorder.h>
 
-#include "nsi_host_trampolines.h"
-#include "nsi_errno.h"
-#include "soc.h"
-#include "cmdline.h" /* native_sim command line options header */
 #include "userchan_bottom.h"
 
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/buf.h>
-#include <zephyr/bluetooth/hci.h>
-#include <zephyr/drivers/bluetooth.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/buf.h>
+#include <embt/bluetooth/hci.h>
+#include <embt/drivers/bluetooth.h>
 #include <embt/base/log.h>
 
 LOG_MODULE_REGISTER(bt_driver, CONFIG_BT_HCI_DRIVER_LOG_LEVEL);
 
-#define DT_DRV_COMPAT zephyr_bt_hci_userchan
 
 struct uc_data {
 	/* bt_hci_driver_data must be first */
@@ -37,9 +46,7 @@ struct uc_data {
 	int           fd;
 };
 
-static K_KERNEL_STACK_DEFINE(rx_thread_stack,
-			     CONFIG_ARCH_POSIX_RECOMMENDED_STACK_SIZE);
-static struct k_thread rx_thread_data;
+static os_thread_t rx_thread_data;
 
 static unsigned short bt_dev_index;
 
@@ -60,7 +67,6 @@ static enum hci_connection_type conn_type;
 static char ip_addr[TCP_ADDR_BUFF_SIZE];
 static unsigned int port;
 static char socket_path[UNIX_ADDR_BUFF_SIZE];
-static bool arg_found;
 
 static bool is_hci_event_discardable(const struct bt_hci_evt_hdr *evt)
 {
@@ -99,7 +105,7 @@ static struct net_buf *get_rx_evt(const uint8_t *data)
 {
 	const struct bt_hci_evt_hdr *evt = (const void *)data;
 	const bool discardable = is_hci_event_discardable(evt);
-	const k_timeout_t timeout = discardable ? K_NO_WAIT : K_SECONDS(1);
+	const bt_timeout_t timeout = discardable ? BT_NO_WAIT : BT_SECONDS(1);
 	struct net_buf *buf;
 
 	do {
@@ -120,7 +126,7 @@ static struct net_buf *get_rx_acl(const uint8_t *data)
 {
 	struct net_buf *buf;
 
-	buf = bt_buf_get_rx(BT_BUF_ACL_IN, K_NO_WAIT);
+	buf = bt_buf_get_rx(BT_BUF_ACL_IN, BT_NO_WAIT);
 	if (buf == NULL) {
 		LOG_ERR("No available ACL buffers!");
 	}
@@ -132,7 +138,7 @@ static struct net_buf *get_rx_iso(const uint8_t *data)
 {
 	struct net_buf *buf;
 
-	buf = bt_buf_get_rx(BT_BUF_ISO_IN, K_NO_WAIT);
+	buf = bt_buf_get_rx(BT_BUF_ISO_IN, BT_NO_WAIT);
 	if (buf == NULL) {
 		LOG_ERR_RATELIMIT("No available ISO buffers!");
 	}
@@ -246,13 +252,11 @@ static int32_t hci_packet_complete(const uint8_t *buf, uint16_t buf_len)
 	return (int32_t)header_len + payload_len;
 }
 
-static void rx_thread(void *p1, void *p2, void *p3)
+static void rx_thread(void *p1)
 {
-	const struct device *dev = p1;
+	const struct bt_hci_transport *dev = p1;
 	struct uc_data *uc = dev->data;
 
-	ARG_UNUSED(p2);
-	ARG_UNUSED(p3);
 
 	LOG_DBG("started");
 
@@ -267,7 +271,7 @@ static void rx_thread(void *p1, void *p2, void *p3)
 		const uint8_t *frame_start = frame;
 
 		if (!user_chan_rx_ready(uc->fd)) {
-			k_sleep(K_MSEC(1));
+			osi_sleep_ms(BT_MSEC(1));
 			continue;
 		}
 
@@ -279,15 +283,15 @@ static void rx_thread(void *p1, void *p2, void *p3)
 
 		LOG_DBG("calling read()");
 
-		len = nsi_host_read(uc->fd, frame + frame_size, sizeof(frame) - frame_size);
+		len = read(uc->fd, frame + frame_size, sizeof(frame) - frame_size);
 		if (len < 0) {
-			if (nsi_host_get_errno() == EINTR) {
-				k_yield();
+			if (errno == EINTR) {
+				osi_thread_yield();
 				continue;
 			}
 
 			LOG_ERR("Reading socket failed, errno %d", errno);
-			(void)nsi_host_close(uc->fd);
+			(void)close(uc->fd);
 			uc->fd = -1;
 			return;
 		}
@@ -340,11 +344,11 @@ static void rx_thread(void *p1, void *p2, void *p3)
 			bt_hci_recv(dev, buf);
 		}
 
-		k_yield();
+		osi_thread_yield();
 	}
 }
 
-static int uc_send(const struct device *dev, struct net_buf *buf)
+static int uc_send(const struct bt_hci_transport *dev, struct net_buf *buf)
 {
 	struct uc_data *uc = dev->data;
 
@@ -355,15 +359,15 @@ static int uc_send(const struct device *dev, struct net_buf *buf)
 		return -EIO;
 	}
 
-	if (nsi_host_write(uc->fd, buf->data, buf->len) < 0) {
-		return -nsi_host_get_errno();
+	if (write(uc->fd, buf->data, buf->len) < 0) {
+		return -errno;
 	}
 
 	net_buf_unref(buf);
 	return 0;
 }
 
-static int uc_open(const struct device *dev)
+static int uc_open(const struct bt_hci_transport *dev)
 {
 	struct uc_data *uc = dev->data;
 
@@ -382,23 +386,25 @@ static int uc_open(const struct device *dev)
 		break;
 	}
 	if (uc->fd < 0) {
-		return -nsi_errno_from_mid(-uc->fd);
+		return uc->fd;
 	}
 
 	LOG_DBG("User Channel opened as fd %d", uc->fd);
 
-	k_thread_create(&rx_thread_data, rx_thread_stack,
-			K_KERNEL_STACK_SIZEOF(rx_thread_stack),
-			rx_thread, (void *)dev, NULL, NULL,
-			K_PRIO_COOP(CONFIG_BT_DRIVER_RX_HIGH_PRIO),
-			0, K_NO_WAIT);
+	int err = osi_thread_create(&rx_thread_data, rx_thread, (void *)dev,
+				    "BT RX", CONFIG_BT_DRIVER_RX_HIGH_PRIO, CONFIG_BT_RX_STACK_SIZE);
+	if (err) {
+		close(uc->fd);
+		uc->fd = -1;
+		return err;
+	}
 
 	LOG_DBG("returning");
 
 	return 0;
 }
 
-static int uc_close(const struct device *dev)
+static int uc_close(const struct bt_hci_transport *dev)
 {
 	struct uc_data *uc = dev->data;
 	int rc;
@@ -407,101 +413,70 @@ static int uc_close(const struct device *dev)
 		return -ENETDOWN;
 	}
 
-	rc = nsi_host_close(uc->fd);
+	rc = close(uc->fd);
 	if (rc < 0) {
-		return -nsi_errno_from_mid(-rc);
+		return -errno;
 	}
 
 	uc->fd = -1;
-
-	return 0;
+	osi_thread_cancel(&rx_thread_data);
+	return osi_thread_join(&rx_thread_data);
 }
 
-static DEVICE_API(bt_hci, uc_drv_api) = {
+static const struct bt_hci_driver_api uc_drv_api = {
 	.open = uc_open,
 	.close = uc_close,
 	.send = uc_send,
 };
 
-static int uc_init(const struct device *dev)
+
+static struct uc_data uc_context = {.fd = -1};
+static struct bt_hci_transport uc_transport = {
+	.name = "Linux HCI user channel",
+	.bus = 1,
+	.api = &uc_drv_api,
+	.data = &uc_context,
+};
+
+/** @brief Select the retained Linux driver explicitly, without simulator startup. */
+int bt_hci_userchan_configure(const char *endpoint)
 {
-	if (!arg_found) {
-		posix_print_warning("Warning: Bluetooth device missing.\n"
-				    "Specify either a local hci interface --bt-dev=hciN,\n"
-				    "a UNIX socket --bt-dev=/tmp/bt-server-bredrle\n"
-				    "or a valid hci tcp server --bt-dev=ip_address:port\n");
-		return -ENODEV;
+	char *end;
+	unsigned long number;
+
+	if (!endpoint || !*endpoint || uc_context.fd >= 0) {
+		return -EINVAL;
 	}
-
-	return 0;
-}
-
-#define UC_DEVICE_INIT(inst) \
-	static struct uc_data uc_data_##inst = { \
-		.fd = -1, \
-	}; \
-	static const struct bt_hci_driver_config uc_config_##inst = \
-		BT_DT_HCI_DRIVER_CONFIG_INST_GET(inst); \
-	DEVICE_DT_INST_DEFINE(inst, uc_init, NULL, &uc_data_##inst, &uc_config_##inst, \
-			      POST_KERNEL, CONFIG_KERNEL_INIT_PRIORITY_DEVICE, &uc_drv_api)
-
-DT_INST_FOREACH_STATUS_OKAY(UC_DEVICE_INIT)
-
-static void cmd_bt_dev_found(char *argv, int offset)
-{
-	arg_found = true;
-	if (strncmp(&argv[offset], "hci", 3) == 0 && strlen(&argv[offset]) >= 4) {
-		long arg_hci_idx = strtol(&argv[offset + 3], NULL, 10);
-
-		if (arg_hci_idx >= 0 && arg_hci_idx <= USHRT_MAX) {
-			bt_dev_index = arg_hci_idx;
-			conn_type = HCI_USERCHAN;
-		} else {
-			posix_print_error_and_exit("Invalid argument value for --bt-dev. "
-						  "hci idx must be within range 0 to 65536.\n");
+	if (!strncmp(endpoint, "hci", 3)) {
+		errno = 0;
+		number = strtoul(endpoint + 3, &end, 10);
+		if (errno || end == endpoint + 3 || *end || number > USHRT_MAX) {
+			LOG_ERR("Invalid HCI device index");
+			return -EINVAL;
 		}
-	} else if (sscanf(&argv[offset], "%15[^:]:%d", ip_addr, &port) == 2) {
-		if (port > USHRT_MAX) {
-			posix_print_error_and_exit("Error: IP port for bluetooth "
-						   "hci tcp server is out of range.\n");
+		bt_dev_index = number;
+		conn_type = HCI_USERCHAN;
+	} else if (*endpoint == '/') {
+		if (strlen(endpoint) >= sizeof(socket_path)) {
+			return -ENAMETOOLONG;
 		}
-
-		if (user_chan_is_ipaddr_ok(ip_addr) != 1) {
-			posix_print_error_and_exit("Error: IP address for bluetooth "
-						   "hci tcp server is incorrect.\n");
-		}
-
-		conn_type = HCI_TCP;
-	} else if (strlen(&argv[offset]) > 0 && argv[offset] == '/') {
-		strncpy(socket_path, &argv[offset], UNIX_ADDR_BUFF_SIZE - 1);
+		strcpy(socket_path, endpoint);
 		conn_type = HCI_UNIX;
 	} else {
-		posix_print_error_and_exit("Invalid option %s for --bt-dev. "
-					   "An hci interface, absolute UNIX socket path or hci tcp server is expected.\n",
-					   &argv[offset]);
+		int used = 0;
+
+		if (sscanf(endpoint, "%15[^:]:%u%n", ip_addr, &port, &used) != 2 ||
+		    endpoint[used] || !port || port > USHRT_MAX ||
+		    user_chan_is_ipaddr_ok(ip_addr) != 1) {
+			LOG_ERR("Invalid IPv4 HCI endpoint");
+			return -EINVAL;
+		}
+		conn_type = HCI_TCP;
 	}
+#if defined(CONFIG_BT_HCI_RAW)
+	return bt_hci_raw_transport_set(&uc_transport);
+#else
+	bt_dev.hci = &uc_transport;
+	return 0;
+#endif
 }
-
-static void add_btuserchan_arg(void)
-{
-	static struct args_struct_t btuserchan_args[] = {
-		/*
-		 * Fields:
-		 * manual, mandatory, switch,
-		 * option_name, var_name ,type,
-		 * destination, callback,
-		 * description
-		 */
-		{ false, true, false,
-		"bt-dev", "hciX", 's',
-		NULL, cmd_bt_dev_found,
-		"A local HCI device to be used for Bluetooth (e.g. hci0), "
-		"UNIX socket (absolute path, like /tmp/bt-server-bredrle) "
-		"or an HCI TCP Server (e.g. 127.0.0.1:9000)"},
-		ARG_TABLE_ENDMARKER
-	};
-
-	native_add_command_line_opts(btuserchan_args);
-}
-
-NATIVE_TASK(add_btuserchan_arg, PRE_BOOT_1, 10);

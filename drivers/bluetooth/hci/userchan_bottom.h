@@ -7,11 +7,16 @@
 #ifndef DRIVERS_BLUETOOTH_HCI_USERCHAN_BOTTOM_H
 #define DRIVERS_BLUETOOTH_HCI_USERCHAN_BOTTOM_H
 
+#include <string.h>
+#include <embt/base/assert.h>
 #include <stdbool.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+/** @brief Select a retained Linux driver endpoint before stack enable. */
+int bt_hci_userchan_configure(const char *endpoint);
 
 bool user_chan_rx_ready(int fd);
 int user_chan_is_ipaddr_ok(char ip_addr[]);
