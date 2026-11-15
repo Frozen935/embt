@@ -7,25 +7,28 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <zephyr/bluetooth/iso.h>
+#undef LOG_TAG
+#define LOG_TAG "bt_conn_br"
+#include <base/log.h>
+#include <base/base.h>
+#include <embt/bluetooth/iso.h>
 #include <string.h>
 #include <errno.h>
 #include <stdbool.h>
-#include <zephyr/sys/atomic.h>
-#include <zephyr/sys/byteorder.h>
-#include <zephyr/sys/iterable_sections.h>
-#include <zephyr/sys/math_extras.h>
-#include <zephyr/sys/util.h>
-#include <zephyr/sys/util_macro.h>
-#include <zephyr/sys/slist.h>
-#include <zephyr/sys/__assert.h>
+#include <embt/sys/byteorder.h>
+#include <embt/sys/iterable_sections.h>
+#include <embt/sys/math_extras.h>
+#include <embt/sys/util.h>
+#include <embt/sys/util_macro.h>
+#include <embt/sys/slist.h>
+#include <embt/sys/__assert.h>
 
-#include <zephyr/bluetooth/hci.h>
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/direction.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/hci_vs.h>
-#include <zephyr/bluetooth/att.h>
+#include <embt/bluetooth/hci.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/direction.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/hci_vs.h>
+#include <embt/bluetooth/att.h>
 
 #include <common/assert.h>
 #include <common/bt_str.h>
@@ -51,7 +54,7 @@ struct bt_conn *bt_conn_create_br(const bt_addr_t *peer,
 	struct bt_conn *conn;
 	struct net_buf *buf;
 
-	if (!atomic_test_bit(bt_dev.flags, BT_DEV_READY)) {
+	if (!bt_atomic_test_bit(bt_dev.flags, BT_DEV_READY)) {
 		return NULL;
 	}
 

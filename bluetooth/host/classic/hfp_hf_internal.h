@@ -202,8 +202,8 @@ struct bt_hfp_hf_call {
 	struct bt_hfp_hf *hf;
 	uint8_t index;
 
-	ATOMIC_DEFINE(flags, BT_HFP_HF_CALL_NUM_FLAGS);
-	ATOMIC_DEFINE(state, BT_HFP_HF_CALL_STATE_NUM_FLAGS);
+	BT_ATOMIC_DEFINE(flags, BT_HFP_HF_CALL_NUM_FLAGS);
+	BT_ATOMIC_DEFINE(state, BT_HFP_HF_CALL_STATE_NUM_FLAGS);
 };
 
 struct bt_hfp_hf {
@@ -216,7 +216,7 @@ struct bt_hfp_hf {
 	/* SCO Channel */
 	struct bt_sco_chan chan;
 	/* SCO connect */
-	atomic_ptr_t sco_conn;
+	bt_atomic_ptr_t sco_conn;
 
 	/* SDP discover params */
 	struct bt_sdp_discover_params sdp_param;
@@ -256,5 +256,5 @@ struct bt_hfp_hf {
 	/* calls */
 	struct bt_hfp_hf_call calls[CONFIG_BT_HFP_HF_MAX_CALLS];
 
-	ATOMIC_DEFINE(flags, BT_HFP_HF_NUM_FLAGS);
+	BT_ATOMIC_DEFINE(flags, BT_HFP_HF_NUM_FLAGS);
 };

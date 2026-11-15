@@ -8,9 +8,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#undef LOG_TAG
+#define LOG_TAG "bt_avrcp_cover_art"
+#include <base/log.h>
 #include <string.h>
 #include <errno.h>
-#include <zephyr/sys/atomic.h>
+#include <base/bt_atomic.h>
 #include <zephyr/sys/byteorder.h>
 #include <zephyr/sys/util.h>
 #include <zephyr/sys/printk.h>
@@ -28,9 +31,7 @@
 #include "avctp_internal.h"
 #include "avrcp_internal.h"
 
-#define LOG_LEVEL CONFIG_BT_AVRCP_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_avrcp_cover_art);
-
+#define LOG_LEVEL CONFIG_EMBT_LOG_LEVEL
 /** @brief AVRCP Cover Art service UUID */
 #define BT_AVRCP_COVER_ART_UUID                                                                    \
 	(const struct bt_uuid_128 *)BT_UUID_DECLARE_128(                                           \

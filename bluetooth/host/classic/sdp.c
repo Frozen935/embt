@@ -9,13 +9,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#undef LOG_TAG
+#define LOG_TAG "bt_sdp"
+#include <base/log.h>
+#include <base/base.h>
 #include <errno.h>
 #include <sys/types.h>
-#include <zephyr/sys/byteorder.h>
-#include <zephyr/sys/__assert.h>
+#include <embt/sys/byteorder.h>
+#include <embt/sys/__assert.h>
 
-#include <zephyr/bluetooth/buf.h>
-#include <zephyr/bluetooth/classic/sdp.h>
+#include <embt/bluetooth/buf.h>
+#include <embt/bluetooth/classic/sdp.h>
 
 #include <common/bt_str.h>
 #include <common/assert.h>
@@ -139,7 +143,7 @@ struct bt_sdp_client {
 	/* client state */
 	enum sdp_client_state                state;
 	/* flags */
-	atomic_t                             flags[1];
+	bt_atomic_t                             flags[1];
 };
 
 static struct bt_sdp_client bt_sdp_client_pool[CONFIG_BT_MAX_CONN];
@@ -1751,8 +1755,17 @@ static int bt_sdp_accept(struct bt_conn *conn, struct bt_l2cap_server *server,
 	return -ENOMEM;
 }
 
+static struct bt_conn_cb bt_conn_cb_sdp_client_conn_callbacks;
+
 void bt_sdp_init(void)
 {
+	static bool registered;
+
+	if (!registered) {
+		bt_conn_cb_register(&bt_conn_cb_sdp_client_conn_callbacks);
+		registered = true;
+	}
+
 	__maybe_unused int err;
 
 	static bool initialized;
@@ -1854,7 +1867,7 @@ static void sdp_client_req_cleanup(struct bt_sdp_client *session)
 	/* Clear received length */
 	session->recv_len = 0U;
 	/* Clear flags */
-	atomic_clear(session->flags);
+	bt_atomic_clear(session->flags);
 }
 
 static void sdp_client_cleanup(struct bt_sdp_client *session)
@@ -2232,7 +2245,7 @@ static void sdp_client_work_handler(struct k_work *work)
 
 		/* Retry the SDP discovery request */
 		if (session->state == SDP_CLIENT_CONNECTED &&
-		    atomic_test_and_clear_bit(session->flags, SDP_CLIENT_FLAG_WAIT_FOR_TX_BUF)) {
+		    bt_atomic_test_and_clear_bit(session->flags, SDP_CLIENT_FLAG_WAIT_FOR_TX_BUF)) {
 			sdp_client_discover(session);
 			bt_conn_unref(conn);
 			continue;
@@ -2659,7 +2672,7 @@ static int sdp_client_discover(struct bt_sdp_client *session)
 	}
 
 	if (err == -ENOBUFS) {
-		atomic_set_bit(session->flags, SDP_CLIENT_FLAG_WAIT_FOR_TX_BUF);
+		bt_atomic_set_bit(session->flags, SDP_CLIENT_FLAG_WAIT_FOR_TX_BUF);
 		return 0;
 	}
 

@@ -9,9 +9,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#undef LOG_TAG
+#define LOG_TAG "bt_a2dp"
+#include <base/log.h>
+#include <base/base.h>
 #include <string.h>
 #include <errno.h>
-#include <zephyr/sys/atomic.h>
+#include <base/bt_atomic.h>
 #include <zephyr/sys/byteorder.h>
 #include <zephyr/sys/util.h>
 #include <zephyr/sys/printk.h>
@@ -45,9 +49,7 @@
 #include <host/l2cap_internal.h>
 #include "avdtp_internal.h"
 
-#define LOG_LEVEL CONFIG_BT_A2DP_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_a2dp);
-
+#define LOG_LEVEL CONFIG_EMBT_LOG_LEVEL
 #define A2DP_NO_SPACE (-1)
 
 enum bt_a2dp_internal_state {

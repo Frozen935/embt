@@ -6,14 +6,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#undef LOG_TAG
+#define LOG_TAG "bt_keys_br"
+#include <base/log.h>
+#include <base/base.h>
 #include <string.h>
-#include <zephyr/sys/atomic.h>
-#include <zephyr/sys/util.h>
+#include <embt/sys/util.h>
 
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/hci.h>
-#include <zephyr/settings/settings.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/hci.h>
+#include <embt/settings/settings.h>
 
 #include <common/bt_str.h>
 

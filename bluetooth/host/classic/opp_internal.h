@@ -6,6 +6,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <base/base.h>
 #include <zephyr/bluetooth/classic/opp.h>
 
 /**

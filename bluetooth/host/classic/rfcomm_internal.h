@@ -8,7 +8,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <zephyr/bluetooth/classic/rfcomm.h>
+#include <base/base.h>
+#include <embt/bluetooth/classic/rfcomm.h>
 
 typedef enum {
 	BT_RFCOMM_CFC_UNKNOWN,
@@ -34,7 +35,7 @@ struct bt_rfcomm_session {
 	uint8_t state;
 	bt_rfcomm_role_t role;
 	bt_rfcomm_cfc_t cfc;
-	atomic_t flags;
+	bt_atomic_t flags;
 };
 
 enum {

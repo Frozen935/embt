@@ -241,7 +241,7 @@ struct bt_hfp_ag_call {
 	char number[CONFIG_BT_HFP_AG_PHONE_NUMBER_MAX_LEN + 1];
 	uint8_t type;
 
-	ATOMIC_DEFINE(flags, BT_HFP_AG_CALL_NUM_FLAGS);
+	BT_ATOMIC_DEFINE(flags, BT_HFP_AG_CALL_NUM_FLAGS);
 
 	/* HFP Call state */
 	bt_hfp_call_state_t call_state;
@@ -262,7 +262,7 @@ struct bt_hfp_ag {
 	uint32_t hf_codec_ids;
 	uint8_t selected_codec_id;
 
-	ATOMIC_DEFINE(flags, BT_HFP_AG_NUM_FLAGS);
+	BT_ATOMIC_DEFINE(flags, BT_HFP_AG_NUM_FLAGS);
 
 	/* ACL Connection Object */
 	struct bt_conn *acl_conn;
@@ -300,7 +300,7 @@ struct bt_hfp_ag {
 	struct bt_sco_chan sco_chan;
 
 	/* SCO connect */
-	atomic_ptr_t sco_conn;
+	bt_atomic_ptr_t sco_conn;
 
 	/* SDP discover params */
 	struct bt_sdp_discover_params sdp_param;
