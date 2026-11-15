@@ -31,17 +31,17 @@
 #include <stdint.h>
 #include <string.h>
 
-#include <zephyr/bluetooth/gap.h>
-#include <zephyr/bluetooth/addr.h>
-#include <zephyr/bluetooth/crypto.h>
-#include <zephyr/bluetooth/data.h>
-#include <zephyr/bluetooth/hci_types.h>
-#include <zephyr/bluetooth/classic/classic.h>
-#include <zephyr/net_buf.h>
-#include <zephyr/sys/slist.h>
-#include <zephyr/sys/util.h>
-#include <zephyr/sys/util_macro.h>
-#include <zephyr/toolchain.h>
+#include <embt/bluetooth/gap.h>
+#include <embt/bluetooth/addr.h>
+#include <embt/bluetooth/crypto.h>
+#include <embt/bluetooth/data.h>
+#include <embt/bluetooth/hci_types.h>
+#include <embt/bluetooth/classic/classic.h>
+#include <embt/net_buf.h>
+#include <embt/base/slist.h>
+#include <embt/base/util.h>
+#include <embt/base/util_macro.h>
+#include <embt/compiler.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -354,6 +354,16 @@ typedef void (*bt_ready_cb_t)(int err);
  *         the callback gets this error.
  */
 int bt_enable(bt_ready_cb_t cb);
+
+/**
+ * @brief Initialize stack mechanisms without opening a transport or sending HCI commands.
+ * @return Zero on success, otherwise a negative errno value.
+ * @pre The application serializes this process-lifetime operation. Call before any other
+ *   Bluetooth API; bt_enable() also calls it for applications that only enable the stack.
+ */
+int bt_stack_init(void);
+
+
 
 /**
  * @brief Disable Bluetooth

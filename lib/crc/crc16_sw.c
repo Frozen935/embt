@@ -4,7 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <zephyr/sys/crc.h>
+#include <string.h>
+#include <embt/base/assert.h>
+#include <embt/base/crc.h>
 
 uint16_t __weak crc16(uint16_t poly, uint16_t seed, const uint8_t *src, size_t len)
 {

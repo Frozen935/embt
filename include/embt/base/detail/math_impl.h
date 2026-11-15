@@ -13,10 +13,10 @@
  */
 
 #ifndef ZEPHYR_INCLUDE_SYS_MATH_EXTRAS_H_
-#error "please include <sys/math_extras.h> instead of this file"
+#error "please include <embt/base/math.h> instead of this file"
 #endif
 
-#include <zephyr/toolchain.h>
+#include <embt/compiler.h>
 
 /** @cond INTERNAL_HIDDEN */
 
@@ -179,13 +179,13 @@ static inline bool size_mul_overflow(size_t a, size_t b, size_t *result)
  * these functions tends to contain a zero check already. For example,
  * from kernel/sched.c:
  *
- *	struct k_thread *z_priq_mq_best(struct _priq_mq *pq)
+ *	os_thread_t *z_priq_mq_best(struct _priq_mq *pq)
  *	{
  *		if (!pq->bitmask) {
  *			return NULL;
  *		}
  *
- *		struct k_thread *thread = NULL;
+ *		os_thread_t *thread = NULL;
  *		sys_dlist_t *l =
  *			&pq->queues[u32_count_trailing_zeros(pq->bitmask)];
  *

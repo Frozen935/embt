@@ -34,11 +34,11 @@
 
 #include <stddef.h>
 
-#include <zephyr/autoconf.h>
-#include <zephyr/bluetooth/assigned_numbers.h>
-#include <zephyr/bluetooth/audio/tbs.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/sys/slist.h>
+#include <embt/autoconf.h>
+#include <embt/bluetooth/assigned_numbers.h>
+#include <embt/bluetooth/audio/tbs.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/base/slist.h>
 
 #ifdef __cplusplus
 extern "C" {

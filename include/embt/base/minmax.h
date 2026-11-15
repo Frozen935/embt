@@ -16,7 +16,7 @@
 #ifndef ZEPHYR_INCLUDE_SYS_MINMAX_H_
 #define ZEPHYR_INCLUDE_SYS_MINMAX_H_
 
-#include <zephyr/sys/util.h>
+#include <embt/base/util.h>
 
 #ifndef _ASMLANGUAGE
 

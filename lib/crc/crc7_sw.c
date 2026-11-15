@@ -4,7 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <zephyr/sys/crc.h>
+#include <string.h>
+#include <embt/base/assert.h>
+#include <embt/base/crc.h>
 
 uint8_t __weak crc7_be(uint8_t seed, const uint8_t *src, size_t len)
 {

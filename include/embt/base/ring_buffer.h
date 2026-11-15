@@ -8,14 +8,15 @@
 #ifndef ZEPHYR_INCLUDE_SYS_RING_BUFFER_H_
 #define ZEPHYR_INCLUDE_SYS_RING_BUFFER_H_
 
+#include <assert.h>
+#include <stdlib.h>
 #include <errno.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
 
-#include <zephyr/sys/util.h>
-#include <zephyr/toolchain.h>
-#include <zephyr/sys/__assert.h>
+#include <embt/base/util.h>
+#include <embt/compiler.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -162,7 +163,7 @@ static ALWAYS_INLINE void rb_store_relaxed(ring_buf_idx_t *p, ring_buf_idx_t v)
  */
 #define RING_BUF_DECLARE(name, size8)							\
 	BUILD_ASSERT((size8) <= RING_BUFFER_MAX_SIZE, RING_BUFFER_SIZE_ASSERT_MSG);	\
-	static uint8_t __noinit _ring_buffer_data_##name[(size8)];			\
+	static uint8_t _ring_buffer_data_##name[(size8)];			\
 	struct ring_buf name = RING_BUF_INIT(_ring_buffer_data_##name, (size8))
 
 /**
@@ -264,7 +265,10 @@ static inline void ring_buf_reset(struct ring_buf *rb)
  */
 static inline void ring_buf_init(struct ring_buf *rb, uint32_t size, uint8_t *data)
 {
-	__ASSERT(size <= RING_BUFFER_MAX_SIZE, RING_BUFFER_SIZE_ASSERT_MSG);
+	if (IS_ENABLED(CONFIG_ASSERT) && !(size <= RING_BUFFER_MAX_SIZE)) {
+		assert(!"size <= RING_BUFFER_MAX_SIZE" && RING_BUFFER_SIZE_ASSERT_MSG);
+		abort();
+	};
 
 	rb->size = (ring_buf_size_t)size;
 	rb->buffer = data;
@@ -294,7 +298,10 @@ static inline uint32_t ring_buf_put_ptr(struct ring_buf *rb, uint8_t **data, siz
 	ring_buf_idx_t read_idx = rb_load_acquire(&rb->read_idx);
 	ring_buf_idx_t off, avail;
 
-	__ASSERT_NO_MSG(offset <= ring_buf_space_get(rb));
+	if (IS_ENABLED(CONFIG_ASSERT) && !(offset <= ring_buf_space_get(rb))) {
+		assert(!"offset <= ring_buf_space_get(rb)");
+		abort();
+	};
 	if (offset > 0) {
 		write_idx = rb_idx_advance((size_t)write_idx + offset, rb->size);
 	}
@@ -323,7 +330,10 @@ static inline void ring_buf_commit(struct ring_buf *rb, size_t size)
 {
 	size_t write_idx = rb_load_relaxed(&rb->write_idx);
 
-	__ASSERT_NO_MSG(size <= ring_buf_space_get(rb));
+	if (IS_ENABLED(CONFIG_ASSERT) && !(size <= ring_buf_space_get(rb))) {
+		assert(!"size <= ring_buf_space_get(rb)");
+		abort();
+	};
 	rb_store_release(&rb->write_idx, rb_idx_advance(write_idx + size, rb->size));
 }
 
@@ -350,7 +360,10 @@ static inline uint32_t ring_buf_get_ptr(struct ring_buf *rb, uint8_t **data, siz
 	ring_buf_idx_t write_idx = rb_load_acquire(&rb->write_idx);
 	ring_buf_idx_t off, avail;
 
-	__ASSERT_NO_MSG(offset <= ring_buf_size_get(rb));
+	if (IS_ENABLED(CONFIG_ASSERT) && !(offset <= ring_buf_size_get(rb))) {
+		assert(!"offset <= ring_buf_size_get(rb)");
+		abort();
+	};
 	if (offset > 0) {
 		read_idx = rb_idx_advance((size_t)read_idx + offset, rb->size);
 	}
@@ -379,7 +392,10 @@ static inline void ring_buf_consume(struct ring_buf *rb, size_t size)
 {
 	size_t read_idx = rb_load_relaxed(&rb->read_idx);
 
-	__ASSERT_NO_MSG(size <= ring_buf_size_get(rb));
+	if (IS_ENABLED(CONFIG_ASSERT) && !(size <= ring_buf_size_get(rb))) {
+		assert(!"size <= ring_buf_size_get(rb)");
+		abort();
+	};
 	rb_store_release(&rb->read_idx, rb_idx_advance(read_idx + size, rb->size));
 }
 
@@ -496,7 +512,7 @@ static inline uint32_t ring_buf_peek(const struct ring_buf *rb, uint8_t *data, u
  */
 #define RING_BUF_ITEM_DECLARE(name, size32)						\
 	BUILD_ASSERT((size32) <= RING_BUFFER_MAX_SIZE / 4, RING_BUFFER_SIZE_ASSERT_MSG);	\
-	static uint32_t __noinit _ring_buffer_data_##name[(size32)];			\
+	static uint32_t _ring_buffer_data_##name[(size32)];			\
 	struct ring_buf name = RING_BUF_INIT((uint8_t *)_ring_buffer_data_##name, 4 * (size32))
 
 /**
@@ -547,10 +563,13 @@ static inline uint32_t ring_buf_peek(const struct ring_buf *rb, uint8_t *data, u
  * @param size Ring buffer size (in 32-bit words)
  * @param data Ring buffer data area (uint32_t data[size]).
  */
-__deprecated /* use #include <zephyr/sys/ringq.h> instead */
+__deprecated /* use the byte-oriented ring buffer API instead */
 static inline void ring_buf_item_init(struct ring_buf *rb, uint32_t size, uint32_t *data)
 {
-	__ASSERT(size <= RING_BUFFER_MAX_SIZE / 4, RING_BUFFER_SIZE_ASSERT_MSG);
+	if (IS_ENABLED(CONFIG_ASSERT) && !(size <= RING_BUFFER_MAX_SIZE / 4)) {
+		assert(!"size <= RING_BUFFER_MAX_SIZE / 4" && RING_BUFFER_SIZE_ASSERT_MSG);
+		abort();
+	};
 	ring_buf_init(rb, 4 * size, (uint8_t *)data);
 }
 
@@ -561,7 +580,7 @@ static inline void ring_buf_item_init(struct ring_buf *rb, uint32_t size, uint32
  *
  * @return Ring buffer free space (in 32-bit words).
  */
-__deprecated /* use #include <zephyr/sys/ringq.h> instead */
+__deprecated /* use the byte-oriented ring buffer API instead */
 static inline uint32_t ring_buf_item_space_get(const struct ring_buf *rb)
 {
 	return ring_buf_space_get(rb) / 4;
@@ -753,7 +772,7 @@ static inline void z_rb_write_no_commit(struct ring_buf *rb, const uint8_t *data
  * @retval 0 Data item was written.
  * @retval -EMSGSIZE Ring buffer has insufficient free space.
  */
-__deprecated /* use #include <zephyr/sys/ringq.h> instead */
+__deprecated /* use the byte-oriented ring buffer API instead */
 static inline int ring_buf_item_put(struct ring_buf *buf, uint16_t type, uint8_t value,
 					uint32_t *data, uint8_t size32)
 {
@@ -797,7 +816,7 @@ static inline int ring_buf_item_put(struct ring_buf *buf, uint16_t type, uint8_t
  * @retval -EMSGSIZE Data area @a data is too small; @a size32 now contains
  *         the number of 32-bit words needed.
  */
-__deprecated /* use #include <zephyr/sys/ringq.h> instead */
+__deprecated /* use the byte-oriented ring buffer API instead */
 static inline int ring_buf_item_get(struct ring_buf *buf, uint16_t *type, uint8_t *value,
 					uint32_t *data, uint8_t *size32)
 {

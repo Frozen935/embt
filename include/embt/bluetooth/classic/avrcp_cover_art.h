@@ -20,10 +20,10 @@
 
 #include <stdint.h>
 
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/l2cap.h>
-#include <zephyr/bluetooth/classic/avrcp.h>
-#include <zephyr/bluetooth/classic/bip.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/l2cap.h>
+#include <embt/bluetooth/classic/avrcp.h>
+#include <embt/bluetooth/classic/bip.h>
 
 #ifdef __cplusplus
 extern "C" {

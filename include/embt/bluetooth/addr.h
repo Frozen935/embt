@@ -10,10 +10,11 @@
 #ifndef ZEPHYR_INCLUDE_BLUETOOTH_ADDR_H_
 #define ZEPHYR_INCLUDE_BLUETOOTH_ADDR_H_
 
+#include <stdbool.h>
+#include <stdio.h>
 #include <stdint.h>
 #include <string.h>
 
-#include <zephyr/sys/printk.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -238,7 +239,7 @@ static inline bool bt_addr_le_is_identity(const bt_addr_le_t *addr)
  */
 static inline int bt_addr_to_str(const bt_addr_t *addr, char *str, size_t len)
 {
-	return snprintk(str, len, "%02X:%02X:%02X:%02X:%02X:%02X",
+	return snprintf(str, len, "%02X:%02X:%02X:%02X:%02X:%02X",
 			addr->val[5], addr->val[4], addr->val[3],
 			addr->val[2], addr->val[1], addr->val[0]);
 }
@@ -283,7 +284,7 @@ static inline int bt_addr_le_to_str(const bt_addr_le_t *addr, char *str,
 		break;
 	}
 
-	return snprintk(str, len, "%c:%02X:%02X:%02X:%02X:%02X:%02X",
+	return snprintf(str, len, "%c:%02X:%02X:%02X:%02X:%02X:%02X",
 			type_char,
 			addr->a.val[5], addr->a.val[4], addr->a.val[3],
 			addr->a.val[2], addr->a.val[1], addr->a.val[0]);

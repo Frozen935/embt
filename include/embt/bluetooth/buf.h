@@ -20,16 +20,19 @@
  * @{
  */
 
+#include <assert.h>
+#include <stdlib.h>
+#include <embt/base/time.h>
 #include <stddef.h>
 #include <stdint.h>
 
-#include <zephyr/autoconf.h>
-#include <zephyr/bluetooth/hci.h>
-#include <zephyr/bluetooth/hci_types.h>
-#include <zephyr/net_buf.h>
-#include <zephyr/sys/util.h>
-#include <zephyr/sys/util_macro.h>
-#include <zephyr/toolchain.h>
+#include <embt/autoconf.h>
+#include <embt/bluetooth/hci.h>
+#include <embt/bluetooth/hci_types.h>
+#include <embt/net_buf.h>
+#include <embt/base/util.h>
+#include <embt/base/util_macro.h>
+#include <embt/compiler.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -80,7 +83,10 @@ static inline uint8_t bt_buf_type_to_h4(enum bt_buf_type type)
 	case BT_BUF_EVT:
 		return BT_HCI_H4_EVT;
 	default:
-		__ASSERT_NO_MSG(false);
+		if (IS_ENABLED(CONFIG_ASSERT) && !(false)) {
+			assert(!"false");
+			abort();
+		};
 		return 0;
 	}
 }
@@ -186,10 +192,10 @@ BUILD_ASSERT(CONFIG_BT_BUF_EVT_RX_COUNT > CONFIG_BT_BUF_ACL_TX_COUNT,
  *  @param type    Type of buffer. Only BT_BUF_EVT, BT_BUF_ACL_IN and BT_BUF_ISO_IN
  *                 are allowed.
  *  @param timeout Non-negative waiting period to obtain a buffer or one of the
- *                 special values K_NO_WAIT and K_FOREVER.
+ *                 special values BT_NO_WAIT and BT_FOREVER.
  *  @return A new buffer.
  */
-struct net_buf *bt_buf_get_rx(enum bt_buf_type type, k_timeout_t timeout);
+struct net_buf *bt_buf_get_rx(enum bt_buf_type type, bt_timeout_t timeout);
 
 /** A callback to notify about freed buffer in the incoming data pool.
  *
@@ -225,12 +231,12 @@ void bt_buf_rx_freed_cb_set(bt_buf_rx_freed_cb_t cb);
  *
  *  @param type    Type of buffer. BT_BUF_CMD or BT_BUF_ACL_OUT.
  *  @param timeout Non-negative waiting period to obtain a buffer or one of the
- *                 special values K_NO_WAIT and K_FOREVER.
+ *                 special values BT_NO_WAIT and BT_FOREVER.
  *  @param data    Initial data to append to buffer. This is optional and can be NULL.
  *  @param size    Initial data size.
  *  @return A new buffer.
  */
-struct net_buf *bt_buf_get_tx(enum bt_buf_type type, k_timeout_t timeout,
+struct net_buf *bt_buf_get_tx(enum bt_buf_type type, bt_timeout_t timeout,
 			      const void *data, size_t size);
 
 /** Allocate a buffer for an HCI Event
@@ -240,10 +246,10 @@ struct net_buf *bt_buf_get_tx(enum bt_buf_type type, k_timeout_t timeout,
  *  @param evt          HCI event code
  *  @param discardable  Whether the driver considers the event discardable.
  *  @param timeout      Non-negative waiting period to obtain a buffer or one of
- *                      the special values K_NO_WAIT and K_FOREVER.
+ *                      the special values BT_NO_WAIT and BT_FOREVER.
  *  @return A new buffer.
  */
-struct net_buf *bt_buf_get_evt(uint8_t evt, bool discardable, k_timeout_t timeout);
+struct net_buf *bt_buf_get_evt(uint8_t evt, bool discardable, bt_timeout_t timeout);
 
 /**
  * @}

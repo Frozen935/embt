@@ -8,15 +8,17 @@
 #ifndef ZEPHYR_INCLUDE_BLUETOOTH_HCI_H_
 #define ZEPHYR_INCLUDE_BLUETOOTH_HCI_H_
 
+#include <embt/base/time.h>
+#include <embt/base/util_macro.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/net_buf.h>
-#include <zephyr/bluetooth/addr.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/hci_types.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/net_buf.h>
+#include <embt/bluetooth/addr.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/hci_types.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -39,7 +41,7 @@ extern "C" {
 #if defined(CONFIG_BT_HCI_ERR_TO_STR)
 const char *bt_hci_err_to_str(uint8_t hci_err);
 #else
-#include <zephyr/toolchain.h>
+#include <embt/compiler.h>
 
 static inline const char *bt_hci_err_to_str(uint8_t hci_err)
 {
@@ -61,7 +63,7 @@ static inline const char *bt_hci_err_to_str(uint8_t hci_err)
  *
  * @return Newly allocated buffer or NULL if allocation failed.
  */
-struct net_buf *bt_hci_cmd_alloc(k_timeout_t timeout);
+struct net_buf *bt_hci_cmd_alloc(bt_timeout_t timeout);
 
 /** Send a HCI command asynchronously.
   *

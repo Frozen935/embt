@@ -7,9 +7,9 @@
 #ifndef ZEPHYR_INCLUDE_BLUETOOTH_SERVICES_NUS_INST_H_
 #define ZEPHYR_INCLUDE_BLUETOOTH_SERVICES_NUS_INST_H_
 
-#include <zephyr/bluetooth/gatt.h>
-#include <zephyr/sys/iterable_sections.h>
-#include <zephyr/sys/slist.h>
+#include <embt/bluetooth/gatt.h>
+#include <embt/sys/iterable_sections.h>
+#include <embt/sys/slist.h>
 
 #ifdef __cplusplus
 extern "C" {

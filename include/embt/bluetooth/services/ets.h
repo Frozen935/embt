@@ -17,7 +17,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include <zephyr/sys/util.h>
+#include <embt/base/util.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -32,7 +32,7 @@ struct bt_ets_elapsed_time {
 	/** The actual time value in the resolution as defined by the flags.
 	 * The Time Value field contains a counter of the number of time units as determined by the
 	 * time resolution of the clock. The starting point of the timeline is 2000-01-01 00:00:00
-	 * when reporting a time of day or is implementation-dependent for a tick counter.
+	 * when reporting a time of day or is implementation-dependent for a elapsed counter.
 	 */
 	uint8_t time_value[6];
 	/** Time synchronization source type. @see @ref BT_ETS_TIME_SOURCE */
@@ -49,16 +49,16 @@ struct bt_ets_elapsed_time {
  * @{
  */
 
-/** Time Value reports a counter (tick counter). If 0, Time Value reports a time of day. */
-#define BT_ETS_FLAG_TICK_COUNTER BIT(0)
+/** Time Value reports a counter (elapsed counter). If 0, Time Value reports a time of day. */
+#define BT_ETS_FLAG_ELAPSED_COUNTER BIT(0)
 
-/** Time is UTC. If 0, time is local time. Has no meaning for tick counter. */
+/** Time is UTC. If 0, time is local time. Has no meaning for elapsed counter. */
 #define BT_ETS_FLAG_UTC BIT(1)
 
 /** Time resolution mask (bits 2-3). */
 #define BT_ETS_FLAG_RESOLUTION_MASK (BIT(2) | BIT(3))
 
-/** TZ/DST offset is used. If 0, offset not used. Has no meaning for tick counter. */
+/** TZ/DST offset is used. If 0, offset not used. Has no meaning for elapsed counter. */
 #define BT_ETS_FLAG_TZ_DST_USED BIT(4)
 
 /** Time stamp is from current timeline. */
@@ -129,7 +129,7 @@ enum bt_ets_write_result {
 
 /** Combined supported flags mask based on configuration. */
 #define BT_ETS_SUPPORTED_FLAGS_MASK                                                                \
-	((IS_ENABLED(CONFIG_BT_ETS_SUPPORT_TICK_COUNTER) ? BT_ETS_FLAG_TICK_COUNTER : 0) |         \
+	((IS_ENABLED(CONFIG_BT_ETS_SUPPORT_ELAPSED_COUNTER) ? BT_ETS_FLAG_ELAPSED_COUNTER : 0) |         \
 	 (IS_ENABLED(CONFIG_BT_ETS_SUPPORT_UTC) ? BT_ETS_FLAG_UTC : 0) |                           \
 	 (IS_ENABLED(CONFIG_BT_ETS_SUPPORT_TZ_DST) ? BT_ETS_FLAG_TZ_DST_USED : 0) |                \
 	 (IS_ENABLED(CONFIG_BT_ETS_RESOLUTION_1_SEC)    ? 0                                        \

@@ -16,11 +16,14 @@
 #ifndef ZEPHYR_INCLUDE_SYS_CRC_H_
 #define ZEPHYR_INCLUDE_SYS_CRC_H_
 
-#include <zephyr/types.h>
+#include <assert.h>
+#include <stdlib.h>
+#include <stdint.h>
 #include <stdbool.h>
 #include <stddef.h>
 
-#include <zephyr/sys/__assert.h>
+
+#include <embt/base/util_macro.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -551,7 +554,10 @@ static inline uint32_t crc_by_type(enum crc_type type, const uint8_t *src, size_
 		break;
 	}
 
-	__ASSERT_NO_MSG(false);
+	if (IS_ENABLED(CONFIG_ASSERT) && !(false)) {
+		assert(!"false");
+		abort();
+	};
 	return -1;
 }
 

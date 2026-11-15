@@ -16,15 +16,16 @@
  * @{
  */
 
+#include <embt/storage.h>
 #include <string.h>
 #include <errno.h>
 #include <stdbool.h>
 
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/l2cap.h>
-#include <zephyr/bluetooth/classic/rfcomm.h>
-#include <zephyr/bluetooth/classic/obex.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/l2cap.h>
+#include <embt/bluetooth/classic/rfcomm.h>
+#include <embt/bluetooth/classic/obex.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -151,7 +152,7 @@ struct bt_goep {
 	struct bt_conn *_acl;
 
 	/** @internal Saves the current transport state, @ref bt_goep_transport_state */
-	atomic_t _state;
+	long _state;
 
 	/** @brief GOEP transport operations
 	 *

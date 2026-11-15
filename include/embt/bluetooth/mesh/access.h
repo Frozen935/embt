@@ -10,10 +10,10 @@
 #ifndef ZEPHYR_INCLUDE_BLUETOOTH_MESH_ACCESS_H_
 #define ZEPHYR_INCLUDE_BLUETOOTH_MESH_ACCESS_H_
 
-#include <zephyr/sys/util.h>
-#include <zephyr/settings/settings.h>
-#include <zephyr/bluetooth/assigned_numbers.h>
-#include <zephyr/bluetooth/mesh/msg.h>
+#include <embt/sys/util.h>
+#include <embt/settings/settings.h>
+#include <embt/bluetooth/assigned_numbers.h>
+#include <embt/bluetooth/mesh/msg.h>
 
 /**
  * @cond INTERNAL_HIDDEN

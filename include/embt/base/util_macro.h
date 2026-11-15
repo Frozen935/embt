@@ -17,6 +17,17 @@
 #ifndef ZEPHYR_INCLUDE_SYS_UTIL_MACRO_H_
 #define ZEPHYR_INCLUDE_SYS_UTIL_MACRO_H_
 
+/** @brief Explicitly consume an otherwise unused expression. */
+#define ARG_UNUSED(value) (void)(value)
+
+/** @brief Stringify a token or its expanded macro value. */
+#define Z_STRINGIFY(value) #value
+#define STRINGIFY(value) Z_STRINGIFY(value)
+
+/** @brief Concatenate expanded macro values. */
+#define _DO_CONCAT(a, b) a ## b
+#define _CONCAT(a, b) _DO_CONCAT(a, b)
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -31,7 +42,7 @@ extern "C" {
  * below (APIs like IS_ENABLED(), COND_CODE_1(), etc.) are hidden away
  * in this file.
  */
-#include <zephyr/sys/util_internal.h>
+#include <embt/base/detail/util_internal.h>
 
 #ifndef BIT
 #if defined(_ASMLANGUAGE)
@@ -85,11 +96,6 @@ extern "C" {
  */
 #define GENMASK(h, l) (((1UL << (h)) << 1U) - (1UL << (l)))
 
-/**
- * @brief Create a contiguous 64-bit bitmask starting at bit position @p l
- *        and ending at position @p h.
- */
-#define GENMASK64(h, l) (((1ULL << (h)) << 1U) - (1ULL << (l)))
 
 /** @brief Check if a @p x is a power of two */
 #define IS_POWER_OF_TWO(x) (((x) != 0U) && (((x) & ((x) - 1U)) == 0U))
@@ -237,30 +243,6 @@ extern "C" {
 #define COND_CODE_0(_flag, _if_0_code, _else_code) \
 	Z_COND_CODE_0(_flag, _if_0_code, _else_code)
 
-/**
- * @brief Evaluate a list of COND_CODE_1-style cases.
- *
- * Each case consists of a flag and a value wrapped in parentheses. The
- * arguments are processed from left to right until a flag expands to the
- * literal 1, in which case the corresponding value is expanded. If no flags
- * expand to 1, the last argument (which must also be wrapped in parentheses)
- * is used as the default value. Supplying only the default argument is also
- * supported.
- *
- * Example:
- *
- *     int foo = COND_CASE_1(CONFIG_SOME_BOOL, (handle_a()),
- *                           CONFIG_SOME_OTHER_BOOL, (handle_b()),
- *                           (handle_default()));
- *
- * Supports up to 16 flag/value pairs before the default.
- *
- * @param ... Flag/value pairs followed by the default value. Each value must
- *            be provided in parentheses to avoid comma handling issues.
- * @see COND_CODE_1()
- */
-#define COND_CASE_1(...) \
-	Z_COND_CASE_1(__VA_ARGS__)
 
 /**
  * @brief Insert code if @p _flag is defined and equals 1.
@@ -443,15 +425,6 @@ extern "C" {
  */
 #define GET_ARGS_LESS_N(N, ...) UTIL_CAT(Z_GET_ARGS_LESS_, N)(__VA_ARGS__)
 
-/**
- * @brief Get the first N arguments from the argument list.
- *
- * @param N Number of arguments to take. N is valid if N < 64.
- * @param ... Variable list of arguments.
- *
- * @return argument list only contains first N arguments.
- */
-#define GET_ARGS_FIRST_N(N, ...) UTIL_CAT(Z_GET_ARGS_FIRST_, N)(__VA_ARGS__)
 
 /**
  * @brief Like <tt>a || b</tt>, but does evaluation and
@@ -483,23 +456,10 @@ extern "C" {
  * @brief UTIL_INC(x) for an integer literal x from 0 to 4095 expands to an
  * integer literal whose value is x+1.
  *
- * @see UTIL_DEC(x)
  */
 #define UTIL_INC(x) UTIL_PRIMITIVE_CAT(Z_UTIL_INC_, x)
 
-/**
- * @brief UTIL_DEC(x) for an integer literal x from 0 to 4095 expands to an
- * integer literal whose value is x-1.
- *
- * @see UTIL_INC(x)
- */
-#define UTIL_DEC(x) UTIL_PRIMITIVE_CAT(Z_UTIL_DEC_, x)
 
-/**
- * @brief UTIL_X2(y) for an integer literal y from 0 to 4095 expands to an
- * integer literal whose value is 2y.
- */
-#define UTIL_X2(y) UTIL_PRIMITIVE_CAT(Z_UTIL_X2_, y)
 
 
 /**
@@ -619,88 +579,8 @@ extern "C" {
 			__DEBRACKET term				\
 		))
 
-/**
- * @brief Call macro @p F on each provided argument, with the argument's index
- *        as an additional parameter.
- *
- * This is like FOR_EACH(), except @p F should be a macro which takes two
- * arguments: <tt>F(index, variable_arg)</tt>.
- *
- * Example:
- *
- *     #define F(idx, x) int a##idx = x
- *     FOR_EACH_IDX(F, (;), 4, 5, 6);
- *
- * This expands to:
- *
- *     int a0 = 4;
- *     int a1 = 5;
- *     int a2 = 6;
- *
- * @param F Macro to invoke
- * @param sep Separator (e.g. comma or semicolon). Must be in parentheses;
- *            this is required to enable providing a comma as separator.
- * @param ... Variable argument list. The macro @p F is invoked as
- *            <tt>F(index, element)</tt> for each element in the list.
- */
-#define FOR_EACH_IDX(F, sep, ...) \
-	Z_FOR_EACH_IDX(F, sep, REVERSE_ARGS(__VA_ARGS__))
 
-/**
- * @brief Call macro @p F on each provided argument, with an additional fixed
- *	  argument as a parameter.
- *
- * This is like FOR_EACH(), except @p F should be a macro which takes two
- * arguments: <tt>F(variable_arg, fixed_arg)</tt>.
- *
- * Example:
- *
- *     static void func(int val, void *dev);
- *     FOR_EACH_FIXED_ARG(func, (;), dev, 4, 5, 6);
- *
- * This expands to:
- *
- *     func(4, dev);
- *     func(5, dev);
- *     func(6, dev);
- *
- * @param F Macro to invoke
- * @param sep Separator (e.g. comma or semicolon). Must be in parentheses;
- *            this is required to enable providing a comma as separator.
- * @param fixed_arg Fixed argument passed to @p F as the second macro parameter.
- * @param ... Variable argument list. The macro @p F is invoked as
- *            <tt>F(element, fixed_arg)</tt> for each element in the list.
- */
-#define FOR_EACH_FIXED_ARG(F, sep, fixed_arg, ...) \
-	Z_FOR_EACH_FIXED_ARG(F, sep, fixed_arg, REVERSE_ARGS(__VA_ARGS__))
 
-/**
- * @brief Calls macro @p F for each variable argument with an index and fixed
- *        argument
- *
- * This is like the combination of FOR_EACH_IDX() with FOR_EACH_FIXED_ARG().
- *
- * Example:
- *
- *     #define F(idx, x, fixed_arg) int fixed_arg##idx = x
- *     FOR_EACH_IDX_FIXED_ARG(F, (;), a, 4, 5, 6);
- *
- * This expands to:
- *
- *     int a0 = 4;
- *     int a1 = 5;
- *     int a2 = 6;
- *
- * @param F Macro to invoke
- * @param sep Separator (e.g. comma or semicolon). Must be in parentheses;
- *            This is required to enable providing a comma as separator.
- * @param fixed_arg Fixed argument passed to @p F as the third macro parameter.
- * @param ... Variable list of arguments. The macro @p F is invoked as
- *            <tt>F(index, element, fixed_arg)</tt> for each element in
- *            the list.
- */
-#define FOR_EACH_IDX_FIXED_ARG(F, sep, fixed_arg, ...) \
-	Z_FOR_EACH_IDX_FIXED_ARG(F, sep, fixed_arg, REVERSE_ARGS(__VA_ARGS__))
 
 /** @brief Reverse arguments order.
  *
@@ -756,42 +636,7 @@ extern "C" {
 #define NUM_VA_ARGS(...)                                                                           \
 	COND_CODE_1(IS_EMPTY(__VA_ARGS__), (0), (UTIL_INC(NUM_VA_ARGS_LESS_1(__VA_ARGS__))))
 
-/**
- * @brief Mapping macro that pastes results together
- *
- * This is similar to FOR_EACH() in that it invokes a macro repeatedly
- * on each element of `__VA_ARGS__`. However, unlike FOR_EACH(),
- * MACRO_MAP_CAT() pastes the results together into a single token.
- *
- * For example, with this macro FOO:
- *
- *     #define FOO(x) item_##x##_
- *
- * <tt>MACRO_MAP_CAT(FOO, a, b, c),</tt> expands to the token:
- *
- *     item_a_item_b_item_c_
- *
- * @param ... Macro to expand on each argument, followed by its
- *            arguments. (The macro should take exactly one argument.)
- * @return The results of expanding the macro on each argument, all pasted
- *         together
- */
-#define MACRO_MAP_CAT(...) Z_MACRO_MAP_CAT_(__VA_ARGS__)
 
-/**
- * @brief Mapping macro that pastes a fixed number of results together
- *
- * Similar to @ref MACRO_MAP_CAT(), but expects a fixed number of
- * arguments. If more arguments are given than are expected, the rest
- * are ignored.
- *
- * @param N   Number of arguments to map
- * @param ... Macro to expand on each argument, followed by its
- *            arguments. (The macro should take exactly one argument.)
- * @return The results of expanding the macro on each argument, all pasted
- *         together
- */
-#define MACRO_MAP_CAT_N(N, ...) Z_MACRO_MAP_CAT_N_(N, __VA_ARGS__)
 
 /**
  * @}

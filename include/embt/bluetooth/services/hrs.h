@@ -19,7 +19,7 @@
 
 #include <stdint.h>
 
-#include <zephyr/sys/slist.h>
+#include <embt/base/slist.h>
 
 #ifdef __cplusplus
 extern "C" {

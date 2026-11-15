@@ -22,23 +22,22 @@
  * @{
  */
 
+#include <limits.h>
 #include <stdint.h>
 #include <stddef.h>
 #include <string.h>
 
 #include <sys/types.h>
 
-#include <zephyr/autoconf.h>
-#include <zephyr/bluetooth/addr.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/uuid.h>
-#include <zephyr/bluetooth/att.h>
-#include <zephyr/sys/atomic.h>
-#include <zephyr/sys/iterable_sections.h>
-#include <zephyr/sys/slist.h>
-#include <zephyr/sys/util.h>
-#include <zephyr/sys/util_macro.h>
-#include <zephyr/toolchain.h>
+#include <embt/autoconf.h>
+#include <embt/bluetooth/addr.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/uuid.h>
+#include <embt/bluetooth/att.h>
+#include <embt/base/slist.h>
+#include <embt/base/util.h>
+#include <embt/base/util_macro.h>
+#include <embt/compiler.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -352,6 +351,8 @@ struct bt_gatt_attr {
  *  define and register a service.
  */
 struct bt_gatt_service_static {
+	/** Internal registration link; applications must not modify it. */
+	struct bt_gatt_service_static *next;
 	/** Service Attributes */
 	const struct bt_gatt_attr *attrs;
 	/** Service Attribute count */
@@ -900,15 +901,18 @@ ssize_t bt_gatt_attr_read_service(struct bt_conn *conn,
 				  void *buf, uint16_t len, uint16_t offset);
 
 /**
- *  @brief Statically define and register a service.
+ *  @brief Define static service storage for explicit registration.
  *
- *  Helper macro to statically define and register a service.
+ *  Call bt_gatt_service_static_register() with the resulting descriptor before GATT initialization.
  *
  *  @param _name Service name.
  */
+/** @brief Register static attribute storage before the stack initializes GATT. */
+int bt_gatt_service_static_register(struct bt_gatt_service_static *service);
+
 #define BT_GATT_SERVICE_DEFINE(_name, ...)				\
 	const struct bt_gatt_attr attr_##_name[] = { __VA_ARGS__ };	\
-	const STRUCT_SECTION_ITERABLE(bt_gatt_service_static, _name) =	\
+	struct bt_gatt_service_static _name =	\
 					BT_GATT_SERVICE(attr_##_name)
 
 #define _BT_GATT_ATTRS_ARRAY_DEFINE(n, _instances, _attrs_def)	\
@@ -2322,7 +2326,7 @@ struct bt_gatt_subscribe_params {
 	bt_security_t min_security;
 #endif /* CONFIG_BT_SMP */
 	/** Subscription flags, see @ref bt_gatt_sub_flag */
-	ATOMIC_DEFINE(flags, BT_GATT_SUBSCRIBE_NUM_FLAGS);
+	long flags[((BT_GATT_SUBSCRIBE_NUM_FLAGS) + sizeof(long) * CHAR_BIT - 1) / (sizeof(long) * CHAR_BIT)];
 
 	/** @cond INTERNAL_HIDDEN
 	 *  Field used for list handling.

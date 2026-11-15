@@ -7,10 +7,10 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include <zephyr/sys/bitmap.h>
-#include <zephyr/sys/byteorder.h>
-#include <zephyr/sys/math_extras.h>
-#include <zephyr/sys/util.h>
+#include <embt/base/bitmap.h>
+#include <embt/base/byteorder.h>
+#include <embt/base/math.h>
+#include <embt/base/util.h>
 
 #if ULONG_MAX > UINT32_MAX
 #define le_ulong_to_cpu(w)            sys_le64_to_cpu(w)

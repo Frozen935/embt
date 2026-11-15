@@ -16,13 +16,14 @@
  * @{
  */
 
+#include <embt/storage.h>
 #include <errno.h>
 
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/uuid.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/l2cap.h>
-#include <zephyr/bluetooth/classic/goep.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/uuid.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/l2cap.h>
+#include <embt/bluetooth/classic/goep.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -396,7 +397,7 @@ struct bt_bip {
 	const struct bt_bip_transport_ops *ops;
 
 	/** @internal Transport state (atomic) */
-	atomic_t _transport_state;
+	long _transport_state;
 
 	/** @internal Responder supported capabilities */
 	uint8_t _supp_caps;
@@ -885,7 +886,7 @@ struct bt_bip_server {
 	const char *_optype;
 
 	/** @internal Server state (atomic) */
-	atomic_t _state;
+	long _state;
 
 	/** @internal Associated client (for secondary connections) */
 	union {
@@ -925,7 +926,7 @@ struct bt_bip_client {
 	struct bt_obex_client _client;
 
 	/** @internal Client state (atomic) */
-	atomic_t _state;
+	long _state;
 
 	/** @internal Associated server (for secondary connections) */
 	union {

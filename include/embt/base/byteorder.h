@@ -11,12 +11,13 @@
 #ifndef ZEPHYR_INCLUDE_SYS_BYTEORDER_H_
 #define ZEPHYR_INCLUDE_SYS_BYTEORDER_H_
 
-#include <zephyr/types.h>
+#include <assert.h>
+#include <stdlib.h>
+#include <stdint.h>
 #include <stddef.h>
 #include <string.h>
-#include <zephyr/sys/__assert.h>
-#include <zephyr/sys/util_macro.h>
-#include <zephyr/toolchain.h>
+#include <embt/base/util_macro.h>
+#include <embt/compiler.h>
 
 #if HAS_BUILTIN(__builtin_bswap16)
 #define BSWAP_16(x) ((uint16_t) __builtin_bswap16(x))
@@ -237,7 +238,7 @@
  *  @return 64-bit unsigned integer as byte array.
  */
 
-#ifdef CONFIG_LITTLE_ENDIAN
+#ifdef CONFIG_EMBT_LITTLE_ENDIAN
 #define sys_le16_to_cpu(val) (val)
 #define sys_cpu_to_le16(val) (val)
 #define sys_le24_to_cpu(val) (val)
@@ -708,9 +709,10 @@ static inline void sys_memcpy_swap(void *dst, const void *src, size_t length)
 	uint8_t *pdst = (uint8_t *)dst;
 	const uint8_t *psrc = (const uint8_t *)src;
 
-	__ASSERT(((psrc < pdst && (psrc + length) <= pdst) ||
-		  (psrc > pdst && (pdst + length) <= psrc)),
-		 "Source and destination buffers must not overlap");
+	if (IS_ENABLED(CONFIG_ASSERT) && !(((psrc < pdst && (psrc + length) <= pdst) || (psrc > pdst && (pdst + length) <= psrc)))) {
+		assert(!"((psrc < pdst && (psrc + length) <= pdst) || (psrc > pdst && (pdst + length) <= psrc))" && "Source and destination buffers must not overlap");
+		abort();
+	};
 
 	psrc += length - 1;
 
@@ -749,7 +751,7 @@ static inline void sys_mem_swap(void *buf, size_t length)
  */
 static inline void sys_le_to_cpu(void *buf, size_t length)
 {
-	if (IS_ENABLED(CONFIG_BIG_ENDIAN)) {
+	if (IS_ENABLED(CONFIG_EMBT_BIG_ENDIAN)) {
 		sys_mem_swap(buf, length);
 	}
 }
@@ -762,7 +764,7 @@ static inline void sys_le_to_cpu(void *buf, size_t length)
  */
 static inline void sys_cpu_to_le(void *buf, size_t length)
 {
-	if (IS_ENABLED(CONFIG_BIG_ENDIAN)) {
+	if (IS_ENABLED(CONFIG_EMBT_BIG_ENDIAN)) {
 		sys_mem_swap(buf, length);
 	}
 }
@@ -775,7 +777,7 @@ static inline void sys_cpu_to_le(void *buf, size_t length)
  */
 static inline void sys_be_to_cpu(void *buf, size_t length)
 {
-	if (IS_ENABLED(CONFIG_LITTLE_ENDIAN)) {
+	if (IS_ENABLED(CONFIG_EMBT_LITTLE_ENDIAN)) {
 		sys_mem_swap(buf, length);
 	}
 }
@@ -788,7 +790,7 @@ static inline void sys_be_to_cpu(void *buf, size_t length)
  */
 static inline void sys_cpu_to_be(void *buf, size_t length)
 {
-	if (IS_ENABLED(CONFIG_LITTLE_ENDIAN)) {
+	if (IS_ENABLED(CONFIG_EMBT_LITTLE_ENDIAN)) {
 		sys_mem_swap(buf, length);
 	}
 }
@@ -805,7 +807,7 @@ static inline void sys_cpu_to_be(void *buf, size_t length)
  */
 static inline void sys_put_le(void *dst, const void *src, size_t length)
 {
-	if (IS_ENABLED(CONFIG_LITTLE_ENDIAN)) {
+	if (IS_ENABLED(CONFIG_EMBT_LITTLE_ENDIAN)) {
 		(void)memcpy(dst, src, length);
 	} else {
 		sys_memcpy_swap(dst, src, length);
@@ -824,7 +826,7 @@ static inline void sys_put_le(void *dst, const void *src, size_t length)
  */
 static inline void sys_put_be(void *dst, const void *src, size_t length)
 {
-	if (IS_ENABLED(CONFIG_LITTLE_ENDIAN)) {
+	if (IS_ENABLED(CONFIG_EMBT_LITTLE_ENDIAN)) {
 		sys_memcpy_swap(dst, src, length);
 	} else {
 		(void)memcpy(dst, src, length);
@@ -843,7 +845,7 @@ static inline void sys_put_be(void *dst, const void *src, size_t length)
  */
 static inline void sys_get_le(void *dst, const void *src, size_t length)
 {
-	if (IS_ENABLED(CONFIG_LITTLE_ENDIAN)) {
+	if (IS_ENABLED(CONFIG_EMBT_LITTLE_ENDIAN)) {
 		(void)memcpy(dst, src, length);
 	} else {
 		sys_memcpy_swap(dst, src, length);
@@ -862,7 +864,7 @@ static inline void sys_get_le(void *dst, const void *src, size_t length)
  */
 static inline void sys_get_be(void *dst, const void *src, size_t length)
 {
-	if (IS_ENABLED(CONFIG_LITTLE_ENDIAN)) {
+	if (IS_ENABLED(CONFIG_EMBT_LITTLE_ENDIAN)) {
 		sys_memcpy_swap(dst, src, length);
 	} else {
 		(void)memcpy(dst, src, length);

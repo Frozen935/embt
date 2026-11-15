@@ -18,6 +18,7 @@
  * @{
  */
 
+#include <embt/base/time.h>
 #include <stdint.h>
 
 #ifdef __cplusplus
@@ -92,7 +93,7 @@ int bt_ans_set_unread_support_category(uint16_t mask);
  * will save the latest call to this function in case an immediate replay is requested via the ANS
  * control point.
  *
- * @note This function waits on a Mutex with @ref K_FOREVER to ensure atomic updates to notification
+ * @note This function waits on a Mutex with @ref BT_FOREVER to ensure atomic updates to notification
  * structs. To avoid deadlocks, do not call this function in BT RX or System Workqueue threads.
  *
  * @param conn The connection object to send the alert to
@@ -113,7 +114,7 @@ int bt_ans_notify_new_alert(struct bt_conn *conn, enum bt_ans_cat category, uint
  * will save the latest call to this function in case an immediate replay is requested via the ANS
  * control point.
  *
- * @note This function waits on a Mutex with @ref K_FOREVER to ensure atomic updates to notification
+ * @note This function waits on a Mutex with @ref BT_FOREVER to ensure atomic updates to notification
  * structs. To avoid deadlocks, do not call this function in BT RX or System Workqueue threads.
  *
  * @param conn The connection object to send the alert to

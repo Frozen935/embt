@@ -25,10 +25,10 @@
  * codec configurations from table 3.16 in the GMAP v1.0 specification
  */
 
-#include <zephyr/bluetooth/audio/audio.h>
-#include <zephyr/bluetooth/audio/bap.h>
-#include <zephyr/bluetooth/audio/bap_lc3_preset.h>
-#include <zephyr/bluetooth/audio/lc3.h>
+#include <embt/bluetooth/audio/audio.h>
+#include <embt/bluetooth/audio/bap.h>
+#include <embt/bluetooth/audio/bap_lc3_preset.h>
+#include <embt/bluetooth/audio/lc3.h>
 
 #ifdef __cplusplus
 extern "C" {

@@ -14,8 +14,10 @@
 #ifndef ZEPHYR_INCLUDE_SYS_UTIL_H_
 #define ZEPHYR_INCLUDE_SYS_UTIL_H_
 
-#include <zephyr/sys/util_macro.h>
-#include <zephyr/toolchain.h>
+#include <assert.h>
+#include <stdlib.h>
+#include <embt/base/util_macro.h>
+#include <embt/compiler.h>
 
 /* needs to be outside _ASMLANGUAGE so 'true' and 'false' can turn
  * into '1' and '0' for asm or linker scripts
@@ -23,9 +25,6 @@
 #include <stdbool.h>
 
 #ifndef _ASMLANGUAGE
-
-#include <zephyr/sys/__assert.h>
-#include <zephyr/types.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
@@ -166,7 +165,10 @@ extern "C" {
  */
 #define ARRAY_INDEX(array, ptr)                                                                    \
 	({                                                                                         \
-		__ASSERT_NO_MSG(IS_ARRAY_ELEMENT(array, ptr));                                     \
+		if (IS_ENABLED(CONFIG_ASSERT) && !(IS_ARRAY_ELEMENT(array, ptr))) { \
+			assert(!"IS_ARRAY_ELEMENT(array, ptr)"); \
+			abort(); \
+		}; \
 		(__typeof__((array)[0]) *)(ptr) - (array);                                         \
 	})
 
@@ -203,7 +205,10 @@ extern "C" {
  */
 #define ARRAY_INDEX_FLOOR(array, ptr)                                                              \
 	({                                                                                         \
-		__ASSERT_NO_MSG(PART_OF_ARRAY(array, ptr));                                        \
+		if (IS_ENABLED(CONFIG_ASSERT) && !(PART_OF_ARRAY(array, ptr))) { \
+			assert(!"PART_OF_ARRAY(array, ptr)"); \
+			abort(); \
+		}; \
 		(POINTER_TO_UINT(ptr) - POINTER_TO_UINT(array)) / sizeof((array)[0]);              \
 	})
 
@@ -752,7 +757,10 @@ uint8_t u8_to_dec(char *buf, uint8_t buflen, uint8_t value);
  */
 static inline int32_t sign_extend(uint32_t value, uint8_t index)
 {
-	__ASSERT_NO_MSG(index <= 31);
+	if (IS_ENABLED(CONFIG_ASSERT) && !(index <= 31)) {
+		assert(!"index <= 31");
+		abort();
+	};
 
 	uint8_t shift = 31 - index;
 
@@ -767,7 +775,10 @@ static inline int32_t sign_extend(uint32_t value, uint8_t index)
  */
 static inline int64_t sign_extend_64(uint64_t value, uint8_t index)
 {
-	__ASSERT_NO_MSG(index <= 63);
+	if (IS_ENABLED(CONFIG_ASSERT) && !(index <= 63)) {
+		assert(!"index <= 63");
+		abort();
+	};
 
 	uint8_t shift = 63 - index;
 
@@ -1030,10 +1041,7 @@ static ALWAYS_INLINE uint64_t sys_lcm_s(int32_t a, int32_t b)
 }
 #endif
 
-/* This file must be included at the end of the !_ASMLANGUAGE guard.
- * It depends on macros defined in this file above which cannot be forward declared.
- */
-#include <zephyr/sys/time_units.h>
+#include <embt/base/time.h>
 
 #endif /* !_ASMLANGUAGE */
 
@@ -1053,56 +1061,6 @@ static ALWAYS_INLINE uint64_t sys_lcm_s(int32_t a, int32_t b)
 #define KHZ(x) ((x) * 1000)
 /** @brief Number of Hz in @p x MHz */
 #define MHZ(x) (KHZ(x) * 1000)
-
-/**
- * @brief For the POSIX architecture add a minimal delay in a busy wait loop.
- * For other architectures this is a no-op.
- *
- * In the POSIX ARCH, code takes zero simulated time to execute,
- * so busy wait loops become infinite loops, unless we
- * force the loop to take a bit of time.
- * Include this macro in all busy wait/spin loops
- * so they will also work when building for the POSIX architecture.
- *
- * @param t Time in microseconds we will busy wait
- */
-#if defined(CONFIG_ARCH_POSIX)
-#define Z_SPIN_DELAY(t) k_busy_wait(t)
-#else
-#define Z_SPIN_DELAY(t)
-#endif
-
-/**
- * @brief Wait for an expression to return true with a timeout
- *
- * Spin on an expression with a timeout and optional delay between iterations
- *
- * Commonly needed when waiting on hardware to complete an asynchronous
- * request to read/write/initialize/reset, but useful for any expression.
- *
- * @param expr Truth expression upon which to poll, e.g.: XYZREG & XYZREG_EN
- * @param timeout Timeout to wait for in microseconds, e.g.: 1000 (1ms)
- * @param delay_stmt Delay statement to perform each poll iteration
- *                   e.g.: NULL, k_yield(), k_msleep(1) or k_busy_wait(1)
- *
- * @return expr As a boolean return, if false then it has timed out.
- */
-#define WAIT_FOR(expr, timeout, delay_stmt)                                                        \
-	({                                                                                         \
-		uint32_t _wf_cycle_count = k_us_to_cyc_ceil32(timeout);                            \
-		uint32_t _wf_start = k_cycle_get_32();                                             \
-		bool _wf_ret;                                                                      \
-		do {                                                                               \
-			bool _wf_timed_out = (_wf_cycle_count <= (k_cycle_get_32() - _wf_start));  \
-			_wf_ret = (expr);                                                          \
-			if (_wf_ret || _wf_timed_out) {                                            \
-				break;                                                             \
-			}                                                                          \
-			({ delay_stmt; });                                                         \
-			Z_SPIN_DELAY(10);                                                          \
-		} while (true);                                                                    \
-		(_wf_ret);                                                                         \
-	})
 
 /**
  * @brief Define symbol as static unless we are building with ZTEST.

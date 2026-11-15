@@ -18,11 +18,12 @@
  * @{
  */
 
+#include <embt/storage.h>
 #include <string.h>
 #include <errno.h>
 #include <stdbool.h>
 
-#include <zephyr/bluetooth/classic/goep.h>
+#include <embt/bluetooth/classic/goep.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -406,7 +407,7 @@ struct bt_pbap_pce {
 	struct bt_goep _goep;
 
 	/** @internal Transport state (atomic). */
-	atomic_t _transport_state;
+	long _transport_state;
 
 	/** @internal Connection ID.
 	 *
@@ -424,7 +425,7 @@ struct bt_pbap_pce {
 	 *
 	 *  Atomic variable tracking the current state of the PBAP connection.
 	 */
-	atomic_t _state;
+	long _state;
 
 	/** @internal Pending response callback. */
 	void (*_rsp_cb)(struct bt_pbap_pce *pbap_pce, uint8_t rsp_code, struct net_buf *buf);
@@ -778,7 +779,7 @@ struct bt_pbap_pse {
 	struct bt_goep _goep;
 
 	/** @internal Transport state (atomic). */
-	atomic_t _transport_state;
+	long _transport_state;
 
 	/** @internal Connection ID.
 	 *
@@ -796,7 +797,7 @@ struct bt_pbap_pse {
 	 *
 	 *  Atomic variable tracking the current state of the PBAP connection.
 	 */
-	atomic_t _state;
+	long _state;
 
 	/** @internal Pending request callback. */
 	void (*_req_cb)(struct bt_pbap_pse *pse, struct net_buf *buf);
@@ -805,7 +806,7 @@ struct bt_pbap_pse {
 	const char *_optype;
 
 	/** @internal Flags. */
-	atomic_t _flags;
+	long _flags;
 };
 
 /** @brief Allocate buffer from pool with reserved headroom for PBAP PSE.

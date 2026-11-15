@@ -22,8 +22,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include <zephyr/sys/util.h>
-#include <zephyr/bluetooth/byteorder.h>
+#include <embt/base/util.h>
+#include <embt/bluetooth/byteorder.h>
 
 #ifdef __cplusplus
 extern "C" {

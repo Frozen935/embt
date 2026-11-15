@@ -7,7 +7,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <zephyr/sys/crc.h>
+#include <string.h>
+#include <embt/base/assert.h>
+#include <embt/base/crc.h>
 
 uint32_t __weak crc24_pgp(const uint8_t *data, size_t len)
 {

@@ -19,14 +19,22 @@
  * @{
  */
 
+#include <embt/base/fifo.h>
 #include <stdint.h>
 #include <stddef.h>
 
-#include <zephyr/net_buf.h>
+#include <embt/net_buf.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+struct bt_hci_transport;
+
+/** @brief Select a real transport before enabling the raw HCI interface. */
+int bt_hci_raw_transport_set(const struct bt_hci_transport *transport);
+
+
 
 /** @brief Send packet to the Bluetooth controller
  *
@@ -49,7 +57,7 @@ int bt_send(struct net_buf *buf);
  *
  *  @return Zero on success or (negative) error code otherwise.
  */
-int bt_enable_raw(struct k_fifo *rx_queue);
+int bt_enable_raw(struct bt_fifo *rx_queue);
 
 #ifdef __cplusplus
 }

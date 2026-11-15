@@ -24,8 +24,10 @@
  * such as Target, Who, Connection ID, or an SRM or reliable-session header.
  */
 
-#include <zephyr/bluetooth/classic/goep.h>
-#include <zephyr/bluetooth/classic/sdp.h>
+
+#include <embt/storage.h>
+#include <embt/bluetooth/classic/goep.h>
+#include <embt/bluetooth/classic/sdp.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -278,16 +280,16 @@ struct bt_opp_client {
 	struct bt_goep _goep;
 
 	/** @internal Transport layer state (atomic). */
-	atomic_t _transport_state;
+	long _transport_state;
 
 	/** @internal OBEX client handle. */
 	struct bt_obex_client _client;
 
 	/** @internal Push operation state (atomic). */
-	atomic_t _push_state;
+	long _push_state;
 
 	/** @internal Pull operation state (atomic). */
-	atomic_t _pull_state;
+	long _pull_state;
 };
 
 /**
@@ -748,16 +750,16 @@ struct bt_opp_server {
 	struct bt_goep _goep;
 
 	/** @internal Transport layer state (atomic). */
-	atomic_t _transport_state;
+	long _transport_state;
 
 	/** @internal OBEX server handle. */
 	struct bt_obex_server _server;
 
 	/** @internal Push operation state (atomic). */
-	atomic_t _push_state;
+	long _push_state;
 
 	/** @internal Pull operation state (atomic). */
-	atomic_t _pull_state;
+	long _pull_state;
 };
 
 /**

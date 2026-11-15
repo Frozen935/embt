@@ -13,8 +13,9 @@
  * @brief Utility functions for the generation and parsing of Universal Unique Identifier.
  * @details This driver is compliant with RFC9562: https://datatracker.ietf.org/doc/rfc9562/
  */
-
-#include <zephyr/types.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <stdbool.h>
 
 #ifdef __cplusplus
 extern "C" {

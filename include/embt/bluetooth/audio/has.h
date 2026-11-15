@@ -31,9 +31,9 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/sys/util.h>
-#include <zephyr/sys/util_macro.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/base/util.h>
+#include <embt/base/util_macro.h>
 
 #ifdef __cplusplus
 extern "C" {

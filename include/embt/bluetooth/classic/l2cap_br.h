@@ -20,13 +20,12 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include <zephyr/bluetooth/buf.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/hci.h>
-#include <zephyr/net_buf.h>
-#include <zephyr/sys/atomic.h>
-#include <zephyr/sys/slist.h>
-#include <zephyr/sys/util.h>
+#include <embt/bluetooth/buf.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/hci.h>
+#include <embt/net_buf.h>
+#include <embt/base/slist.h>
+#include <embt/base/util.h>
 #include <sys/types.h>
 
 #ifdef __cplusplus

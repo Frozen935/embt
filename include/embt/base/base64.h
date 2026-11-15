@@ -32,8 +32,7 @@
 #define ZEPHYR_INCLUDE_SYS_BASE64_H_
 
 #include <stddef.h>
-#include <zephyr/types.h>
-
+#include <stdint.h>
 #ifdef __cplusplus
 extern "C" {
 #endif

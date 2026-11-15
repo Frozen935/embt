@@ -19,17 +19,18 @@
  * as a part of ongoing development.
  */
 
+#include <stdio.h>
 #include <stdbool.h>
 #include <stdint.h>
 
 #include <sys/types.h>
 
-#include <zephyr/sys/byteorder.h>
-#include <zephyr/sys/util.h>
-#include <zephyr/sys/crc.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/uuid.h>
-#include <zephyr/bluetooth/gatt.h>
+#include <embt/base/byteorder.h>
+#include <embt/base/util.h>
+#include <embt/base/crc.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/uuid.h>
+#include <embt/bluetooth/gatt.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -1139,7 +1140,7 @@ static inline int bt_ots_obj_id_to_str(uint64_t obj_id, char *str, size_t len)
 
 	sys_put_le48(obj_id, id);
 
-	return snprintk(str, len, "0x%02X%02X%02X%02X%02X%02X",
+	return snprintf(str, len, "0x%02X%02X%02X%02X%02X%02X",
 			id[5], id[4], id[3], id[2], id[1], id[0]);
 }
 
