@@ -1,9 +1,0 @@
-description: Silabs Gecko Clock Management Unit
-
-compatible: "silabs,series0-cmu"
-
-include: [base.yaml]
-
-properties:
-  reg:
-    required: true

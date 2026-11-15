@@ -1,6 +1,0 @@
-tests:
-  arch.xtensa.load_store_emulation:
-    arch_allow: xtensa
-    filter: CONFIG_SOC_ESP32
-    tags:
-      - kernel
