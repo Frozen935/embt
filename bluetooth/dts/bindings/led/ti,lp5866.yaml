@@ -1,5 +1,0 @@
-description: Texas Instruments LP5866 I2C LED controller node
-
-compatible: "ti,lp5866"
-
-include: ti,lp586x.yaml
