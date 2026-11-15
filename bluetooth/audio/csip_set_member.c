@@ -6,6 +6,11 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
+#include <embt/base/work.h>
+#include <embt/base/time.h>
+#include <embt/osi/sync.h>
+#include <embt/base/assert.h>
+#include <embt/base/util_macro.h>
 #include <sys/types.h>
 #include <errno.h>
 #include <stdbool.h>
@@ -14,25 +19,24 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <zephyr/autoconf.h>
-#include <zephyr/bluetooth/addr.h>
-#include <zephyr/bluetooth/att.h>
-#include <zephyr/bluetooth/audio/csip.h>
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/crypto.h>
-#include <zephyr/bluetooth/gatt.h>
-#include <zephyr/bluetooth/buf.h>
-#include <zephyr/bluetooth/uuid.h>
+#include <embt/autoconf.h>
+#include <embt/bluetooth/addr.h>
+#include <embt/bluetooth/att.h>
+#include <embt/bluetooth/audio/csip.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/crypto.h>
+#include <embt/bluetooth/gatt.h>
+#include <embt/bluetooth/buf.h>
+#include <embt/bluetooth/uuid.h>
 #include <embt/base/log.h>
-#include <zephyr/settings/settings.h>
-#include <zephyr/sys/__assert.h>
-#include <zephyr/sys/atomic.h>
-#include <zephyr/sys/util.h>
-#include <zephyr/sys/util_macro.h>
-#include <zephyr/toolchain.h>
-#include <zephyr/types.h>
-#include <zephyr/sys/byteorder.h>
+#include <embt/settings/settings.h>
+#include <embt/base/assert.h>
+#include <embt/base/atomic.h>
+#include <embt/base/util.h>
+#include <embt/base/util_macro.h>
+#include <embt/compiler.h>
+#include <embt/base/byteorder.h>
 
 #include "../host/conn_internal.h"
 #include "../host/keys.h"
@@ -44,7 +48,7 @@
 #include "csip_internal.h"
 #include "csip_crypto.h"
 
-#define CSIP_SET_LOCK_TIMER_VALUE       K_SECONDS(60)
+#define CSIP_SET_LOCK_TIMER_VALUE       BT_SECONDS(60)
 
 #define CSIS_CHAR_ATTR_COUNT	  3 /* declaration + value + cccd */
 #define CSIS_RANK_CHAR_ATTR_COUNT 2 /* declaration + value */
@@ -70,7 +74,7 @@ struct csip_client {
 	bt_addr_le_t addr;
 
 	/* Pending notification flags */
-	ATOMIC_DEFINE(flags, FLAG_NUM);
+	BT_ATOMIC_DEFINE(flags, FLAG_NUM);
 };
 
 struct bt_csip_set_member_svc_inst {
@@ -84,7 +88,7 @@ struct bt_csip_set_member_svc_inst {
 #if defined(CONFIG_BT_CSIP_SET_MEMBER_LOCK_SUPPORT)
 	uint8_t set_lock;
 	bool lockable;
-	struct k_work_delayable set_lock_timer;
+	struct bt_work_delayable set_lock_timer;
 	bt_addr_le_t lock_client_addr;
 #endif /* CONFIG_BT_CSIP_SET_MEMBER_LOCK_SUPPORT */
 	struct bt_csip_set_member_cb *cb;
@@ -94,12 +98,12 @@ struct bt_csip_set_member_svc_inst {
 	struct bt_gatt_attr attrs[CSIS_MAX_ATTR];
 
 	/* Must be last: exclude from memset during unregister */
-	struct k_mutex mutex;
+	os_mutex_t mutex;
 };
 
 static struct bt_csip_set_member_svc_inst svc_insts[CONFIG_BT_CSIP_SET_MEMBER_MAX_INSTANCE_COUNT];
 
-static void deferred_nfy_work_handler(struct k_work *work);
+static void deferred_nfy_work_handler(struct bt_work *work);
 static void add_bonded_addr_to_client_list(const struct bt_bond_info *info, void *data);
 
 #if defined(CONFIG_BT_SETTINGS)
@@ -120,7 +124,7 @@ SETTINGS_STATIC_HANDLER_DEFINE_WITH_CPRIO(bt_csip_set_member, "bt/csip", NULL, N
 					csip_settings_commit, NULL, BT_SETTINGS_CPRIO_2);
 #endif /* CONFIG_BT_SETTINGS */
 
-static K_WORK_DELAYABLE_DEFINE(deferred_nfy_work, deferred_nfy_work_handler);
+static BT_WORK_DELAYABLE_DEFINE(deferred_nfy_work, deferred_nfy_work_handler);
 
 #if defined(CONFIG_BT_CSIP_SET_MEMBER_LOCK_SUPPORT)
 static bool is_last_client_to_write(const struct bt_csip_set_member_svc_inst *svc_inst,
@@ -135,16 +139,16 @@ static bool is_last_client_to_write(const struct bt_csip_set_member_svc_inst *sv
 }
 #endif /* CONFIG_BT_CSIP_SET_MEMBER_LOCK_SUPPORT */
 
-static void notify_work_reschedule(k_timeout_t delay)
+static void notify_work_reschedule(bt_timeout_t delay)
 {
 	int err;
 
 	/* If it is already scheduled, don't reschedule */
-	if (k_work_delayable_remaining_get(&deferred_nfy_work) > 0) {
+	if (bt_work_delayable_remaining_get(&deferred_nfy_work) > 0) {
 		return;
 	}
 
-	err = k_work_reschedule(&deferred_nfy_work, delay);
+	err = bt_work_reschedule(&deferred_nfy_work, delay);
 	if (err < 0) {
 		LOG_ERR("Failed to reschedule notification work err %d", err);
 	}
@@ -161,20 +165,20 @@ static void notify_clients(struct bt_csip_set_member_svc_inst *svc_inst,
 
 		client = &svc_inst->clients[i];
 
-		if (atomic_test_bit(client->flags, FLAG_ACTIVE)) {
+		if (bt_atomic_test_bit(client->flags, FLAG_ACTIVE)) {
 			if (excluded_client != NULL &&
 			    bt_addr_le_eq(bt_conn_get_dst(excluded_client), &client->addr)) {
 				continue;
 			}
 
-			atomic_set_bit(client->flags, flag);
+			bt_atomic_set_bit(client->flags, flag);
 			submit_work = true;
 		}
 	}
 
 	/* Reschedule work for notifying */
 	if (submit_work) {
-		notify_work_reschedule(K_NO_WAIT);
+		notify_work_reschedule(BT_NO_WAIT);
 	}
 }
 
@@ -428,11 +432,11 @@ static uint8_t set_lock(struct bt_conn *conn,
 			bt_addr_le_copy(&svc_inst->lock_client_addr,
 					bt_conn_get_dst(conn));
 		}
-		(void)k_work_reschedule(&svc_inst->set_lock_timer,
+		(void)bt_work_reschedule(&svc_inst->set_lock_timer,
 					CSIP_SET_LOCK_TIMER_VALUE);
 	} else {
 		bt_addr_le_copy(&svc_inst->lock_client_addr, BT_ADDR_LE_NONE);
-		(void)k_work_cancel_delayable(&svc_inst->set_lock_timer);
+		(void)bt_work_cancel_delayable(&svc_inst->set_lock_timer);
 	}
 
 	LOG_DBG("%u", svc_inst->set_lock);
@@ -527,12 +531,12 @@ static ssize_t read_rank(struct bt_conn *conn, const struct bt_gatt_attr *attr,
 }
 
 #if defined(CONFIG_BT_CSIP_SET_MEMBER_LOCK_SUPPORT)
-static void set_lock_timer_handler(struct k_work *work)
+static void set_lock_timer_handler(struct bt_work *work)
 {
-	struct k_work_delayable *delayable;
+	struct bt_work_delayable *delayable;
 	struct bt_csip_set_member_svc_inst *svc_inst;
 
-	delayable = k_work_delayable_from_work(work);
+	delayable = bt_work_delayable_from_work(work);
 	svc_inst = CONTAINER_OF(delayable, struct bt_csip_set_member_svc_inst,
 				set_lock_timer);
 
@@ -574,7 +578,7 @@ static void csip_security_changed(struct bt_conn *conn, bt_security_t level,
 		for (size_t j = 0U; j < ARRAY_SIZE(svc_inst->clients); j++) {
 			client = &svc_inst->clients[j];
 
-			if (atomic_test_bit(client->flags, FLAG_ACTIVE) &&
+			if (bt_atomic_test_bit(client->flags, FLAG_ACTIVE) &&
 			    bt_addr_le_eq(peer_addr, &client->addr)) {
 				found = true;
 				break;
@@ -592,10 +596,10 @@ static void csip_security_changed(struct bt_conn *conn, bt_security_t level,
 		}
 
 		/* Check if client has pending notifications */
-		if (atomic_test_bit(client->flags, FLAG_NOTIFY_LOCK) ||
-		    atomic_test_bit(client->flags, FLAG_NOTIFY_SIRK) ||
-		    atomic_test_bit(client->flags, FLAG_NOTIFY_SIZE)) {
-			notify_work_reschedule(K_NO_WAIT);
+		if (bt_atomic_test_bit(client->flags, FLAG_NOTIFY_LOCK) ||
+		    bt_atomic_test_bit(client->flags, FLAG_NOTIFY_SIRK) ||
+		    bt_atomic_test_bit(client->flags, FLAG_NOTIFY_SIZE)) {
+			notify_work_reschedule(BT_NO_WAIT);
 			break;
 		}
 	}
@@ -658,7 +662,7 @@ static void handle_csip_auth_complete(struct bt_csip_set_member_svc_inst *svc_in
 
 		client = &svc_inst->clients[i];
 
-		if (atomic_test_bit(client->flags, FLAG_ACTIVE) &&
+		if (bt_atomic_test_bit(client->flags, FLAG_ACTIVE) &&
 		    bt_addr_le_eq(bt_conn_get_dst(conn), &client->addr)) {
 			return;
 		}
@@ -670,12 +674,12 @@ static void handle_csip_auth_complete(struct bt_csip_set_member_svc_inst *svc_in
 
 		client = &svc_inst->clients[i];
 
-		if (!atomic_test_bit(client->flags, FLAG_ACTIVE)) {
-			atomic_set_bit(client->flags, FLAG_ACTIVE);
+		if (!bt_atomic_test_bit(client->flags, FLAG_ACTIVE)) {
+			bt_atomic_set_bit(client->flags, FLAG_ACTIVE);
 			memcpy(&client->addr, bt_conn_get_dst(conn), sizeof(bt_addr_le_t));
 
 			/* Send out all pending notifications */
-			notify_work_reschedule(K_NO_WAIT);
+			notify_work_reschedule(BT_NO_WAIT);
 			return;
 		}
 	}
@@ -721,9 +725,9 @@ static void csip_bond_deleted(uint8_t id, const bt_addr_le_t *peer)
 		for (size_t j = 0U; j < ARRAY_SIZE(svc_inst->clients); j++) {
 
 			/* Check if match, and if active, if so, reset */
-			if (atomic_test_bit(svc_inst->clients[i].flags, FLAG_ACTIVE) &&
+			if (bt_atomic_test_bit(svc_inst->clients[i].flags, FLAG_ACTIVE) &&
 			    bt_addr_le_eq(peer, &svc_inst->clients[i].addr)) {
-				atomic_clear(svc_inst->clients[i].flags);
+				bt_atomic_clear(svc_inst->clients[i].flags);
 				(void)memset(&svc_inst->clients[i].addr, 0, sizeof(bt_addr_le_t));
 				break;
 			}
@@ -828,10 +832,10 @@ static void notify_cb(struct bt_conn *conn, void *data)
 		struct csip_client *client;
 		bool client_found = false;
 
-		err = k_mutex_lock(&svc_inst->mutex, K_NO_WAIT);
+		err = osi_mutex_lock(&svc_inst->mutex, BT_NO_WAIT);
 		if (err != 0) {
 			LOG_DBG("Mutex lock failed (%d) for svc_inst[%zu], rescheduling", err, i);
-			notify_work_reschedule(K_USEC(BT_AUDIO_NOTIFY_RETRY_DELAY_US));
+			notify_work_reschedule(BT_MSEC(bt_time_us_to_ms_ceil(BT_AUDIO_NOTIFY_RETRY_DELAY_US)));
 			continue;
 		}
 
@@ -844,7 +848,7 @@ static void notify_cb(struct bt_conn *conn, void *data)
 
 			client = &svc_inst->clients[j];
 
-			if (atomic_test_bit(client->flags, FLAG_ACTIVE) &&
+			if (bt_atomic_test_bit(client->flags, FLAG_ACTIVE) &&
 			    bt_addr_le_eq(bt_conn_get_dst(conn), &client->addr)) {
 				client_found = true;
 				break;
@@ -856,31 +860,31 @@ static void notify_cb(struct bt_conn *conn, void *data)
 		}
 
 #if defined(CONFIG_BT_CSIP_SET_MEMBER_LOCK_SUPPORT)
-		if (atomic_test_and_clear_bit(client->flags, FLAG_NOTIFY_LOCK)) {
+		if (bt_atomic_test_and_clear_bit(client->flags, FLAG_NOTIFY_LOCK)) {
 			notify(svc_inst, conn, BT_UUID_CSIS_SET_LOCK, &svc_inst->set_lock,
 			       sizeof(svc_inst->set_lock));
 		}
 #endif /* CONFIG_BT_CSIP_SET_MEMBER_LOCK_SUPPORT */
 		if (IS_ENABLED(CONFIG_BT_CSIP_SET_MEMBER_SIRK_NOTIFIABLE) &&
-		    atomic_test_and_clear_bit(client->flags, FLAG_NOTIFY_SIRK)) {
+		    bt_atomic_test_and_clear_bit(client->flags, FLAG_NOTIFY_SIRK)) {
 			notify(svc_inst, conn, BT_UUID_CSIS_SIRK, &svc_inst->sirk,
 			       sizeof(svc_inst->sirk));
 		}
 #if defined(CONFIG_BT_CSIP_SET_MEMBER_SIZE_SUPPORT)
 		if (IS_ENABLED(CONFIG_BT_CSIP_SET_MEMBER_SIZE_NOTIFIABLE) &&
-		    atomic_test_and_clear_bit(client->flags, FLAG_NOTIFY_SIZE)) {
+		    bt_atomic_test_and_clear_bit(client->flags, FLAG_NOTIFY_SIZE)) {
 			notify(svc_inst, conn, BT_UUID_CSIS_SET_SIZE, &svc_inst->set_size,
 			       sizeof(svc_inst->set_size));
 		}
 #endif /* CONFIG_BT_CSIP_SET_MEMBER_SIZE_SUPPORT */
 
 unlock_and_return:
-		err = k_mutex_unlock(&svc_inst->mutex);
+		err = osi_mutex_unlock(&svc_inst->mutex);
 		__ASSERT(err == 0, "Failed to unlock mutex: %d", err);
 	}
 }
 
-static void deferred_nfy_work_handler(struct k_work *work)
+static void deferred_nfy_work_handler(struct bt_work *work)
 {
 	ARG_UNUSED(work);
 
@@ -896,7 +900,7 @@ static void add_bonded_addr_to_client_list(const struct bt_bond_info *info, void
 
 		for (size_t j = 0U; j < ARRAY_SIZE(svc_inst->clients); j++) {
 			/* Check if device is registered, it not, add it */
-			if (!atomic_test_and_set_bit(svc_inst->clients[j].flags, FLAG_ACTIVE)) {
+			if (!bt_atomic_test_and_set_bit(svc_inst->clients[j].flags, FLAG_ACTIVE)) {
 				memcpy(&svc_inst->clients[j].addr, &info->addr,
 				       sizeof(bt_addr_le_t));
 				LOG_DBG("Added %s to bonded list\n",
@@ -1135,7 +1139,7 @@ int bt_csip_set_member_register(const struct bt_csip_set_member_register_param *
 
 	if (!first_register) {
 		for (size_t i = 0U; i < ARRAY_SIZE(svc_insts); i++) {
-			k_mutex_init(&svc_insts[i].mutex);
+			osi_mutex_init(&svc_insts[i].mutex, OS_MUTEX_RECURSIVE);
 		}
 		err = bt_conn_auth_info_cb_register(&auth_callbacks);
 		__ASSERT(err == 0, "Failed to register auth_info callbacks: %d", err);
@@ -1145,7 +1149,7 @@ int bt_csip_set_member_register(const struct bt_csip_set_member_register_param *
 
 	inst = NULL;
 	ARRAY_FOR_EACH_PTR(svc_insts, si) {
-		err = k_mutex_lock(&si->mutex, K_NO_WAIT);
+		err = osi_mutex_lock(&si->mutex, BT_NO_WAIT);
 		if (err != 0) {
 			/* Try the next */
 			continue;
@@ -1155,7 +1159,7 @@ int bt_csip_set_member_register(const struct bt_csip_set_member_register_param *
 			inst = si;
 			break;
 		} else {
-			err = k_mutex_unlock(&si->mutex);
+			err = osi_mutex_unlock(&si->mutex);
 			__ASSERT(err == 0, "Failed to unlock mutex: %d", err);
 		}
 	}
@@ -1173,7 +1177,7 @@ int bt_csip_set_member_register(const struct bt_csip_set_member_register_param *
 
 		LOG_DBG("CSIS service register failed: %d", err);
 		(void)memset(inst, 0, offsetof(struct bt_csip_set_member_svc_inst, mutex));
-		mutex_err = k_mutex_unlock(&inst->mutex);
+		mutex_err = osi_mutex_unlock(&inst->mutex);
 		__ASSERT(mutex_err == 0, "Failed to unlock mutex: %d", mutex_err);
 		return err;
 	}
@@ -1186,7 +1190,7 @@ int bt_csip_set_member_register(const struct bt_csip_set_member_register_param *
 	inst->sirk.type = BT_CSIP_SIRK_TYPE_PLAIN;
 	inst->cb = param->cb;
 #if defined(CONFIG_BT_CSIP_SET_MEMBER_LOCK_SUPPORT)
-	k_work_init_delayable(&inst->set_lock_timer,
+	bt_work_init_delayable(&inst->set_lock_timer,
 			      set_lock_timer_handler);
 	inst->set_lock = BT_CSIP_RELEASE_VALUE;
 	inst->lockable = param->lockable;
@@ -1206,7 +1210,7 @@ int bt_csip_set_member_register(const struct bt_csip_set_member_register_param *
 
 	*svc_inst = inst;
 
-	err = k_mutex_unlock(&inst->mutex);
+	err = osi_mutex_unlock(&inst->mutex);
 	__ASSERT(err == 0, "Failed to unlock mutex: %d", err);
 
 	return 0;
@@ -1221,7 +1225,7 @@ int bt_csip_set_member_unregister(struct bt_csip_set_member_svc_inst *svc_inst)
 		return -EINVAL;
 	}
 
-	err = k_mutex_lock(&svc_inst->mutex, K_NO_WAIT);
+	err = osi_mutex_lock(&svc_inst->mutex, BT_NO_WAIT);
 	if (err != 0) {
 		LOG_DBG("Failed to lock mutex");
 		return -EBUSY;
@@ -1232,18 +1236,18 @@ int bt_csip_set_member_unregister(struct bt_csip_set_member_svc_inst *svc_inst)
 		int mutex_err;
 
 		LOG_DBG("CSIS service unregister failed: %d", err);
-		mutex_err = k_mutex_unlock(&svc_inst->mutex);
+		mutex_err = osi_mutex_unlock(&svc_inst->mutex);
 		__ASSERT(mutex_err == 0, "Failed to unlock mutex: %d", mutex_err);
 
 		return err;
 	}
 
 #if defined(CONFIG_BT_CSIP_SET_MEMBER_LOCK_SUPPORT)
-	(void)k_work_cancel_delayable(&svc_inst->set_lock_timer);
+	(void)bt_work_cancel_delayable(&svc_inst->set_lock_timer);
 #endif /* CONFIG_BT_CSIP_SET_MEMBER_LOCK_SUPPORT */
 	memset(svc_inst, 0, offsetof(struct bt_csip_set_member_svc_inst, mutex));
 
-	err = k_mutex_unlock(&svc_inst->mutex);
+	err = osi_mutex_unlock(&svc_inst->mutex);
 	__ASSERT(err == 0, "Failed to unlock mutex: %d", err);
 
 	return 0;
@@ -1395,3 +1399,14 @@ int bt_csip_set_member_lock(struct bt_csip_set_member_svc_inst *svc_inst,
 	}
 }
 #endif /* CONFIG_BT_CSIP_SET_MEMBER_LOCK_SUPPORT */
+
+int bt_audio_csip_set_member_register(void)
+{
+	int err;
+
+	err = bt_conn_cb_register(&bt_conn_cb_conn_callbacks);
+	if (err && err != -EEXIST) {
+		return err;
+	}
+	return 0;
+}

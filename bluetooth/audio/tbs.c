@@ -7,6 +7,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <embt/base/work.h>
+#include <embt/base/time.h>
+#include <embt/osi/sync.h>
+#include <embt/base/assert.h>
+#include <embt/base/util_macro.h>
 #include <errno.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -15,27 +20,25 @@
 #include <ctype.h>
 #include <sys/types.h>
 
-#include <zephyr/autoconf.h>
-#include <zephyr/bluetooth/assigned_numbers.h>
-#include <zephyr/bluetooth/att.h>
-#include <zephyr/bluetooth/audio/ccid.h>
-#include <zephyr/bluetooth/audio/tbs.h>
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/gatt.h>
-#include <zephyr/bluetooth/uuid.h>
+#include <embt/autoconf.h>
+#include <embt/bluetooth/assigned_numbers.h>
+#include <embt/bluetooth/att.h>
+#include <embt/bluetooth/audio/ccid.h>
+#include <embt/bluetooth/audio/tbs.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/gatt.h>
+#include <embt/bluetooth/uuid.h>
 #include <embt/base/log.h>
-#include <zephyr/net_buf.h>
-#include <zephyr/sys/__assert.h>
-#include <zephyr/sys/atomic.h>
-#include <zephyr/sys/byteorder.h>
-#include <zephyr/sys/time_units.h>
-#include <zephyr/sys/util.h>
-#include <zephyr/sys/util_macro.h>
-#include <zephyr/sys/util_utf8.h>
-#include <zephyr/toolchain.h>
-#include <zephyr/types.h>
-
+#include <embt/net_buf.h>
+#include <embt/base/assert.h>
+#include <embt/base/atomic.h>
+#include <embt/base/byteorder.h>
+#include <embt/base/time.h>
+#include <embt/base/util.h>
+#include <embt/base/util_macro.h>
+#include <embt/base/utf8.h>
+#include <embt/compiler.h>
 #include "audio_internal.h"
 #include "tbs_internal.h"
 #include "common/bt_str.h"
@@ -43,7 +46,7 @@
 LOG_MODULE_REGISTER(bt_tbs, CONFIG_BT_TBS_LOG_LEVEL);
 
 #define BT_TBS_VALID_STATUS_FLAGS(val) ((val) <= (BIT(0U) | BIT(1U)))
-#define MUTEX_TIMEOUT                  K_MSEC(CONFIG_BT_TBS_LOCK_TIMEOUT)
+#define MUTEX_TIMEOUT                  BT_MSEC(CONFIG_BT_TBS_LOCK_TIMEOUT)
 
 struct tbs_flags {
 	bool bearer_provider_name_changed: 1;
@@ -89,7 +92,7 @@ struct tbs_inst {
 	struct bt_tbs_call calls[CONFIG_BT_TBS_MAX_CALLS];
 
 	bool pending_signal_strength_notification;
-	struct k_work_delayable reporting_interval_work;
+	struct bt_work_delayable reporting_interval_work;
 
 	/** Service Attributes */
 	const struct bt_gatt_attr *attrs;
@@ -113,12 +116,12 @@ struct tbs_inst {
 		bool pending: 1;
 	} cp_ntf;
 
-	struct k_work_delayable notify_work;
+	struct bt_work_delayable notify_work;
 };
 
 static struct tbs_inst svc_insts[CONFIG_BT_TBS_BEARER_COUNT];
 static struct tbs_inst gtbs_inst;
-static K_MUTEX_DEFINE(tbs_mutex);
+static os_mutex_t tbs_mutex;
 
 static bool try_change_dialing_call_to_alerting(struct tbs_inst *inst);
 
@@ -379,7 +382,7 @@ static void disconnected(struct bt_conn *conn, uint8_t reason)
 
 	conn_index = bt_conn_index(conn);
 
-	err = k_mutex_lock(&tbs_mutex, MUTEX_TIMEOUT);
+	err = osi_mutex_lock(&tbs_mutex, MUTEX_TIMEOUT);
 	if (err != 0) {
 		LOG_WRN("Failed to take mutex: %d", err);
 		/* In this case we still need to clear the data, so continue and hope for
@@ -411,7 +414,7 @@ static void disconnected(struct bt_conn *conn, uint8_t reason)
 
 	if (err == 0) { /* if mutex was locked */
 		(void)try_change_dialing_call_to_alerting(&gtbs_inst);
-		err = k_mutex_unlock(&tbs_mutex);
+		err = osi_mutex_unlock(&tbs_mutex);
 		__ASSERT(err == 0, "Failed to unlock mutex: %d", err);
 	}
 }
@@ -470,18 +473,18 @@ static void set_value_changed_cb(struct bt_conn *conn, void *data)
 		/* We may schedule the same work multiple times, but that is OK as scheduling the
 		 * same work multiple times is a no-op
 		 */
-		err = k_work_schedule(&inst->notify_work, K_NO_WAIT);
+		err = bt_work_schedule(&inst->notify_work, BT_NO_WAIT);
 		__ASSERT(err >= 0, "Failed to schedule work: %d", err);
 	} else {
 		/* Not subscribed, set the specific flag based on the provided callback */
 		cb_info->value_cb(flags, false);
 
-		/* Check if all flags are cleared, and if so then cancel any pending k_work */
+		/* Check if all flags are cleared, and if so then cancel any pending bt_work */
 		/* Ideally only _changed flags would be checked, but _dirty flags are
 		 * included too. A cleaner check would require splitting the struct
 		 */
 		if (util_memeq(flags, &(struct tbs_flags){0}, sizeof(*flags))) {
-			(void)k_work_cancel_delayable(&inst->notify_work);
+			(void)bt_work_cancel_delayable(&inst->notify_work);
 		}
 	}
 }
@@ -1027,7 +1030,7 @@ static void notify_handler_cb(struct bt_conn *conn, void *data)
 		notify_handler_cb(conn, &gtbs_inst);
 	}
 
-	err = k_mutex_lock(&tbs_mutex, MUTEX_TIMEOUT);
+	err = osi_mutex_lock(&tbs_mutex, MUTEX_TIMEOUT);
 	if (err != 0) {
 		LOG_DBG("Failed to take mutex: %d", err);
 		goto reschedule;
@@ -1210,21 +1213,21 @@ fail:
 	if (err != 0) {
 		LOG_DBG("Notify failed (%d), retrying next connection interval", err);
 reschedule:
-		err = k_work_reschedule(&inst->notify_work,
-					K_USEC(info.le.interval_us));
+		err = bt_work_reschedule(&inst->notify_work,
+					BT_MSEC(bt_time_us_to_ms_ceil(info.le.interval_us)));
 		__ASSERT(err >= 0, "Failed to reschedule work: %d", err);
 	}
 
 	if (locked) {
-		err = k_mutex_unlock(&tbs_mutex);
+		err = osi_mutex_unlock(&tbs_mutex);
 		__ASSERT(err == 0, "Failed to unlock mutex: %d", err);
 	}
 }
 
-static void notify_work_handler(struct k_work *work)
+static void notify_work_handler(struct bt_work *work)
 {
 	struct tbs_inst *inst =
-		CONTAINER_OF(k_work_delayable_from_work(work), struct tbs_inst, notify_work);
+		CONTAINER_OF(bt_work_delayable_from_work(work), struct tbs_inst, notify_work);
 
 	bt_conn_foreach(BT_CONN_TYPE_LE, notify_handler_cb, inst);
 }
@@ -1237,7 +1240,7 @@ static ssize_t read_provider_name(struct bt_conn *conn, const struct bt_gatt_att
 	ssize_t ret;
 	int err;
 
-	err = k_mutex_lock(&tbs_mutex, MUTEX_TIMEOUT);
+	err = osi_mutex_lock(&tbs_mutex, MUTEX_TIMEOUT);
 	if (err != 0) {
 		LOG_DBG("Failed to lock mutex");
 		return -EBUSY;
@@ -1255,7 +1258,7 @@ static ssize_t read_provider_name(struct bt_conn *conn, const struct bt_gatt_att
 					strlen(inst->provider_name));
 	}
 
-	err = k_mutex_unlock(&tbs_mutex);
+	err = osi_mutex_unlock(&tbs_mutex);
 	__ASSERT(err == 0, "Failed to unlock mutex: %d", err);
 
 	return ret;
@@ -1266,13 +1269,13 @@ static void cfg_changed_clear_pending(struct tbs_inst *inst, uint16_t value,
 				      const struct bt_uuid *uuid)
 {
 	if (value == 0U) {
-		int err = k_mutex_lock(&tbs_mutex, MUTEX_TIMEOUT);
+		int err = osi_mutex_lock(&tbs_mutex, MUTEX_TIMEOUT);
 
 		if (err != 0) {
 			LOG_DBG("Failed to lock mutex");
 		} else {
 			set_value_changed(inst, value_cb, uuid);
-			err = k_mutex_unlock(&tbs_mutex);
+			err = osi_mutex_unlock(&tbs_mutex);
 			__ASSERT(err == 0, "Failed to unlock mutex: %d", err);
 		}
 	}
@@ -1331,7 +1334,7 @@ static ssize_t read_uri_scheme_list(struct bt_conn *conn, const struct bt_gatt_a
 	ssize_t ret;
 	int err;
 
-	err = k_mutex_lock(&tbs_mutex, MUTEX_TIMEOUT);
+	err = osi_mutex_lock(&tbs_mutex, MUTEX_TIMEOUT);
 	if (err != 0) {
 		LOG_DBG("Failed to lock mutex");
 		return -EBUSY;
@@ -1347,7 +1350,7 @@ static ssize_t read_uri_scheme_list(struct bt_conn *conn, const struct bt_gatt_a
 		ret = bt_gatt_attr_read(conn, attr, buf, len, offset, read_buf.data, read_buf.len);
 	}
 
-	err = k_mutex_unlock(&tbs_mutex);
+	err = osi_mutex_unlock(&tbs_mutex);
 	__ASSERT(err == 0, "Failed to unlock mutex: %d", err);
 
 	return ret;
@@ -1443,7 +1446,7 @@ static void current_calls_cfg_changed(const struct bt_gatt_attr *attr, uint16_t 
 	LOG_DBG("Index %u: value 0x%04x", inst_index(inst), value);
 
 	if (value == 0U) {
-		int err = k_mutex_lock(&tbs_mutex, MUTEX_TIMEOUT);
+		int err = osi_mutex_lock(&tbs_mutex, MUTEX_TIMEOUT);
 
 		if (err != 0) {
 			LOG_DBG("Failed to lock mutex: %d", err);
@@ -1456,7 +1459,7 @@ static void current_calls_cfg_changed(const struct bt_gatt_attr *attr, uint16_t 
 		set_value_changed(inst, set_list_current_calls_changed_cb,
 				  BT_UUID_TBS_LIST_CURRENT_CALLS);
 
-		err = k_mutex_unlock(&tbs_mutex);
+		err = osi_mutex_unlock(&tbs_mutex);
 		__ASSERT(err == 0, "Failed to unlock mutex: %d", err);
 	}
 }
@@ -1469,7 +1472,7 @@ static ssize_t read_current_calls(struct bt_conn *conn, const struct bt_gatt_att
 	ssize_t ret;
 	int err;
 
-	err = k_mutex_lock(&tbs_mutex, MUTEX_TIMEOUT);
+	err = osi_mutex_lock(&tbs_mutex, MUTEX_TIMEOUT);
 	if (err != 0) {
 		LOG_DBG("Failed to lock mutex");
 		return -EBUSY;
@@ -1492,7 +1495,7 @@ static ssize_t read_current_calls(struct bt_conn *conn, const struct bt_gatt_att
 		ret = bt_gatt_attr_read(conn, attr, buf, len, offset, read_buf.data, read_buf.len);
 	}
 
-	err = k_mutex_unlock(&tbs_mutex);
+	err = osi_mutex_unlock(&tbs_mutex);
 	__ASSERT(err == 0, "Failed to unlock mutex: %d", err);
 
 	return ret;
@@ -1540,7 +1543,7 @@ static ssize_t read_incoming_uri(struct bt_conn *conn, const struct bt_gatt_attr
 	ssize_t ret;
 	int err;
 
-	err = k_mutex_lock(&tbs_mutex, MUTEX_TIMEOUT);
+	err = osi_mutex_lock(&tbs_mutex, MUTEX_TIMEOUT);
 	if (err != 0) {
 		LOG_DBG("Failed to lock mutex");
 		return -EBUSY;
@@ -1571,7 +1574,7 @@ static ssize_t read_incoming_uri(struct bt_conn *conn, const struct bt_gatt_attr
 		}
 	}
 
-	err = k_mutex_unlock(&tbs_mutex);
+	err = osi_mutex_unlock(&tbs_mutex);
 	__ASSERT(err == 0, "Failed to unlock mutex: %d", err);
 
 	return ret;
@@ -1598,7 +1601,7 @@ static ssize_t read_call_state(struct bt_conn *conn, const struct bt_gatt_attr *
 	ssize_t ret;
 	int err;
 
-	err = k_mutex_lock(&tbs_mutex, MUTEX_TIMEOUT);
+	err = osi_mutex_lock(&tbs_mutex, MUTEX_TIMEOUT);
 	if (err != 0) {
 		LOG_DBG("Failed to lock mutex");
 		return -EBUSY;
@@ -1621,7 +1624,7 @@ static ssize_t read_call_state(struct bt_conn *conn, const struct bt_gatt_attr *
 		ret = bt_gatt_attr_read(conn, attr, buf, len, offset, read_buf.data, read_buf.len);
 	}
 
-	err = k_mutex_unlock(&tbs_mutex);
+	err = osi_mutex_unlock(&tbs_mutex);
 	__ASSERT(err == 0, "Failed to unlock mutex: %d", err);
 
 	return ret;
@@ -1638,7 +1641,7 @@ static void call_state_cfg_changed(const struct bt_gatt_attr *attr, uint16_t val
 	LOG_DBG("Index %u: value 0x%04x", inst_index(inst), value);
 
 	if (value == 0U) {
-		int err = k_mutex_lock(&tbs_mutex, MUTEX_TIMEOUT);
+		int err = osi_mutex_lock(&tbs_mutex, MUTEX_TIMEOUT);
 
 		if (err != 0) {
 			LOG_DBG("Failed to lock mutex: %d", err);
@@ -1650,7 +1653,7 @@ static void call_state_cfg_changed(const struct bt_gatt_attr *attr, uint16_t val
 		/* Clear any pending notifications for any connections that unsubscribe */
 		set_value_changed(inst, set_call_state_changed_cb, BT_UUID_TBS_CALL_STATE);
 
-		err = k_mutex_unlock(&tbs_mutex);
+		err = osi_mutex_unlock(&tbs_mutex);
 		__ASSERT(err == 0, "Failed to unlock mutex: %d", err);
 	}
 }
@@ -2007,14 +2010,14 @@ static ssize_t write_call_cp(struct bt_conn *conn, const struct bt_gatt_attr *at
 	LOG_DBG("Index %u: Processing the %s opcode", inst_index(inst),
 		bt_tbs_opcode_str(ccp->opcode));
 
-	err = k_mutex_lock(&tbs_mutex, MUTEX_TIMEOUT);
+	err = osi_mutex_lock(&tbs_mutex, MUTEX_TIMEOUT);
 	if (err != 0) {
 		LOG_DBG("Failed to lock mutex");
 		return -EBUSY;
 	}
 
 	if (inst->cp_ntf.pending) {
-		err = k_mutex_unlock(&tbs_mutex);
+		err = osi_mutex_unlock(&tbs_mutex);
 		__ASSERT(err == 0, "Failed to unlock mutex: %d", err);
 
 		return BT_GATT_ERR(BT_TBS_RESULT_CODE_OPERATION_NOT_POSSIBLE);
@@ -2159,11 +2162,11 @@ static ssize_t write_call_cp(struct bt_conn *conn, const struct bt_gatt_attr *at
 		/* We may schedule the same work multiple times, but that is OK as scheduling the
 		 * same work multiple times is a no-op
 		 */
-		err = k_work_schedule(&inst->notify_work, K_NO_WAIT);
+		err = bt_work_schedule(&inst->notify_work, BT_NO_WAIT);
 		__ASSERT(err >= 0, "Failed to schedule work: %d", err);
 	} /* else local operation; don't notify */
 
-	err = k_mutex_unlock(&tbs_mutex);
+	err = osi_mutex_unlock(&tbs_mutex);
 	__ASSERT(err == 0, "Failed to unlock mutex: %d", err);
 
 	if (calls_changed) {
@@ -2211,7 +2214,7 @@ static void call_cp_cfg_changed(const struct bt_gatt_attr *attr, uint16_t value)
 
 	/* Clear the pending notification only when its owning connection unsubscribes */
 	if (value == 0U) {
-		int err = k_mutex_lock(&tbs_mutex, MUTEX_TIMEOUT);
+		int err = osi_mutex_lock(&tbs_mutex, MUTEX_TIMEOUT);
 
 		if (err != 0) {
 			LOG_DBG("Failed to lock mutex");
@@ -2220,7 +2223,7 @@ static void call_cp_cfg_changed(const struct bt_gatt_attr *attr, uint16_t value)
 				inst->cp_ntf.pending = false;
 			}
 
-			err = k_mutex_unlock(&tbs_mutex);
+			err = osi_mutex_unlock(&tbs_mutex);
 			__ASSERT(err == 0, "Failed to unlock mutex: %d", err);
 		}
 	}
@@ -2260,7 +2263,7 @@ static ssize_t read_friendly_name(struct bt_conn *conn, const struct bt_gatt_att
 	ssize_t ret;
 	int err;
 
-	err = k_mutex_lock(&tbs_mutex, MUTEX_TIMEOUT);
+	err = osi_mutex_lock(&tbs_mutex, MUTEX_TIMEOUT);
 	if (err != 0) {
 		LOG_DBG("Failed to lock mutex");
 		return -EBUSY;
@@ -2289,7 +2292,7 @@ static ssize_t read_friendly_name(struct bt_conn *conn, const struct bt_gatt_att
 		}
 	}
 
-	err = k_mutex_unlock(&tbs_mutex);
+	err = osi_mutex_unlock(&tbs_mutex);
 	__ASSERT(err == 0, "Failed to unlock mutex: %d", err);
 
 	return ret;
@@ -2315,7 +2318,7 @@ static ssize_t read_incoming_call(struct bt_conn *conn, const struct bt_gatt_att
 	ssize_t ret;
 	int err;
 
-	err = k_mutex_lock(&tbs_mutex, MUTEX_TIMEOUT);
+	err = osi_mutex_lock(&tbs_mutex, MUTEX_TIMEOUT);
 	if (err != 0) {
 		LOG_DBG("Failed to lock mutex");
 		return -EBUSY;
@@ -2344,7 +2347,7 @@ static ssize_t read_incoming_call(struct bt_conn *conn, const struct bt_gatt_att
 		}
 	}
 
-	err = k_mutex_unlock(&tbs_mutex);
+	err = osi_mutex_unlock(&tbs_mutex);
 	__ASSERT(err == 0, "Failed to unlock mutex: %d", err);
 
 	return ret;
@@ -2465,9 +2468,9 @@ static struct bt_gatt_service gtbs_svc =
 BT_GATT_SERVICE_INSTANCE_DEFINE(tbs_service_list, svc_insts, CONFIG_BT_TBS_BEARER_COUNT,
 				BT_TBS_SERVICE_DEFINITION);
 
-static void signal_interval_timeout(struct k_work *work)
+static void signal_interval_timeout(struct bt_work *work)
 {
-	struct k_work_delayable *dwork = k_work_delayable_from_work(work);
+	struct bt_work_delayable *dwork = bt_work_delayable_from_work(work);
 	struct tbs_inst *inst = CONTAINER_OF(dwork, struct tbs_inst, reporting_interval_work);
 
 	if (!inst->pending_signal_strength_notification) {
@@ -2478,8 +2481,8 @@ static void signal_interval_timeout(struct k_work *work)
 			    sizeof(inst->signal_strength));
 
 	if (inst->signal_strength_interval) {
-		k_work_reschedule(&inst->reporting_interval_work,
-				  K_SECONDS(inst->signal_strength_interval));
+		bt_work_reschedule(&inst->reporting_interval_work,
+				  BT_SECONDS(inst->signal_strength_interval));
 	}
 
 	inst->pending_signal_strength_notification = false;
@@ -2509,8 +2512,8 @@ static int tbs_inst_init_and_register(struct tbs_inst *inst, struct bt_gatt_serv
 	inst->attr_count = svc->attr_count;
 	inst->authorization_required = param->authorization_required;
 
-	k_work_init_delayable(&inst->reporting_interval_work, signal_interval_timeout);
-	k_work_init_delayable(&inst->notify_work, notify_work_handler);
+	bt_work_init_delayable(&inst->reporting_interval_work, signal_interval_timeout);
+	bt_work_init_delayable(&inst->notify_work, notify_work_handler);
 
 	ret = bt_gatt_service_register(svc);
 	if (ret != 0) {
@@ -2649,7 +2652,7 @@ int bt_tbs_unregister_bearer(uint8_t bearer_index)
 {
 	struct tbs_inst *inst = inst_lookup_index(bearer_index);
 	struct bt_gatt_service *svc;
-	struct k_work_sync sync;
+	struct bt_work_sync sync;
 	bool restart_reporting_interval;
 	int err;
 
@@ -2681,7 +2684,7 @@ int bt_tbs_unregister_bearer(uint8_t bearer_index)
 	}
 
 	restart_reporting_interval =
-		k_work_cancel_delayable_sync(&inst->reporting_interval_work, &sync);
+		bt_work_cancel_delayable_sync(&inst->reporting_interval_work, &sync);
 
 	err = bt_gatt_service_unregister(svc);
 	if (err != 0) {
@@ -2689,13 +2692,13 @@ int bt_tbs_unregister_bearer(uint8_t bearer_index)
 
 		if (restart_reporting_interval && inst->signal_strength_interval != 0U) {
 			/* In this unlikely scenario we may report interval later than expected if
-			 * the k_work was cancelled right before it was set to trigger. It is not a
+			 * the bt_work was cancelled right before it was set to trigger. It is not a
 			 * big deal and not worth trying to reschedule in a way that it would
 			 * trigger at the same time again, as specific timing over GATT is a wishful
 			 * dream anyways
 			 */
-			k_work_schedule(&inst->reporting_interval_work,
-					K_SECONDS(inst->signal_strength_interval));
+			bt_work_schedule(&inst->reporting_interval_work,
+					BT_SECONDS(inst->signal_strength_interval));
 		}
 
 		return -ENOEXEC;
@@ -2721,7 +2724,7 @@ int bt_tbs_accept(uint8_t call_index)
 		return BT_TBS_RESULT_CODE_INVALID_CALL_INDEX;
 	}
 
-	err = k_mutex_lock(&tbs_mutex, K_NO_WAIT);
+	err = osi_mutex_lock(&tbs_mutex, BT_NO_WAIT);
 	if (err != 0) {
 		LOG_DBG("Failed to lock mutex");
 		return -EBUSY;
@@ -2732,7 +2735,7 @@ int bt_tbs_accept(uint8_t call_index)
 		notify_calls(inst);
 	}
 
-	err = k_mutex_unlock(&tbs_mutex);
+	err = osi_mutex_unlock(&tbs_mutex);
 	__ASSERT(err == 0, "Failed to unlock mutex: %d", err);
 
 	return ret;
@@ -2753,7 +2756,7 @@ int bt_tbs_hold(uint8_t call_index)
 		return BT_TBS_RESULT_CODE_INVALID_CALL_INDEX;
 	}
 
-	err = k_mutex_lock(&tbs_mutex, K_NO_WAIT);
+	err = osi_mutex_lock(&tbs_mutex, BT_NO_WAIT);
 	if (err != 0) {
 		LOG_DBG("Failed to lock mutex");
 		return -EBUSY;
@@ -2764,7 +2767,7 @@ int bt_tbs_hold(uint8_t call_index)
 		notify_calls(inst);
 	}
 
-	err = k_mutex_unlock(&tbs_mutex);
+	err = osi_mutex_unlock(&tbs_mutex);
 	__ASSERT(err == 0, "Failed to unlock mutex: %d", err);
 
 	return ret;
@@ -2785,7 +2788,7 @@ int bt_tbs_retrieve(uint8_t call_index)
 		return BT_TBS_RESULT_CODE_INVALID_CALL_INDEX;
 	}
 
-	err = k_mutex_lock(&tbs_mutex, K_NO_WAIT);
+	err = osi_mutex_lock(&tbs_mutex, BT_NO_WAIT);
 	if (err != 0) {
 		LOG_DBG("Failed to lock mutex");
 		return -EBUSY;
@@ -2796,7 +2799,7 @@ int bt_tbs_retrieve(uint8_t call_index)
 		notify_calls(inst);
 	}
 
-	err = k_mutex_unlock(&tbs_mutex);
+	err = osi_mutex_unlock(&tbs_mutex);
 	__ASSERT(err == 0, "Failed to unlock mutex: %d", err);
 
 	return ret;
@@ -2817,7 +2820,7 @@ int bt_tbs_terminate(uint8_t call_index)
 		return BT_TBS_RESULT_CODE_INVALID_CALL_INDEX;
 	}
 
-	err = k_mutex_lock(&tbs_mutex, K_NO_WAIT);
+	err = osi_mutex_lock(&tbs_mutex, BT_NO_WAIT);
 	if (err != 0) {
 		LOG_DBG("Failed to lock mutex");
 		return -EBUSY;
@@ -2828,7 +2831,7 @@ int bt_tbs_terminate(uint8_t call_index)
 		notify_calls(inst);
 	}
 
-	err = k_mutex_unlock(&tbs_mutex);
+	err = osi_mutex_unlock(&tbs_mutex);
 	__ASSERT(err == 0, "Failed to unlock mutex: %d", err);
 
 	return ret;
@@ -2874,7 +2877,7 @@ int bt_tbs_originate(uint8_t bearer_index, char *remote_uri, uint8_t *call_index
 		target_inst = inst;
 	}
 
-	err = k_mutex_lock(&tbs_mutex, K_NO_WAIT);
+	err = osi_mutex_lock(&tbs_mutex, BT_NO_WAIT);
 	if (err != 0) {
 		LOG_DBG("Failed to lock mutex");
 		return -EBUSY;
@@ -2890,7 +2893,7 @@ int bt_tbs_originate(uint8_t bearer_index, char *remote_uri, uint8_t *call_index
 	 */
 	(void)try_change_dialing_call_to_alerting(target_inst);
 
-	err = k_mutex_unlock(&tbs_mutex);
+	err = osi_mutex_unlock(&tbs_mutex);
 	__ASSERT(err == 0, "Failed to unlock mutex: %d", err);
 
 	return ret;
@@ -2921,7 +2924,7 @@ int bt_tbs_join(uint8_t call_index_cnt, uint8_t *call_indexes)
 		return BT_TBS_RESULT_CODE_INVALID_CALL_INDEX;
 	}
 
-	err = k_mutex_lock(&tbs_mutex, K_NO_WAIT);
+	err = osi_mutex_lock(&tbs_mutex, BT_NO_WAIT);
 	if (err != 0) {
 		LOG_DBG("Failed to lock mutex");
 		return -EBUSY;
@@ -2935,7 +2938,7 @@ int bt_tbs_join(uint8_t call_index_cnt, uint8_t *call_indexes)
 		notify_calls(inst);
 	}
 
-	err = k_mutex_unlock(&tbs_mutex);
+	err = osi_mutex_unlock(&tbs_mutex);
 	__ASSERT(err == 0, "Failed to unlock mutex: %d", err);
 
 	return ret;
@@ -2953,7 +2956,7 @@ int bt_tbs_remote_answer(uint8_t call_index)
 		return BT_TBS_RESULT_CODE_INVALID_CALL_INDEX;
 	}
 
-	err = k_mutex_lock(&tbs_mutex, K_NO_WAIT);
+	err = osi_mutex_lock(&tbs_mutex, BT_NO_WAIT);
 	if (err != 0) {
 		LOG_DBG("Failed to lock mutex");
 		return -EBUSY;
@@ -2972,7 +2975,7 @@ int bt_tbs_remote_answer(uint8_t call_index)
 		ret = BT_TBS_RESULT_CODE_STATE_MISMATCH;
 	}
 
-	err = k_mutex_unlock(&tbs_mutex);
+	err = osi_mutex_unlock(&tbs_mutex);
 	__ASSERT(err == 0, "Failed to unlock mutex: %d", err);
 
 	return ret;
@@ -2994,7 +2997,7 @@ int bt_tbs_remote_hold(uint8_t call_index)
 		return BT_TBS_RESULT_CODE_INVALID_CALL_INDEX;
 	}
 
-	err = k_mutex_lock(&tbs_mutex, K_NO_WAIT);
+	err = osi_mutex_lock(&tbs_mutex, BT_NO_WAIT);
 	if (err != 0) {
 		LOG_DBG("Failed to lock mutex");
 		return -EBUSY;
@@ -3014,7 +3017,7 @@ int bt_tbs_remote_hold(uint8_t call_index)
 		notify_calls(inst);
 	}
 
-	err = k_mutex_unlock(&tbs_mutex);
+	err = osi_mutex_unlock(&tbs_mutex);
 	__ASSERT(err == 0, "Failed to unlock mutex: %d", err);
 
 	return ret;
@@ -3036,7 +3039,7 @@ int bt_tbs_remote_retrieve(uint8_t call_index)
 		return BT_TBS_RESULT_CODE_INVALID_CALL_INDEX;
 	}
 
-	err = k_mutex_lock(&tbs_mutex, K_NO_WAIT);
+	err = osi_mutex_lock(&tbs_mutex, BT_NO_WAIT);
 	if (err != 0) {
 		LOG_DBG("Failed to lock mutex");
 		return -EBUSY;
@@ -3055,7 +3058,7 @@ int bt_tbs_remote_retrieve(uint8_t call_index)
 		notify_calls(inst);
 	}
 
-	err = k_mutex_unlock(&tbs_mutex);
+	err = osi_mutex_unlock(&tbs_mutex);
 	__ASSERT(err == 0, "Failed to unlock mutex: %d", err);
 
 	return ret;
@@ -3076,7 +3079,7 @@ int bt_tbs_remote_terminate(uint8_t call_index)
 		return BT_TBS_RESULT_CODE_INVALID_CALL_INDEX;
 	}
 
-	err = k_mutex_lock(&tbs_mutex, K_NO_WAIT);
+	err = osi_mutex_lock(&tbs_mutex, BT_NO_WAIT);
 	if (err != 0) {
 		LOG_DBG("Failed to lock mutex");
 		return -EBUSY;
@@ -3087,7 +3090,7 @@ int bt_tbs_remote_terminate(uint8_t call_index)
 		notify_calls(inst);
 	}
 
-	err = k_mutex_unlock(&tbs_mutex);
+	err = osi_mutex_unlock(&tbs_mutex);
 	__ASSERT(err == 0, "Failed to unlock mutex: %d", err);
 
 	return ret;
@@ -3142,7 +3145,7 @@ int bt_tbs_remote_incoming(uint8_t bearer_index, const char *to, const char *fro
 		return -ENOMEM;
 	}
 
-	err = k_mutex_lock(&tbs_mutex, K_NO_WAIT);
+	err = osi_mutex_lock(&tbs_mutex, BT_NO_WAIT);
 	if (err != 0) {
 		LOG_DBG("Failed to lock mutex");
 		return -EBUSY;
@@ -3161,7 +3164,7 @@ int bt_tbs_remote_incoming(uint8_t bearer_index, const char *to, const char *fro
 
 	notify_calls(inst);
 
-	err = k_mutex_unlock(&tbs_mutex);
+	err = osi_mutex_unlock(&tbs_mutex);
 	__ASSERT(err == 0, "Failed to unlock mutex: %d", err);
 
 	LOG_DBG("New call with call index %u", call->index);
@@ -3185,7 +3188,7 @@ int bt_tbs_set_bearer_provider_name(uint8_t bearer_index, const char *name)
 		return 0;
 	}
 
-	err = k_mutex_lock(&tbs_mutex, K_NO_WAIT);
+	err = osi_mutex_lock(&tbs_mutex, BT_NO_WAIT);
 	if (err != 0) {
 		LOG_DBG("Failed to lock mutex");
 		return -EBUSY;
@@ -3195,7 +3198,7 @@ int bt_tbs_set_bearer_provider_name(uint8_t bearer_index, const char *name)
 
 	set_value_changed(inst, set_bearer_provider_name_changed_cb, BT_UUID_TBS_PROVIDER_NAME);
 
-	err = k_mutex_unlock(&tbs_mutex);
+	err = osi_mutex_unlock(&tbs_mutex);
 	__ASSERT(err == 0, "Failed to unlock mutex: %d", err);
 
 	return 0;
@@ -3216,7 +3219,7 @@ int bt_tbs_set_bearer_technology(uint8_t bearer_index, enum bt_bearer_tech new_t
 		return 0;
 	}
 
-	err = k_mutex_lock(&tbs_mutex, K_NO_WAIT);
+	err = osi_mutex_lock(&tbs_mutex, BT_NO_WAIT);
 	if (err != 0) {
 		LOG_DBG("Failed to lock mutex");
 		return -EBUSY;
@@ -3226,7 +3229,7 @@ int bt_tbs_set_bearer_technology(uint8_t bearer_index, enum bt_bearer_tech new_t
 
 	set_value_changed(inst, set_bearer_technology_changed_cb, BT_UUID_TBS_TECHNOLOGY);
 
-	err = k_mutex_unlock(&tbs_mutex);
+	err = osi_mutex_unlock(&tbs_mutex);
 	__ASSERT(err == 0, "Failed to unlock mutex: %d", err);
 
 	return 0;
@@ -3245,7 +3248,7 @@ int bt_tbs_set_signal_strength(uint8_t bearer_index, uint8_t new_signal_strength
 		return -EINVAL;
 	}
 
-	err = k_mutex_lock(&tbs_mutex, K_NO_WAIT);
+	err = osi_mutex_lock(&tbs_mutex, BT_NO_WAIT);
 	if (err != 0) {
 		LOG_DBG("Failed to lock mutex");
 		return -EBUSY;
@@ -3255,16 +3258,16 @@ int bt_tbs_set_signal_strength(uint8_t bearer_index, uint8_t new_signal_strength
 		inst->signal_strength = new_signal_strength;
 		inst->pending_signal_strength_notification = true;
 
-		timer_status = k_work_delayable_remaining_get(&inst->reporting_interval_work);
+		timer_status = bt_work_delayable_remaining_get(&inst->reporting_interval_work);
 		if (timer_status == 0U) {
-			k_work_reschedule(&inst->reporting_interval_work, K_NO_WAIT);
+			bt_work_reschedule(&inst->reporting_interval_work, BT_NO_WAIT);
 		}
 
 		LOG_DBG("Index %u: Reporting signal strength in %u ms", bearer_index,
-			k_ticks_to_ms_ceil32(timer_status));
+			(uint32_t)(timer_status));
 	}
 
-	err = k_mutex_unlock(&tbs_mutex);
+	err = osi_mutex_unlock(&tbs_mutex);
 	__ASSERT(err == 0, "Failed to unlock mutex: %d", err);
 
 	return 0;
@@ -3285,7 +3288,7 @@ int bt_tbs_set_status_flags(uint8_t bearer_index, uint16_t status_flags)
 		return 0;
 	}
 
-	err = k_mutex_lock(&tbs_mutex, K_NO_WAIT);
+	err = osi_mutex_lock(&tbs_mutex, BT_NO_WAIT);
 	if (err != 0) {
 		LOG_DBG("Failed to lock mutex");
 		return -EBUSY;
@@ -3295,7 +3298,7 @@ int bt_tbs_set_status_flags(uint8_t bearer_index, uint16_t status_flags)
 
 	set_value_changed(inst, set_status_flags_changed_cb, BT_UUID_TBS_STATUS_FLAGS);
 
-	err = k_mutex_unlock(&tbs_mutex);
+	err = osi_mutex_unlock(&tbs_mutex);
 	__ASSERT(err == 0, "Failed to unlock mutex: %d", err);
 
 	return 0;
@@ -3326,7 +3329,7 @@ int bt_tbs_set_uri_scheme_list(uint8_t bearer_index, const char *uri_scheme_list
 		return -ENOMEM;
 	}
 
-	err = k_mutex_lock(&tbs_mutex, K_NO_WAIT);
+	err = osi_mutex_lock(&tbs_mutex, BT_NO_WAIT);
 	if (err != 0) {
 		LOG_DBG("Failed to lock mutex");
 		return -EBUSY;
@@ -3358,7 +3361,7 @@ int bt_tbs_set_uri_scheme_list(uint8_t bearer_index, const char *uri_scheme_list
 		}
 	}
 
-	err = k_mutex_unlock(&tbs_mutex);
+	err = osi_mutex_unlock(&tbs_mutex);
 	__ASSERT(err == 0, "Failed to unlock mutex: %d", err);
 
 	return 0;
@@ -3389,3 +3392,20 @@ void bt_tbs_dbg_print_calls(void)
 	}
 }
 #endif /* BT_LOG_LEVEL_ENABLED(BT_TBS, DBG) */
+
+int bt_tbs_base_init(void)
+{
+	return osi_mutex_init(&tbs_mutex, OS_MUTEX_RECURSIVE);
+}
+
+/** @brief Register callbacks during explicit component initialization. */
+int bt_audio_tbs_callbacks_init(void)
+{
+	int err = 0;
+
+	err = bt_conn_cb_register(&bt_conn_cb_conn_cb);
+	if (err && err != -EEXIST) {
+		return err;
+	}
+	return 0;
+}

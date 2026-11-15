@@ -9,16 +9,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 #include <common/assert.h>
-#include <base/queue.h>
-#include <base/fifo.h>
-#include <base/work.h>
-#include <base/init.h>
-#include <base/spinlock.h>
-#include <embt/types/timeout.h>
-#include <base/base.h>
-#include <base/atomic.h>
-#include <osi/sync.h>
-#include <osi/thread.h>
+#include <embt/base/queue.h>
+#include <embt/base/fifo.h>
+#include <embt/base/work.h>
+#include <embt/base/init.h>
+#include <embt/base/spinlock.h>
+#include <embt/base/time.h>
+#include <embt/base/base.h>
+#include <embt/base/atomic.h>
+#include <embt/osi/sync.h>
+#include <embt/osi/thread.h>
 #include <errno.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -42,12 +42,16 @@
 #include <embt/base/log.h>
 #include <embt/net_buf.h>
 #include <embt/settings/settings.h>
-#include <embt/sys/util_macro.h>
-#include <embt/sys/util.h>
-#include <embt/sys/slist.h>
-#include <embt/sys/byteorder.h>
-#include <base/assert.h>
+#include <embt/base/util_macro.h>
+#include <embt/base/util.h>
+#include <embt/base/slist.h>
+#include <embt/base/byteorder.h>
+#include <embt/base/assert.h>
 #include <embt/compiler.h>
+
+#if defined(CONFIG_BT_AUDIO)
+#include "audio/audio_internal.h"
+#endif
 
 #include "addr_internal.h"
 #include "adv.h"
@@ -5202,6 +5206,12 @@ int bt_stack_init(void)
 		if (err) {
 			goto failed;
 		}
+	}
+#endif
+#if defined(CONFIG_BT_AUDIO)
+	err = bt_audio_init();
+	if (err) {
+		goto failed;
 	}
 #endif
 #if defined(CONFIG_BT_CHANNEL_SOUNDING)

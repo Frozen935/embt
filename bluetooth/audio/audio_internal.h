@@ -11,10 +11,10 @@
 #include <stdint.h>
 #include <sys/types.h>
 
-#include <zephyr/autoconf.h>
-#include <zephyr/bluetooth/audio/audio.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/gatt.h>
+#include <embt/autoconf.h>
+#include <embt/bluetooth/audio/audio.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/gatt.h>
 
 #define BT_AUDIO_NOTIFY_RETRY_DELAY_US ((CONFIG_BT_AUDIO_NOTIFY_RETRY_DELAY) * 1250U)
 
@@ -83,3 +83,10 @@ bool bt_audio_valid_ltv(const uint8_t *data, uint8_t data_len);
  * @retval BT_ATT_ERR_ENCRYPTION_KEY_SIZE Key size is not 128-bit
  */
 uint8_t bt_audio_security_check(const struct bt_conn *conn);
+
+/** @brief Initialize selected LE Audio services after the Host base. */
+int bt_audio_init(void);
+/** @brief Initialize scan-delegator state and register authentication callbacks. */
+int bt_bap_scan_delegator_init(void);
+/** @brief Register periodic advertising callbacks for the broadcast sink. */
+int bt_bap_broadcast_sink_init(void);

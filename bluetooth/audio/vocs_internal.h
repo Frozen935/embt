@@ -10,13 +10,16 @@
 #ifndef ZEPHYR_INCLUDE_BLUETOOTH_AUDIO_VOCS_INTERNAL_
 #define ZEPHYR_INCLUDE_BLUETOOTH_AUDIO_VOCS_INTERNAL_
 
+#include <embt/base/work.h>
+#include <string.h>
+#include <embt/base/assert.h>
 #include <stdbool.h>
 #include <stdint.h>
 
-#include <zephyr/autoconf.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/gatt.h>
-#include <zephyr/sys/atomic.h>
+#include <embt/autoconf.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/gatt.h>
+#include <embt/base/atomic.h>
 
 /* Set the buf size to include the NULL terminator */
 #if defined(CONFIG_BT_VOCS)
@@ -80,7 +83,7 @@ struct bt_vocs_client {
 	struct bt_gatt_discover_params discover_params;
 	struct bt_conn *conn;
 
-	ATOMIC_DEFINE(flags, BT_VOCS_CLIENT_FLAG_NUM_FLAGS);
+	BT_ATOMIC_DEFINE(flags, BT_VOCS_CLIENT_FLAG_NUM_FLAGS);
 };
 
 enum bt_vocs_notify {
@@ -100,8 +103,8 @@ struct bt_vocs_server {
 
 	struct bt_gatt_service *service_p;
 
-	ATOMIC_DEFINE(notify, NOTIFY_NUM);
-	struct k_work_delayable notify_work;
+	BT_ATOMIC_DEFINE(notify, NOTIFY_NUM);
+	struct bt_work_delayable notify_work;
 };
 
 int bt_vocs_client_state_get(struct bt_vocs_client *inst);

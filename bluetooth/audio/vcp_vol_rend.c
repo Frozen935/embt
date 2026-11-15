@@ -8,29 +8,34 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <embt/base/work.h>
+#include <embt/base/time.h>
+#include <string.h>
+#include <embt/base/assert.h>
+#include <embt/base/util_macro.h>
 #include <errno.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <sys/types.h>
 
-#include <zephyr/autoconf.h>
-#include <zephyr/bluetooth/att.h>
-#include <zephyr/bluetooth/audio/aics.h>
-#include <zephyr/bluetooth/audio/vcp.h>
-#include <zephyr/bluetooth/audio/vocs.h>
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/gatt.h>
-#include <zephyr/bluetooth/uuid.h>
+#include <embt/autoconf.h>
+#include <embt/bluetooth/att.h>
+#include <embt/bluetooth/audio/aics.h>
+#include <embt/bluetooth/audio/vcp.h>
+#include <embt/bluetooth/audio/vocs.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/gatt.h>
+#include <embt/bluetooth/uuid.h>
 #include <embt/base/log.h>
-#include <zephyr/sys/__assert.h>
-#include <zephyr/sys/atomic.h>
-#include <zephyr/sys/byteorder.h>
-#include <zephyr/sys/time_units.h>
-#include <zephyr/sys/util.h>
-#include <zephyr/sys/util_macro.h>
-#include <zephyr/toolchain.h>
+#include <embt/base/assert.h>
+#include <embt/base/atomic.h>
+#include <embt/base/byteorder.h>
+#include <embt/base/time.h>
+#include <embt/base/util.h>
+#include <embt/base/util_macro.h>
+#include <embt/compiler.h>
 
 #include "audio_internal.h"
 #include "vcp_internal.h"
@@ -60,8 +65,8 @@ struct bt_vcp_vol_rend {
 	struct bt_vocs *vocs_insts[CONFIG_BT_VCP_VOL_REND_VOCS_INSTANCE_COUNT];
 	struct bt_aics *aics_insts[CONFIG_BT_VCP_VOL_REND_AICS_INSTANCE_COUNT];
 
-	ATOMIC_DEFINE(notify, NOTIFY_NUM);
-	struct k_work_delayable notify_work;
+	BT_ATOMIC_DEFINE(notify, NOTIFY_NUM);
+	struct bt_work_delayable notify_work;
 };
 
 static struct bt_vcp_vol_rend vol_rend;
@@ -99,19 +104,19 @@ static const char *vol_rend_notify_str(enum vol_rend_notify notify)
 }
 
 static void notify_work_reschedule(struct bt_vcp_vol_rend *inst, enum vol_rend_notify notify,
-				   k_timeout_t delay)
+				   bt_timeout_t delay)
 {
 	int err;
 
-	atomic_set_bit(inst->notify, notify);
+	bt_atomic_set_bit(inst->notify, notify);
 
-	err = k_work_reschedule(&inst->notify_work, delay);
+	err = bt_work_reschedule(&inst->notify_work, delay);
 	if (err < 0) {
 		LOG_ERR("Failed to reschedule %s notification err %d", vol_rend_notify_str(notify),
 			err);
-	} else if (!K_TIMEOUT_EQ(delay, K_NO_WAIT)) {
+	} else if (!BT_TIMEOUT_EQ(delay, BT_NO_WAIT)) {
 		LOG_DBG("%s notification scheduled in %dms", vol_rend_notify_str(notify),
-			k_ticks_to_ms_floor32(k_work_delayable_remaining_get(&inst->notify_work)));
+			(uint32_t)(bt_work_delayable_remaining_get(&inst->notify_work)));
 	}
 }
 
@@ -122,30 +127,30 @@ static void notify(struct bt_vcp_vol_rend *inst, enum vol_rend_notify notify,
 
 	err = bt_gatt_notify_uuid(NULL, uuid, inst->service_p->attrs, data, len);
 	if (err == -ENOMEM) {
-		notify_work_reschedule(inst, notify, K_USEC(BT_AUDIO_NOTIFY_RETRY_DELAY_US));
+		notify_work_reschedule(inst, notify, BT_MSEC(bt_time_us_to_ms_ceil(BT_AUDIO_NOTIFY_RETRY_DELAY_US)));
 	} else if (err < 0 && err != -ENOTCONN) {
 		LOG_ERR("Notify %s err %d", vol_rend_notify_str(notify), err);
 	}
 }
 
-static void notify_work_handler(struct k_work *work)
+static void notify_work_handler(struct bt_work *work)
 {
-	struct k_work_delayable *d_work = k_work_delayable_from_work(work);
+	struct bt_work_delayable *d_work = bt_work_delayable_from_work(work);
 	struct bt_vcp_vol_rend *inst = CONTAINER_OF(d_work, struct bt_vcp_vol_rend, notify_work);
 
-	if (atomic_test_and_clear_bit(inst->notify, NOTIFY_STATE)) {
+	if (bt_atomic_test_and_clear_bit(inst->notify, NOTIFY_STATE)) {
 		notify(inst, NOTIFY_STATE, BT_UUID_VCS_STATE, &inst->state, sizeof(inst->state));
 	}
 
 	if (IS_ENABLED(CONFIG_BT_VCP_VOL_REND_VOL_FLAGS_NOTIFIABLE) &&
-	    atomic_test_and_clear_bit(inst->notify, NOTIFY_FLAGS)) {
+	    bt_atomic_test_and_clear_bit(inst->notify, NOTIFY_FLAGS)) {
 		notify(inst, NOTIFY_FLAGS, BT_UUID_VCS_FLAGS, &inst->flags, sizeof(inst->flags));
 	}
 }
 
 static void value_changed(struct bt_vcp_vol_rend *inst, enum vol_rend_notify notify)
 {
-	notify_work_reschedule(inst, notify, K_NO_WAIT);
+	notify_work_reschedule(inst, notify, BT_NO_WAIT);
 }
 
 static ssize_t write_vcs_control(struct bt_conn *conn,
@@ -487,8 +492,8 @@ int bt_vcp_vol_rend_register(struct bt_vcp_vol_rend_register_param *param)
 
 	vol_rend.cb = param->cb;
 
-	atomic_clear(vol_rend.notify);
-	k_work_init_delayable(&vol_rend.notify_work, notify_work_handler);
+	bt_atomic_clear(vol_rend.notify);
+	bt_work_init_delayable(&vol_rend.notify_work, notify_work_handler);
 
 	registered = true;
 

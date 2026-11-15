@@ -7,19 +7,17 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include <zephyr/autoconf.h>
-#include <zephyr/bluetooth/assigned_numbers.h>
-#include <zephyr/bluetooth/audio/audio.h>
-#include <zephyr/bluetooth/audio/pbp.h>
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/data.h>
-#include <zephyr/bluetooth/gap.h>
-#include <zephyr/bluetooth/uuid.h>
+#include <embt/autoconf.h>
+#include <embt/bluetooth/assigned_numbers.h>
+#include <embt/bluetooth/audio/audio.h>
+#include <embt/bluetooth/audio/pbp.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/data.h>
+#include <embt/bluetooth/gap.h>
+#include <embt/bluetooth/uuid.h>
 #include <embt/base/log.h>
-#include <zephyr/net_buf.h>
-#include <zephyr/sys/byteorder.h>
-#include <zephyr/types.h>
-
+#include <embt/net_buf.h>
+#include <embt/base/byteorder.h>
 LOG_MODULE_REGISTER(bt_pbp, CONFIG_BT_PBP_LOG_LEVEL);
 
 int bt_pbp_get_announcement(const uint8_t meta[], size_t meta_len,

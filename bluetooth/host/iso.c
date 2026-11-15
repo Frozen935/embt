@@ -8,12 +8,12 @@
  */
 
 #include <common/assert.h>
-#include <base/base.h>
-#include <base/work.h>
-#include <base/fifo.h>
-#include <embt/types/timeout.h>
-#include <base/assert.h>
-#include <embt/sys/util_macro.h>
+#include <embt/base/base.h>
+#include <embt/base/work.h>
+#include <embt/base/fifo.h>
+#include <embt/base/time.h>
+#include <embt/base/assert.h>
+#include <embt/base/util_macro.h>
 #include <errno.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -21,21 +21,21 @@
 #include <string.h>
 
 #include <embt/autoconf.h>
-#include <zephyr/bluetooth/buf.h>
-#include <zephyr/bluetooth/gap.h>
-#include <zephyr/bluetooth/hci.h>
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/hci_types.h>
-#include <zephyr/bluetooth/iso.h>
+#include <embt/bluetooth/buf.h>
+#include <embt/bluetooth/gap.h>
+#include <embt/bluetooth/hci.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/hci_types.h>
+#include <embt/bluetooth/iso.h>
 #include <embt/base/log.h>
-#include <zephyr/net_buf.h>
-#include <base/assert.h>
-#include <base/atomic.h>
-#include <zephyr/sys/byteorder.h>
-#include <zephyr/sys/slist.h>
-#include <zephyr/sys/util.h>
-#include <zephyr/sys/util_macro.h>
+#include <embt/net_buf.h>
+#include <embt/base/assert.h>
+#include <embt/base/atomic.h>
+#include <embt/base/byteorder.h>
+#include <embt/base/slist.h>
+#include <embt/base/util.h>
+#include <embt/base/util_macro.h>
 #include <embt/compiler.h>
 
 #include "host/buf_view.h"
@@ -958,8 +958,8 @@ static uint16_t iso_chan_max_data_len(const struct bt_iso_chan *chan)
 int conn_iso_send(struct bt_conn *conn, struct net_buf *buf, enum bt_iso_timestamp has_ts)
 {
 	if (buf->user_data_size < CONFIG_BT_CONN_TX_USER_DATA_SIZE) {
-		LOG_ERR("not enough room in user_data %d < %d pool %u", buf->user_data_size,
-			CONFIG_BT_CONN_TX_USER_DATA_SIZE, buf->pool_id);
+		LOG_ERR("not enough room in user_data %d < %d pool %p", buf->user_data_size,
+			CONFIG_BT_CONN_TX_USER_DATA_SIZE, (void *)buf->pool);
 		return -EINVAL;
 	}
 

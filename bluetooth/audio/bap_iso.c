@@ -12,16 +12,16 @@
 #include <stdint.h>
 #include <string.h>
 
-#include <zephyr/autoconf.h>
-#include <zephyr/bluetooth/audio/audio.h>
-#include <zephyr/bluetooth/audio/bap.h>
-#include <zephyr/bluetooth/hci_types.h>
-#include <zephyr/bluetooth/iso.h>
+#include <embt/autoconf.h>
+#include <embt/bluetooth/audio/audio.h>
+#include <embt/bluetooth/audio/bap.h>
+#include <embt/bluetooth/hci_types.h>
+#include <embt/bluetooth/iso.h>
 #include <embt/base/log.h>
-#include <zephyr/sys/__assert.h>
-#include <zephyr/sys/atomic.h>
-#include <zephyr/sys/util.h>
-#include <zephyr/sys/util_macro.h>
+#include <embt/base/assert.h>
+#include <embt/base/atomic.h>
+#include <embt/base/util.h>
+#include <embt/base/util_macro.h>
 
 #include "bap_iso.h"
 #include "audio_internal.h"
@@ -40,7 +40,7 @@ struct bt_bap_iso *bt_bap_iso_new(void)
 	struct bt_bap_iso *iso = NULL;
 
 	for (size_t i = 0U; i < ARRAY_SIZE(iso_pool); i++) {
-		if (atomic_cas(&iso_pool[i].ref, 0, 1)) {
+		if (bt_atomic_cas(&iso_pool[i].ref, 0, 1)) {
 			iso = &iso_pool[i];
 			break;
 		}
@@ -57,7 +57,7 @@ struct bt_bap_iso *bt_bap_iso_new(void)
 
 struct bt_bap_iso *bt_bap_iso_ref(struct bt_bap_iso *iso)
 {
-	atomic_val_t old;
+	bt_atomic_val_t old;
 
 	__ASSERT_NO_MSG(iso != NULL);
 
@@ -67,23 +67,23 @@ struct bt_bap_iso *bt_bap_iso_ref(struct bt_bap_iso *iso)
 	 * count since the read, and start over again when that happens.
 	 */
 	do {
-		old = atomic_get(&iso->ref);
+		old = bt_atomic_get(&iso->ref);
 
 		if (!old) {
 			return NULL;
 		}
-	} while (!atomic_cas(&iso->ref, old, old + 1));
+	} while (!bt_atomic_cas(&iso->ref, old, old + 1));
 
 	return iso;
 }
 
 void bt_bap_iso_unref(struct bt_bap_iso *iso)
 {
-	atomic_val_t old;
+	bt_atomic_val_t old;
 
 	__ASSERT_NO_MSG(iso != NULL);
 
-	old = atomic_dec(&iso->ref);
+	old = bt_atomic_dec(&iso->ref);
 
 	__ASSERT(old > 0, "iso reference counter is 0");
 }

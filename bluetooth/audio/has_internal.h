@@ -11,11 +11,11 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/gatt.h>
-#include <zephyr/bluetooth/uuid.h>
-#include <zephyr/sys/atomic.h>
-#include <zephyr/sys/util_macro.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/gatt.h>
+#include <embt/bluetooth/uuid.h>
+#include <embt/base/atomic.h>
+#include <embt/base/util_macro.h>
 
 /* Control Point opcodes */
 #define BT_HAS_OP_READ_PRESET_REQ        0x01U
@@ -164,7 +164,7 @@ struct bt_has_client {
 	struct bt_conn *conn;
 
 	/** Internal flags */
-	ATOMIC_DEFINE(flags, HAS_CLIENT_NUM_FLAGS);
+	BT_ATOMIC_DEFINE(flags, HAS_CLIENT_NUM_FLAGS);
 
 	/* GATT procedure parameters */
 	union {

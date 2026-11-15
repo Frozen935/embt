@@ -8,6 +8,12 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
+#include <common/assert.h>
+#include <embt/osi/sync.h>
+#include <embt/base/work.h>
+#include <embt/base/time.h>
+#include <embt/base/assert.h>
+#include <embt/base/util_macro.h>
 #include <errno.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -15,32 +21,31 @@
 #include <string.h>
 #include <sys/types.h>
 
-#include <zephyr/autoconf.h>
-#include <zephyr/bluetooth/addr.h>
-#include <zephyr/bluetooth/assigned_numbers.h>
-#include <zephyr/bluetooth/att.h>
-#include <zephyr/bluetooth/audio/ascs.h>
-#include <zephyr/bluetooth/audio/audio.h>
-#include <zephyr/bluetooth/audio/bap.h>
-#include <zephyr/bluetooth/audio/pacs.h>
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/data.h>
-#include <zephyr/bluetooth/gatt.h>
-#include <zephyr/bluetooth/hci_types.h>
-#include <zephyr/bluetooth/iso.h>
-#include <zephyr/bluetooth/uuid.h>
+#include <embt/autoconf.h>
+#include <embt/bluetooth/addr.h>
+#include <embt/bluetooth/assigned_numbers.h>
+#include <embt/bluetooth/att.h>
+#include <embt/bluetooth/audio/ascs.h>
+#include <embt/bluetooth/audio/audio.h>
+#include <embt/bluetooth/audio/bap.h>
+#include <embt/bluetooth/audio/pacs.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/data.h>
+#include <embt/bluetooth/gatt.h>
+#include <embt/bluetooth/hci_types.h>
+#include <embt/bluetooth/iso.h>
+#include <embt/bluetooth/uuid.h>
 #include <embt/base/log.h>
-#include <zephyr/net_buf.h>
-#include <zephyr/sys/__assert.h>
-#include <zephyr/sys/byteorder.h>
-#include <zephyr/sys/util.h>
-#include <zephyr/sys/util_macro.h>
-#include <zephyr/toolchain.h>
+#include <embt/net_buf.h>
+#include <embt/base/assert.h>
+#include <embt/base/byteorder.h>
+#include <embt/base/util.h>
+#include <embt/base/util_macro.h>
+#include <embt/compiler.h>
 
 LOG_MODULE_REGISTER(bt_ascs, CONFIG_BT_ASCS_LOG_LEVEL);
 
-#include "common/assert.h"
 #include "common/bt_str.h"
 
 #include "../host/att_internal.h"
@@ -54,7 +59,7 @@ LOG_MODULE_REGISTER(bt_ascs, CONFIG_BT_ASCS_LOG_LEVEL);
 #include "cap_internal.h"
 #include "pacs_internal.h"
 
-#define ASE_BUF_SEM_TIMEOUT K_MSEC(CONFIG_BT_ASCS_ASE_BUF_TIMEOUT)
+#define ASE_BUF_SEM_TIMEOUT BT_MSEC(CONFIG_BT_ASCS_ASE_BUF_TIMEOUT)
 
 #define MAX_ASES_SESSIONS CONFIG_BT_MAX_CONN * \
 				(CONFIG_BT_ASCS_MAX_ASE_SNK_COUNT + \
@@ -87,7 +92,7 @@ struct bt_ascs_ase {
 	struct bt_conn *conn;
 	struct bt_bap_ep ep;
 	const struct bt_gatt_attr *attr;
-	struct k_work_delayable disconnect_work;
+	struct bt_work_delayable disconnect_work;
 	enum bt_bap_ep_state state_pending;
 	bool unexpected_iso_link_loss;
 	bool has_pending_state;
@@ -96,7 +101,7 @@ struct bt_ascs_ase {
 
 struct ascs_client {
 	struct bt_conn *conn;
-	struct k_work_delayable notify_work;
+	struct bt_work_delayable notify_work;
 
 	uint8_t _cp_rsp_data[CP_RSP_BUF_SIZE];
 	struct net_buf_simple cp_rsp_buf;
@@ -143,7 +148,8 @@ BUILD_ASSERT(CONFIG_BT_ATT_PREPARE_COUNT > 0, "CONFIG_BT_ATT_PREPARE_COUNT shall
 
 static const struct bt_ascs_cb *ascs_cb;
 
-static K_SEM_DEFINE(ase_buf_sem, 1, 1);
+static os_sem_t ase_buf_sem;
+static bool ase_buf_sem_initialized;
 NET_BUF_SIMPLE_DEFINE_STATIC(ase_buf, ASE_BUF_SIZE);
 
 static int control_point_notify(struct ascs_client *client);
@@ -214,7 +220,7 @@ static void ase_free(struct bt_ascs_ase *ase)
 	ase->state_pending = BT_BAP_EP_STATE_IDLE;
 	ase->has_pending_state = false;
 
-	(void)k_work_cancel_delayable(&ase->disconnect_work);
+	(void)bt_work_cancel_delayable(&ase->disconnect_work);
 }
 
 static int ase_state_notify(struct bt_ascs_ase *ase)
@@ -235,7 +241,7 @@ static int ase_state_notify(struct bt_ascs_ase *ase)
 		return 0;
 	}
 
-	err = k_sem_take(&ase_buf_sem, ASE_BUF_SEM_TIMEOUT);
+	err = osi_sem_take(&ase_buf_sem, ASE_BUF_SEM_TIMEOUT);
 	if (err != 0) {
 		LOG_WRN("Failed to take ase_buf_sem: %d", err);
 
@@ -247,7 +253,7 @@ static int ase_state_notify(struct bt_ascs_ase *ase)
 	max_ntf_size = bt_att_get_max_notify_size(conn, BT_ATT_CHAN_OPT_NONE);
 	if (max_ntf_size < 0) {
 		__ASSERT(max_ntf_size != -EINVAL, "Unexpected -EINVAL");
-		k_sem_give(&ase_buf_sem);
+		osi_sem_give(&ase_buf_sem);
 		return max_ntf_size;
 	}
 
@@ -259,14 +265,14 @@ static int ase_state_notify(struct bt_ascs_ase *ase)
 
 	err = bt_gatt_notify(conn, ase->attr, ase_buf.data, ntf_size);
 
-	k_sem_give(&ase_buf_sem);
+	osi_sem_give(&ase_buf_sem);
 
 	return err;
 }
 
-static void ascs_disconnect_stream_work_handler(struct k_work *work)
+static void ascs_disconnect_stream_work_handler(struct bt_work *work)
 {
-	struct k_work_delayable *d_work = k_work_delayable_from_work(work);
+	struct bt_work_delayable *d_work = bt_work_delayable_from_work(work);
 	struct bt_ascs_ase *ase = CONTAINER_OF(d_work, struct bt_ascs_ase,
 					       disconnect_work);
 	struct bt_bap_ep *ep = &ase->ep;
@@ -304,7 +310,7 @@ static void ascs_disconnect_stream_work_handler(struct k_work *work)
 					ep);
 
 		/* Cancel pair ASE disconnect work if pending */
-		(void)k_work_cancel_delayable(&pair_ase->disconnect_work);
+		(void)bt_work_cancel_delayable(&pair_ase->disconnect_work);
 	}
 
 	if (stream != NULL &&
@@ -327,8 +333,8 @@ static int ascs_disconnect_stream(struct bt_bap_stream *stream)
 
 	LOG_DBG("%p", stream);
 
-	return k_work_reschedule(&ase->disconnect_work,
-				 K_MSEC(CONFIG_BT_ASCS_ISO_DISCONNECT_DELAY));
+	return bt_work_reschedule(&ase->disconnect_work,
+				 BT_MSEC(CONFIG_BT_ASCS_ISO_DISCONNECT_DELAY));
 }
 
 static void ase_enter_state_idle(struct bt_ascs_ase *ase)
@@ -655,17 +661,17 @@ static void reschedule_notify_work(struct ascs_client *client)
 	retry_delay_us = info.le.interval_us;
 
 	/* Reschedule the state transition */
-	err = k_work_reschedule(&client->notify_work, K_USEC(retry_delay_us));
+	err = bt_work_reschedule(&client->notify_work, BT_MSEC(bt_time_us_to_ms_ceil(retry_delay_us)));
 	__ASSERT(err >= 0, "Failed to reschedule notify_work for client %p (conn %p): %d", client,
 		 client->conn, err);
 
 	LOG_DBG("Out of buffers for notification. Will retry in %dus", retry_delay_us);
 }
 
-static void notify_work_handler(struct k_work *work)
+static void notify_work_handler(struct bt_work *work)
 {
 	struct ascs_client *client =
-		CONTAINER_OF(k_work_delayable_from_work(work), struct ascs_client, notify_work);
+		CONTAINER_OF(bt_work_delayable_from_work(work), struct ascs_client, notify_work);
 
 	if (client->rsp_building) {
 		/* Response is building, so do not attempt to send any incomplete notifications */
@@ -731,7 +737,7 @@ int ascs_ep_set_state(struct bt_bap_ep *ep, enum bt_bap_ep_state state)
 	/* Take semaphore here in case that `ase_state_notify` is constructing the new state
 	 * to avoid modifying the `state_pending` value.
 	 */
-	err = k_sem_take(&ase_buf_sem, ASE_BUF_SEM_TIMEOUT);
+	err = osi_sem_take(&ase_buf_sem, ASE_BUF_SEM_TIMEOUT);
 	if (err != 0) {
 		LOG_WRN("Failed to take ase_buf_sem: %d", err);
 
@@ -741,9 +747,9 @@ int ascs_ep_set_state(struct bt_bap_ep *ep, enum bt_bap_ep_state state)
 	ase->state_pending = state;
 	ase->has_pending_state = true;
 
-	k_sem_give(&ase_buf_sem);
+	osi_sem_give(&ase_buf_sem);
 
-	err = k_work_schedule(&client->notify_work, K_NO_WAIT);
+	err = bt_work_schedule(&client->notify_work, BT_NO_WAIT);
 	if (err < 0) {
 		LOG_ERR("Failed to schedule state transition work err %d", err);
 		return err;
@@ -1107,7 +1113,7 @@ static void ascs_ep_iso_disconnected(struct bt_bap_ep *ep, uint8_t reason)
 	}
 
 	/* Cancel ASE disconnect work if pending */
-	(void)k_work_cancel_delayable(&ase->disconnect_work);
+	(void)bt_work_cancel_delayable(&ase->disconnect_work);
 	ep->reason = reason;
 
 	if (ep->state == BT_BAP_EP_STATE_RELEASING) {
@@ -1371,9 +1377,9 @@ int bt_ascs_disable_ase(struct bt_bap_ep *ep)
 static void force_ase_release(struct bt_ascs_ase *ase, uint8_t reason)
 {
 	struct ascs_client *client;
-	struct k_work_sync sync;
+	struct bt_work_sync sync;
 
-	(void)k_work_cancel_delayable_sync(&ase->disconnect_work, &sync);
+	(void)bt_work_cancel_delayable_sync(&ase->disconnect_work, &sync);
 
 	if (ase->conn == NULL) {
 		client = NULL;
@@ -1382,7 +1388,7 @@ static void force_ase_release(struct bt_ascs_ase *ase, uint8_t reason)
 
 		__ASSERT(client != NULL, "Failed to client for ASE %p with conn %p", ase,
 			 ase->conn);
-		(void)k_work_cancel_delayable_sync(&client->notify_work, &sync);
+		(void)bt_work_cancel_delayable_sync(&client->notify_work, &sync);
 	}
 
 	/* Execute and pending state transitions to call the appropriate callbacks */
@@ -1402,9 +1408,9 @@ static void force_ase_release(struct bt_ascs_ase *ase, uint8_t reason)
 		execute_post_state_transition(ase, old_state);
 
 		/* Entering the releasing state may attempt to disconnect the CIS */
-		if (k_work_delayable_is_pending(&ase->disconnect_work)) {
+		if (bt_work_delayable_is_pending(&ase->disconnect_work)) {
 			/* Force any disconnect work to complete */
-			(void)k_work_cancel_delayable_sync(&ase->disconnect_work, &sync);
+			(void)bt_work_cancel_delayable_sync(&ase->disconnect_work, &sync);
 			ascs_disconnect_stream_work_handler(&ase->disconnect_work.work);
 		}
 
@@ -1413,7 +1419,7 @@ static void force_ase_release(struct bt_ascs_ase *ase, uint8_t reason)
 		 * cancel as we force that transition below
 		 */
 		if (client != NULL) {
-			(void)k_work_cancel_delayable_sync(&client->notify_work, &sync);
+			(void)bt_work_cancel_delayable_sync(&client->notify_work, &sync);
 		}
 	}
 
@@ -1427,7 +1433,7 @@ static void force_ase_release(struct bt_ascs_ase *ase, uint8_t reason)
 		/* At this point, `ase` object have been free'd */
 	}
 
-	__ASSERT(!k_work_delayable_is_pending(&ase->disconnect_work),
+	__ASSERT(!bt_work_delayable_is_pending(&ase->disconnect_work),
 		 "ase %p still has pending disconnect_work", ase);
 	__ASSERT(ase->ep.state == BT_BAP_EP_STATE_IDLE, "Unexpected ASE state: %d", ase->ep.state);
 	__ASSERT(!ase->has_pending_state, "Unexpected pending ASE state: %d", ase->state_pending);
@@ -1436,7 +1442,7 @@ static void force_ase_release(struct bt_ascs_ase *ase, uint8_t reason)
 static void disconnected(struct bt_conn *conn, uint8_t reason)
 {
 	struct ascs_client *client;
-	struct k_work_sync sync;
+	struct bt_work_sync sync;
 
 	if (bt_conn_get_security(conn) < BT_SECURITY_L2 ||
 	    !bt_conn_is_type(conn, BT_CONN_TYPE_LE)) {
@@ -1447,7 +1453,7 @@ static void disconnected(struct bt_conn *conn, uint8_t reason)
 	__ASSERT(client != NULL, "Failed to remove client address %s for conn %p",
 		 bt_conn_dst_str(conn), conn);
 
-	(void)k_work_cancel_delayable_sync(&client->notify_work, &sync);
+	(void)bt_work_cancel_delayable_sync(&client->notify_work, &sync);
 
 	for (size_t i = 0U; i < ARRAY_SIZE(ascs.ase_pool); i++) {
 		struct bt_ascs_ase *ase = &ascs.ase_pool[i];
@@ -1586,7 +1592,7 @@ static void ase_init(struct bt_ascs_ase *ase, struct bt_conn *conn, uint8_t id)
 
 	__ASSERT(ase->attr, "ASE characteristic not found\n");
 
-	k_work_init_delayable(&ase->disconnect_work, ascs_disconnect_stream_work_handler);
+	bt_work_init_delayable(&ase->disconnect_work, ascs_disconnect_stream_work_handler);
 }
 
 static struct bt_ascs_ase *ase_new(struct bt_conn *conn, uint8_t id)
@@ -1652,7 +1658,7 @@ static ssize_t ascs_ase_read(struct bt_conn *conn,
 		return ascs_ase_read_status_idle(conn, attr, buf, len, offset);
 	}
 
-	err = k_sem_take(&ase_buf_sem, ASE_BUF_SEM_TIMEOUT);
+	err = osi_sem_take(&ase_buf_sem, ASE_BUF_SEM_TIMEOUT);
 	if (err != 0) {
 		LOG_DBG("Failed to take ase_buf_sem: %d", err);
 
@@ -1663,7 +1669,7 @@ static ssize_t ascs_ase_read(struct bt_conn *conn,
 
 	ret_val = bt_gatt_attr_read(conn, attr, buf, len, offset, ase_buf.data, ase_buf.len);
 
-	k_sem_give(&ase_buf_sem);
+	osi_sem_give(&ase_buf_sem);
 
 	return ret_val;
 }
@@ -3353,7 +3359,7 @@ static void control_point_respond(struct ascs_client *client)
 	client->rsp_pending = true;
 	client->rsp_building = false;
 
-	err = k_work_reschedule(&client->notify_work, K_NO_WAIT);
+	err = bt_work_reschedule(&client->notify_work, BT_NO_WAIT);
 	__ASSERT(err >= 0, "Failed to schedule notify_work: %d", err);
 }
 
@@ -3565,6 +3571,14 @@ int bt_ascs_register(const struct bt_ascs_register_param *param)
 		return -EINVAL;
 	}
 
+	if (!ase_buf_sem_initialized) {
+		err = osi_sem_init(&ase_buf_sem, 1, 1);
+		if (err) {
+			return err;
+		}
+		ase_buf_sem_initialized = true;
+	}
+
 	err = bt_iso_server_register(&iso_server);
 	if (err != 0) {
 		__ASSERT(err == -EADDRINUSE || err == -ENOTSUP,
@@ -3583,7 +3597,7 @@ int bt_ascs_register(const struct bt_ascs_register_param *param)
 		net_buf_simple_reset(&client->cp_rsp_buf);
 		client->rsp_pending = false;
 
-		k_work_init_delayable(&client->notify_work, notify_work_handler);
+		bt_work_init_delayable(&client->notify_work, notify_work_handler);
 	}
 
 	err = bt_gatt_service_register(&ascs_svc);
@@ -3634,11 +3648,11 @@ int bt_ascs_unregister(void)
 	}
 
 	ARRAY_FOR_EACH_PTR(ascs.clients, client) {
-		struct k_work_sync sync;
+		struct bt_work_sync sync;
 
-		(void)k_work_cancel_delayable_sync(&client->notify_work, &sync);
+		(void)bt_work_cancel_delayable_sync(&client->notify_work, &sync);
 
-		__ASSERT(!k_work_delayable_is_pending(&client->notify_work),
+		__ASSERT(!bt_work_delayable_is_pending(&client->notify_work),
 			 "client %p still has pending notify_work", client);
 	}
 
@@ -3668,4 +3682,15 @@ struct bt_conn *bt_ascs_ep_get_conn(const struct bt_bap_ep *ep)
 	}
 
 	return bt_conn_ref(ase->conn);
+}
+
+int bt_audio_ascs_register(void)
+{
+	int err;
+
+	err = bt_conn_cb_register(&bt_conn_cb_conn_cb);
+	if (err && err != -EEXIST) {
+		return err;
+	}
+	return 0;
 }

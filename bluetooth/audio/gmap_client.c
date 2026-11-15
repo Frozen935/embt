@@ -4,23 +4,24 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <embt/base/util_macro.h>
 #include <errno.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
 
-#include <zephyr/autoconf.h>
-#include <zephyr/bluetooth/att.h>
-#include <zephyr/bluetooth/audio/gmap.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/gatt.h>
-#include <zephyr/bluetooth/uuid.h>
+#include <embt/autoconf.h>
+#include <embt/bluetooth/att.h>
+#include <embt/bluetooth/audio/gmap.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/gatt.h>
+#include <embt/bluetooth/uuid.h>
 #include <embt/base/log.h>
-#include <zephyr/net_buf.h>
-#include <zephyr/sys/__assert.h>
-#include <zephyr/sys/atomic.h>
-#include <zephyr/toolchain.h>
+#include <embt/net_buf.h>
+#include <embt/base/assert.h>
+#include <embt/base/atomic.h>
+#include <embt/compiler.h>
 
 #include "audio_internal.h"
 
@@ -58,7 +59,7 @@ static struct bt_gmap_client {
 		struct bt_gatt_discover_params discover;
 	} params;
 
-	ATOMIC_DEFINE(flags, GMAP_CLIENT_FLAG_NUM_FLAGS);
+	BT_ATOMIC_DEFINE(flags, GMAP_CLIENT_FLAG_NUM_FLAGS);
 } gmap_insts[CONFIG_BT_MAX_CONN];
 
 static void gmap_reset(struct bt_gmap_client *gmap_cli)
@@ -107,7 +108,7 @@ static void discover_complete(struct bt_gmap_client *gmap_cli)
 {
 	LOG_DBG("conn %p", (void *)gmap_cli->conn);
 
-	atomic_clear_bit(gmap_cli->flags, GMAP_CLIENT_FLAG_BUSY);
+	bt_atomic_clear_bit(gmap_cli->flags, GMAP_CLIENT_FLAG_BUSY);
 
 	if (gmap_cb != NULL && gmap_cb->discover != NULL) {
 		gmap_cb->discover(gmap_cli->conn, 0, gmap_cli->role, gmap_cli->feat);
@@ -122,7 +123,7 @@ static void discover_failed(struct bt_gmap_client *gmap_cli, int err)
 
 	LOG_DBG("conn %p err %d", (void *)conn, err);
 
-	atomic_clear_bit(gmap_cli->flags, GMAP_CLIENT_FLAG_BUSY);
+	bt_atomic_clear_bit(gmap_cli->flags, GMAP_CLIENT_FLAG_BUSY);
 
 	if (gmap_cb != NULL && gmap_cb->discover != NULL) {
 		gmap_cb->discover(conn, err, 0, (struct bt_gmap_feat){0});
@@ -668,7 +669,7 @@ int bt_gmap_discover(struct bt_conn *conn)
 
 	gmap_cli = &gmap_insts[bt_conn_index(conn)];
 
-	if (atomic_test_and_set_bit(gmap_cli->flags, GMAP_CLIENT_FLAG_BUSY)) {
+	if (bt_atomic_test_and_set_bit(gmap_cli->flags, GMAP_CLIENT_FLAG_BUSY)) {
 		LOG_DBG("Busy");
 
 		return -EBUSY;
@@ -701,7 +702,7 @@ int bt_gmap_discover(struct bt_conn *conn)
 	return 0;
 
 cleanup:
-	atomic_clear_bit(gmap_cli->flags, GMAP_CLIENT_FLAG_BUSY);
+	bt_atomic_clear_bit(gmap_cli->flags, GMAP_CLIENT_FLAG_BUSY);
 	return err;
 }
 
@@ -721,5 +722,17 @@ int bt_gmap_cb_register(const struct bt_gmap_cb *cb)
 
 	gmap_cb = cb;
 
+	return 0;
+}
+
+/** @brief Register callbacks during explicit component initialization. */
+int bt_audio_gmap_client_callbacks_init(void)
+{
+	int err = 0;
+
+	err = bt_conn_cb_register(&bt_conn_cb_conn_callbacks);
+	if (err && err != -EEXIST) {
+		return err;
+	}
 	return 0;
 }

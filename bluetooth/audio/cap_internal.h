@@ -6,26 +6,26 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <string.h>
+#include <embt/base/assert.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
-#include <zephyr/autoconf.h>
-#include <zephyr/bluetooth/audio/ascs.h>
-#include <zephyr/bluetooth/audio/audio.h>
-#include <zephyr/bluetooth/audio/bap.h>
-#include <zephyr/bluetooth/audio/cap.h>
-#include <zephyr/bluetooth/audio/csip.h>
-#include <zephyr/bluetooth/addr.h>
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/gatt.h>
-#include <zephyr/bluetooth/iso.h>
-#include <zephyr/sys/atomic.h>
-#include <zephyr/sys/util.h>
-#include <zephyr/sys/util_macro.h>
-#include <zephyr/types.h>
-
+#include <embt/autoconf.h>
+#include <embt/bluetooth/audio/ascs.h>
+#include <embt/bluetooth/audio/audio.h>
+#include <embt/bluetooth/audio/bap.h>
+#include <embt/bluetooth/audio/cap.h>
+#include <embt/bluetooth/audio/csip.h>
+#include <embt/bluetooth/addr.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/gatt.h>
+#include <embt/bluetooth/iso.h>
+#include <embt/base/atomic.h>
+#include <embt/base/util.h>
+#include <embt/base/util_macro.h>
 bool bt_cap_acceptor_ccid_exist(const struct bt_conn *conn, uint8_t ccid);
 bool bt_cap_acceptor_ccids_exist(const struct bt_conn *conn, const uint8_t ccids[],
 				 uint8_t ccid_cnt);
@@ -268,7 +268,7 @@ struct bt_cap_common_proc_param {
 };
 
 struct bt_cap_common_proc {
-	ATOMIC_DEFINE(proc_state_flags, BT_CAP_COMMON_PROC_STATE_FLAG_NUM);
+	BT_ATOMIC_DEFINE(proc_state_flags, BT_CAP_COMMON_PROC_STATE_FLAG_NUM);
 	/* Total number of items (streams or connections) in the procedure*/
 	size_t proc_cnt;
 	/* Number of items where a subprocedure have been started */

@@ -5,6 +5,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <embt/base/time.h>
+#include <embt/osi/sync.h>
+#include <embt/base/assert.h>
 #include <ctype.h>
 #include <errno.h>
 #include <stdbool.h>
@@ -12,19 +15,19 @@
 #include <stdint.h>
 #include <string.h>
 
-#include <zephyr/autoconf.h>
-#include <zephyr/bluetooth/assigned_numbers.h>
-#include <zephyr/bluetooth/att.h>
-#include <zephyr/bluetooth/audio/tbs.h>
+#include <embt/autoconf.h>
+#include <embt/bluetooth/assigned_numbers.h>
+#include <embt/bluetooth/att.h>
+#include <embt/bluetooth/audio/tbs.h>
 #include <embt/base/log.h>
-#include <zephyr/sys/__assert.h>
-#include <zephyr/sys/util.h>
-#include <zephyr/sys/util_utf8.h>
-#include <zephyr/toolchain.h>
+#include <embt/base/assert.h>
+#include <embt/base/util.h>
+#include <embt/base/utf8.h>
+#include <embt/compiler.h>
 
 LOG_MODULE_REGISTER(bt_ccp_call_control_server, CONFIG_BT_CCP_CALL_CONTROL_SERVER_LOG_LEVEL);
 
-#define MUTEX_TIMEOUT K_MSEC(1000U)
+#define MUTEX_TIMEOUT BT_MSEC(1000U)
 
 /* A service instance can either be a GTBS or a TBS instance */
 struct bt_ccp_call_control_server_bearer {
@@ -34,7 +37,7 @@ struct bt_ccp_call_control_server_bearer {
 	char uri_schemes[CONFIG_BT_CCP_CALL_CONTROL_SERVER_URI_SCHEMES_MAX_LENGTH + 1];
 	uint8_t tbs_index;
 	bool registered;
-	struct k_mutex mutex;
+	os_mutex_t mutex;
 };
 
 static struct bt_ccp_call_control_server_bearer
@@ -52,7 +55,7 @@ static struct bt_ccp_call_control_server_bearer *get_free_bearer(void)
 	for (size_t i = 0U; i < ARRAY_SIZE(bearers); i++) {
 		int err;
 
-		err = k_mutex_lock(&bearers[i].mutex, K_NO_WAIT);
+		err = osi_mutex_lock(&bearers[i].mutex, BT_NO_WAIT);
 		if (err != 0) {
 			continue;
 		}
@@ -61,7 +64,7 @@ static struct bt_ccp_call_control_server_bearer *get_free_bearer(void)
 			return &bearers[i];
 		}
 
-		err = k_mutex_unlock(&bearers[i].mutex);
+		err = osi_mutex_unlock(&bearers[i].mutex);
 		__ASSERT(err == 0, "Failed to unlock mutex: %d", err);
 	}
 
@@ -205,7 +208,7 @@ int bt_ccp_call_control_server_register_bearer(const struct bt_tbs_register_para
 		ret = 0;
 	}
 
-	err = k_mutex_unlock(&free_bearer->mutex);
+	err = osi_mutex_unlock(&free_bearer->mutex);
 	__ASSERT(err == 0, "Failed to unlock mutex: %d", err);
 
 	return ret;
@@ -222,7 +225,7 @@ int bt_ccp_call_control_server_unregister_bearer(struct bt_ccp_call_control_serv
 		return -EINVAL;
 	}
 
-	err = k_mutex_lock(&bearer->mutex, MUTEX_TIMEOUT);
+	err = osi_mutex_lock(&bearer->mutex, MUTEX_TIMEOUT);
 	__ASSERT(err == 0, "Failed to lock mutex: %d", err);
 
 	if (!bearer->registered) {
@@ -241,7 +244,7 @@ int bt_ccp_call_control_server_unregister_bearer(struct bt_ccp_call_control_serv
 		}
 	}
 
-	err = k_mutex_unlock(&bearer->mutex);
+	err = osi_mutex_unlock(&bearer->mutex);
 	__ASSERT(err == 0, "Failed to unlock mutex: %d", err);
 
 	return ret;
@@ -273,7 +276,7 @@ int bt_ccp_call_control_server_set_bearer_provider_name(
 		return -EINVAL;
 	}
 
-	err = k_mutex_lock(&bearer->mutex, MUTEX_TIMEOUT);
+	err = osi_mutex_lock(&bearer->mutex, MUTEX_TIMEOUT);
 	__ASSERT(err == 0, "Failed to lock mutex: %d", err);
 
 	if (!bearer->registered) {
@@ -297,7 +300,7 @@ int bt_ccp_call_control_server_set_bearer_provider_name(
 		}
 	}
 
-	err = k_mutex_unlock(&bearer->mutex);
+	err = osi_mutex_unlock(&bearer->mutex);
 	__ASSERT(err == 0, "Failed to unlock mutex: %d", err);
 
 	return ret;
@@ -322,7 +325,7 @@ int bt_ccp_call_control_server_get_bearer_provider_name(
 		return -EINVAL;
 	}
 
-	err = k_mutex_lock(&bearer->mutex, MUTEX_TIMEOUT);
+	err = osi_mutex_lock(&bearer->mutex, MUTEX_TIMEOUT);
 	__ASSERT(err == 0, "Failed to lock mutex: %d", err);
 
 	if (!bearer->registered) {
@@ -343,7 +346,7 @@ int bt_ccp_call_control_server_get_bearer_provider_name(
 		}
 	}
 
-	err = k_mutex_unlock(&bearer->mutex);
+	err = osi_mutex_unlock(&bearer->mutex);
 	__ASSERT(err == 0, "Failed to unlock mutex: %d", err);
 
 	return ret;
@@ -368,7 +371,7 @@ int bt_ccp_call_control_server_get_bearer_uci(struct bt_ccp_call_control_server_
 		return -EINVAL;
 	}
 
-	err = k_mutex_lock(&bearer->mutex, MUTEX_TIMEOUT);
+	err = osi_mutex_lock(&bearer->mutex, MUTEX_TIMEOUT);
 	__ASSERT(err == 0, "Failed to lock mutex: %d", err);
 
 	if (!bearer->registered) {
@@ -384,7 +387,7 @@ int bt_ccp_call_control_server_get_bearer_uci(struct bt_ccp_call_control_server_
 		ret = 0;
 	}
 
-	err = k_mutex_unlock(&bearer->mutex);
+	err = osi_mutex_unlock(&bearer->mutex);
 	__ASSERT(err == 0, "Failed to unlock mutex: %d", err);
 
 	return ret;
@@ -475,7 +478,7 @@ int bt_ccp_call_control_server_set_bearer_uri_schemes(
 		return -ENOMEM;
 	}
 
-	err = k_mutex_lock(&bearer->mutex, MUTEX_TIMEOUT);
+	err = osi_mutex_lock(&bearer->mutex, MUTEX_TIMEOUT);
 	__ASSERT(err == 0, "Failed to lock mutex: %d", err);
 
 	if (!bearer->registered) {
@@ -493,7 +496,7 @@ int bt_ccp_call_control_server_set_bearer_uri_schemes(
 		}
 	}
 
-	err = k_mutex_unlock(&bearer->mutex);
+	err = osi_mutex_unlock(&bearer->mutex);
 	__ASSERT(err == 0, "Failed to unlock mutex: %d", err);
 
 	return ret;
@@ -519,7 +522,7 @@ int bt_ccp_call_control_server_get_bearer_uri_schemes(
 		return -EINVAL;
 	}
 
-	err = k_mutex_lock(&bearer->mutex, MUTEX_TIMEOUT);
+	err = osi_mutex_lock(&bearer->mutex, MUTEX_TIMEOUT);
 	__ASSERT(err == 0, "Failed to lock mutex: %d", err);
 
 	if (!bearer->registered) {
@@ -539,22 +542,20 @@ int bt_ccp_call_control_server_get_bearer_uri_schemes(
 		}
 	}
 
-	err = k_mutex_unlock(&bearer->mutex);
+	err = osi_mutex_unlock(&bearer->mutex);
 	__ASSERT(err == 0, "Failed to unlock mutex: %d", err);
 
 	return ret;
 }
 
-static int ccp_server_init(void)
+int bt_ccp_server_base_init(void)
 {
 	ARRAY_FOR_EACH_PTR(bearers, bearer) {
 		__maybe_unused int err;
 
-		err = k_mutex_init(&bearer->mutex);
+		err = osi_mutex_init(&bearer->mutex, OS_MUTEX_RECURSIVE);
 		__ASSERT(err == 0, "Failed to init mutex: %d", err);
 	}
 
 	return 0;
 }
-
-SYS_INIT(ccp_server_init, APPLICATION, 0);

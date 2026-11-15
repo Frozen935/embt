@@ -5,6 +5,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <embt/base/time.h>
+#include <embt/osi/sync.h>
+#include <embt/base/assert.h>
 #include <errno.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -12,36 +15,38 @@
 #include <string.h>
 
 #include <sys/errno.h>
-#include <zephyr/autoconf.h>
-#include <zephyr/bluetooth/addr.h>
-#include <zephyr/bluetooth/assigned_numbers.h>
-#include <zephyr/bluetooth/audio/ascs.h>
-#include <zephyr/bluetooth/audio/audio.h>
-#include <zephyr/bluetooth/audio/bap.h>
-#include <zephyr/bluetooth/audio/cap.h>
-#include <zephyr/bluetooth/audio/ccid.h>
-#include <zephyr/bluetooth/audio/csip.h>
-#include <zephyr/bluetooth/audio/tbs.h>
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/data.h>
-#include <zephyr/bluetooth/gap.h>
-#include <zephyr/bluetooth/gatt.h>
-#include <zephyr/bluetooth/hci_types.h>
-#include <zephyr/bluetooth/iso.h>
+#include <embt/autoconf.h>
+#include <embt/bluetooth/addr.h>
+#include <embt/bluetooth/assigned_numbers.h>
+#include <embt/bluetooth/audio/ascs.h>
+#include <embt/bluetooth/audio/audio.h>
+#include <embt/bluetooth/audio/bap.h>
+#include <embt/bluetooth/audio/cap.h>
+#include <embt/bluetooth/audio/ccid.h>
+#include <embt/bluetooth/audio/csip.h>
+#include <embt/bluetooth/audio/tbs.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/data.h>
+#include <embt/bluetooth/gap.h>
+#include <embt/bluetooth/gatt.h>
+#include <embt/bluetooth/hci_types.h>
+#include <embt/bluetooth/iso.h>
 #include <embt/base/log.h>
-#include <zephyr/net_buf.h>
-#include <zephyr/sys/__assert.h>
-#include <zephyr/sys/atomic.h>
-#include <zephyr/sys/util.h>
-#include <zephyr/sys/util_macro.h>
-#include <zephyr/toolchain.h>
+#include <embt/net_buf.h>
+#include <embt/base/assert.h>
+#include <embt/base/atomic.h>
+#include <embt/base/util.h>
+#include <embt/base/util_macro.h>
+#include <embt/compiler.h>
 
 #include "bap_endpoint.h"
 #include "cap_internal.h"
 #include "csip_internal.h"
 
 LOG_MODULE_REGISTER(bt_cap_initiator, CONFIG_BT_CAP_INITIATOR_LOG_LEVEL);
+
+static os_mutex_t initiator_list_mutex;
 
 #include "common/bt_str.h"
 
@@ -1076,7 +1081,7 @@ int bt_cap_unicast_group_create(const struct bt_cap_unicast_group_param *param,
 	struct cap_to_bap_unicast_params bap_param = {0};
 	int err;
 
-	static K_MUTEX_DEFINE(list_mutex);
+
 
 	if (out_unicast_group == NULL) {
 		LOG_DBG("out_unicast_group is NULL");
@@ -1089,7 +1094,7 @@ int bt_cap_unicast_group_create(const struct bt_cap_unicast_group_param *param,
 
 	*out_unicast_group = NULL;
 
-	(void)k_mutex_lock(&list_mutex, K_FOREVER);
+	(void)osi_mutex_lock(&initiator_list_mutex, BT_FOREVER);
 	for (size_t i = 0U; i < ARRAY_SIZE(unicast_groups); i++) {
 		if (unicast_groups[i].bap_unicast_group == NULL) {
 			unicast_group = &unicast_groups[i];
@@ -1099,7 +1104,7 @@ int bt_cap_unicast_group_create(const struct bt_cap_unicast_group_param *param,
 
 	if (unicast_group == NULL) {
 		LOG_DBG("Could not allocate more unicast groups");
-		(void)k_mutex_unlock(&list_mutex);
+		(void)osi_mutex_unlock(&initiator_list_mutex);
 		return -ENOMEM;
 	}
 
@@ -1113,7 +1118,7 @@ int bt_cap_unicast_group_create(const struct bt_cap_unicast_group_param *param,
 	} else {
 		*out_unicast_group = unicast_group;
 	}
-	(void)k_mutex_unlock(&list_mutex);
+	(void)osi_mutex_unlock(&initiator_list_mutex);
 
 	return err;
 }
@@ -3172,3 +3177,8 @@ void bt_cap_initiator_released(struct bt_cap_stream *cap_stream)
 }
 
 #endif /* CONFIG_BT_BAP_UNICAST_CLIENT */
+
+int bt_cap_initiator_base_init(void)
+{
+	return osi_mutex_init(&initiator_list_mutex, OS_MUTEX_RECURSIVE);
+}

@@ -6,17 +6,18 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
+#include <embt/base/util_macro.h>
 #include <errno.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <sys/types.h>
 
-#include <zephyr/bluetooth/att.h>
-#include <zephyr/bluetooth/audio/ccid.h>
-#include <zephyr/bluetooth/gatt.h>
-#include <zephyr/bluetooth/uuid.h>
-#include <zephyr/sys/__assert.h>
-#include <zephyr/toolchain.h>
+#include <embt/bluetooth/att.h>
+#include <embt/bluetooth/audio/ccid.h>
+#include <embt/bluetooth/gatt.h>
+#include <embt/bluetooth/uuid.h>
+#include <embt/base/assert.h>
+#include <embt/compiler.h>
 
 struct ccid_search_param {
 	const struct bt_gatt_attr *attr;

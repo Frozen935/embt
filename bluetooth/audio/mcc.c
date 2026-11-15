@@ -7,31 +7,31 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
+#include <embt/base/assert.h>
+#include <embt/base/util_macro.h>
 #include <errno.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
 
-#include <zephyr/autoconf.h>
-#include <zephyr/bluetooth/audio/mcc.h>
-#include <zephyr/bluetooth/att.h>
-#include <zephyr/bluetooth/audio/mcs.h>
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/gatt.h>
-#include <zephyr/bluetooth/services/ots.h>
-#include <zephyr/bluetooth/uuid.h>
+#include <embt/autoconf.h>
+#include <embt/bluetooth/audio/mcc.h>
+#include <embt/bluetooth/att.h>
+#include <embt/bluetooth/audio/mcs.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/gatt.h>
+#include <embt/bluetooth/services/ots.h>
+#include <embt/bluetooth/uuid.h>
 #include <embt/base/log.h>
-#include <zephyr/net_buf.h>
-#include <zephyr/sys/__assert.h>
-#include <zephyr/sys/atomic.h>
-#include <zephyr/sys/byteorder.h>
-#include <zephyr/sys/util.h>
-#include <zephyr/sys/util_macro.h>
-#include <zephyr/toolchain.h>
-#include <zephyr/types.h>
-
+#include <embt/net_buf.h>
+#include <embt/base/assert.h>
+#include <embt/base/atomic.h>
+#include <embt/base/byteorder.h>
+#include <embt/base/util.h>
+#include <embt/base/util_macro.h>
+#include <embt/compiler.h>
 #include "../services/ots/ots_client_internal.h"
 #include "common/bt_str.h"
 #include "mcc_internal.h"
@@ -108,7 +108,7 @@ static uint8_t mcc_read_player_name_cb(struct bt_conn *conn, uint8_t err,
 {
 	struct mcs_instance_t *mcs_inst = CONTAINER_OF(params, struct mcs_instance_t, read_params);
 
-	atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
+	bt_atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
 	mcc_player_name_cb(conn, err, data, length);
 
 	return BT_GATT_ITER_STOP;
@@ -125,7 +125,7 @@ static uint8_t mcc_read_icon_obj_id_cb(struct bt_conn *conn, uint8_t err,
 	uint8_t *pid = (uint8_t *)data;
 	uint64_t id = 0U;
 
-	atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
+	bt_atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
 	LOG_DBG("err: 0x%02x, length: %d, data: %p", err, length, data);
 	if (err != 0) {
 		LOG_DBG("err: 0x%02x", err);
@@ -158,7 +158,7 @@ static uint8_t mcc_read_icon_url_cb(struct bt_conn *conn, uint8_t err,
 	int cb_err = err;
 	char url[CONFIG_BT_MCC_ICON_URL_MAX];
 
-	atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
+	bt_atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
 	LOG_DBG("err: 0x%02x, length: %d, data: %p", err, length, data);
 	if (err != 0) {
 		LOG_DBG("err: 0x%02x", err);
@@ -213,7 +213,7 @@ static uint8_t mcc_read_track_title_cb(struct bt_conn *conn, uint8_t err,
 {
 	struct mcs_instance_t *mcs_inst = CONTAINER_OF(params, struct mcs_instance_t, read_params);
 
-	atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
+	bt_atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
 	mcc_track_title_cb(conn, err, data, length);
 
 	return BT_GATT_ITER_STOP;
@@ -249,7 +249,7 @@ static uint8_t mcc_read_track_duration_cb(struct bt_conn *conn, uint8_t err,
 {
 	struct mcs_instance_t *mcs_inst = CONTAINER_OF(params, struct mcs_instance_t, read_params);
 
-	atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
+	bt_atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
 	mcc_track_duration_cb(conn, err, data, length);
 
 	return BT_GATT_ITER_STOP;
@@ -285,7 +285,7 @@ static uint8_t mcc_read_track_position_cb(struct bt_conn *conn, uint8_t err,
 {
 	struct mcs_instance_t *mcs_inst = CONTAINER_OF(params, struct mcs_instance_t, read_params);
 
-	atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
+	bt_atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
 	mcc_track_position_cb(conn, err, data, length);
 
 	return BT_GATT_ITER_STOP;
@@ -300,7 +300,7 @@ static void mcs_write_track_position_cb(struct bt_conn *conn, uint8_t err,
 	int cb_err = err;
 	int32_t pos = 0;
 
-	atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
+	bt_atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
 	if (err != 0) {
 		LOG_DBG("err: 0x%02x", err);
 	} else if (!params->data || params->length != sizeof(pos)) {
@@ -347,7 +347,7 @@ static uint8_t mcc_read_playback_speed_cb(struct bt_conn *conn, uint8_t err,
 {
 	struct mcs_instance_t *mcs_inst = CONTAINER_OF(params, struct mcs_instance_t, read_params);
 
-	atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
+	bt_atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
 	mcc_playback_speed_cb(conn, err, data, length);
 
 	return BT_GATT_ITER_STOP;
@@ -362,7 +362,7 @@ static void mcs_write_playback_speed_cb(struct bt_conn *conn, uint8_t err,
 	int cb_err = err;
 	int8_t speed = 0;
 
-	atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
+	bt_atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
 	if (err != 0) {
 		LOG_DBG("err: 0x%02x", err);
 	} else if (!params->data || params->length != sizeof(speed)) {
@@ -408,7 +408,7 @@ static uint8_t mcc_read_seeking_speed_cb(struct bt_conn *conn, uint8_t err,
 {
 	struct mcs_instance_t *mcs_inst = CONTAINER_OF(params, struct mcs_instance_t, read_params);
 
-	atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
+	bt_atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
 	mcc_seeking_speed_cb(conn, err, data, length);
 
 	return BT_GATT_ITER_STOP;
@@ -425,7 +425,7 @@ static uint8_t mcc_read_segments_obj_id_cb(struct bt_conn *conn, uint8_t err,
 	uint8_t *pid = (uint8_t *)data;
 	uint64_t id = 0U;
 
-	atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
+	bt_atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
 	if (err != 0) {
 		LOG_DBG("err: 0x%02x", err);
 	} else if ((!pid) || (length != BT_OTS_OBJ_ID_SIZE)) {
@@ -481,7 +481,7 @@ static uint8_t mcc_read_current_track_obj_id_cb(struct bt_conn *conn, uint8_t er
 {
 	struct mcs_instance_t *mcs_inst = CONTAINER_OF(params, struct mcs_instance_t, read_params);
 
-	atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
+	bt_atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
 	mcc_current_track_obj_id_cb(conn, err, data, length);
 
 	return BT_GATT_ITER_STOP;
@@ -494,7 +494,7 @@ static void mcs_write_current_track_obj_id_cb(struct bt_conn *conn, uint8_t err,
 	int cb_err = err;
 	uint64_t obj_id = 0U;
 
-	atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
+	bt_atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
 	if (err != 0) {
 		LOG_DBG("err: 0x%02x", err);
 	} else if (!params->data || params->length != BT_OTS_OBJ_ID_SIZE) {
@@ -549,7 +549,7 @@ static uint8_t mcc_read_next_track_obj_id_cb(struct bt_conn *conn, uint8_t err,
 {
 	struct mcs_instance_t *mcs_inst = CONTAINER_OF(params, struct mcs_instance_t, read_params);
 
-	atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
+	bt_atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
 	mcc_next_track_obj_id_cb(conn, err, data, length);
 
 	return BT_GATT_ITER_STOP;
@@ -562,7 +562,7 @@ static void mcs_write_next_track_obj_id_cb(struct bt_conn *conn, uint8_t err,
 	int cb_err = err;
 	uint64_t obj_id = 0U;
 
-	atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
+	bt_atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
 	if (err != 0) {
 		LOG_DBG("err: 0x%02x", err);
 	} else if (!params->data || params->length != BT_OTS_OBJ_ID_SIZE) {
@@ -615,7 +615,7 @@ static uint8_t mcc_read_parent_group_obj_id_cb(struct bt_conn *conn, uint8_t err
 {
 	struct mcs_instance_t *mcs_inst = CONTAINER_OF(params, struct mcs_instance_t, read_params);
 
-	atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
+	bt_atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
 	mcc_parent_group_obj_id_cb(conn, err, data, length);
 
 	return BT_GATT_ITER_STOP;
@@ -654,7 +654,7 @@ static uint8_t mcc_read_current_group_obj_id_cb(struct bt_conn *conn, uint8_t er
 {
 	struct mcs_instance_t *mcs_inst = CONTAINER_OF(params, struct mcs_instance_t, read_params);
 
-	atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
+	bt_atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
 	mcc_current_group_obj_id_cb(conn, err, data, length);
 
 	return BT_GATT_ITER_STOP;
@@ -667,7 +667,7 @@ static void mcs_write_current_group_obj_id_cb(struct bt_conn *conn, uint8_t err,
 	int cb_err = err;
 	uint64_t obj_id = 0U;
 
-	atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
+	bt_atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
 	if (err != 0) {
 		LOG_DBG("err: 0x%02x", err);
 	} else if (!params->data || params->length != BT_OTS_OBJ_ID_SIZE) {
@@ -717,7 +717,7 @@ static uint8_t mcc_read_playing_order_cb(struct bt_conn *conn, uint8_t err,
 {
 	struct mcs_instance_t *mcs_inst = CONTAINER_OF(params, struct mcs_instance_t, read_params);
 
-	atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
+	bt_atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
 	mcc_playing_order_cb(conn, err, data, length);
 
 	return BT_GATT_ITER_STOP;
@@ -732,7 +732,7 @@ static void mcs_write_playing_order_cb(struct bt_conn *conn, uint8_t err,
 	int cb_err = err;
 	uint8_t order = 0U;
 
-	atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
+	bt_atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
 	if (err != 0) {
 		LOG_DBG("err: 0x%02x", err);
 	} else if (!params->data || params->length != sizeof(order)) {
@@ -758,7 +758,7 @@ static uint8_t mcc_read_playing_orders_supported_cb(struct bt_conn *conn, uint8_
 	int cb_err = err;
 	uint16_t orders = 0U;
 
-	atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
+	bt_atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
 	if (err != 0) {
 		LOG_DBG("err: 0x%02x", err);
 	} else if (!data || length != sizeof(orders)) {
@@ -806,7 +806,7 @@ static uint8_t mcc_read_media_state_cb(struct bt_conn *conn, uint8_t err,
 {
 	struct mcs_instance_t *mcs_inst = CONTAINER_OF(params, struct mcs_instance_t, read_params);
 
-	atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
+	bt_atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
 	mcc_media_state_cb(conn, err, data, length);
 
 	return BT_GATT_ITER_STOP;
@@ -821,7 +821,7 @@ static void mcs_write_cp_cb(struct bt_conn *conn, uint8_t err,
 	int cb_err = err;
 	struct bt_mcs_cmd cmd = {0};
 
-	atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
+	bt_atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
 
 	if (err != 0) {
 		LOG_DBG("err: 0x%02x", err);
@@ -879,7 +879,7 @@ static uint8_t mcc_read_opcodes_supported_cb(struct bt_conn *conn, uint8_t err,
 {
 	struct mcs_instance_t *mcs_inst = CONTAINER_OF(params, struct mcs_instance_t, read_params);
 
-	atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
+	bt_atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
 	mcc_opcodes_supported_cb(conn, err, data, length);
 
 	return BT_GATT_ITER_STOP;
@@ -894,7 +894,7 @@ static void mcs_write_scp_cb(struct bt_conn *conn, uint8_t err,
 	int cb_err = err;
 	struct bt_mcs_search search = {0};
 
-	atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
+	bt_atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
 
 	if (err != 0) {
 		LOG_DBG("err: 0x%02x", err);
@@ -948,7 +948,7 @@ static uint8_t mcc_read_search_results_obj_id_cb(struct bt_conn *conn, uint8_t e
 {
 	struct mcs_instance_t *mcs_inst = CONTAINER_OF(params, struct mcs_instance_t, read_params);
 
-	atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
+	bt_atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
 	mcc_search_results_obj_id_cb(conn, err, data, length);
 
 	return BT_GATT_ITER_STOP;
@@ -964,7 +964,7 @@ static uint8_t mcc_read_content_control_id_cb(struct bt_conn *conn, uint8_t err,
 	int cb_err = err;
 	uint8_t ccid = 0U;
 
-	atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
+	bt_atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
 
 	if (err != 0) {
 		LOG_DBG("err: 0x%02x", err);
@@ -1359,7 +1359,7 @@ static void discovery_complete(struct bt_conn *conn, int err)
 
 	mcs_inst = lookup_inst_by_conn(conn);
 	if (mcs_inst != NULL) {
-		atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
+		bt_atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
 		if (err != 0) {
 			(void)reset_mcs_inst(mcs_inst);
 		}
@@ -1439,7 +1439,7 @@ static uint8_t discover_otc_char_func(struct bt_conn *conn,
 			sub_params->value = BT_GATT_CCC_INDICATE;
 			sub_params->value_handle = chrc->value_handle;
 			sub_params->notify = bt_ots_client_indicate_handler;
-			atomic_set_bit(sub_params->flags, BT_GATT_SUBSCRIBE_FLAG_VOLATILE);
+			bt_atomic_set_bit(sub_params->flags, BT_GATT_SUBSCRIBE_FLAG_VOLATILE);
 
 			err = bt_gatt_subscribe(conn, sub_params);
 			if (err != 0) {
@@ -1604,7 +1604,7 @@ static int do_subscribe(struct mcs_instance_t *mcs_inst, struct bt_conn *conn,
 	sub_params->subscribe = subscribe_mcs_char_func;
 	/* disc_params pointer is also used as subscription flag */
 	sub_params->disc_params = &mcs_inst->discover_params;
-	atomic_set_bit(sub_params->flags, BT_GATT_SUBSCRIBE_FLAG_VOLATILE);
+	bt_atomic_set_bit(sub_params->flags, BT_GATT_SUBSCRIBE_FLAG_VOLATILE);
 
 	LOG_DBG("Subscring to handle %d", handle);
 	return bt_gatt_subscribe(conn, sub_params);
@@ -2116,7 +2116,7 @@ int bt_mcc_discover_mcs(struct bt_conn *conn, bool subscribe)
 		return -EINVAL;
 	}
 
-	if (atomic_test_and_set_bit(mcs_inst->flags, MCC_FLAG_BUSY)) {
+	if (bt_atomic_test_and_set_bit(mcs_inst->flags, MCC_FLAG_BUSY)) {
 		return -EBUSY;
 	}
 
@@ -2153,7 +2153,7 @@ int bt_mcc_discover_mcs(struct bt_conn *conn, bool subscribe)
 	return 0;
 
 cleanup:
-	atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
+	bt_atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
 	return err;
 }
 
@@ -2177,7 +2177,7 @@ int bt_mcc_read_player_name(struct bt_conn *conn)
 		LOG_DBG("handle not set");
 
 		return -EINVAL;
-	} else if (atomic_test_and_set_bit(mcs_inst->flags, MCC_FLAG_BUSY)) {
+	} else if (bt_atomic_test_and_set_bit(mcs_inst->flags, MCC_FLAG_BUSY)) {
 
 		LOG_DBG("mcs_inst busy");
 		return -EBUSY;
@@ -2190,7 +2190,7 @@ int bt_mcc_read_player_name(struct bt_conn *conn)
 
 	err = bt_gatt_read(conn, &mcs_inst->read_params);
 	if (err != 0) {
-		atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
+		bt_atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
 	}
 	return err;
 }
@@ -2216,7 +2216,7 @@ int bt_mcc_read_icon_obj_id(struct bt_conn *conn)
 		LOG_DBG("handle not set");
 
 		return -EINVAL;
-	} else if (atomic_test_and_set_bit(mcs_inst->flags, MCC_FLAG_BUSY)) {
+	} else if (bt_atomic_test_and_set_bit(mcs_inst->flags, MCC_FLAG_BUSY)) {
 
 		LOG_DBG("mcs_inst busy");
 		return -EBUSY;
@@ -2229,7 +2229,7 @@ int bt_mcc_read_icon_obj_id(struct bt_conn *conn)
 
 	err = bt_gatt_read(conn, &mcs_inst->read_params);
 	if (err != 0) {
-		atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
+		bt_atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
 	}
 	return err;
 }
@@ -2256,7 +2256,7 @@ int bt_mcc_read_icon_url(struct bt_conn *conn)
 		LOG_DBG("handle not set");
 
 		return -EINVAL;
-	} else if (atomic_test_and_set_bit(mcs_inst->flags, MCC_FLAG_BUSY)) {
+	} else if (bt_atomic_test_and_set_bit(mcs_inst->flags, MCC_FLAG_BUSY)) {
 
 		LOG_DBG("mcs_inst busy");
 		return -EBUSY;
@@ -2269,7 +2269,7 @@ int bt_mcc_read_icon_url(struct bt_conn *conn)
 
 	err = bt_gatt_read(conn, &mcs_inst->read_params);
 	if (err != 0) {
-		atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
+		bt_atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
 	}
 	return err;
 }
@@ -2296,7 +2296,7 @@ int bt_mcc_read_track_title(struct bt_conn *conn)
 		LOG_DBG("handle not set");
 
 		return -EINVAL;
-	} else if (atomic_test_and_set_bit(mcs_inst->flags, MCC_FLAG_BUSY)) {
+	} else if (bt_atomic_test_and_set_bit(mcs_inst->flags, MCC_FLAG_BUSY)) {
 
 		LOG_DBG("mcs_inst busy");
 		return -EBUSY;
@@ -2309,7 +2309,7 @@ int bt_mcc_read_track_title(struct bt_conn *conn)
 
 	err = bt_gatt_read(conn, &mcs_inst->read_params);
 	if (err != 0) {
-		atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
+		bt_atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
 	}
 	return err;
 }
@@ -2336,7 +2336,7 @@ int bt_mcc_read_track_duration(struct bt_conn *conn)
 		LOG_DBG("handle not set");
 
 		return -EINVAL;
-	} else if (atomic_test_and_set_bit(mcs_inst->flags, MCC_FLAG_BUSY)) {
+	} else if (bt_atomic_test_and_set_bit(mcs_inst->flags, MCC_FLAG_BUSY)) {
 
 		LOG_DBG("mcs_inst busy");
 		return -EBUSY;
@@ -2349,7 +2349,7 @@ int bt_mcc_read_track_duration(struct bt_conn *conn)
 
 	err = bt_gatt_read(conn, &mcs_inst->read_params);
 	if (err != 0) {
-		atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
+		bt_atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
 	}
 	return err;
 }
@@ -2376,7 +2376,7 @@ int bt_mcc_read_track_position(struct bt_conn *conn)
 		LOG_DBG("handle not set");
 
 		return -EINVAL;
-	} else if (atomic_test_and_set_bit(mcs_inst->flags, MCC_FLAG_BUSY)) {
+	} else if (bt_atomic_test_and_set_bit(mcs_inst->flags, MCC_FLAG_BUSY)) {
 
 		LOG_DBG("mcs_inst busy");
 		return -EBUSY;
@@ -2389,7 +2389,7 @@ int bt_mcc_read_track_position(struct bt_conn *conn)
 
 	err = bt_gatt_read(conn, &mcs_inst->read_params);
 	if (err != 0) {
-		atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
+		bt_atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
 	}
 	return err;
 }
@@ -2416,7 +2416,7 @@ int bt_mcc_set_track_position(struct bt_conn *conn, int32_t pos)
 		LOG_DBG("handle not set");
 
 		return -EINVAL;
-	} else if (atomic_test_and_set_bit(mcs_inst->flags, MCC_FLAG_BUSY)) {
+	} else if (bt_atomic_test_and_set_bit(mcs_inst->flags, MCC_FLAG_BUSY)) {
 
 		LOG_DBG("mcs_inst busy");
 		return -EBUSY;
@@ -2434,7 +2434,7 @@ int bt_mcc_set_track_position(struct bt_conn *conn, int32_t pos)
 
 	err = bt_gatt_write(conn, &mcs_inst->write_params);
 	if (err != 0) {
-		atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
+		bt_atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
 	}
 	return err;
 }
@@ -2461,7 +2461,7 @@ int bt_mcc_read_playback_speed(struct bt_conn *conn)
 		LOG_DBG("handle not set");
 
 		return -EINVAL;
-	} else if (atomic_test_and_set_bit(mcs_inst->flags, MCC_FLAG_BUSY)) {
+	} else if (bt_atomic_test_and_set_bit(mcs_inst->flags, MCC_FLAG_BUSY)) {
 
 		LOG_DBG("mcs_inst busy");
 		return -EBUSY;
@@ -2474,7 +2474,7 @@ int bt_mcc_read_playback_speed(struct bt_conn *conn)
 
 	err = bt_gatt_read(conn, &mcs_inst->read_params);
 	if (err != 0) {
-		atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
+		bt_atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
 	}
 	return err;
 }
@@ -2501,7 +2501,7 @@ int bt_mcc_set_playback_speed(struct bt_conn *conn, int8_t speed)
 		LOG_DBG("handle not set");
 
 		return -EINVAL;
-	} else if (atomic_test_and_set_bit(mcs_inst->flags, MCC_FLAG_BUSY)) {
+	} else if (bt_atomic_test_and_set_bit(mcs_inst->flags, MCC_FLAG_BUSY)) {
 
 		LOG_DBG("mcs_inst busy");
 		return -EBUSY;
@@ -2519,7 +2519,7 @@ int bt_mcc_set_playback_speed(struct bt_conn *conn, int8_t speed)
 
 	err = bt_gatt_write(conn, &mcs_inst->write_params);
 	if (err != 0) {
-		atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
+		bt_atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
 	}
 	return err;
 }
@@ -2546,7 +2546,7 @@ int bt_mcc_read_seeking_speed(struct bt_conn *conn)
 		LOG_DBG("handle not set");
 
 		return -EINVAL;
-	} else if (atomic_test_and_set_bit(mcs_inst->flags, MCC_FLAG_BUSY)) {
+	} else if (bt_atomic_test_and_set_bit(mcs_inst->flags, MCC_FLAG_BUSY)) {
 
 		LOG_DBG("mcs_inst busy");
 		return -EBUSY;
@@ -2559,7 +2559,7 @@ int bt_mcc_read_seeking_speed(struct bt_conn *conn)
 
 	err = bt_gatt_read(conn, &mcs_inst->read_params);
 	if (err != 0) {
-		atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
+		bt_atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
 	}
 	return err;
 }
@@ -2586,7 +2586,7 @@ int bt_mcc_read_segments_obj_id(struct bt_conn *conn)
 		LOG_DBG("handle not set");
 
 		return -EINVAL;
-	} else if (atomic_test_and_set_bit(mcs_inst->flags, MCC_FLAG_BUSY)) {
+	} else if (bt_atomic_test_and_set_bit(mcs_inst->flags, MCC_FLAG_BUSY)) {
 
 		LOG_DBG("mcs_inst busy");
 		return -EBUSY;
@@ -2599,7 +2599,7 @@ int bt_mcc_read_segments_obj_id(struct bt_conn *conn)
 
 	err = bt_gatt_read(conn, &mcs_inst->read_params);
 	if (err != 0) {
-		atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
+		bt_atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
 	}
 	return err;
 }
@@ -2624,7 +2624,7 @@ int bt_mcc_read_current_track_obj_id(struct bt_conn *conn)
 		LOG_DBG("handle not set");
 
 		return -EINVAL;
-	} else if (atomic_test_and_set_bit(mcs_inst->flags, MCC_FLAG_BUSY)) {
+	} else if (bt_atomic_test_and_set_bit(mcs_inst->flags, MCC_FLAG_BUSY)) {
 
 		LOG_DBG("mcs_inst busy");
 		return -EBUSY;
@@ -2637,7 +2637,7 @@ int bt_mcc_read_current_track_obj_id(struct bt_conn *conn)
 
 	err = bt_gatt_read(conn, &mcs_inst->read_params);
 	if (err != 0) {
-		atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
+		bt_atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
 	}
 	return err;
 }
@@ -2667,7 +2667,7 @@ int bt_mcc_set_current_track_obj_id(struct bt_conn *conn, uint64_t obj_id)
 		LOG_DBG("handle not set");
 
 		return -EINVAL;
-	} else if (atomic_test_and_set_bit(mcs_inst->flags, MCC_FLAG_BUSY)) {
+	} else if (bt_atomic_test_and_set_bit(mcs_inst->flags, MCC_FLAG_BUSY)) {
 
 		LOG_DBG("mcs_inst busy");
 		return -EBUSY;
@@ -2684,7 +2684,7 @@ int bt_mcc_set_current_track_obj_id(struct bt_conn *conn, uint64_t obj_id)
 
 	err = bt_gatt_write(conn, &mcs_inst->write_params);
 	if (err != 0) {
-		atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
+		bt_atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
 	}
 	return err;
 }
@@ -2709,7 +2709,7 @@ int bt_mcc_read_next_track_obj_id(struct bt_conn *conn)
 		LOG_DBG("handle not set");
 
 		return -EINVAL;
-	} else if (atomic_test_and_set_bit(mcs_inst->flags, MCC_FLAG_BUSY)) {
+	} else if (bt_atomic_test_and_set_bit(mcs_inst->flags, MCC_FLAG_BUSY)) {
 
 		LOG_DBG("mcs_inst busy");
 		return -EBUSY;
@@ -2722,7 +2722,7 @@ int bt_mcc_read_next_track_obj_id(struct bt_conn *conn)
 
 	err = bt_gatt_read(conn, &mcs_inst->read_params);
 	if (err != 0) {
-		atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
+		bt_atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
 	}
 	return err;
 }
@@ -2752,7 +2752,7 @@ int bt_mcc_set_next_track_obj_id(struct bt_conn *conn, uint64_t obj_id)
 		LOG_DBG("handle not set");
 
 		return -EINVAL;
-	} else if (atomic_test_and_set_bit(mcs_inst->flags, MCC_FLAG_BUSY)) {
+	} else if (bt_atomic_test_and_set_bit(mcs_inst->flags, MCC_FLAG_BUSY)) {
 
 		LOG_DBG("mcs_inst busy");
 		return -EBUSY;
@@ -2769,7 +2769,7 @@ int bt_mcc_set_next_track_obj_id(struct bt_conn *conn, uint64_t obj_id)
 
 	err = bt_gatt_write(conn, &mcs_inst->write_params);
 	if (err != 0) {
-		atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
+		bt_atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
 	}
 	return err;
 }
@@ -2794,7 +2794,7 @@ int bt_mcc_read_parent_group_obj_id(struct bt_conn *conn)
 		LOG_DBG("handle not set");
 
 		return -EINVAL;
-	} else if (atomic_test_and_set_bit(mcs_inst->flags, MCC_FLAG_BUSY)) {
+	} else if (bt_atomic_test_and_set_bit(mcs_inst->flags, MCC_FLAG_BUSY)) {
 
 		LOG_DBG("mcs_inst busy");
 		return -EBUSY;
@@ -2807,7 +2807,7 @@ int bt_mcc_read_parent_group_obj_id(struct bt_conn *conn)
 
 	err = bt_gatt_read(conn, &mcs_inst->read_params);
 	if (err != 0) {
-		atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
+		bt_atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
 	}
 	return err;
 }
@@ -2832,7 +2832,7 @@ int bt_mcc_read_current_group_obj_id(struct bt_conn *conn)
 		LOG_DBG("handle not set");
 
 		return -EINVAL;
-	} else if (atomic_test_and_set_bit(mcs_inst->flags, MCC_FLAG_BUSY)) {
+	} else if (bt_atomic_test_and_set_bit(mcs_inst->flags, MCC_FLAG_BUSY)) {
 
 		LOG_DBG("mcs_inst busy");
 		return -EBUSY;
@@ -2845,7 +2845,7 @@ int bt_mcc_read_current_group_obj_id(struct bt_conn *conn)
 
 	err = bt_gatt_read(conn, &mcs_inst->read_params);
 	if (err != 0) {
-		atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
+		bt_atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
 	}
 	return err;
 }
@@ -2875,7 +2875,7 @@ int bt_mcc_set_current_group_obj_id(struct bt_conn *conn, uint64_t obj_id)
 		LOG_DBG("handle not set");
 
 		return -EINVAL;
-	} else if (atomic_test_and_set_bit(mcs_inst->flags, MCC_FLAG_BUSY)) {
+	} else if (bt_atomic_test_and_set_bit(mcs_inst->flags, MCC_FLAG_BUSY)) {
 
 		LOG_DBG("mcs_inst busy");
 		return -EBUSY;
@@ -2892,7 +2892,7 @@ int bt_mcc_set_current_group_obj_id(struct bt_conn *conn, uint64_t obj_id)
 
 	err = bt_gatt_write(conn, &mcs_inst->write_params);
 	if (err != 0) {
-		atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
+		bt_atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
 	}
 	return err;
 }
@@ -2919,7 +2919,7 @@ int bt_mcc_read_playing_order(struct bt_conn *conn)
 		LOG_DBG("handle not set");
 
 		return -EINVAL;
-	} else if (atomic_test_and_set_bit(mcs_inst->flags, MCC_FLAG_BUSY)) {
+	} else if (bt_atomic_test_and_set_bit(mcs_inst->flags, MCC_FLAG_BUSY)) {
 
 		LOG_DBG("mcs_inst busy");
 		return -EBUSY;
@@ -2932,7 +2932,7 @@ int bt_mcc_read_playing_order(struct bt_conn *conn)
 
 	err = bt_gatt_read(conn, &mcs_inst->read_params);
 	if (err != 0) {
-		atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
+		bt_atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
 	}
 	return err;
 }
@@ -2966,7 +2966,7 @@ int bt_mcc_set_playing_order(struct bt_conn *conn, uint8_t order)
 		LOG_DBG("handle not set");
 
 		return -EINVAL;
-	} else if (atomic_test_and_set_bit(mcs_inst->flags, MCC_FLAG_BUSY)) {
+	} else if (bt_atomic_test_and_set_bit(mcs_inst->flags, MCC_FLAG_BUSY)) {
 
 		LOG_DBG("mcs_inst busy");
 		return -EBUSY;
@@ -2984,7 +2984,7 @@ int bt_mcc_set_playing_order(struct bt_conn *conn, uint8_t order)
 
 	err = bt_gatt_write(conn, &mcs_inst->write_params);
 	if (err != 0) {
-		atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
+		bt_atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
 	}
 	return err;
 }
@@ -3011,7 +3011,7 @@ int bt_mcc_read_playing_orders_supported(struct bt_conn *conn)
 		LOG_DBG("handle not set");
 
 		return -EINVAL;
-	} else if (atomic_test_and_set_bit(mcs_inst->flags, MCC_FLAG_BUSY)) {
+	} else if (bt_atomic_test_and_set_bit(mcs_inst->flags, MCC_FLAG_BUSY)) {
 
 		LOG_DBG("mcs_inst busy");
 		return -EBUSY;
@@ -3024,7 +3024,7 @@ int bt_mcc_read_playing_orders_supported(struct bt_conn *conn)
 
 	err = bt_gatt_read(conn, &mcs_inst->read_params);
 	if (err != 0) {
-		atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
+		bt_atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
 	}
 	return err;
 }
@@ -3051,7 +3051,7 @@ int bt_mcc_read_media_state(struct bt_conn *conn)
 		LOG_DBG("handle not set");
 
 		return -EINVAL;
-	} else if (atomic_test_and_set_bit(mcs_inst->flags, MCC_FLAG_BUSY)) {
+	} else if (bt_atomic_test_and_set_bit(mcs_inst->flags, MCC_FLAG_BUSY)) {
 
 		LOG_DBG("mcs_inst busy");
 		return -EBUSY;
@@ -3064,7 +3064,7 @@ int bt_mcc_read_media_state(struct bt_conn *conn)
 
 	err = bt_gatt_read(conn, &mcs_inst->read_params);
 	if (err != 0) {
-		atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
+		bt_atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
 	}
 	return err;
 }
@@ -3104,7 +3104,7 @@ int bt_mcc_send_cmd(struct bt_conn *conn, const struct bt_mcs_cmd *cmd)
 		LOG_DBG("handle not set");
 
 		return -EINVAL;
-	} else if (atomic_test_and_set_bit(mcs_inst->flags, MCC_FLAG_BUSY)) {
+	} else if (bt_atomic_test_and_set_bit(mcs_inst->flags, MCC_FLAG_BUSY)) {
 
 		LOG_DBG("mcs_inst busy");
 		return -EBUSY;
@@ -3128,7 +3128,7 @@ int bt_mcc_send_cmd(struct bt_conn *conn, const struct bt_mcs_cmd *cmd)
 
 	err = bt_gatt_write(conn, &mcs_inst->write_params);
 	if (err != 0) {
-		atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
+		bt_atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
 	}
 	return err;
 }
@@ -3155,7 +3155,7 @@ int bt_mcc_read_opcodes_supported(struct bt_conn *conn)
 		LOG_DBG("handle not set");
 
 		return -EINVAL;
-	} else if (atomic_test_and_set_bit(mcs_inst->flags, MCC_FLAG_BUSY)) {
+	} else if (bt_atomic_test_and_set_bit(mcs_inst->flags, MCC_FLAG_BUSY)) {
 
 		LOG_DBG("mcs_inst busy");
 		return -EBUSY;
@@ -3168,7 +3168,7 @@ int bt_mcc_read_opcodes_supported(struct bt_conn *conn)
 
 	err = bt_gatt_read(conn, &mcs_inst->read_params);
 	if (err != 0) {
-		atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
+		bt_atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
 	}
 	return err;
 }
@@ -3207,7 +3207,7 @@ int bt_mcc_send_search(struct bt_conn *conn, const struct bt_mcs_search *search)
 		LOG_DBG("handle not set");
 
 		return -EINVAL;
-	} else if (atomic_test_and_set_bit(mcs_inst->flags, MCC_FLAG_BUSY)) {
+	} else if (bt_atomic_test_and_set_bit(mcs_inst->flags, MCC_FLAG_BUSY)) {
 
 		LOG_DBG("mcs_inst busy");
 		return -EBUSY;
@@ -3225,7 +3225,7 @@ int bt_mcc_send_search(struct bt_conn *conn, const struct bt_mcs_search *search)
 
 	err = bt_gatt_write(conn, &mcs_inst->write_params);
 	if (err != 0) {
-		atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
+		bt_atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
 	}
 	return err;
 }
@@ -3250,7 +3250,7 @@ int bt_mcc_read_search_results_obj_id(struct bt_conn *conn)
 		LOG_DBG("handle not set");
 
 		return -EINVAL;
-	} else if (atomic_test_and_set_bit(mcs_inst->flags, MCC_FLAG_BUSY)) {
+	} else if (bt_atomic_test_and_set_bit(mcs_inst->flags, MCC_FLAG_BUSY)) {
 
 		LOG_DBG("mcs_inst busy");
 		return -EBUSY;
@@ -3263,7 +3263,7 @@ int bt_mcc_read_search_results_obj_id(struct bt_conn *conn)
 
 	err = bt_gatt_read(conn, &mcs_inst->read_params);
 	if (err != 0) {
-		atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
+		bt_atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
 	}
 	return err;
 }
@@ -3290,7 +3290,7 @@ int bt_mcc_read_content_control_id(struct bt_conn *conn)
 		LOG_DBG("handle not set");
 
 		return -EINVAL;
-	} else if (atomic_test_and_set_bit(mcs_inst->flags, MCC_FLAG_BUSY)) {
+	} else if (bt_atomic_test_and_set_bit(mcs_inst->flags, MCC_FLAG_BUSY)) {
 
 		LOG_DBG("mcs_inst busy");
 		return -EBUSY;
@@ -3303,7 +3303,7 @@ int bt_mcc_read_content_control_id(struct bt_conn *conn)
 
 	err = bt_gatt_read(conn, &mcs_inst->read_params);
 	if (err != 0) {
-		atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
+		bt_atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
 	}
 	return err;
 }
@@ -3321,7 +3321,7 @@ void on_obj_selected(struct bt_ots_client *otc_inst,
 	LOG_DBG("Current object selected");
 
 	if (mcs_inst != NULL) {
-		atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
+		bt_atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
 	}
 
 	/* TODO: Read metadata here? */
@@ -3366,7 +3366,7 @@ int on_icon_content(struct bt_ots_client *otc_inst, struct bt_conn *conn,
 		LOG_DBG("Icon object received");
 
 		if (mcs_inst != NULL) {
-			atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
+			bt_atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
 		}
 
 		if (mcc_cb && mcc_cb->otc_icon_object) {
@@ -3457,7 +3457,7 @@ int on_track_segments_content(struct bt_ots_client *otc_inst,
 		LOG_DBG("Track segment object received");
 
 		if (mcs_inst != NULL) {
-			atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
+			bt_atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
 		}
 
 #if BT_LOG_LEVEL_ENABLED(BT_MCC, DBG)
@@ -3511,7 +3511,7 @@ int on_current_track_content(struct bt_ots_client *otc_inst,
 		LOG_DBG("Current Track Object received");
 
 		if (mcs_inst != NULL) {
-			atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
+			bt_atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
 		}
 
 		if (mcc_cb && mcc_cb->otc_current_track_object) {
@@ -3551,7 +3551,7 @@ int on_next_track_content(struct bt_ots_client *otc_inst,
 		LOG_DBG("Next Track Object received");
 
 		if (mcs_inst != NULL) {
-			atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
+			bt_atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
 		}
 
 		if (mcc_cb && mcc_cb->otc_next_track_object) {
@@ -3619,7 +3619,7 @@ int on_parent_group_content(struct bt_ots_client *otc_inst,
 		LOG_DBG("Parent Group object received");
 
 		if (mcs_inst != NULL) {
-			atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
+			bt_atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
 		}
 
 #if BT_LOG_LEVEL_ENABLED(BT_MCC, DBG)
@@ -3673,7 +3673,7 @@ int on_current_group_content(struct bt_ots_client *otc_inst,
 		LOG_DBG("Current Group object received");
 
 		if (mcs_inst != NULL) {
-			atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
+			bt_atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
 		}
 
 #if BT_LOG_LEVEL_ENABLED(BT_MCC, DBG)
@@ -3716,7 +3716,7 @@ void on_object_metadata(struct bt_ots_client *otc_inst,
 	}
 
 	if (mcs_inst != NULL) {
-		atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
+		bt_atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
 	}
 
 	bt_ots_metadata_display(&otc_inst->cur_object, 1);
@@ -3742,7 +3742,7 @@ int bt_mcc_otc_read_object_metadata(struct bt_conn *conn)
 		LOG_DBG("Could not lookup mcs_inst from conn %p", (void *)conn);
 
 		return -EINVAL;
-	} else if (atomic_test_and_set_bit(mcs_inst->flags, MCC_FLAG_BUSY)) {
+	} else if (bt_atomic_test_and_set_bit(mcs_inst->flags, MCC_FLAG_BUSY)) {
 
 		LOG_DBG("mcs_inst busy");
 		return -EBUSY;
@@ -3752,7 +3752,7 @@ int bt_mcc_otc_read_object_metadata(struct bt_conn *conn)
 						 BT_OTS_METADATA_REQ_ALL);
 	if (err != 0) {
 		LOG_DBG("Error reading the object: %d", err);
-		atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
+		bt_atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
 	}
 
 	return err;
@@ -3775,7 +3775,7 @@ int bt_mcc_otc_read_icon_object(struct bt_conn *conn)
 		LOG_DBG("Could not lookup mcs_inst from conn %p", (void *)conn);
 
 		return -EINVAL;
-	} else if (atomic_test_and_set_bit(mcs_inst->flags, MCC_FLAG_BUSY)) {
+	} else if (bt_atomic_test_and_set_bit(mcs_inst->flags, MCC_FLAG_BUSY)) {
 
 		LOG_DBG("mcs_inst busy");
 		return -EBUSY;
@@ -3786,7 +3786,7 @@ int bt_mcc_otc_read_icon_object(struct bt_conn *conn)
 	err = bt_ots_client_read_object_data(&mcs_inst->otc, conn);
 	if (err != 0) {
 		LOG_DBG("Error reading the object: %d", err);
-		atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
+		bt_atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
 	}
 
 	return err;
@@ -3808,7 +3808,7 @@ int bt_mcc_otc_read_track_segments_object(struct bt_conn *conn)
 		LOG_DBG("Could not lookup mcs_inst from conn %p", (void *)conn);
 
 		return -EINVAL;
-	} else if (atomic_test_and_set_bit(mcs_inst->flags, MCC_FLAG_BUSY)) {
+	} else if (bt_atomic_test_and_set_bit(mcs_inst->flags, MCC_FLAG_BUSY)) {
 
 		LOG_DBG("mcs_inst busy");
 		return -EBUSY;
@@ -3820,7 +3820,7 @@ int bt_mcc_otc_read_track_segments_object(struct bt_conn *conn)
 	err = bt_ots_client_read_object_data(&mcs_inst->otc, conn);
 	if (err != 0) {
 		LOG_DBG("Error reading the object: %d", err);
-		atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
+		bt_atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
 	}
 
 	return err;
@@ -3842,7 +3842,7 @@ int bt_mcc_otc_read_current_track_object(struct bt_conn *conn)
 		LOG_DBG("Could not lookup mcs_inst from conn %p", (void *)conn);
 
 		return -EINVAL;
-	} else if (atomic_test_and_set_bit(mcs_inst->flags, MCC_FLAG_BUSY)) {
+	} else if (bt_atomic_test_and_set_bit(mcs_inst->flags, MCC_FLAG_BUSY)) {
 
 		LOG_DBG("mcs_inst busy");
 		return -EBUSY;
@@ -3854,7 +3854,7 @@ int bt_mcc_otc_read_current_track_object(struct bt_conn *conn)
 	err = bt_ots_client_read_object_data(&mcs_inst->otc, conn);
 	if (err != 0) {
 		LOG_DBG("Error reading the object: %d", err);
-		atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
+		bt_atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
 	}
 
 	return err;
@@ -3876,7 +3876,7 @@ int bt_mcc_otc_read_next_track_object(struct bt_conn *conn)
 		LOG_DBG("Could not lookup mcs_inst from conn %p", (void *)conn);
 
 		return -EINVAL;
-	} else if (atomic_test_and_set_bit(mcs_inst->flags, MCC_FLAG_BUSY)) {
+	} else if (bt_atomic_test_and_set_bit(mcs_inst->flags, MCC_FLAG_BUSY)) {
 
 		LOG_DBG("mcs_inst busy");
 		return -EBUSY;
@@ -3888,7 +3888,7 @@ int bt_mcc_otc_read_next_track_object(struct bt_conn *conn)
 	err = bt_ots_client_read_object_data(&mcs_inst->otc, conn);
 	if (err != 0) {
 		LOG_DBG("Error reading the object: %d", err);
-		atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
+		bt_atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
 	}
 
 	return err;
@@ -3910,7 +3910,7 @@ int bt_mcc_otc_read_parent_group_object(struct bt_conn *conn)
 		LOG_DBG("Could not lookup mcs_inst from conn %p", (void *)conn);
 
 		return -EINVAL;
-	} else if (atomic_test_and_set_bit(mcs_inst->flags, MCC_FLAG_BUSY)) {
+	} else if (bt_atomic_test_and_set_bit(mcs_inst->flags, MCC_FLAG_BUSY)) {
 
 		LOG_DBG("mcs_inst busy");
 		return -EBUSY;
@@ -3924,7 +3924,7 @@ int bt_mcc_otc_read_parent_group_object(struct bt_conn *conn)
 	err = bt_ots_client_read_object_data(&mcs_inst->otc, conn);
 	if (err != 0) {
 		LOG_DBG("Error reading the object: %d", err);
-		atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
+		bt_atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
 	}
 
 	return err;
@@ -3946,7 +3946,7 @@ int bt_mcc_otc_read_current_group_object(struct bt_conn *conn)
 		LOG_DBG("Could not lookup mcs_inst from conn %p", (void *)conn);
 
 		return -EINVAL;
-	} else if (atomic_test_and_set_bit(mcs_inst->flags, MCC_FLAG_BUSY)) {
+	} else if (bt_atomic_test_and_set_bit(mcs_inst->flags, MCC_FLAG_BUSY)) {
 
 		LOG_DBG("mcs_inst busy");
 		return -EBUSY;
@@ -3958,7 +3958,7 @@ int bt_mcc_otc_read_current_group_object(struct bt_conn *conn)
 	err = bt_ots_client_read_object_data(&mcs_inst->otc, conn);
 	if (err != 0) {
 		LOG_DBG("Error reading the object: %d", err);
-		atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
+		bt_atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
 	}
 
 	return err;
@@ -3979,3 +3979,14 @@ struct bt_ots_client *bt_mcc_otc_inst(struct bt_conn *conn)
 #endif /* defined(CONFIG_BT_MCC_SHELL) */
 
 #endif /* CONFIG_BT_MCC_OTS */
+
+int bt_audio_mcc_register(void)
+{
+	int err;
+
+	err = bt_conn_cb_register(&bt_conn_cb_conn_callbacks);
+	if (err && err != -EEXIST) {
+		return err;
+	}
+	return 0;
+}

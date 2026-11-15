@@ -7,14 +7,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <embt/base/atomic.h>
+#include <string.h>
+#include <embt/base/assert.h>
 #include <stdbool.h>
 #include <stdint.h>
 
-#include <zephyr/autoconf.h>
-#include <zephyr/bluetooth/audio/audio.h>
-#include <zephyr/bluetooth/audio/bap.h>
-#include <zephyr/bluetooth/iso.h>
-#include <zephyr/sys/atomic_types.h>
+#include <embt/autoconf.h>
+#include <embt/bluetooth/audio/audio.h>
+#include <embt/bluetooth/audio/bap.h>
+#include <embt/bluetooth/iso.h>
 
 struct bt_bap_iso_dir {
 	struct bt_bap_stream *stream;
@@ -33,7 +35,7 @@ struct bt_bap_iso {
 	/* Must be at the end so that everything else in the structure can be
 	 * memset to zero without affecting the ref.
 	 */
-	atomic_t ref;
+	bt_atomic_t ref;
 };
 
 typedef bool (*bt_bap_iso_func_t)(struct bt_bap_iso *iso, void *user_data);

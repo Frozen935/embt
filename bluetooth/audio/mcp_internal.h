@@ -10,11 +10,14 @@
 #ifndef ZEPHYR_SUBSYS_BLUETOOTH_AUDIO_MCP_INTERNAL_
 #define ZEPHYR_SUBSYS_BLUETOOTH_AUDIO_MCP_INTERNAL_
 
+#include <embt/base/work.h>
+#include <string.h>
+#include <embt/base/assert.h>
 #include <stdbool.h>
 #include <stdint.h>
 
-#include <zephyr/autoconf.h>
-#include <zephyr/bluetooth/audio/mcs.h>
+#include <embt/autoconf.h>
+#include <embt/bluetooth/audio/mcs.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -97,7 +100,7 @@ struct bt_mcp_media_control_server_player {
 		struct bt_mcp_group *group; /* The group of the set track */
 	} next;
 
-	struct k_work_delayable pos_work;
+	struct bt_work_delayable pos_work;
 };
 
 /* Special calls for testing */

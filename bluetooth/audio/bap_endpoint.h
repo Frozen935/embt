@@ -7,20 +7,20 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <string.h>
+#include <embt/base/assert.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stddef.h>
 
-#include <zephyr/autoconf.h>
-#include <zephyr/bluetooth/audio/ascs.h>
-#include <zephyr/bluetooth/audio/audio.h>
-#include <zephyr/bluetooth/audio/bap.h>
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/iso.h>
-#include <zephyr/sys/atomic.h>
-#include <zephyr/sys/slist.h>
-#include <zephyr/types.h>
-
+#include <embt/autoconf.h>
+#include <embt/bluetooth/audio/ascs.h>
+#include <embt/bluetooth/audio/audio.h>
+#include <embt/bluetooth/audio/bap.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/iso.h>
+#include <embt/base/atomic.h>
+#include <embt/base/slist.h>
 #include "bap_stream.h"
 
 #if defined(CONFIG_BT_BAP_UNICAST_CLIENT)
@@ -176,7 +176,7 @@ struct bt_bap_broadcast_sink {
 	sys_slist_t streams;
 
 	/** Flags */
-	ATOMIC_DEFINE(flags, BT_BAP_BROADCAST_SINK_FLAG_NUM_FLAGS);
+	BT_ATOMIC_DEFINE(flags, BT_BAP_BROADCAST_SINK_FLAG_NUM_FLAGS);
 };
 #endif /* CONFIG_BT_BAP_BROADCAST_SINK */
 

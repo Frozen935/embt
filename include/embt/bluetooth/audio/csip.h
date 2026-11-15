@@ -27,7 +27,7 @@
  * sets of devices.
  */
 
-#include <embt/storage.h>
+#include <embt/base/time.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -39,14 +39,14 @@
 #include <embt/bluetooth/conn.h>
 #include <embt/bluetooth/data.h>
 #include <embt/bluetooth/gap.h>
-#include <embt/sys/slist.h>
+#include <embt/base/slist.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 /** Recommended timer for member discovery */
-#define BT_CSIP_SET_COORDINATOR_DISCOVER_TIMER_VALUE        K_SECONDS(10)
+#define BT_CSIP_SET_COORDINATOR_DISCOVER_TIMER_VALUE        BT_SECONDS(10)
 
 /**
  * Defines the maximum number of Coordinated Set Identification service instances for the

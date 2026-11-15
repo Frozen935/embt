@@ -8,37 +8,39 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <embt/base/work.h>
+#include <embt/base/time.h>
+#include <embt/base/assert.h>
+#include <embt/base/util_macro.h>
 #include <errno.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
 
-#include <zephyr/autoconf.h>
-#include <zephyr/bluetooth/addr.h>
-#include <zephyr/bluetooth/att.h>
-#include <zephyr/bluetooth/audio/audio.h>
-#include <zephyr/bluetooth/audio/bap.h>
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/buf.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/data.h>
-#include <zephyr/bluetooth/gap.h>
-#include <zephyr/bluetooth/gatt.h>
-#include <zephyr/bluetooth/hci_types.h>
-#include <zephyr/bluetooth/iso.h>
-#include <zephyr/bluetooth/l2cap.h>
-#include <zephyr/bluetooth/uuid.h>
-#include <zephyr/net_buf.h>
-#include <zephyr/sys/__assert.h>
-#include <zephyr/sys/atomic.h>
-#include <zephyr/sys/byteorder.h>
-#include <zephyr/sys/slist.h>
-#include <zephyr/sys/util.h>
-#include <zephyr/sys/util_macro.h>
-#include <zephyr/toolchain.h>
-#include <zephyr/types.h>
-
+#include <embt/autoconf.h>
+#include <embt/bluetooth/addr.h>
+#include <embt/bluetooth/att.h>
+#include <embt/bluetooth/audio/audio.h>
+#include <embt/bluetooth/audio/bap.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/buf.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/data.h>
+#include <embt/bluetooth/gap.h>
+#include <embt/bluetooth/gatt.h>
+#include <embt/bluetooth/hci_types.h>
+#include <embt/bluetooth/iso.h>
+#include <embt/bluetooth/l2cap.h>
+#include <embt/bluetooth/uuid.h>
+#include <embt/net_buf.h>
+#include <embt/base/assert.h>
+#include <embt/base/atomic.h>
+#include <embt/base/byteorder.h>
+#include <embt/base/slist.h>
+#include <embt/base/util.h>
+#include <embt/base/util_macro.h>
+#include <embt/compiler.h>
 #include <sys/errno.h>
 #include <embt/base/log.h>
 
@@ -90,7 +92,7 @@ struct bap_broadcast_assistant_instance {
 		struct bt_gatt_discover_params disc_params;
 	};
 
-	struct k_work_delayable bap_read_work;
+	struct bt_work_delayable bap_read_work;
 	uint16_t long_read_handle;
 	/* The inst->net_buf needs to use the maximum ATT attribute size as a single receive state
 	 * may use the full size
@@ -101,7 +103,7 @@ struct bap_broadcast_assistant_instance {
 	struct bap_broadcast_assistant_recv_state_info
 		recv_states[CONFIG_BT_BAP_BROADCAST_ASSISTANT_RECV_STATE_COUNT];
 
-	ATOMIC_DEFINE(flags, BAP_BA_FLAG_NUM_FLAGS);
+	BT_ATOMIC_DEFINE(flags, BAP_BA_FLAG_NUM_FLAGS);
 };
 
 static sys_slist_t broadcast_assistant_cbs = SYS_SLIST_STATIC_INIT(&broadcast_assistant_cbs);
@@ -152,8 +154,8 @@ static void bap_broadcast_assistant_discover_complete(struct bt_conn *conn, int 
 
 	if (inst != NULL) {
 		net_buf_simple_reset(&inst->net_buf);
-		atomic_clear_bit(inst->flags, BAP_BA_FLAG_BUSY);
-		atomic_clear_bit(inst->flags, BAP_BA_FLAG_DISCOVER_IN_PROGRESS);
+		bt_atomic_clear_bit(inst->flags, BAP_BA_FLAG_BUSY);
+		bt_atomic_clear_bit(inst->flags, BAP_BA_FLAG_DISCOVER_IN_PROGRESS);
 	}
 
 	SYS_SLIST_FOR_EACH_CONTAINER_SAFE(&broadcast_assistant_cbs,
@@ -342,7 +344,7 @@ static void bap_long_read_reset(struct bap_broadcast_assistant_instance *inst)
 {
 	inst->long_read_handle = 0U;
 	net_buf_simple_reset(&inst->net_buf);
-	atomic_clear_bit(inst->flags, BAP_BA_FLAG_BUSY);
+	bt_atomic_clear_bit(inst->flags, BAP_BA_FLAG_BUSY);
 }
 
 static uint8_t parse_and_send_recv_state(struct bt_conn *conn, uint16_t handle,
@@ -441,7 +443,7 @@ static void long_bap_read(struct bt_conn *conn, uint16_t handle)
 		return;
 	}
 
-	if (atomic_test_and_set_bit(inst->flags, BAP_BA_FLAG_BUSY)) {
+	if (bt_atomic_test_and_set_bit(inst->flags, BAP_BA_FLAG_BUSY)) {
 		LOG_DBG("conn %p", (void *)conn);
 
 		/* If the client is busy reading reschedule the long read */
@@ -455,8 +457,8 @@ static void long_bap_read(struct bt_conn *conn, uint16_t handle)
 		}
 
 		/* Wait a connection interval to retry */
-		err = k_work_reschedule(&inst->bap_read_work,
-					K_USEC(conn_info.le.interval_us));
+		err = bt_work_reschedule(&inst->bap_read_work,
+					BT_MSEC(bt_time_us_to_ms_ceil(conn_info.le.interval_us)));
 		if (err < 0) {
 			LOG_DBG("Failed to reschedule read work: %d", err);
 			bap_long_read_reset(inst);
@@ -478,10 +480,10 @@ static void long_bap_read(struct bt_conn *conn, uint16_t handle)
 	}
 }
 
-static void delayed_bap_read_handler(struct k_work *work)
+static void delayed_bap_read_handler(struct bt_work *work)
 {
 	struct bap_broadcast_assistant_instance *inst =
-		CONTAINER_OF((struct k_work_delayable *)work,
+		CONTAINER_OF((struct bt_work_delayable *)work,
 			     struct bap_broadcast_assistant_instance, bap_read_work);
 	long_bap_read(inst->conn, inst->long_read_handle);
 }
@@ -507,7 +509,7 @@ static uint8_t notify_handler(struct bt_conn *conn,
 		return BT_GATT_ITER_STOP;
 	}
 
-	if (atomic_test_bit(inst->flags, BAP_BA_FLAG_DISCOVER_IN_PROGRESS)) {
+	if (bt_atomic_test_bit(inst->flags, BAP_BA_FLAG_DISCOVER_IN_PROGRESS)) {
 		/* If we are discovering then we ignore notifications as the handles may change */
 		return BT_GATT_ITER_CONTINUE;
 	}
@@ -537,7 +539,7 @@ static uint8_t notify_handler(struct bt_conn *conn,
 		}
 
 		/* Cancel any pending long reads containing now obsolete information */
-		(void)k_work_cancel_delayable(&inst->bap_read_work);
+		(void)bt_work_cancel_delayable(&inst->bap_read_work);
 
 		if (max_ntf_size >= 0 && length == max_ntf_size) {
 			/* TODO: if we are busy we should not overwrite the long_read_handle,
@@ -547,7 +549,7 @@ static uint8_t notify_handler(struct bt_conn *conn,
 			 */
 			inst->long_read_handle = handle;
 
-			if (!atomic_test_bit(inst->flags, BAP_BA_FLAG_BUSY)) {
+			if (!bt_atomic_test_bit(inst->flags, BAP_BA_FLAG_BUSY)) {
 				net_buf_simple_add_mem(&inst->net_buf, data, length);
 			}
 
@@ -609,10 +611,10 @@ static uint8_t read_recv_state_cb(struct bt_conn *conn, uint8_t err,
 
 	if (cb_err != 0) {
 		LOG_DBG("err %d", cb_err);
-		atomic_clear_bit(inst->flags, BAP_BA_FLAG_BUSY);
+		bt_atomic_clear_bit(inst->flags, BAP_BA_FLAG_BUSY);
 		bap_broadcast_assistant_recv_state_changed(conn, cb_err, NULL);
 	} else {
-		atomic_clear_bit(inst->flags, BAP_BA_FLAG_BUSY);
+		bt_atomic_clear_bit(inst->flags, BAP_BA_FLAG_BUSY);
 		bap_broadcast_assistant_recv_state_changed(conn, cb_err,
 							   active_recv_state ? &recv_state : NULL);
 	}
@@ -622,10 +624,10 @@ static uint8_t read_recv_state_cb(struct bt_conn *conn, uint8_t err,
 
 static void discover_init(struct bap_broadcast_assistant_instance *inst)
 {
-	k_work_init_delayable(&inst->bap_read_work, delayed_bap_read_handler);
+	bt_work_init_delayable(&inst->bap_read_work, delayed_bap_read_handler);
 	net_buf_simple_init_with_data(&inst->net_buf, inst->att_buf, sizeof(inst->att_buf));
 	net_buf_simple_reset(&inst->net_buf);
-	atomic_set_bit(inst->flags, BAP_BA_FLAG_DISCOVER_IN_PROGRESS);
+	bt_atomic_set_bit(inst->flags, BAP_BA_FLAG_DISCOVER_IN_PROGRESS);
 }
 
 /**
@@ -688,7 +690,7 @@ static uint8_t char_discover_func(struct bt_conn *conn,
 			sub_params->value = BT_GATT_CCC_NOTIFY;
 			sub_params->value_handle = attr->handle + 1;
 			sub_params->notify = notify_handler;
-			atomic_set_bit(sub_params->flags, BT_GATT_SUBSCRIBE_FLAG_VOLATILE);
+			bt_atomic_set_bit(sub_params->flags, BT_GATT_SUBSCRIBE_FLAG_VOLATILE);
 
 			err = bt_gatt_subscribe(conn, sub_params);
 			if (err != 0) {
@@ -766,7 +768,7 @@ static void bap_broadcast_assistant_write_cp_cb(struct bt_conn *conn, uint8_t er
 	/* we reset the buffer, so that we are ready for new notifications and writes */
 	net_buf_simple_reset(&inst->net_buf);
 
-	atomic_clear_bit(inst->flags, BAP_BA_FLAG_BUSY);
+	bt_atomic_clear_bit(inst->flags, BAP_BA_FLAG_BUSY);
 
 	SYS_SLIST_FOR_EACH_CONTAINER_SAFE(&broadcast_assistant_cbs, listener, next, _node) {
 		switch (opcode) {
@@ -838,7 +840,7 @@ static int bt_bap_broadcast_assistant_common_cp(struct bt_conn *conn,
 
 	err = bt_gatt_write(conn, &inst->write_params);
 	if (err != 0) {
-		atomic_clear_bit(inst->flags, BAP_BA_FLAG_BUSY);
+		bt_atomic_clear_bit(inst->flags, BAP_BA_FLAG_BUSY);
 
 		/* Report expected possible errors */
 		if (err == -ENOTCONN || err == -ENOMEM) {
@@ -931,7 +933,7 @@ static int broadcast_assistant_reset(struct bap_broadcast_assistant_instance *in
 	inst->recv_state_cnt = 0U;
 	inst->cp_handle = 0U;
 	inst->long_read_handle = 0U;
-	(void)k_work_cancel_delayable(&inst->bap_read_work);
+	(void)bt_work_cancel_delayable(&inst->bap_read_work);
 
 	for (int i = 0U; i < CONFIG_BT_BAP_BROADCAST_ASSISTANT_RECV_STATE_COUNT; i++) {
 		memset(&inst->recv_states[i], 0, sizeof(inst->recv_states[i]));
@@ -1018,7 +1020,7 @@ int bt_bap_broadcast_assistant_discover(struct bt_conn *conn)
 	inst = &broadcast_assistants[bt_conn_index(conn)];
 
 	/* Do not allow new discoveries while we are reading or writing */
-	if (atomic_test_and_set_bit(inst->flags, BAP_BA_FLAG_BUSY)) {
+	if (bt_atomic_test_and_set_bit(inst->flags, BAP_BA_FLAG_BUSY)) {
 		LOG_DBG("Instance is busy");
 		return -EBUSY;
 	}
@@ -1064,8 +1066,8 @@ int bt_bap_broadcast_assistant_discover(struct bt_conn *conn)
 	return 0;
 
 cleanup:
-	atomic_clear_bit(inst->flags, BAP_BA_FLAG_DISCOVER_IN_PROGRESS);
-	atomic_clear_bit(inst->flags, BAP_BA_FLAG_BUSY);
+	bt_atomic_clear_bit(inst->flags, BAP_BA_FLAG_DISCOVER_IN_PROGRESS);
+	bt_atomic_clear_bit(inst->flags, BAP_BA_FLAG_BUSY);
 	return err;
 }
 
@@ -1124,7 +1126,7 @@ int bt_bap_broadcast_assistant_scan_start(struct bt_conn *conn, bool start_scan)
 		LOG_DBG("handle not set");
 
 		return -EINVAL;
-	} else if (atomic_test_and_set_bit(inst->flags, BAP_BA_FLAG_BUSY)) {
+	} else if (bt_atomic_test_and_set_bit(inst->flags, BAP_BA_FLAG_BUSY)) {
 		/* Do not allow writes while we are discovering as the handles may change */
 
 		LOG_DBG("instance busy");
@@ -1136,10 +1138,10 @@ int bt_bap_broadcast_assistant_scan_start(struct bt_conn *conn, bool start_scan)
 	if (start_scan) {
 		static bool cb_registered;
 
-		if (atomic_test_and_set_bit(inst->flags, BAP_BA_FLAG_SCANNING)) {
+		if (bt_atomic_test_and_set_bit(inst->flags, BAP_BA_FLAG_SCANNING)) {
 			LOG_DBG("Already scanning");
 
-			atomic_clear_bit(inst->flags, BAP_BA_FLAG_BUSY);
+			bt_atomic_clear_bit(inst->flags, BAP_BA_FLAG_BUSY);
 
 			return -EALREADY;
 		}
@@ -1153,8 +1155,8 @@ int bt_bap_broadcast_assistant_scan_start(struct bt_conn *conn, bool start_scan)
 		if (err != 0) {
 			LOG_DBG("Could not start scan (%d)", err);
 
-			atomic_clear_bit(inst->flags, BAP_BA_FLAG_BUSY);
-			atomic_clear_bit(inst->flags, BAP_BA_FLAG_SCANNING);
+			bt_atomic_clear_bit(inst->flags, BAP_BA_FLAG_BUSY);
+			bt_atomic_clear_bit(inst->flags, BAP_BA_FLAG_SCANNING);
 
 			/* Report expected possible errors */
 			if (err == -EAGAIN) {
@@ -1183,7 +1185,7 @@ int bt_bap_broadcast_assistant_scan_start(struct bt_conn *conn, bool start_scan)
 			return -ENOEXEC;
 		}
 
-		atomic_clear_bit(inst->flags, BAP_BA_FLAG_SCANNING);
+		bt_atomic_clear_bit(inst->flags, BAP_BA_FLAG_SCANNING);
 	}
 
 	return err;
@@ -1210,23 +1212,23 @@ int bt_bap_broadcast_assistant_scan_stop(struct bt_conn *conn)
 		LOG_DBG("handle not set");
 
 		return -EINVAL;
-	} else if (atomic_test_and_set_bit(inst->flags, BAP_BA_FLAG_BUSY)) {
+	} else if (bt_atomic_test_and_set_bit(inst->flags, BAP_BA_FLAG_BUSY)) {
 		LOG_DBG("instance busy");
 
 		return -EBUSY;
 	}
 
-	if (atomic_test_bit(inst->flags, BAP_BA_FLAG_SCANNING)) {
+	if (bt_atomic_test_bit(inst->flags, BAP_BA_FLAG_SCANNING)) {
 		err = bt_le_scan_stop();
 		if (err != 0) {
 			LOG_DBG("Could not stop scan (%d)", err);
 
-			atomic_clear_bit(inst->flags, BAP_BA_FLAG_BUSY);
+			bt_atomic_clear_bit(inst->flags, BAP_BA_FLAG_BUSY);
 
 			return err;
 		}
 
-		atomic_clear_bit(inst->flags, BAP_BA_FLAG_SCANNING);
+		bt_atomic_clear_bit(inst->flags, BAP_BA_FLAG_SCANNING);
 	}
 
 	/* Reset buffer before using */
@@ -1401,7 +1403,7 @@ int bt_bap_broadcast_assistant_add_src(struct bt_conn *conn,
 		LOG_DBG("handle not set");
 
 		return -EINVAL;
-	} else if (atomic_test_and_set_bit(inst->flags, BAP_BA_FLAG_BUSY)) {
+	} else if (bt_atomic_test_and_set_bit(inst->flags, BAP_BA_FLAG_BUSY)) {
 		LOG_DBG("instance busy");
 
 		return -EBUSY;
@@ -1440,7 +1442,7 @@ int bt_bap_broadcast_assistant_add_src(struct bt_conn *conn,
 
 			/* TODO: Validate parameters before setting the busy flag to reduce cleanup
 			 */
-			atomic_clear_bit(inst->flags, BAP_BA_FLAG_BUSY);
+			bt_atomic_clear_bit(inst->flags, BAP_BA_FLAG_BUSY);
 
 			return -EINVAL;
 		}
@@ -1528,7 +1530,7 @@ int bt_bap_broadcast_assistant_mod_src(struct bt_conn *conn,
 		LOG_DBG("handle not set");
 
 		return -EINVAL;
-	} else if (atomic_test_and_set_bit(inst->flags, BAP_BA_FLAG_BUSY)) {
+	} else if (bt_atomic_test_and_set_bit(inst->flags, BAP_BA_FLAG_BUSY)) {
 		LOG_DBG("instance busy");
 
 		return -EBUSY;
@@ -1584,7 +1586,7 @@ int bt_bap_broadcast_assistant_mod_src(struct bt_conn *conn,
 
 			/* TODO: Validate parameters before setting the busy flag to reduce cleanup
 			 */
-			atomic_clear_bit(inst->flags, BAP_BA_FLAG_BUSY);
+			bt_atomic_clear_bit(inst->flags, BAP_BA_FLAG_BUSY);
 
 			return -EINVAL;
 		}
@@ -1631,7 +1633,7 @@ int bt_bap_broadcast_assistant_set_broadcast_code(
 		LOG_DBG("handle not set");
 
 		return -EINVAL;
-	} else if (atomic_test_and_set_bit(inst->flags, BAP_BA_FLAG_BUSY)) {
+	} else if (bt_atomic_test_and_set_bit(inst->flags, BAP_BA_FLAG_BUSY)) {
 		LOG_DBG("instance busy");
 
 		return -EBUSY;
@@ -1671,7 +1673,7 @@ int bt_bap_broadcast_assistant_rem_src(struct bt_conn *conn, uint8_t src_id)
 		LOG_DBG("handle not set");
 
 		return -EINVAL;
-	} else if (atomic_test_and_set_bit(inst->flags, BAP_BA_FLAG_BUSY)) {
+	} else if (bt_atomic_test_and_set_bit(inst->flags, BAP_BA_FLAG_BUSY)) {
 		LOG_DBG("instance busy");
 
 		return -EBUSY;
@@ -1730,7 +1732,7 @@ int bt_bap_broadcast_assistant_read_recv_state(struct bt_conn *conn,
 		LOG_DBG("handle not set");
 
 		return -EINVAL;
-	} else if (atomic_test_and_set_bit(inst->flags, BAP_BA_FLAG_BUSY)) {
+	} else if (bt_atomic_test_and_set_bit(inst->flags, BAP_BA_FLAG_BUSY)) {
 		LOG_DBG("instance busy");
 
 		return -EBUSY;
@@ -1740,8 +1742,20 @@ int bt_bap_broadcast_assistant_read_recv_state(struct bt_conn *conn,
 	if (err != 0) {
 		(void)memset(&inst->read_params, 0,
 			     sizeof(inst->read_params));
-		atomic_clear_bit(inst->flags, BAP_BA_FLAG_BUSY);
+		bt_atomic_clear_bit(inst->flags, BAP_BA_FLAG_BUSY);
 	}
 
 	return err;
+}
+
+/** @brief Register callbacks during explicit component initialization. */
+int bt_audio_bap_broadcast_assistant_callbacks_init(void)
+{
+	int err = 0;
+
+	err = bt_conn_cb_register(&bt_conn_cb_conn_callbacks);
+	if (err && err != -EEXIST) {
+		return err;
+	}
+	return 0;
 }

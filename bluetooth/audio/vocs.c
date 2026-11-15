@@ -5,6 +5,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <embt/base/work.h>
+#include <embt/base/time.h>
+#include <embt/base/assert.h>
+#include <embt/base/util_macro.h>
 #include <errno.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -12,22 +16,22 @@
 #include <string.h>
 #include <sys/types.h>
 
-#include <zephyr/autoconf.h>
-#include <zephyr/bluetooth/assigned_numbers.h>
-#include <zephyr/bluetooth/att.h>
-#include <zephyr/bluetooth/audio/audio.h>
-#include <zephyr/bluetooth/audio/vocs.h>
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/gatt.h>
-#include <zephyr/bluetooth/uuid.h>
+#include <embt/autoconf.h>
+#include <embt/bluetooth/assigned_numbers.h>
+#include <embt/bluetooth/att.h>
+#include <embt/bluetooth/audio/audio.h>
+#include <embt/bluetooth/audio/vocs.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/gatt.h>
+#include <embt/bluetooth/uuid.h>
 #include <embt/base/log.h>
-#include <zephyr/sys/atomic.h>
-#include <zephyr/sys/byteorder.h>
-#include <zephyr/sys/util.h>
-#include <zephyr/sys/util_macro.h>
-#include <zephyr/sys/util_utf8.h>
-#include <zephyr/toolchain.h>
+#include <embt/base/atomic.h>
+#include <embt/base/byteorder.h>
+#include <embt/base/util.h>
+#include <embt/base/util_macro.h>
+#include <embt/base/utf8.h>
+#include <embt/compiler.h>
 
 #include "audio_internal.h"
 #include "vocs_internal.h"
@@ -78,13 +82,13 @@ static const char *vocs_notify_str(enum bt_vocs_notify notify)
 }
 
 static void notify_work_reschedule(struct bt_vocs_server *inst, enum bt_vocs_notify notify,
-				   k_timeout_t delay)
+				   bt_timeout_t delay)
 {
 	int err;
 
-	atomic_set_bit(inst->notify, notify);
+	bt_atomic_set_bit(inst->notify, notify);
 
-	err = k_work_reschedule(&inst->notify_work, delay);
+	err = bt_work_reschedule(&inst->notify_work, delay);
 	if (err < 0) {
 		LOG_ERR("Failed to reschedule %s notification err %d",
 			vocs_notify_str(notify), err);
@@ -98,27 +102,27 @@ static void notify(struct bt_vocs_server *inst, enum bt_vocs_notify notify,
 
 	err = bt_gatt_notify_uuid(NULL, uuid, inst->service_p->attrs, data, len);
 	if (err == -ENOMEM) {
-		notify_work_reschedule(inst, notify, K_USEC(BT_AUDIO_NOTIFY_RETRY_DELAY_US));
+		notify_work_reschedule(inst, notify, BT_MSEC(bt_time_us_to_ms_ceil(BT_AUDIO_NOTIFY_RETRY_DELAY_US)));
 	} else if (err < 0 && err != -ENOTCONN) {
 		LOG_ERR("Notify %s err %d", vocs_notify_str(notify), err);
 	}
 }
 
-static void notify_work_handler(struct k_work *work)
+static void notify_work_handler(struct bt_work *work)
 {
-	struct k_work_delayable *d_work = k_work_delayable_from_work(work);
+	struct bt_work_delayable *d_work = bt_work_delayable_from_work(work);
 	struct bt_vocs_server *inst = CONTAINER_OF(d_work, struct bt_vocs_server, notify_work);
 
-	if (atomic_test_and_clear_bit(inst->notify, NOTIFY_STATE)) {
+	if (bt_atomic_test_and_clear_bit(inst->notify, NOTIFY_STATE)) {
 		notify(inst, NOTIFY_STATE, BT_UUID_VOCS_STATE, &inst->state, sizeof(inst->state));
 	}
 
-	if (atomic_test_and_clear_bit(inst->notify, NOTIFY_LOCATION)) {
+	if (bt_atomic_test_and_clear_bit(inst->notify, NOTIFY_LOCATION)) {
 		notify(inst, NOTIFY_LOCATION, BT_UUID_VOCS_LOCATION, &inst->location,
 		       sizeof(inst->location));
 	}
 
-	if (atomic_test_and_clear_bit(inst->notify, NOTIFY_OUTPUT_DESC)) {
+	if (bt_atomic_test_and_clear_bit(inst->notify, NOTIFY_OUTPUT_DESC)) {
 		notify(inst, NOTIFY_OUTPUT_DESC, BT_UUID_VOCS_DESCRIPTION, &inst->output_desc,
 		       strlen(inst->output_desc));
 	}
@@ -126,7 +130,7 @@ static void notify_work_handler(struct k_work *work)
 
 static void value_changed(struct bt_vocs_server *inst, enum bt_vocs_notify notify)
 {
-	notify_work_reschedule(inst, notify, K_NO_WAIT);
+	notify_work_reschedule(inst, notify, BT_NO_WAIT);
 }
 #else
 #define value_changed(...)
@@ -473,8 +477,8 @@ int bt_vocs_register(struct bt_vocs *vocs,
 		return err;
 	}
 
-	atomic_clear(inst->notify);
-	k_work_init_delayable(&inst->notify_work, notify_work_handler);
+	bt_atomic_clear(inst->notify);
+	bt_work_init_delayable(&inst->notify_work, notify_work_handler);
 
 	inst->initialized = true;
 	return 0;

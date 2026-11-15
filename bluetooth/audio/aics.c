@@ -5,6 +5,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <embt/base/work.h>
+#include <embt/base/time.h>
+#include <embt/base/assert.h>
+#include <embt/base/util_macro.h>
 #include <errno.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -12,19 +16,19 @@
 #include <string.h>
 #include <sys/types.h>
 
-#include <zephyr/autoconf.h>
-#include <zephyr/bluetooth/att.h>
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/gatt.h>
-#include <zephyr/bluetooth/audio/aics.h>
-#include <zephyr/bluetooth/uuid.h>
-#include <zephyr/sys/atomic.h>
-#include <zephyr/sys/byteorder.h>
-#include <zephyr/sys/util.h>
-#include <zephyr/sys/util_macro.h>
-#include <zephyr/sys/util_utf8.h>
-#include <zephyr/toolchain.h>
+#include <embt/autoconf.h>
+#include <embt/bluetooth/att.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/gatt.h>
+#include <embt/bluetooth/audio/aics.h>
+#include <embt/bluetooth/uuid.h>
+#include <embt/base/atomic.h>
+#include <embt/base/byteorder.h>
+#include <embt/base/util.h>
+#include <embt/base/util_macro.h>
+#include <embt/base/utf8.h>
+#include <embt/compiler.h>
 
 #include "aics_internal.h"
 #include "audio_internal.h"
@@ -192,13 +196,13 @@ static const char *aics_notify_str(enum bt_aics_notify notify)
 }
 
 static void notify_work_reschedule(struct bt_aics *inst, enum bt_aics_notify notify,
-				   k_timeout_t delay)
+				   bt_timeout_t delay)
 {
 	int err;
 
-	atomic_set_bit(inst->srv.notify, notify);
+	bt_atomic_set_bit(inst->srv.notify, notify);
 
-	err = k_work_reschedule(&inst->srv.notify_work, delay);
+	err = bt_work_reschedule(&inst->srv.notify_work, delay);
 	if (err < 0) {
 		LOG_ERR("Failed to reschedule %s notification err %d",
 			aics_notify_str(notify), err);
@@ -212,7 +216,7 @@ static void notify(struct bt_aics *inst, enum bt_aics_notify notify, const struc
 
 	err = bt_gatt_notify_uuid(NULL, uuid, inst->srv.service_p->attrs, data, len);
 	if (err == -ENOMEM) {
-		notify_work_reschedule(inst, notify, K_USEC(BT_AUDIO_NOTIFY_RETRY_DELAY_US));
+		notify_work_reschedule(inst, notify, BT_MSEC(bt_time_us_to_ms_ceil(BT_AUDIO_NOTIFY_RETRY_DELAY_US)));
 	} else if (err < 0 && err != -ENOTCONN) {
 		LOG_ERR("Notify %s err %d", aics_notify_str(notify), err);
 	} else {
@@ -220,22 +224,22 @@ static void notify(struct bt_aics *inst, enum bt_aics_notify notify, const struc
 	}
 }
 
-static void notify_work_handler(struct k_work *work)
+static void notify_work_handler(struct bt_work *work)
 {
-	struct k_work_delayable *d_work = k_work_delayable_from_work(work);
+	struct bt_work_delayable *d_work = bt_work_delayable_from_work(work);
 	struct bt_aics *inst = CONTAINER_OF(d_work, struct bt_aics, srv.notify_work);
 
-	if (atomic_test_and_clear_bit(inst->srv.notify, AICS_NOTIFY_STATE)) {
+	if (bt_atomic_test_and_clear_bit(inst->srv.notify, AICS_NOTIFY_STATE)) {
 		notify(inst, AICS_NOTIFY_STATE, BT_UUID_AICS_STATE, &inst->srv.state,
 		       sizeof(inst->srv.state));
 	}
 
-	if (atomic_test_and_clear_bit(inst->srv.notify, AICS_NOTIFY_DESCRIPTION)) {
+	if (bt_atomic_test_and_clear_bit(inst->srv.notify, AICS_NOTIFY_DESCRIPTION)) {
 		notify(inst, AICS_NOTIFY_DESCRIPTION, BT_UUID_AICS_DESCRIPTION,
 		       &inst->srv.description, strlen(inst->srv.description));
 	}
 
-	if (atomic_test_and_clear_bit(inst->srv.notify, AICS_NOTIFY_STATUS)) {
+	if (bt_atomic_test_and_clear_bit(inst->srv.notify, AICS_NOTIFY_STATUS)) {
 		notify(inst, AICS_NOTIFY_STATUS, BT_UUID_AICS_INPUT_STATUS, &inst->srv.status,
 		       sizeof(inst->srv.status));
 	}
@@ -243,7 +247,7 @@ static void notify_work_handler(struct k_work *work)
 
 static void value_changed(struct bt_aics *inst, enum bt_aics_notify notify)
 {
-	notify_work_reschedule(inst, notify, K_NO_WAIT);
+	notify_work_reschedule(inst, notify, BT_NO_WAIT);
 }
 #else
 #define value_changed(...)
@@ -596,8 +600,8 @@ int bt_aics_register(struct bt_aics *aics, struct bt_aics_register_param *param)
 	aics->srv.status = param->status ? BT_AICS_STATUS_ACTIVE : BT_AICS_STATUS_INACTIVE;
 	aics->srv.cb = param->cb;
 
-	atomic_clear(aics->srv.notify);
-	k_work_init_delayable(&aics->srv.notify_work, notify_work_handler);
+	bt_atomic_clear(aics->srv.notify);
+	bt_work_init_delayable(&aics->srv.notify_work, notify_work_handler);
 
 	if (param->description) {
 		(void)utf8_lcpy(aics->srv.description, param->description,

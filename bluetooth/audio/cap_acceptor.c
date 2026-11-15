@@ -9,14 +9,14 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include <zephyr/autoconf.h>
-#include <zephyr/bluetooth/gatt.h>
-#include <zephyr/bluetooth/audio/tbs.h>
-#include <zephyr/bluetooth/audio/csip.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/uuid.h>
+#include <embt/autoconf.h>
+#include <embt/bluetooth/gatt.h>
+#include <embt/bluetooth/audio/tbs.h>
+#include <embt/bluetooth/audio/csip.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/uuid.h>
 #include <embt/base/log.h>
-#include <zephyr/sys/util_macro.h>
+#include <embt/base/util_macro.h>
 
 #include "cap_internal.h"
 
@@ -130,4 +130,15 @@ bool bt_cap_acceptor_ccids_exist(const struct bt_conn *conn, const uint8_t ccids
 
 	/* This will also return true if the ccid_cnt is 0 which is intended */
 	return true;
+}
+
+int bt_audio_cap_acceptor_register(void)
+{
+	int err;
+
+	err = bt_gatt_service_static_register(&cas_svc);
+	if (err && err != -EEXIST) {
+		return err;
+	}
+	return 0;
 }

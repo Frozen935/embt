@@ -7,26 +7,27 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <embt/base/util_macro.h>
 #include <errno.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <sys/types.h>
 
-#include <zephyr/autoconf.h>
-#include <zephyr/bluetooth/assigned_numbers.h>
-#include <zephyr/bluetooth/att.h>
-#include <zephyr/bluetooth/audio/audio.h>
-#include <zephyr/bluetooth/audio/bap.h>
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/data.h>
-#include <zephyr/bluetooth/gatt.h>
-#include <zephyr/bluetooth/hci.h>
-#include <zephyr/bluetooth/hci_types.h>
+#include <embt/autoconf.h>
+#include <embt/bluetooth/assigned_numbers.h>
+#include <embt/bluetooth/att.h>
+#include <embt/bluetooth/audio/audio.h>
+#include <embt/bluetooth/audio/bap.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/data.h>
+#include <embt/bluetooth/gatt.h>
+#include <embt/bluetooth/hci.h>
+#include <embt/bluetooth/hci_types.h>
 #include <embt/base/log.h>
-#include <zephyr/sys/util.h>
-#include <zephyr/toolchain.h>
+#include <embt/base/util.h>
+#include <embt/compiler.h>
 
 #include "audio_internal.h"
 
@@ -274,3 +275,280 @@ ssize_t bt_audio_ccc_cfg_write(struct bt_conn *conn, const struct bt_gatt_attr *
 	return sizeof(value);
 }
 #endif /* CONFIG_BT_CONN */
+
+int bt_audio_init(void)
+{
+	int err = 0;
+
+#if defined(CONFIG_BT_CAP_INITIATOR_UNICAST) || defined(CONFIG_BT_CAP_COMMANDER)
+	{
+		extern int bt_cap_common_base_init(void);
+
+		err = bt_cap_common_base_init();
+		if (err) {
+			return err;
+		}
+	}
+#endif
+#if defined(CONFIG_BT_CAP_INITIATOR)
+	{
+		extern int bt_cap_initiator_base_init(void);
+
+		err = bt_cap_initiator_base_init();
+		if (err) {
+			return err;
+		}
+	}
+#endif
+#if defined(CONFIG_BT_TBS)
+	{
+		extern int bt_tbs_base_init(void);
+
+		err = bt_tbs_base_init();
+		if (err) {
+			return err;
+		}
+	}
+#endif
+#if defined(CONFIG_BT_CCP_CALL_CONTROL_SERVER)
+	{
+		extern int bt_ccp_server_base_init(void);
+
+		err = bt_ccp_server_base_init();
+		if (err) {
+			return err;
+		}
+	}
+#endif
+#if defined(CONFIG_BT_MCS)
+	{
+		extern int bt_mcs_base_init(void);
+
+		err = bt_mcs_base_init();
+		if (err) {
+			return err;
+		}
+	}
+#endif
+#if defined(CONFIG_BT_BAP_SCAN_DELEGATOR)
+	{
+		extern int bt_bap_scan_delegator_init(void);
+
+		err = bt_bap_scan_delegator_init();
+		if (err) {
+			return err;
+		}
+	}
+#endif
+#if defined(CONFIG_BT_BAP_BROADCAST_SINK)
+	{
+		extern int bt_bap_broadcast_sink_init(void);
+
+		err = bt_bap_broadcast_sink_init();
+		if (err) {
+			return err;
+		}
+	}
+#endif
+#if defined(CONFIG_BT_ASCS)
+	{
+		extern int bt_audio_ascs_register(void);
+
+		err = bt_audio_ascs_register();
+		if (err) {
+			return err;
+		}
+	}
+#endif
+#if defined(CONFIG_BT_PACS)
+	{
+		extern int bt_audio_pacs_register(void);
+
+		err = bt_audio_pacs_register();
+		if (err) {
+			return err;
+		}
+	}
+#endif
+#if defined(CONFIG_BT_BAP_UNICAST_CLIENT)
+	{
+		extern int bt_audio_bap_unicast_client_register(void);
+
+		err = bt_audio_bap_unicast_client_register();
+		if (err) {
+			return err;
+		}
+	}
+#endif
+#if defined(CONFIG_BT_BAP_SCAN_DELEGATOR)
+	{
+		extern int bt_audio_bap_scan_delegator_register(void);
+
+		err = bt_audio_bap_scan_delegator_register();
+		if (err) {
+			return err;
+		}
+	}
+#endif
+#if defined(CONFIG_BT_CAP_SUBPROC_SUPPORT)
+	{
+		extern int bt_audio_cap_common_register(void);
+
+		err = bt_audio_cap_common_register();
+		if (err) {
+			return err;
+		}
+	}
+#endif
+#if defined(CONFIG_BT_CAP_ACCEPTOR)
+	{
+		extern int bt_audio_cap_acceptor_register(void);
+
+		err = bt_audio_cap_acceptor_register();
+		if (err) {
+			return err;
+		}
+	}
+#endif
+#if defined(CONFIG_BT_CCP_CALL_CONTROL_CLIENT)
+	{
+		extern int bt_audio_ccp_call_control_client_register(void);
+
+		err = bt_audio_ccp_call_control_client_register();
+		if (err) {
+			return err;
+		}
+	}
+#endif
+#if defined(CONFIG_BT_CSIP_SET_COORDINATOR)
+	{
+		extern int bt_audio_csip_set_coordinator_register(void);
+
+		err = bt_audio_csip_set_coordinator_register();
+		if (err) {
+			return err;
+		}
+	}
+#endif
+#if defined(CONFIG_BT_CSIP_SET_MEMBER)
+	{
+		extern int bt_audio_csip_set_member_register(void);
+
+		err = bt_audio_csip_set_member_register();
+		if (err) {
+			return err;
+		}
+	}
+#endif
+#if defined(CONFIG_BT_HAS)
+	{
+		extern int bt_audio_has_register(void);
+
+		err = bt_audio_has_register();
+		if (err) {
+			return err;
+		}
+	}
+#endif
+#if defined(CONFIG_BT_HAS_CLIENT)
+	{
+		extern int bt_audio_has_client_register(void);
+
+		err = bt_audio_has_client_register();
+		if (err) {
+			return err;
+		}
+	}
+#endif
+#if defined(CONFIG_BT_MCC)
+	{
+		extern int bt_audio_mcc_register(void);
+
+		err = bt_audio_mcc_register();
+		if (err) {
+			return err;
+		}
+	}
+#endif
+#if defined(CONFIG_BT_MCS)
+	{
+		extern int bt_audio_mcs_register(void);
+
+		err = bt_audio_mcs_register();
+		if (err) {
+			return err;
+		}
+	}
+#endif
+#if defined(CONFIG_BT_MICP_MIC_CTLR)
+	{
+		extern int bt_audio_micp_mic_ctlr_register(void);
+
+		err = bt_audio_micp_mic_ctlr_register();
+		if (err) {
+			return err;
+		}
+	}
+#endif
+#if defined(CONFIG_BT_VCP_VOL_CTLR)
+	{
+		extern int bt_audio_vcp_vol_ctlr_register(void);
+
+		err = bt_audio_vcp_vol_ctlr_register();
+		if (err) {
+			return err;
+		}
+	}
+#endif
+#if defined(CONFIG_BT_VOCS_CLIENT)
+	{
+		extern int bt_audio_vocs_client_register(void);
+
+		err = bt_audio_vocs_client_register();
+		if (err) {
+			return err;
+		}
+	}
+#endif
+#if defined(CONFIG_BT_TBS)
+	{
+		extern int bt_audio_tbs_callbacks_init(void);
+
+		err = bt_audio_tbs_callbacks_init();
+		if (err) {
+			return err;
+		}
+	}
+#endif
+#if defined(CONFIG_BT_GMAP)
+	{
+		extern int bt_audio_gmap_client_callbacks_init(void);
+
+		err = bt_audio_gmap_client_callbacks_init();
+		if (err) {
+			return err;
+		}
+	}
+#endif
+#if defined(CONFIG_BT_AICS_CLIENT)
+	{
+		extern int bt_audio_aics_client_callbacks_init(void);
+
+		err = bt_audio_aics_client_callbacks_init();
+		if (err) {
+			return err;
+		}
+	}
+#endif
+#if defined(CONFIG_BT_BAP_BROADCAST_ASSISTANT)
+	{
+		extern int bt_audio_bap_broadcast_assistant_callbacks_init(void);
+
+		err = bt_audio_bap_broadcast_assistant_callbacks_init();
+		if (err) {
+			return err;
+		}
+	}
+#endif
+	return err;
+}

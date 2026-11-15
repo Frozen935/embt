@@ -12,14 +12,13 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include <zephyr/bluetooth/audio/audio.h>
-#include <zephyr/bluetooth/audio/bap.h>
-#include <zephyr/bluetooth/addr.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/iso.h>
-#include <zephyr/sys/util_macro.h>
-#include <zephyr/types.h>
-
+#include <embt/bluetooth/audio/audio.h>
+#include <embt/bluetooth/audio/bap.h>
+#include <embt/bluetooth/addr.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/iso.h>
+#include <embt/base/util_macro.h>
+#include <stddef.h>
 #define BT_BAP_BASS_SCAN_STATE_NOT_SCANNING   0x00U
 #define BT_BAP_BASS_SCAN_STATE_SCANNING       0x01U
 

@@ -13,13 +13,13 @@
 #include <stdint.h>
 #include <string.h>
 
-#include <zephyr/autoconf.h>
-#include <zephyr/bluetooth/audio/csip.h>
-#include <zephyr/bluetooth/crypto.h>
+#include <embt/autoconf.h>
+#include <embt/bluetooth/audio/csip.h>
+#include <embt/bluetooth/crypto.h>
 #include <embt/base/log.h>
-#include <zephyr/sys/byteorder.h>
-#include <zephyr/sys/util.h>
-#include <zephyr/sys/util_macro.h>
+#include <embt/base/byteorder.h>
+#include <embt/base/util.h>
+#include <embt/base/util_macro.h>
 
 #include "crypto/bt_crypto.h"
 

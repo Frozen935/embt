@@ -11,15 +11,17 @@
 
 #ifndef ZEPHYR_INCLUDE_BLUETOOTH_AUDIO_AICS_INTERNAL_
 #define ZEPHYR_INCLUDE_BLUETOOTH_AUDIO_AICS_INTERNAL_
+#include <embt/base/work.h>
+#include <string.h>
+#include <embt/base/assert.h>
 #include <stdbool.h>
 #include <stdint.h>
 
-#include <zephyr/autoconf.h>
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/gatt.h>
-#include <zephyr/sys/atomic.h>
-#include <zephyr/types.h>
-
+#include <embt/autoconf.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/gatt.h>
+#include <embt/base/atomic.h>
+#include <stddef.h>
 /* Set the buf size to include the NULL terminator */
 #if defined(CONFIG_BT_AICS)
 #define BT_AICS_DESC_BUF_SIZE CONFIG_BT_AICS_MAX_INPUT_DESCRIPTION_SIZE + 1U
@@ -83,7 +85,7 @@ struct bt_aics_client {
 	struct bt_aics_cb *cb;
 	struct bt_conn *conn;
 
-	ATOMIC_DEFINE(flags, BT_AICS_CLIENT_FLAG_NUM_FLAGS);
+	BT_ATOMIC_DEFINE(flags, BT_AICS_CLIENT_FLAG_NUM_FLAGS);
 };
 
 struct bt_aics_state {
@@ -118,8 +120,8 @@ struct bt_aics_server {
 
 	struct bt_gatt_service *service_p;
 
-	ATOMIC_DEFINE(notify, AICS_NOTIFY_NUM);
-	struct k_work_delayable notify_work;
+	BT_ATOMIC_DEFINE(notify, AICS_NOTIFY_NUM);
+	struct bt_work_delayable notify_work;
 };
 
 /* Struct used as a common type for the api */

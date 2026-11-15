@@ -5,32 +5,32 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
+#include <embt/base/assert.h>
+#include <embt/base/util_macro.h>
 #include <errno.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
 
-#include <zephyr/autoconf.h>
-#include <zephyr/bluetooth/assigned_numbers.h>
-#include <zephyr/bluetooth/att.h>
-#include <zephyr/bluetooth/audio/tbs.h>
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/buf.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/gatt.h>
-#include <zephyr/bluetooth/uuid.h>
+#include <embt/autoconf.h>
+#include <embt/bluetooth/assigned_numbers.h>
+#include <embt/bluetooth/att.h>
+#include <embt/bluetooth/audio/tbs.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/buf.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/gatt.h>
+#include <embt/bluetooth/uuid.h>
 #include <embt/base/log.h>
-#include <zephyr/net_buf.h>
-#include <zephyr/sys/__assert.h>
-#include <zephyr/sys/atomic.h>
-#include <zephyr/sys/slist.h>
-#include <zephyr/sys/util.h>
-#include <zephyr/sys/util_macro.h>
-#include <zephyr/sys/util_utf8.h>
-#include <zephyr/toolchain.h>
-#include <zephyr/types.h>
-
+#include <embt/net_buf.h>
+#include <embt/base/assert.h>
+#include <embt/base/atomic.h>
+#include <embt/base/slist.h>
+#include <embt/base/util.h>
+#include <embt/base/util_macro.h>
+#include <embt/base/utf8.h>
+#include <embt/compiler.h>
 #include "common/bt_str.h"
 #include "tbs_internal.h"
 
@@ -781,7 +781,7 @@ static void initialize_net_buf_read_buffer(struct bt_tbs_instance *inst)
 static void tbs_client_gatt_read_complete(struct bt_tbs_instance *inst)
 {
 	(void)memset(&inst->read_params, 0, sizeof(inst->read_params));
-	atomic_clear_bit(inst->flags, BT_TBS_CLIENT_FLAG_BUSY);
+	bt_atomic_clear_bit(inst->flags, BT_TBS_CLIENT_FLAG_BUSY);
 }
 
 static int tbs_client_gatt_read(struct bt_conn *conn, struct bt_tbs_instance *inst, uint16_t handle,
@@ -789,7 +789,7 @@ static int tbs_client_gatt_read(struct bt_conn *conn, struct bt_tbs_instance *in
 {
 	int err;
 
-	if (atomic_test_and_set_bit(inst->flags, BT_TBS_CLIENT_FLAG_BUSY)) {
+	if (bt_atomic_test_and_set_bit(inst->flags, BT_TBS_CLIENT_FLAG_BUSY)) {
 		LOG_DBG("Instance is busy");
 
 		return -EBUSY;
@@ -841,11 +841,11 @@ static void tbs_client_discover_complete(struct bt_conn *conn, int err)
 	srv_inst->current_inst = NULL;
 
 #if defined(CONFIG_BT_TBS_CLIENT_GTBS)
-	atomic_clear_bit(srv_inst->gtbs_inst.flags, BT_TBS_CLIENT_FLAG_BUSY);
+	bt_atomic_clear_bit(srv_inst->gtbs_inst.flags, BT_TBS_CLIENT_FLAG_BUSY);
 #endif /* CONFIG_BT_TBS_CLIENT_GTBS */
 #if defined(CONFIG_BT_TBS_CLIENT_TBS)
 	for (size_t i = 0U; i < ARRAY_SIZE(srv_inst->tbs_insts); i++) {
-		atomic_clear_bit(srv_inst->tbs_insts[i].flags, BT_TBS_CLIENT_FLAG_BUSY);
+		bt_atomic_clear_bit(srv_inst->tbs_insts[i].flags, BT_TBS_CLIENT_FLAG_BUSY);
 	}
 #endif /* CONFIG_BT_TBS_CLIENT_TBS */
 
@@ -1719,7 +1719,7 @@ static uint8_t discover_func(struct bt_conn *conn,
 				sub_params->ccc_handle = BT_GATT_AUTO_DISCOVER_CCC_HANDLE;
 				sub_params->end_handle = current_inst->end_handle;
 				sub_params->notify = notify_handler;
-				atomic_set_bit(sub_params->flags, BT_GATT_SUBSCRIBE_FLAG_VOLATILE);
+				bt_atomic_set_bit(sub_params->flags, BT_GATT_SUBSCRIBE_FLAG_VOLATILE);
 
 				err = bt_gatt_subscribe(conn, sub_params);
 				if (err != 0 && err != -EALREADY) {
@@ -2424,7 +2424,7 @@ static bool check_and_set_all_busy(struct bt_tbs_server_inst *srv_inst)
 	bool all_idle = true;
 
 #if defined(CONFIG_BT_TBS_CLIENT_GTBS)
-	if (atomic_test_and_set_bit(srv_inst->gtbs_inst.flags, BT_TBS_CLIENT_FLAG_BUSY)) {
+	if (bt_atomic_test_and_set_bit(srv_inst->gtbs_inst.flags, BT_TBS_CLIENT_FLAG_BUSY)) {
 		LOG_DBG("GTBS is busy");
 
 		return false;
@@ -2437,7 +2437,7 @@ static bool check_and_set_all_busy(struct bt_tbs_server_inst *srv_inst)
 	for (num_free = 0U; num_free < ARRAY_SIZE(srv_inst->tbs_insts); num_free++) {
 		struct bt_tbs_instance *tbs_inst = &srv_inst->tbs_insts[num_free];
 
-		if (atomic_test_and_set_bit(tbs_inst->flags, BT_TBS_CLIENT_FLAG_BUSY)) {
+		if (bt_atomic_test_and_set_bit(tbs_inst->flags, BT_TBS_CLIENT_FLAG_BUSY)) {
 			LOG_DBG("inst[%zu] (%p) is busy", num_free, tbs_inst);
 			all_idle = false;
 
@@ -2449,11 +2449,11 @@ static bool check_and_set_all_busy(struct bt_tbs_server_inst *srv_inst)
 	/* If any is busy, revert any busy states we've set */
 	if (!all_idle) {
 #if defined(CONFIG_BT_TBS_CLIENT_GTBS)
-		atomic_clear_bit(srv_inst->gtbs_inst.flags, BT_TBS_CLIENT_FLAG_BUSY);
+		bt_atomic_clear_bit(srv_inst->gtbs_inst.flags, BT_TBS_CLIENT_FLAG_BUSY);
 #endif /* CONFIG_BT_TBS_CLIENT_GTBS */
 #if defined(CONFIG_BT_TBS_CLIENT_TBS)
 		for (uint8_t i = 0U; i < num_free; i++) {
-			atomic_clear_bit(srv_inst->tbs_insts[i].flags, BT_TBS_CLIENT_FLAG_BUSY);
+			bt_atomic_clear_bit(srv_inst->tbs_insts[i].flags, BT_TBS_CLIENT_FLAG_BUSY);
 		}
 #endif /* CONFIG_BT_TBS_CLIENT_TBS */
 	}
