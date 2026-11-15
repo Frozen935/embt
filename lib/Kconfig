@@ -8,4 +8,8 @@ rsource "net_buf/Kconfig"
 rsource "utils/Kconfig"
 rsource "uuid/Kconfig"
 
+rsource "crc/Kconfig"
+rsource "random/Kconfig"
+rsource "settings/Kconfig"
+
 endmenu
