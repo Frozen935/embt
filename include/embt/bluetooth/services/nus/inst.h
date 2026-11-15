@@ -8,20 +8,23 @@
 #define ZEPHYR_INCLUDE_BLUETOOTH_SERVICES_NUS_INST_H_
 
 #include <embt/bluetooth/gatt.h>
-#include <embt/sys/iterable_sections.h>
-#include <embt/sys/slist.h>
+#include <embt/base/slist.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 struct bt_nus_inst {
+	struct bt_nus_inst *next; /**< Internal explicit-registration link. */
 	/** Pointer to the NUS Service Instance  */
 	const struct bt_gatt_service_static *svc;
 
 	/** List of subscribers to invoke callbacks on asynchronous events */
 	sys_slist_t *cbs;
 };
+
+/** @brief Register a persistent instance before GATT initialization. */
+int bt_nus_inst_register(struct bt_nus_inst *instance);
 
 #define BT_UUID_NUS_SERVICE BT_UUID_DECLARE_128(BT_UUID_NUS_SRV_VAL)
 #define BT_UUID_NUS_TX_CHAR BT_UUID_DECLARE_128(BT_UUID_NUS_TX_CHAR_VAL)
@@ -70,7 +73,7 @@ BT_GATT_SERVICE_DEFINE(_name##_svc,								   \
 												   \
 sys_slist_t _name##_cbs = SYS_SLIST_STATIC_INIT(&_name##_cbs);					   \
 												   \
-STRUCT_SECTION_ITERABLE(bt_nus_inst, _name) = {							   \
+struct bt_nus_inst _name = {							   \
 	.svc = &_name##_svc,									   \
 	.cbs = &_name##_cbs,									   \
 }

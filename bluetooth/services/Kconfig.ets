@@ -5,12 +5,12 @@
 
 menuconfig BT_ETS
 	bool "GATT Elapsed Time service [EXPERIMENTAL]"
-	select EXPERIMENTAL
+	select EMBT_EXPERIMENTAL
 	help
 	  Enable Bluetooth Elapsed Time Service (ETS).
 	  This service provides a time service for embedded devices that either:
 	  - Keep track of absolute time (time of day, UTC or local)
-	  - Maintain a tick counter for relative time measurements
+	  - Maintain a elapsed counter for relative time measurements
 
 if BT_ETS
 
@@ -26,7 +26,7 @@ choice BT_ETS_TIME_MODE
 	  Time of Day: Reports absolute time since 2000-01-01 00:00:00.
 	  Use this for devices with real-time clocks or time synchronization.
 
-	  Tick Counter: Reports relative time (elapsed ticks/counter).
+	  Elapsed Counter: Reports relative time (elapsed counter units).
 	  Use this for simple event timing without absolute time reference.
 	  The counter starting point is implementation-dependent.
 
@@ -37,10 +37,10 @@ config BT_ETS_SUPPORT_TIME_OF_DAY
 	  Time Value represents the number of time units (based on resolution)
 	  since the epoch. Supports UTC or local time with timezone offset.
 
-config BT_ETS_SUPPORT_TICK_COUNTER
-	bool "Tick counter (relative time)"
+config BT_ETS_SUPPORT_ELAPSED_COUNTER
+	bool "Elapsed counter (relative time)"
 	help
-	  Report relative time using a counter/tick value.
+	  Report relative time using a elapsed counter value.
 	  Time Value represents elapsed time units (based on resolution).
 	  The counter starting point is implementation-dependent.
 	  Timezone and UTC/local settings are not applicable in this mode.

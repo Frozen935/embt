@@ -4,8 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <zephyr/bluetooth/services/bas.h>
-#include <zephyr/bluetooth/gatt.h>
+#include <errno.h>
+#include <embt/base/util_macro.h>
+#include <embt/bluetooth/services/bas.h>
+#include <embt/bluetooth/gatt.h>
 #include "bas_internal.h"
 #include <embt/base/log.h>
 

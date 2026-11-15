@@ -6,25 +6,29 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <embt/base/fifo.h>
+#include <embt/base/time.h>
+#include <string.h>
+#include <embt/base/assert.h>
+#include <embt/base/util_macro.h>
 #include <errno.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
-#include <zephyr/bluetooth/buf.h>
-#include <zephyr/bluetooth/hci.h>
-#include <zephyr/bluetooth/hci_raw.h>
-#include <zephyr/bluetooth/hci_types.h>
-#include <zephyr/bluetooth/l2cap.h>
-#include <zephyr/bluetooth/iso.h>
-#include <zephyr/devicetree.h>
-#include <zephyr/drivers/bluetooth.h>
+#include <embt/bluetooth/buf.h>
+#include <embt/bluetooth/hci.h>
+#include <embt/bluetooth/hci_raw.h>
+#include <embt/bluetooth/hci_types.h>
+#include <embt/bluetooth/l2cap.h>
+#include <embt/bluetooth/iso.h>
+#include <embt/drivers/bluetooth.h>
 #include <embt/base/log.h>
-#include <zephyr/net_buf.h>
-#include <zephyr/sys/atomic.h>
-#include <zephyr/sys/byteorder.h>
-#include <zephyr/sys/util_macro.h>
-#include <zephyr/toolchain.h>
+#include <embt/net_buf.h>
+#include <embt/base/atomic.h>
+#include <embt/base/byteorder.h>
+#include <embt/base/util_macro.h>
+#include <embt/compiler.h>
 
 #include "common/hci_common_internal.h"
 #include "hci_raw_internal.h"
@@ -32,7 +36,7 @@
 
 LOG_MODULE_REGISTER(bt_hci_raw, CONFIG_BT_HCI_CORE_LOG_LEVEL);
 
-static struct k_fifo *raw_rx;
+static struct bt_fifo *raw_rx;
 
 static bt_buf_rx_freed_cb_t buf_rx_freed_cb;
 
@@ -56,24 +60,9 @@ NET_BUF_POOL_FIXED_DEFINE(hci_iso_pool, CONFIG_BT_ISO_TX_BUF_COUNT,
 			  BT_ISO_SDU_BUF_SIZE(CONFIG_BT_ISO_TX_MTU), 0, NULL);
 #endif /* CONFIG_BT_ISO */
 
-#if DT_HAS_CHOSEN(zephyr_bt_hci)
-#define BT_HCI_NODE   DT_CHOSEN(zephyr_bt_hci)
-#define BT_HCI_DEV    DEVICE_DT_GET(BT_HCI_NODE)
-#define BT_HCI_BUS    BT_DT_HCI_BUS_GET(BT_HCI_NODE)
-#define BT_HCI_NAME   BT_DT_HCI_NAME_GET(BT_HCI_NODE)
-#else
-/* The zephyr,bt-hci chosen property is mandatory, except for unit tests */
-BUILD_ASSERT(IS_ENABLED(CONFIG_ZTEST), "Missing DT chosen property for HCI");
-#define BT_HCI_DEV    NULL
-#define BT_HCI_BUS    0
-#define BT_HCI_NAME   ""
-#endif
+struct bt_dev_raw bt_dev;
 
-struct bt_dev_raw bt_dev = {
-	.hci = BT_HCI_DEV,
-};
-
-struct net_buf *bt_buf_get_rx(enum bt_buf_type type, k_timeout_t timeout)
+struct net_buf *bt_buf_get_rx(enum bt_buf_type type, bt_timeout_t timeout)
 {
 	struct net_buf *buf;
 
@@ -102,7 +91,7 @@ void bt_buf_rx_freed_cb_set(bt_buf_rx_freed_cb_t cb)
 	buf_rx_freed_cb = cb;
 }
 
-struct net_buf *bt_buf_get_tx(enum bt_buf_type type, k_timeout_t timeout,
+struct net_buf *bt_buf_get_tx(enum bt_buf_type type, bt_timeout_t timeout,
 			      const void *data, size_t size)
 {
 	struct net_buf_pool *pool;
@@ -144,7 +133,7 @@ struct net_buf *bt_buf_get_tx(enum bt_buf_type type, k_timeout_t timeout,
 	return buf;
 }
 
-struct net_buf *bt_buf_get_evt(uint8_t evt, bool discardable, k_timeout_t timeout)
+struct net_buf *bt_buf_get_evt(uint8_t evt, bool discardable, bt_timeout_t timeout)
 {
 	ARG_UNUSED(evt);
 	ARG_UNUSED(discardable);
@@ -152,7 +141,7 @@ struct net_buf *bt_buf_get_evt(uint8_t evt, bool discardable, k_timeout_t timeou
 	return bt_buf_get_rx(BT_BUF_EVT, timeout);
 }
 
-static int bt_recv(const struct device *dev, struct net_buf *buf)
+static int bt_recv(const struct bt_hci_transport *dev, struct net_buf *buf)
 {
 	uint8_t type = buf->data[0];
 
@@ -162,7 +151,7 @@ static int bt_recv(const struct device *dev, struct net_buf *buf)
 
 	bt_monitor_send(bt_monitor_opcode(type, BT_MONITOR_RX), buf->data + 1, buf->len - 1);
 
-	k_fifo_put(raw_rx, net_buf_take(&buf));
+	bt_fifo_put(raw_rx, net_buf_take(&buf));
 
 	return 0;
 }
@@ -181,20 +170,39 @@ int bt_send(struct net_buf *buf)
 	return bt_hci_send(bt_dev.hci, buf);
 }
 
-int bt_enable_raw(struct k_fifo *rx_queue)
+void bt_hci_raw_init(void)
 {
+	static bool initialized;
+
+	if (initialized) {
+		return;
+	}
+	net_buf_pool_init(&hci_rx_pool);
+	net_buf_pool_init(&hci_cmd_pool);
+	net_buf_pool_init(&hci_acl_pool);
+#if defined(CONFIG_BT_ISO)
+	net_buf_pool_init(&hci_iso_pool);
+#endif
+	initialized = true;
+}
+
+int bt_enable_raw(struct bt_fifo *rx_queue)
+{
+	bt_hci_raw_init();
+	bt_fifo_init(rx_queue);
+
 	int err;
 
 	LOG_DBG("");
 
 	raw_rx = rx_queue;
 
-	if (!device_is_ready(bt_dev.hci)) {
+	if (!bt_dev.hci || !bt_dev.hci->api) {
 		LOG_ERR("HCI driver is not ready");
 		return -ENODEV;
 	}
 
-	bt_monitor_new_index(BT_MONITOR_TYPE_PRIMARY, BT_HCI_BUS, BT_ADDR_ANY, BT_HCI_NAME);
+	bt_monitor_new_index(BT_MONITOR_TYPE_PRIMARY, bt_dev.hci->bus, BT_ADDR_ANY, bt_dev.hci->name);
 
 	err = bt_hci_open(bt_dev.hci, bt_recv);
 	if (err) {
@@ -202,8 +210,20 @@ int bt_enable_raw(struct k_fifo *rx_queue)
 		return err;
 	}
 
-	LOG_INF("Lower HCI transport: %s", BT_HCI_NAME);
+	LOG_INF("Lower HCI transport: %s", bt_dev.hci->name);
 	LOG_INF("Bluetooth enabled in RAW mode");
 
+	return 0;
+}
+
+int bt_hci_raw_transport_set(const struct bt_hci_transport *transport)
+{
+	if (!transport || !transport->api) {
+		return -EINVAL;
+	}
+	if (raw_rx) {
+		return -EBUSY;
+	}
+	bt_dev.hci = transport;
 	return 0;
 }

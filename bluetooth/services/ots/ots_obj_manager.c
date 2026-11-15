@@ -3,15 +3,14 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-
-#include <zephyr/types.h>
+#include <stdint.h>
 #include <stddef.h>
 #include <string.h>
 #include <errno.h>
-#include <zephyr/sys/dlist.h>
-#include <zephyr/sys/byteorder.h>
+#include <embt/base/dlist.h>
+#include <embt/base/byteorder.h>
 
-#include <zephyr/bluetooth/services/ots.h>
+#include <embt/bluetooth/services/ots.h>
 #include "ots_internal.h"
 #include <embt/base/log.h>
 

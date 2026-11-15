@@ -4,8 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/services/nus.h>
+#include <string.h>
+#include <embt/base/assert.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/services/nus.h>
 
 #define DEVICE_NAME		CONFIG_BT_DEVICE_NAME
 #define DEVICE_NAME_LEN		(sizeof(DEVICE_NAME) - 1)
@@ -19,7 +21,7 @@ static const struct bt_data sd[] = {
 	BT_DATA_BYTES(BT_DATA_UUID128_ALL, BT_UUID_NUS_SRV_VAL),
 };
 
-static int bt_nus_auto_start(void)
+int bt_nus_auto_start(void)
 {
 	int err;
 
@@ -31,5 +33,3 @@ static int bt_nus_auto_start(void)
 
 	return 0;
 }
-
-SYS_INIT(bt_nus_auto_start, APPLICATION, CONFIG_APPLICATION_INIT_PRIORITY);

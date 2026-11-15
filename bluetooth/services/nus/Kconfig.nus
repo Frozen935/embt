@@ -16,9 +16,10 @@ config BT_ZEPHYR_NUS_DEFAULT_INSTANCE
 	  instance as well.
 
 config BT_ZEPHYR_NUS_AUTO_START_BLUETOOTH
-	bool "Auto-enable Bluetooth stack and start LE advertisements"
+	bool "Provide explicit Bluetooth and NUS advertising startup helper"
 	help
-	  Auto-Enable the Bluetooth stack and start advertising with the NUS
+	  The application explicitly calls bt_nus_auto_start() to enable the
+	  Bluetooth stack and start advertising with the NUS
 	  UUID. Useful to run applications that inherently do not deal with
 	  Bluetooth (e.g: Non-Bluetooth samples using UART over Bluetooth LE).
 

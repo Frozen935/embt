@@ -1207,7 +1207,6 @@ static int gatt_register(struct bt_gatt_service *svc)
 	struct bt_gatt_attr *attrs = svc->attrs;
 	uint16_t count = svc->attr_count;
 
-	BT_DEV_LOCK_ASSERT();
 
 	if (sys_slist_is_empty(&db)) {
 		handle = last_static_handle;

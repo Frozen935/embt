@@ -10,18 +10,20 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <embt/base/util_macro.h>
 #include <errno.h>
-#include <zephyr/sys/__assert.h>
+#include <embt/base/assert.h>
 #include <stdbool.h>
-#include <zephyr/types.h>
-#include <zephyr/sys/util.h>
-#include <zephyr/sys/util_macro.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <embt/base/util.h>
+#include <embt/base/util_macro.h>
 
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/gatt.h>
-#include <zephyr/bluetooth/uuid.h>
-#include <zephyr/bluetooth/services/bas.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/gatt.h>
+#include <embt/bluetooth/uuid.h>
+#include <embt/bluetooth/services/bas.h>
 #include "bas_internal.h"
 #include <embt/base/log.h>
 
@@ -90,7 +92,7 @@ BT_GATT_SERVICE_DEFINE(
 #endif /* CONFIG_BT_BAS_BCS */
 );
 
-static int bas_init(void)
+int bt_bas_base_init(void)
 {
 	if (IS_ENABLED(CONFIG_BT_BAS_BLS)) {
 		/* Initialize the Battery Level Status Module */
@@ -135,4 +137,14 @@ const struct bt_gatt_attr *bt_bas_get_bas_attr(uint16_t index)
 	return NULL;
 }
 
-SYS_INIT(bas_init, APPLICATION, CONFIG_APPLICATION_INIT_PRIORITY);
+
+int bt_service_bas_bas_register(void)
+{
+	int err;
+
+	err = bt_gatt_service_static_register(&bas);
+	if (err && err != -EEXIST) {
+		return err;
+	}
+	return 0;
+}

@@ -6,38 +6,59 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <zephyr/autoconf.h>
+#include <embt/base/base.h>
+#include <embt/base/work.h>
+#include <embt/base/time.h>
+#include <string.h>
+#include <embt/base/assert.h>
+#include <embt/autoconf.h>
 
-K_THREAD_STACK_DEFINE(bt_lw_stack_area, CONFIG_BT_LONG_WQ_STACK_SIZE);
-static struct k_work_q bt_long_wq;
 
-int bt_long_wq_schedule(struct k_work_delayable *dwork, k_timeout_t timeout)
+
+
+static struct bt_work_q bt_long_wq;
+
+int bt_long_wq_schedule(struct bt_work_delayable *dwork, bt_timeout_t timeout)
 {
-	return k_work_schedule_for_queue(&bt_long_wq, dwork, timeout);
+	return bt_work_schedule_for_queue(&bt_long_wq, dwork, timeout);
 }
 
-int bt_long_wq_reschedule(struct k_work_delayable *dwork, k_timeout_t timeout)
+int bt_long_wq_reschedule(struct bt_work_delayable *dwork, bt_timeout_t timeout)
 {
-	return k_work_reschedule_for_queue(&bt_long_wq, dwork, timeout);
+	return bt_work_reschedule_for_queue(&bt_long_wq, dwork, timeout);
 }
 
-int bt_long_wq_submit(struct k_work *work)
+int bt_long_wq_submit(struct bt_work *work)
 {
-	return k_work_submit_to_queue(&bt_long_wq, work);
+	return bt_work_submit_to_queue(&bt_long_wq, work);
 }
 
-static int long_wq_init(void)
+int bt_long_wq_init(void)
 {
+	int err;
 
-	const struct k_work_queue_config cfg = {.name = "BT LW WQ"};
-
-	k_work_queue_init(&bt_long_wq);
-
-	k_work_queue_start(&bt_long_wq, bt_lw_stack_area,
-			   K_THREAD_STACK_SIZEOF(bt_lw_stack_area),
-			   CONFIG_BT_LONG_WQ_PRIO, &cfg);
-
-	return 0;
+	if (bt_long_wq.started) {
+		return 0;
+	}
+	err = bt_work_queue_init(&bt_long_wq);
+	if (err) {
+		return err;
+	}
+	err = bt_work_queue_start(&bt_long_wq, CONFIG_BT_LONG_WQ_STACK_SIZE, CONFIG_BT_LONG_WQ_PRIO,
+		&(const struct bt_work_queue_config){.name = "BT LW WQ"});
+	if (err) {
+		bt_base_require(bt_work_queue_deinit(&bt_long_wq));
+	}
+	return err;
 }
 
-SYS_INIT(long_wq_init, POST_KERNEL, CONFIG_BT_LONG_WQ_INIT_PRIO);
+
+int bt_long_wq_deinit(void)
+{
+	int err = (bt_long_wq.started ? bt_work_queue_drain(&bt_long_wq, true) : 0);
+	if (!err && bt_long_wq.joinable) {
+		err = bt_work_queue_stop(&bt_long_wq);
+	}
+
+	return err ? err : bt_work_queue_deinit(&bt_long_wq);
+}

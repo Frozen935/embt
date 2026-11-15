@@ -6,18 +6,21 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <zephyr/bluetooth/uuid.h>
-#include <zephyr/net_buf.h>
-#include <zephyr/types.h>
+#include <errno.h>
+#include <string.h>
+#include <embt/base/assert.h>
+#include <embt/bluetooth/uuid.h>
+#include <embt/net_buf.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <embt/base/byteorder.h>
 
-#include <zephyr/sys/byteorder.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/gatt.h>
+#include <embt/bluetooth/l2cap.h>
 
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/gatt.h>
-#include <zephyr/bluetooth/l2cap.h>
-
-#include <zephyr/bluetooth/services/ots.h>
+#include <embt/bluetooth/services/ots.h>
 #include "ots_internal.h"
 #include "ots_client_internal.h"
 #include "ots_l2cap_internal.h"

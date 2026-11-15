@@ -17,6 +17,8 @@
 
 #include <stdint.h>
 
+#include <embt/base/util.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif

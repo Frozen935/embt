@@ -8,17 +8,19 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <zephyr/types.h>
+#include <embt/base/assert.h>
+#include <embt/base/util_macro.h>
+#include <stdint.h>
 #include <stddef.h>
 #include <string.h>
 #include <errno.h>
 
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/hci.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/uuid.h>
-#include <zephyr/bluetooth/gatt.h>
-#include <zephyr/bluetooth/services/hrs.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/hci.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/uuid.h>
+#include <embt/bluetooth/gatt.h>
+#include <embt/bluetooth/services/hrs.h>
 #include <embt/base/log.h>
 
 LOG_MODULE_REGISTER(hrs, CONFIG_BT_HRS_LOG_LEVEL);
@@ -122,7 +124,7 @@ BT_GATT_SERVICE_DEFINE(hrs_svc,
 			       NULL, ctrl_point_write, NULL),
 );
 
-static int hrs_init(void)
+int bt_hrs_base_init(void)
 {
 
 	hrs_blsc = 0x01;
@@ -167,4 +169,14 @@ int bt_hrs_notify(uint16_t heartrate)
 	return rc == -ENOTCONN ? 0 : rc;
 }
 
-SYS_INIT(hrs_init, APPLICATION, CONFIG_APPLICATION_INIT_PRIORITY);
+
+int bt_service_hrs_register(void)
+{
+	int err;
+
+	err = bt_gatt_service_static_register(&hrs_svc);
+	if (err && err != -EEXIST) {
+		return err;
+	}
+	return 0;
+}

@@ -7,8 +7,8 @@
 #ifndef BT_HIDS_INTERNAL_H_
 #define BT_HIDS_INTERNAL_H_
 
-#include <zephyr/bluetooth/gatt.h>
-#include <zephyr/bluetooth/services/hids.h>
+#include <embt/bluetooth/gatt.h>
+#include <embt/bluetooth/services/hids.h>
 
 /* HID Information characteristic value layout */
 #define HID_INFO_VAL_SIZE 4U

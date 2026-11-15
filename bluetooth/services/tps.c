@@ -9,13 +9,13 @@
  */
 
 #include <errno.h>
-#include <zephyr/types.h>
-
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/gatt.h>
-#include <zephyr/bluetooth/uuid.h>
-#include <zephyr/bluetooth/hci.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/gatt.h>
+#include <embt/bluetooth/uuid.h>
+#include <embt/bluetooth/hci.h>
 #include <embt/base/log.h>
 
 LOG_MODULE_REGISTER(tps, CONFIG_BT_TPS_LOG_LEVEL);
@@ -50,3 +50,14 @@ BT_GATT_SERVICE_DEFINE(tps_svc,
 			       BT_GATT_CHRC_READ, BT_GATT_PERM_READ,
 			       read_tx_power_level, NULL, NULL),
 );
+
+int bt_service_tps_register(void)
+{
+	int err;
+
+	err = bt_gatt_service_static_register(&tps_svc);
+	if (err && err != -EEXIST) {
+		return err;
+	}
+	return 0;
+}

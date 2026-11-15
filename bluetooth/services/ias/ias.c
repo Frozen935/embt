@@ -8,16 +8,18 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <string.h>
+#include <embt/base/assert.h>
 #include <errno.h>
 #include <stdint.h>
-#include <zephyr/net_buf.h>
+#include <embt/net_buf.h>
 #include <embt/base/log.h>
-#include <zephyr/bluetooth/gatt.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/services/ias.h>
-#include <zephyr/sys/iterable_sections.h>
-
+#include <embt/bluetooth/gatt.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/services/ias.h>
 LOG_MODULE_REGISTER(ias, CONFIG_BT_IAS_LOG_LEVEL);
+
+static struct bt_ias_cb *callbacks;
 
 #define BT_IAS_ALERT_LVL_LEN 1
 
@@ -54,21 +56,21 @@ static void set_alert_level(void)
 	curr_lvl = alert_level;
 
 	if (alert_level == BT_IAS_ALERT_LVL_HIGH_ALERT) {
-		STRUCT_SECTION_FOREACH(bt_ias_cb, cb) {
+		for (struct bt_ias_cb *cb = callbacks; cb; cb = cb->next) {
 			if (cb->high_alert) {
 				cb->high_alert();
 			}
 		}
 		LOG_DBG("High alert");
 	} else if (alert_level == BT_IAS_ALERT_LVL_MILD_ALERT) {
-		STRUCT_SECTION_FOREACH(bt_ias_cb, cb) {
+		for (struct bt_ias_cb *cb = callbacks; cb; cb = cb->next) {
 			if (cb->mild_alert) {
 				cb->mild_alert();
 			}
 		}
 		LOG_DBG("Mild alert");
 	} else {
-		STRUCT_SECTION_FOREACH(bt_ias_cb, cb) {
+		for (struct bt_ias_cb *cb = callbacks; cb; cb = cb->next) {
 			if (cb->no_alert) {
 				cb->no_alert();
 			}
@@ -134,3 +136,33 @@ BT_GATT_SERVICE_DEFINE(ias_svc,
 	BT_GATT_CHARACTERISTIC(BT_UUID_ALERT_LEVEL, BT_GATT_CHRC_WRITE_WITHOUT_RESP,
 			       IAS_ALERT_LEVEL_PERM, NULL,
 			       bt_ias_write_alert_lvl, NULL));
+
+int bt_service_ias_ias_register(void)
+{
+	int err;
+
+	err = bt_conn_cb_register(&bt_conn_cb_conn_callbacks);
+	if (err && err != -EEXIST) {
+		return err;
+	}
+	err = bt_gatt_service_static_register(&ias_svc);
+	if (err && err != -EEXIST) {
+		return err;
+	}
+	return 0;
+}
+
+int bt_ias_cb_register(struct bt_ias_cb *cb)
+{
+	if (!cb) {
+		return -EINVAL;
+	}
+	for (struct bt_ias_cb *entry = callbacks; entry; entry = entry->next) {
+		if (entry == cb) {
+			return -EALREADY;
+		}
+	}
+	cb->next = callbacks;
+	callbacks = cb;
+	return 0;
+}

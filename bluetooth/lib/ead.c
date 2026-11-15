@@ -2,9 +2,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <zephyr/bluetooth/ead.h>
-#include <zephyr/bluetooth/crypto.h>
-#include <zephyr/bluetooth/bluetooth.h>
+#include <errno.h>
+#include <embt/bluetooth/ead.h>
+#include <embt/bluetooth/crypto.h>
+#include <embt/bluetooth/bluetooth.h>
 
 #include <stddef.h>
 #include <stdint.h>

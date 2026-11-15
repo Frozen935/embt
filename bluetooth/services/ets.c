@@ -5,15 +5,19 @@
  */
 
 #include <errno.h>
+#include <embt/base/assert.h>
+#include <embt/base/work.h>
+#include <embt/base/util_macro.h>
+#include <errno.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <string.h>
 
-#include <zephyr/sys/byteorder.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/gatt.h>
-#include <zephyr/bluetooth/uuid.h>
-#include <zephyr/bluetooth/services/ets.h>
+#include <embt/base/byteorder.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/gatt.h>
+#include <embt/bluetooth/uuid.h>
+#include <embt/bluetooth/services/ets.h>
 #include <embt/base/log.h>
 
 LOG_MODULE_REGISTER(bt_ets, CONFIG_BT_ETS_LOG_LEVEL);
@@ -71,7 +75,7 @@ static void indicate_cb(struct bt_conn *conn, struct bt_gatt_indicate_params *pa
 }
 
 /* Work item for sending indications */
-static void send_indication_work_handler(struct k_work *work)
+static void send_indication_work_handler(struct bt_work *work)
 {
 	ARG_UNUSED(work);
 	int err;
@@ -106,7 +110,7 @@ static void send_indication_work_handler(struct k_work *work)
 	}
 }
 
-K_WORK_DEFINE(send_indication_work, send_indication_work_handler);
+BT_WORK_DEFINE(send_indication_work, send_indication_work_handler);
 
 static void ccc_cfg_changed(const struct bt_gatt_attr *attr, uint16_t value)
 {
@@ -122,7 +126,7 @@ static void ccc_cfg_changed(const struct bt_gatt_attr *attr, uint16_t value)
 	 * send an indication
 	 */
 	if (indicate_enabled) {
-		k_work_submit(&send_indication_work);
+		bt_work_submit(&send_indication_work);
 	}
 }
 
@@ -235,7 +239,7 @@ static ssize_t write_elapsed_time(struct bt_conn *conn, const struct bt_gatt_att
 	 * client to the Current Elapsed Time characteristic, the server shall send an indication of
 	 * the Current Elapsed Time characteristic to other connected clients.
 	 */
-	k_work_submit(&send_indication_work);
+	bt_work_submit(&send_indication_work);
 
 	return len;
 }
@@ -469,3 +473,14 @@ int bt_ets_time_from_unix_ms(struct bt_ets_elapsed_time *et_time, int64_t unix_m
 }
 
 #endif /* CONFIG_BT_ETS_HELPER_API */
+
+int bt_service_ets_register(void)
+{
+	int err;
+
+	err = bt_gatt_service_static_register(&ets_svc);
+	if (err && err != -EEXIST) {
+		return err;
+	}
+	return 0;
+}

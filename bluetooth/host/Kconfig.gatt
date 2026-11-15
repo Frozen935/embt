@@ -7,7 +7,7 @@ menu "ATT and GATT Options"
 
 config BT_ATT_ERR_TO_STR
 	bool "Print ATT error codes as strings [EXPERIMENTAL]"
-	select EXPERIMENTAL
+	select EMBT_EXPERIMENTAL
 	help
 	  This configuration enables printing of ATT error
 	  codes represented as strings.
@@ -71,7 +71,7 @@ config BT_ATT_RETRY_ON_SEC_ERR
 config BT_EATT
 	bool "Enhanced ATT Bearers support [EXPERIMENTAL]"
 	depends on BT_L2CAP_ECRED
-	select EXPERIMENTAL
+	select EMBT_EXPERIMENTAL
 	select BT_GATT_READ_MULT_VAR_LEN
 	help
 	  This option enables support for Enhanced ATT bearers support. When
@@ -160,7 +160,6 @@ config BT_GATT_CACHING
 	select PSA_WANT_KEY_TYPE_AES
 	select PSA_WANT_ALG_CMAC
 	select PSA_WANT_ALG_ECB_NO_PADDING
-	imply MBEDTLS_AES_ROM_TABLES if PSA_CRYPTO_PROVIDER_MBEDTLS
 	help
 	  This option enables support for GATT Caching. When enabled the stack
 	  will register Client Supported Features and Database Hash

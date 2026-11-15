@@ -4,20 +4,21 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <zephyr/types.h>
+#include <embt/base/work.h>
+#include <embt/base/assert.h>
+#include <stdint.h>
 #include <stddef.h>
 #include <string.h>
 #include <errno.h>
-#include <zephyr/sys/printk.h>
-#include <zephyr/sys/byteorder.h>
+#include <embt/base/byteorder.h>
 
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/l2cap.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/uuid.h>
-#include <zephyr/bluetooth/gatt.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/l2cap.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/uuid.h>
+#include <embt/bluetooth/gatt.h>
 
-#include <zephyr/bluetooth/services/ots.h>
+#include <embt/bluetooth/services/ots.h>
 #include "ots_internal.h"
 #include "ots_obj_manager_internal.h"
 #include "ots_dir_list_internal.h"
@@ -437,7 +438,7 @@ void *bt_ots_svc_decl_get(struct bt_ots *ots)
 }
 #endif
 
-static void oacp_indicate_work_handler(struct k_work *work)
+static void oacp_indicate_work_handler(struct bt_work *work)
 {
 	struct bt_gatt_ots_indicate *ind = CONTAINER_OF(work, struct bt_gatt_ots_indicate, work);
 	struct bt_ots *ots = CONTAINER_OF(ind, struct bt_ots, oacp_ind);
@@ -445,7 +446,7 @@ static void oacp_indicate_work_handler(struct k_work *work)
 	bt_gatt_indicate(NULL, &ots->oacp_ind.params);
 }
 
-static void olcp_indicate_work_handler(struct k_work *work)
+static void olcp_indicate_work_handler(struct bt_work *work)
 {
 	struct bt_gatt_ots_indicate *ind = CONTAINER_OF(work, struct bt_gatt_ots_indicate, work);
 	struct bt_ots *ots = CONTAINER_OF(ind, struct bt_ots, olcp_ind);
@@ -515,8 +516,8 @@ int bt_ots_init(struct bt_ots *ots,
 		bt_ots_dir_list_init(&ots->dir_list, ots->obj_manager);
 	}
 
-	k_work_init(&ots->oacp_ind.work, oacp_indicate_work_handler);
-	k_work_init(&ots->olcp_ind.work, olcp_indicate_work_handler);
+	bt_work_init(&ots->oacp_ind.work, oacp_indicate_work_handler);
+	bt_work_init(&ots->olcp_ind.work, olcp_indicate_work_handler);
 
 	LOG_DBG("Initialized OTS");
 
@@ -653,7 +654,7 @@ struct bt_ots *bt_ots_free_instance_get(void)
 	return &BT_GATT_OTS_INSTANCE_LIST_START[instance_cnt++];
 }
 
-static int bt_gatt_ots_instances_prepare(void)
+int bt_gatt_ots_instances_prepare(void)
 {
 	uint32_t index;
 	struct bt_ots *instance;
@@ -684,5 +685,15 @@ static int bt_gatt_ots_instances_prepare(void)
 	return 0;
 }
 
-SYS_INIT(bt_gatt_ots_instances_prepare, APPLICATION,
-	 CONFIG_KERNEL_INIT_PRIORITY_DEFAULT);
+
+/** @brief Register callbacks during explicit component initialization. */
+int bt_services_ots_ots_callbacks_init(void)
+{
+	int err = 0;
+
+	err = bt_conn_cb_register(&bt_conn_cb_conn_callbacks);
+	if (err && err != -EEXIST) {
+		return err;
+	}
+	return 0;
+}

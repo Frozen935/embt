@@ -8,22 +8,22 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#undef _POSIX_C_SOURCE
-#define _POSIX_C_SOURCE 200809L /* To get gmtime_r()'s prototype */
 
 #ifdef CONFIG_BT_CTS_HELPER_API
+#include <errno.h>
+#include <embt/base/assert.h>
 #include <time.h>
-#include <zephyr/sys/timeutil.h>
+#include <embt/base/time.h>
 #endif
 
 #include <errno.h>
 #include <stdbool.h>
-#include <zephyr/sys/byteorder.h>
+#include <embt/base/byteorder.h>
 
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/gatt.h>
-#include <zephyr/bluetooth/uuid.h>
-#include <zephyr/bluetooth/services/cts.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/gatt.h>
+#include <embt/bluetooth/uuid.h>
+#include <embt/bluetooth/services/cts.h>
 #include <embt/base/log.h>
 
 LOG_MODULE_REGISTER(cts, CONFIG_BT_CTS_LOG_LEVEL);
@@ -50,7 +50,7 @@ int bt_cts_time_to_unix_ms(const struct bt_cts_time_format *ct_time, int64_t *un
 	struct tm date_time;
 	/* fill date time structure */
 	date_time.tm_year = sys_le16_to_cpu(ct_time->year); /* year (little endian) */
-	date_time.tm_year -= TIME_UTILS_BASE_YEAR;
+	date_time.tm_year -= 1900;
 	date_time.tm_mon = ct_time->mon - 1;   /* month start from 1, but need from 0 */
 	date_time.tm_mday = ct_time->mday;     /* day of month */
 	date_time.tm_hour = ct_time->hours;    /* hours of day */
@@ -61,7 +61,7 @@ int bt_cts_time_to_unix_ms(const struct bt_cts_time_format *ct_time, int64_t *un
 	LOG_DBG("CTS Write Time: %d/%d/%d %d:%d:%d", date_time.tm_year, date_time.tm_mon,
 		date_time.tm_mday, date_time.tm_hour, date_time.tm_min, date_time.tm_sec);
 	/* get unit timestamp from datetime */
-	(*unix_ms) = timeutil_timegm64(&date_time);
+	(*unix_ms) = (int64_t)timegm(&date_time);
 	if ((*unix_ms) == ((time_t)-1)) {
 		return -EOVERFLOW;
 	}
@@ -90,7 +90,7 @@ int bt_cts_time_from_unix_ms(struct bt_cts_time_format *ct_time, int64_t unix_ms
 	if (gmtime_r(&unix_ts, &date_time) == NULL) {
 		return -EOVERFLOW;
 	}
-	date_time.tm_year += TIME_UTILS_BASE_YEAR;
+	date_time.tm_year += 1900;
 
 	LOG_DBG("CTS Read Time: %d/%d/%d %d:%d:%d", date_time.tm_year, date_time.tm_mon,
 		date_time.tm_mday, date_time.tm_hour, date_time.tm_min, date_time.tm_sec);
@@ -129,8 +129,8 @@ int bt_cts_local_time_to_ms(const struct bt_cts_local_time *local_time, int32_t 
 
 	/* Calculate timezone offset in milliseconds */
 	timezone_offset_ms = (int32_t)local_time->timezone_offset * BT_CTS_TIMEZONE_INCREMENT_MIN *
-			     SEC_PER_MIN * MSEC_PER_SEC;
-	dst_offset_ms = (int32_t)local_time->dst_offset * BT_CTS_DST_INCREMENT_MIN * SEC_PER_MIN *
+			     60 * MSEC_PER_SEC;
+	dst_offset_ms = (int32_t)local_time->dst_offset * BT_CTS_DST_INCREMENT_MIN * 60 *
 			MSEC_PER_SEC;
 	(*relative_ms) = timezone_offset_ms + dst_offset_ms;
 	return 0;
@@ -281,4 +281,15 @@ int bt_cts_send_notification(enum bt_cts_update_reason reason)
 		return err;
 	}
 	return bt_gatt_notify(NULL, &cts_svc.attrs[1], &ct_time, sizeof(ct_time));
+}
+
+int bt_service_cts_register(void)
+{
+	int err;
+
+	err = bt_gatt_service_static_register(&cts_svc);
+	if (err && err != -EEXIST) {
+		return err;
+	}
+	return 0;
 }

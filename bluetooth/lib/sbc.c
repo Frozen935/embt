@@ -5,7 +5,7 @@
  */
 
 #include <errno.h>
-#include <zephyr/bluetooth/sbc.h>
+#include <embt/bluetooth/sbc.h>
 
 #if defined(CONFIG_LIBSBC)
 

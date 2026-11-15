@@ -4,14 +4,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <zephyr/types.h>
+#include <embt/base/time.h>
+#include <embt/base/atomic.h>
+#include <embt/base/assert.h>
+#include <embt/base/log.h>
+#include <stdint.h>
 #include <stddef.h>
 #include <string.h>
 #include <errno.h>
-#include <zephyr/sys/printk.h>
-#include <zephyr/sys/byteorder.h>
+#include <embt/base/byteorder.h>
 
-#include <zephyr/net_buf.h>
+#include <embt/net_buf.h>
 
 #include "ots_l2cap_internal.h"
 
@@ -52,7 +55,7 @@ static int ots_l2cap_send(struct bt_gatt_ots_l2cap *l2cap_ctx)
 	len = MIN(len, l2cap_ctx->tx.len - l2cap_ctx->tx.len_sent);
 
 	/* Prepare buffer for sending. */
-	buf = net_buf_alloc(&ot_chan_tx_pool, K_FOREVER);
+	buf = net_buf_alloc(&ot_chan_tx_pool, BT_FOREVER);
 	net_buf_reserve(buf, BT_L2CAP_SDU_CHAN_SEND_RESERVE);
 	net_buf_add_mem(buf, &l2cap_ctx->tx.data[l2cap_ctx->tx.len_sent], len);
 
@@ -77,7 +80,7 @@ static struct net_buf *l2cap_alloc_buf(struct bt_l2cap_chan *chan)
 {
 	LOG_DBG("Channel %p allocating buffer", chan);
 
-	return net_buf_alloc(&ot_chan_rx_pool, K_FOREVER);
+	return net_buf_alloc(&ot_chan_rx_pool, BT_FOREVER);
 }
 #endif
 
@@ -124,9 +127,9 @@ static int l2cap_recv(struct bt_l2cap_chan *chan, struct net_buf *buf)
 	return l2cap_ctx->rx_done(l2cap_ctx, chan->conn, buf);
 }
 
-static void l2cap_status(struct bt_l2cap_chan *chan, atomic_t *status)
+static void l2cap_status(struct bt_l2cap_chan *chan, bt_atomic_t *status)
 {
-	LOG_DBG("Channel %p status %lu", chan, atomic_get(status));
+	LOG_DBG("Channel %p status %lu", chan, bt_atomic_get(status));
 }
 
 static void l2cap_connected(struct bt_l2cap_chan *chan)
@@ -207,7 +210,7 @@ static struct bt_l2cap_server l2cap_server = {
 	.accept	= l2cap_accept,
 };
 
-static int bt_gatt_ots_l2cap_init(void)
+int bt_gatt_ots_l2cap_init(void)
 {
 	int err;
 
@@ -314,5 +317,12 @@ int bt_gatt_ots_l2cap_disconnect(struct bt_gatt_ots_l2cap *l2cap_ctx)
 	return bt_l2cap_chan_disconnect(&l2cap_ctx->ot_chan.chan);
 }
 
-SYS_INIT(bt_gatt_ots_l2cap_init, APPLICATION,
-	 CONFIG_APPLICATION_INIT_PRIORITY);
+
+/** @brief Initialize module-owned storage before protocol operations. */
+void bt_services_ots_ots_l2cap_storage_init(void)
+{
+	net_buf_pool_init(&ot_chan_tx_pool);
+#if ((CONFIG_BT_OTS_L2CAP_CHAN_RX_MTU > BT_L2CAP_SDU_RX_MTU))
+	net_buf_pool_init(&ot_chan_rx_pool);
+#endif
+}

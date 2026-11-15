@@ -11,7 +11,11 @@
 #ifndef ZEPHYR_INCLUDE_DRIVERS_BLUETOOTH_HCI_LOCKSTEP_H_
 #define ZEPHYR_INCLUDE_DRIVERS_BLUETOOTH_HCI_LOCKSTEP_H_
 
-#include <base/base.h>
+#include <embt/base/spinlock.h>
+#include <embt/base/time.h>
+#include <embt/osi/sync.h>
+#include <string.h>
+#include <embt/base/assert.h>
 #include <embt/drivers/bluetooth.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -100,8 +104,8 @@ struct bt_hci_lockstep {
 	/** @cond INTERNAL_HIDDEN */
 	const struct bt_hci_transport *dev;
 	bt_hci_lockstep_send_t send;
-	struct k_sem changed;
-	struct k_spinlock lock;
+	os_sem_t changed;
+	struct bt_spinlock lock;
 	struct net_buf_simple *rsp;
 	uint16_t opcode;
 	uint8_t state;
@@ -115,7 +119,7 @@ struct bt_hci_lockstep {
 	 *  bt_hci_lockstep_init() sets it to 10 seconds, the Bluetooth Host's
 	 *  own command timeout; a driver may change it afterwards.
 	 */
-	k_timeout_t timeout;
+	bt_timeout_t timeout;
 };
 
 /** @brief Initialize a lockstep helper.

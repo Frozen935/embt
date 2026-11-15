@@ -5,7 +5,7 @@
 #include <errno.h>
 #include <string.h>
 
-#include <zephyr/sys/byteorder.h>
+#include <embt/base/byteorder.h>
 
 #include "psa/crypto.h"
 

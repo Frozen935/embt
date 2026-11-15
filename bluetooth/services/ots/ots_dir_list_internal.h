@@ -12,12 +12,12 @@
 #include <stdint.h>
 #include <sys/types.h>
 
-#include <zephyr/autoconf.h>
-#include <zephyr/bluetooth/uuid.h>
-#include <zephyr/net_buf.h>
-#include <zephyr/sys/util.h>
-#include <zephyr/sys/util_macro.h>
-#include <zephyr/toolchain.h>
+#include <embt/autoconf.h>
+#include <embt/bluetooth/uuid.h>
+#include <embt/net_buf.h>
+#include <embt/base/util.h>
+#include <embt/base/util_macro.h>
+#include <embt/compiler.h>
 
 #ifdef __cplusplus
 extern "C" {

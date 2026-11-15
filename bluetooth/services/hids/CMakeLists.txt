@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
 
-zephyr_library()
+embt_library(embt_services_hids)
 
-zephyr_library_sources_ifdef(CONFIG_BT_HIDS hids.c)
+embt_library_sources_ifdef(CONFIG_BT_HIDS hids.c)

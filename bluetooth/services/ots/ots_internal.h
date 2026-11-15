@@ -11,7 +11,9 @@
 extern "C" {
 #endif
 
-#include <zephyr/types.h>
+#include <embt/base/work.h>
+#include <stddef.h>
+#include <stdint.h>
 #include "ots_l2cap_internal.h"
 #include "ots_oacp_internal.h"
 #include "ots_olcp_internal.h"
@@ -122,7 +124,7 @@ struct bt_gatt_ots_indicate {
 	struct bt_gatt_attr attr;
 	struct bt_gatt_ccc_managed_user_data ccc;
 	bool is_enabled;
-	struct k_work work;
+	struct bt_work work;
 	uint8_t res[OACP_OLCP_RES_MAX_SIZE];
 };
 

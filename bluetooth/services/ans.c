@@ -9,15 +9,21 @@
  */
 
 #include <errno.h>
+#include <embt/base/assert.h>
+#include <embt/base/time.h>
+#include <embt/osi/sync.h>
+#include <embt/base/util_macro.h>
+#include <errno.h>
 #include <string.h>
-#include <zephyr/types.h>
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/gatt.h>
-#include <zephyr/bluetooth/uuid.h>
-#include <zephyr/bluetooth/services/ans.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/gatt.h>
+#include <embt/bluetooth/uuid.h>
+#include <embt/bluetooth/services/ans.h>
 #include <embt/base/log.h>
-#include <zephyr/sys/util_utf8.h>
+#include <embt/base/utf8.h>
 
 LOG_MODULE_REGISTER(bt_ans, CONFIG_BT_ANS_LOG_LEVEL);
 
@@ -94,8 +100,8 @@ struct unread_alert_status {
 } __packed;
 
 /* Mutex for modifying database */
-K_MUTEX_DEFINE(new_alert_mutex);
-K_MUTEX_DEFINE(unread_mutex);
+os_mutex_t new_alert_mutex;
+os_mutex_t unread_mutex;
 
 /* Saved messages database */
 static struct new_alert new_alerts[BT_ANS_CAT_NUM];
@@ -233,8 +239,18 @@ static ssize_t write_alert_notif_ctrl_point(struct bt_conn *conn, const struct b
 	return len;
 }
 
-static int ans_init(void)
+int bt_ans_base_init(void)
 {
+	int err = osi_mutex_init(&new_alert_mutex, OS_MUTEX_RECURSIVE);
+
+	if (err) {
+		return err;
+	}
+	err = osi_mutex_init(&unread_mutex, OS_MUTEX_RECURSIVE);
+	if (err) {
+		osi_mutex_deinit(&new_alert_mutex);
+		return err;
+	}
 	for (int i = 0; i < BT_ANS_CAT_NUM; i++) {
 		new_alerts[i].category_id = i;
 		unread_alerts[i].category_id = i;
@@ -267,7 +283,7 @@ static int notify_new_alert_category(struct bt_conn *conn, uint8_t cat)
 	int rc;
 	int ret;
 
-	ret = k_mutex_lock(&new_alert_mutex, K_NO_WAIT);
+	ret = osi_mutex_lock(&new_alert_mutex, BT_NO_WAIT);
 	if (ret != 0) {
 		LOG_ERR("Unable to lock mutex (err: %d)", ret);
 		return -EAGAIN;
@@ -276,7 +292,7 @@ static int notify_new_alert_category(struct bt_conn *conn, uint8_t cat)
 	rc = bt_gatt_notify_uuid(conn, BT_UUID_GATT_NALRT, ans_svc.attrs, &new_alerts[cat],
 				 sizeof(struct new_alert));
 
-	ret = k_mutex_unlock(&new_alert_mutex);
+	ret = osi_mutex_unlock(&new_alert_mutex);
 	__ASSERT(ret == 0, "Unable to unlock mutex (err: %d)", ret);
 
 	/* If the client is not connected, that is fine */
@@ -328,7 +344,7 @@ static int notify_unread_alert_category(struct bt_conn *conn, uint8_t cat)
 	int rc;
 	int ret;
 
-	ret = k_mutex_lock(&unread_mutex, K_NO_WAIT);
+	ret = osi_mutex_lock(&unread_mutex, BT_NO_WAIT);
 	if (ret != 0) {
 		LOG_ERR("Unable to lock mutex (err: %d)", ret);
 		return -EAGAIN;
@@ -337,7 +353,7 @@ static int notify_unread_alert_category(struct bt_conn *conn, uint8_t cat)
 	rc = bt_gatt_notify_uuid(conn, BT_UUID_GATT_UALRTS, ans_svc.attrs, &unread_alerts[cat],
 				 sizeof(struct unread_alert_status));
 
-	ret = k_mutex_unlock(&unread_mutex);
+	ret = osi_mutex_unlock(&unread_mutex);
 	__ASSERT(ret == 0, "Unable to unlock mutex (err: %d)", ret);
 
 	/* If the client is not connected, that is fine */
@@ -397,11 +413,11 @@ int bt_ans_notify_new_alert(struct bt_conn *conn, enum bt_ans_cat category, uint
 	}
 
 	/* Update the saved value */
-	ret = k_mutex_lock(&new_alert_mutex, K_FOREVER);
+	ret = osi_mutex_lock(&new_alert_mutex, BT_FOREVER);
 	__ASSERT(ret == 0, "Unable to lock mutex (err: %d)", ret);
 	new_alerts[cat_in].num_new_alerts = num_new;
 	utf8_lcpy(new_alerts[cat_in].text_string, text, sizeof(new_alerts[cat_in].text_string));
-	ret = k_mutex_unlock(&new_alert_mutex);
+	ret = osi_mutex_unlock(&new_alert_mutex);
 	__ASSERT(ret == 0, "Unable to unlock mutex (err: %d)", ret);
 
 	return transmit_new_alert(conn, category);
@@ -420,10 +436,10 @@ int bt_ans_set_unread_count(struct bt_conn *conn, enum bt_ans_cat category, uint
 	}
 
 	/* Update the saved value */
-	ret = k_mutex_lock(&unread_mutex, K_FOREVER);
+	ret = osi_mutex_lock(&unread_mutex, BT_FOREVER);
 	__ASSERT(ret == 0, "Unable to lock mutex (err: %d)", ret);
 	unread_alerts[cat_in].unread_count = unread;
-	ret = k_mutex_unlock(&unread_mutex);
+	ret = osi_mutex_unlock(&unread_mutex);
 	__ASSERT(ret == 0, "Unable to unlock mutex (err: %d)", ret);
 
 	return transmit_unread_alert(conn, category);
@@ -485,4 +501,14 @@ int bt_ans_set_unread_support_category(uint16_t mask)
 	return 0;
 }
 
-SYS_INIT(ans_init, APPLICATION, CONFIG_APPLICATION_INIT_PRIORITY);
+
+int bt_service_ans_register(void)
+{
+	int err;
+
+	err = bt_gatt_service_static_register(&ans_svc);
+	if (err && err != -EEXIST) {
+		return err;
+	}
+	return 0;
+}

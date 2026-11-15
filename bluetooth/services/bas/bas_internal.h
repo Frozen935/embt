@@ -8,9 +8,9 @@
 #define BT_BAS_INTERNAL_H_
 
 #include <sys/types.h>
-#include <zephyr/sys/atomic.h>
-#include <zephyr/types.h>
-
+#include <embt/base/atomic.h>
+#include <stddef.h>
+#include <stdint.h>
 /**
  * @brief  Battery level status structure definition.
  */

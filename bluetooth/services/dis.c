@@ -10,21 +10,23 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <zephyr/types.h>
+#include <embt/base/assert.h>
+#include <embt/base/util_macro.h>
+#include <stdint.h>
 #include <stddef.h>
 #include <string.h>
 #include <errno.h>
 
-#include <zephyr/settings/settings.h>
+#include <embt/settings/settings.h>
 
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/hci.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/uuid.h>
-#include <zephyr/bluetooth/gatt.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/hci.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/uuid.h>
+#include <embt/bluetooth/gatt.h>
 
-#include <zephyr/sys/byteorder.h>
-#include <zephyr/bluetooth/byteorder.h>
+#include <embt/base/byteorder.h>
+#include <embt/bluetooth/byteorder.h>
 #include <embt/base/log.h>
 
 LOG_MODULE_REGISTER(bt_dis, CONFIG_BT_SERVICE_LOG_LEVEL);
@@ -477,3 +479,14 @@ static int dis_set(const char *name, size_t len_rd, settings_read_cb read_cb, vo
 SETTINGS_STATIC_HANDLER_DEFINE(bt_dis, "bt/dis", NULL, dis_set, NULL, NULL);
 
 #endif /* CONFIG_BT_DIS_SETTINGS*/
+
+int bt_service_dis_register(void)
+{
+	int err;
+
+	err = bt_gatt_service_static_register(&dis_svc);
+	if (err && err != -EEXIST) {
+		return err;
+	}
+	return 0;
+}

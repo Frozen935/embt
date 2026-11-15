@@ -6,15 +6,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <string.h>
 #include <errno.h>
 #include <stddef.h>
 #include <stdint.h>
 
-#include <zephyr/bluetooth/hci_pkt.h>
-#include <zephyr/bluetooth/hci_types.h>
-#include <zephyr/net_buf.h>
-#include <zephyr/sys/__assert.h>
-#include <zephyr/sys/byteorder.h>
+#include <embt/bluetooth/hci_pkt.h>
+#include <embt/bluetooth/hci_types.h>
+#include <embt/net_buf.h>
+#include <embt/base/assert.h>
+#include <embt/base/byteorder.h>
 
 void bt_hci_pkt_reset_cmd(struct net_buf_simple *buf)
 {

@@ -10,9 +10,8 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-#include <zephyr/types.h>
-
+#include <stddef.h>
+#include <stdint.h>
 int bt_gatt_ots_obj_manager_first_obj_get(void *obj_manager,
 	struct bt_gatt_ots_object **obj);
 

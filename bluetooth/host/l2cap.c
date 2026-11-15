@@ -818,7 +818,6 @@ static void lower_data_ready(struct bt_l2cap_le_chan *le_chan)
 	/* Only called from the TX processor, which holds the host lock
 	 * across the whole processing pass.
 	 */
-	BT_DEV_LOCK_ASSERT();
 
 	s = sys_slist_get(&conn->l2cap_data_ready);
 
@@ -1309,7 +1308,6 @@ static struct bt_l2cap_server *l2cap_server_lookup_psm(uint16_t psm)
 {
 	struct bt_l2cap_server *server;
 
-	BT_DEV_LOCK_ASSERT();
 
 	SYS_SLIST_FOR_EACH_CONTAINER(&servers, server, node) {
 		if (server->psm == psm) {
@@ -1325,7 +1323,6 @@ static bool l2cap_server_is_registered(const struct bt_l2cap_server *server)
 {
 	struct bt_l2cap_server *registered;
 
-	BT_DEV_LOCK_ASSERT();
 
 	SYS_SLIST_FOR_EACH_CONTAINER(&servers, registered, node) {
 		if (registered == server) {

@@ -4,16 +4,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <zephyr/types.h>
+#include <embt/base/work.h>
+#include <embt/base/assert.h>
+#include <stdint.h>
 #include <stddef.h>
 #include <string.h>
 #include <errno.h>
-#include <zephyr/sys/printk.h>
-#include <zephyr/sys/byteorder.h>
-#include <zephyr/sys/crc.h>
+#include <embt/base/byteorder.h>
+#include <embt/base/crc.h>
 
-#include <zephyr/bluetooth/gatt.h>
-#include <zephyr/bluetooth/services/ots.h>
+#include <embt/bluetooth/gatt.h>
+#include <embt/bluetooth/services/ots.h>
 #include "ots_internal.h"
 #include "ots_dir_list_internal.h"
 #include "ots_obj_manager_internal.h"
@@ -666,7 +667,7 @@ static void oacp_ind_send(const struct bt_gatt_attr *oacp_attr,
 	LOG_DBG("Sending OACP indication");
 
 
-	k_work_submit(&ots->oacp_ind.work);
+	bt_work_submit(&ots->oacp_ind.work);
 }
 
 ssize_t bt_gatt_ots_oacp_write(struct bt_conn *conn,
@@ -692,7 +693,7 @@ ssize_t bt_gatt_ots_oacp_write(struct bt_conn *conn,
 		return BT_GATT_ERR(BT_ATT_ERR_INVALID_OFFSET);
 	}
 
-	if (k_work_is_pending(&ots->oacp_ind.work)) {
+	if (bt_work_is_pending(&ots->oacp_ind.work)) {
 		LOG_ERR("OACP Write received before indication sent");
 		return BT_GATT_ERR(BT_ATT_ERR_PROCEDURE_IN_PROGRESS);
 	}

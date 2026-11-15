@@ -10,14 +10,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <embt/base/assert.h>
 #include <stddef.h>
 #include <errno.h>
 #include <string.h>
 
 #include "common/bt_str.h"
 
-#include <zephyr/bluetooth/addr.h>
-#include <zephyr/bluetooth/crypto.h>
+#include <embt/bluetooth/addr.h>
+#include <embt/bluetooth/crypto.h>
 #include <embt/base/log.h>
 
 LOG_MODULE_REGISTER(bt_rpa, CONFIG_BT_RPA_LOG_LEVEL);
@@ -69,7 +70,7 @@ bool bt_addr_matches_irk(const bt_addr_t *rpa, const uint8_t irk[BT_IRK_SIZE])
 	return memcmp(rpa->val, hash, 3) == 0;
 }
 
-#if defined(CONFIG_BT_PRIVACY) || defined(CONFIG_BT_CTLR_PRIVACY)
+#if defined(CONFIG_BT_PRIVACY)
 int bt_rpa_create(const uint8_t irk[16], bt_addr_t *rpa)
 {
 	int err;

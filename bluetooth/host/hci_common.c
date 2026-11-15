@@ -4,14 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <base/base.h>
 #include <stdbool.h>
 #include <stdint.h>
 
-#include <zephyr/bluetooth/buf.h>
-#include <zephyr/bluetooth/hci_types.h>
-#include <zephyr/drivers/bluetooth.h>
-#include <zephyr/net_buf.h>
-#include <zephyr/sys/byteorder.h>
+#include <embt/bluetooth/buf.h>
+#include <embt/bluetooth/hci_types.h>
+#include <embt/drivers/bluetooth.h>
+#include <embt/net_buf.h>
+#include <embt/sys/byteorder.h>
 
 #include "common/assert.h"
 

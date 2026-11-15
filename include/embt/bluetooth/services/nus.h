@@ -9,7 +9,7 @@
 
 #include <embt/bluetooth/uuid.h>
 #include <embt/bluetooth/services/nus/inst.h>
-#include <embt/sys/slist.h>
+#include <embt/base/slist.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -126,6 +126,9 @@ static inline int bt_nus_send(struct bt_conn *conn, const void *data, uint16_t l
 {
 	return bt_nus_inst_send(conn, NULL, data, len);
 }
+
+/** @brief Explicitly enable Bluetooth and NUS advertising after application setup. */
+int bt_nus_auto_start(void);
 
 #ifdef __cplusplus
 }

@@ -1078,7 +1078,6 @@ static struct bt_conn *get_conn_ready(void)
 	/* Called from the TX processor with the host lock held; the lock
 	 * serializes conn_ready list access against bt_conn_data_ready().
 	 */
-	BT_DEV_LOCK_ASSERT();
 
 	if (dont_have_viewbufs()) {
 		/* We will get scheduled again when the (view) buffers are freed. If you

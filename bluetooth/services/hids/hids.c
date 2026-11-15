@@ -4,21 +4,25 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <embt/base/time.h>
+#include <embt/osi/sync.h>
+#include <embt/osi/thread.h>
+#include <embt/base/assert.h>
+#include <embt/base/util_macro.h>
 #include <errno.h>
 #include <stddef.h>
 #include <string.h>
 
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/gatt.h>
-#include <zephyr/bluetooth/services/hids.h>
-#include <zephyr/bluetooth/uuid.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/gatt.h>
+#include <embt/bluetooth/services/hids.h>
+#include <embt/bluetooth/uuid.h>
 #include <embt/base/log.h>
-#include <zephyr/sys/__assert.h>
-#include <zephyr/sys/byteorder.h>
-#include <zephyr/sys/util.h>
-#include <zephyr/types.h>
-
+#include <embt/base/assert.h>
+#include <embt/base/byteorder.h>
+#include <embt/base/util.h>
+#include <stdint.h>
 #include "hids_internal.h"
 
 LOG_MODULE_REGISTER(bt_hids, CONFIG_BT_HIDS_LOG_LEVEL);
@@ -50,7 +54,9 @@ BUILD_ASSERT(HIDS_REPORT_COUNT > 0, "The HID Service needs at least one Report c
  * the API and a notification waiting for a buffer does not hold up the
  * handlers.
  */
-static K_MUTEX_DEFINE(hids_mutex);
+static os_mutex_t hids_mutex;
+static os_thread_t hids_owner;
+static unsigned int hids_lock_depth;
 static const struct bt_hids_cb *callbacks;
 static struct hids_state hids;
 
@@ -62,23 +68,27 @@ static struct hids_report_ctx reports[HIDS_REPORT_COUNT];
 
 static void hids_lock(void)
 {
-	__maybe_unused int err = k_mutex_lock(&hids_mutex, K_FOREVER);
+	__maybe_unused int err = osi_mutex_lock(&hids_mutex, BT_FOREVER);
 
-	__ASSERT(err == 0, "Failed to lock the HID Service (err %d)", err);
+	BT_ASSERT_CHECK(err == 0, "Failed to lock the HID Service (err %d)", err);
+	hids_owner = osi_thread_self();
+	hids_lock_depth++;
 }
 
 static void hids_unlock(void)
 {
-	__maybe_unused int err = k_mutex_unlock(&hids_mutex);
+	BT_ASSERT_CHECK(hids_lock_depth > 0);
+	hids_lock_depth--;
+	__maybe_unused int err = osi_mutex_unlock(&hids_mutex);
 
 	__ASSERT(err == 0, "Failed to unlock the HID Service (err %d)", err);
 }
 
-/* Assert that the current thread holds hids_mutex. k_mutex resets the owner on
- * the final unlock, so the owner check alone is exact.
+/* Only a positive lock depth makes the borrowed owner handle valid for comparison.
  */
 #define HIDS_LOCK_ASSERT()                                                                         \
-	__ASSERT(hids_mutex.owner == k_current_get(), "hids_mutex not held by %p", k_current_get())
+	__ASSERT(hids_lock_depth > 0 && osi_thread_equal(hids_owner, osi_thread_self()),              \
+		 "hids_mutex not held by current thread")
 
 /* Return the module to its unregistered state */
 static void hids_reset(void)
@@ -679,4 +689,9 @@ int bt_hids_send_report(struct bt_conn *conn, uint8_t report_id, const uint8_t *
 	};
 
 	return bt_gatt_notify_cb(conn, &params);
+}
+
+int bt_hids_base_init(void)
+{
+	return osi_mutex_init(&hids_mutex, OS_MUTEX_RECURSIVE);
 }

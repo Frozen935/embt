@@ -10,12 +10,12 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-#include <zephyr/types.h>
-#include <zephyr/sys/slist.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <embt/base/slist.h>
 #include <sys/types.h>
 
-#include <zephyr/bluetooth/l2cap.h>
+#include <embt/bluetooth/l2cap.h>
 
 struct bt_gatt_ots_l2cap_tx {
 	uint8_t *data;

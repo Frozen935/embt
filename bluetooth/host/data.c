@@ -4,15 +4,16 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
+#include <base/base.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
 
-#include <zephyr/autoconf.h>
-#include <zephyr/bluetooth/bluetooth.h>
+#include <embt/autoconf.h>
+#include <embt/bluetooth/bluetooth.h>
 #include <embt/base/log.h>
-#include <zephyr/net_buf.h>
+#include <embt/net_buf.h>
 
 LOG_MODULE_REGISTER(bt_data, CONFIG_BT_HCI_CORE_LOG_LEVEL);
 

@@ -6,19 +6,27 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
+#include <embt/base/fifo.h>
+#include <embt/base/work.h>
+#include <embt/base/time.h>
+#include <embt/base/atomic.h>
+#include <embt/osi/sync.h>
+#include <embt/osi/thread.h>
+#include <string.h>
+#include <embt/base/assert.h>
 #include <stdbool.h>
 #include <stdint.h>
 
-#include <zephyr/autoconf.h>
-#include <zephyr/bluetooth/addr.h>
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/hci_types.h>
-#include <zephyr/devicetree.h>
-#include <zephyr/net_buf.h>
-#include <zephyr/sys/atomic.h>
-#include <zephyr/sys/slist.h>
-#include <zephyr/sys/util_macro.h>
+#include <embt/autoconf.h>
+#include <embt/bluetooth/addr.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/hci_types.h>
+#include <embt/drivers/bluetooth.h>
+
+#include <embt/net_buf.h>
+#include <embt/base/slist.h>
+#include <embt/base/util_macro.h>
 
 /* LL connection parameters */
 #define LE_CONN_LATENCY		0x0000
@@ -225,10 +233,10 @@ struct bt_le_ext_adv {
 	/* Current target address */
 	bt_addr_le_t            target_addr;
 
-	ATOMIC_DEFINE(flags, BT_ADV_NUM_FLAGS);
+	BT_ATOMIC_DEFINE(flags, BT_ADV_NUM_FLAGS);
 
 #if defined(CONFIG_BT_LIM_ADV)
-	struct k_work_delayable	lim_adv_timeout_work;
+	struct bt_work_delayable	lim_adv_timeout_work;
 #endif /* CONFIG_BT_LIM_ADV */
 
 	/** The options used to set the parameters for this advertising set
@@ -305,7 +313,7 @@ struct bt_le_per_adv_sync {
 	bool report_truncated;
 
 	/** Flags */
-	ATOMIC_DEFINE(flags, BT_PER_ADV_SYNC_NUM_FLAGS);
+	BT_ATOMIC_DEFINE(flags, BT_PER_ADV_SYNC_NUM_FLAGS);
 
 #if defined(CONFIG_BT_PER_ADV_SYNC_RSP)
 	/** Number of subevents */
@@ -331,12 +339,15 @@ struct bt_dev_le {
 #if defined(CONFIG_BT_CONN)
 	/* Controller buffer information */
 	uint16_t		acl_mtu;
-	struct k_sem		acl_pkts;
+	os_sem_t		acl_pkts;
+	uint16_t acl_pkts_limit;
+	bool acl_pkts_initialized;
 #endif /* CONFIG_BT_CONN */
 #if defined(CONFIG_BT_ISO)
 	uint16_t		iso_mtu;
 	uint8_t			iso_limit;
-	struct k_sem		iso_pkts;
+	os_sem_t		iso_pkts;
+	bool iso_pkts_initialized;
 #endif /* CONFIG_BT_ISO */
 #if defined(CONFIG_BT_BROADCASTER)
 	uint16_t max_adv_data_len;
@@ -363,7 +374,9 @@ struct bt_dev_le {
 struct bt_dev_br {
 	/* Max controller's acceptable ACL packet length */
 	uint16_t         mtu;
-	struct k_sem  pkts;
+	os_sem_t  pkts;
+	uint16_t pkts_limit;
+	bool pkts_initialized;
 	uint16_t         esco_pkt_type;
 };
 
@@ -460,12 +473,12 @@ struct bt_dev {
 	uint8_t                    vs_commands[BT_DEV_VS_CMDS_MAX];
 #endif
 
-	struct k_work           init;
+	struct bt_work           init;
 
-	ATOMIC_DEFINE(flags, BT_DEV_NUM_FLAGS);
+	BT_ATOMIC_DEFINE(flags, BT_DEV_NUM_FLAGS);
 
 	/* Supported commands, one bit per enum bt_dev_cmd */
-	ATOMIC_DEFINE(supported_commands, BT_DEV_CMD_NUM);
+	BT_ATOMIC_DEFINE(supported_commands, BT_DEV_CMD_NUM);
 
 	/* LE controller specific features */
 	struct bt_dev_le	le;
@@ -476,7 +489,7 @@ struct bt_dev {
 #endif
 
 	/* Number of commands controller can accept */
-	struct k_sem		ncmd_sem;
+	os_sem_t		ncmd_sem;
 
 	/* Last sent HCI command */
 	struct net_buf		*sent_cmd;
@@ -485,9 +498,9 @@ struct bt_dev {
 	sys_slist_t rx_queue;
 
 	/* Queue for outgoing HCI commands */
-	struct k_fifo		cmd_tx_queue;
+	struct bt_fifo		cmd_tx_queue;
 
-	const struct device *hci;
+	const struct bt_hci_transport *hci;
 
 #if defined(CONFIG_BT_PRIVACY)
 	/* Local Identity Resolving Key */
@@ -499,7 +512,7 @@ struct bt_dev {
 #endif
 
 	/* Work used for RPA rotation */
-	struct k_work_delayable rpa_update;
+	struct bt_work_delayable rpa_update;
 
 	/* The RPA timeout value. */
 	uint16_t rpa_timeout;
@@ -515,11 +528,10 @@ struct bt_dev {
 #endif
 
 	/* The host lock: serializes access to the per-controller host state
-	 * between the contexts that mutate it. Statically initialized
-	 * (Z_MUTEX_INITIALIZER) so that it is usable before bt_enable(), e.g.
-	 * from bt_gatt_service_register().
+	 * between the contexts that mutate it. Initialized by bt_stack_init()
+	 * before bt_enable() and service registration.
 	 */
-	struct k_mutex		lock;
+	os_mutex_t		lock;
 };
 
 extern struct bt_dev bt_dev;
@@ -527,16 +539,10 @@ extern struct bt_dev bt_dev;
 /* Check if the controller supports one of the commands that the host checks */
 static inline bool bt_dev_cmd_supported(enum bt_dev_cmd cmd)
 {
-	return atomic_test_bit(bt_dev.supported_commands, cmd);
+	return bt_atomic_test_bit(bt_dev.supported_commands, cmd);
 }
 
-/* Assert that the current thread holds the host lock. k_mutex resets the
- * owner on the final unlock, so the owner check alone is exact.
- */
-#define BT_DEV_LOCK_ASSERT()                                                                       \
-	__ASSERT(bt_dev.lock.owner == k_current_get(), "host lock not held by %p", k_current_get())
-
-/* Lock/unlock the host lock. k_mutex is recursive, so nested lock/unlock
+/* Lock/unlock the host lock. os_mutex_t is recursive, so nested lock/unlock
  * pairs on the same thread are legal (needed e.g. for the
  * bt_att_req_send() -> bt_att_chan_req_send() nesting).
  */
@@ -553,9 +559,15 @@ enum bt_security_err bt_security_err_get(uint8_t hci_err);
  * This is used for the host's internal work items to avoid the shared system
  * workqueue. The work runs in the RX thread context.
  */
-int bt_work_submit(struct k_work *work);
-int bt_work_schedule(struct k_work_delayable *work, k_timeout_t delay);
-int bt_work_reschedule(struct k_work_delayable *work, k_timeout_t delay);
+int bt_host_work_submit(struct bt_work *work);
+/**
+ * @brief Wait for submitted Host work without plugging the queue.
+ * @return Zero on completion, or a negative error if the queue cannot be drained.
+ * @note Call from outside the Host worker thread. Delayed work is not flushed.
+ */
+int bt_host_work_drain(void);
+int bt_host_work_schedule(struct bt_work_delayable *work, bt_timeout_t delay);
+int bt_host_work_reschedule(struct bt_work_delayable *work, bt_timeout_t delay);
 
 /* Check whether it is executing in the `bt_workq` thread context. */
 bool bt_is_work_thread(void);
@@ -565,7 +577,7 @@ bool bt_is_work_thread(void);
  */
 struct bt_hci_cmd_state_set {
 	/* Target memory to be updated */
-	atomic_t *target;
+	bt_atomic_t *target;
 	/* Bit number to be updated in target memory */
 	int bit;
 	/* Value to determine if enable or disable bit */
@@ -575,7 +587,7 @@ struct bt_hci_cmd_state_set {
 /* Set command state related with the command buffer */
 void bt_hci_cmd_state_set_init(struct net_buf *buf,
 			       struct bt_hci_cmd_state_set *state,
-			       atomic_t *target, int bit, bool val);
+			       bt_atomic_t *target, int bit, bool val);
 
 int bt_hci_disconnect(uint16_t handle, uint8_t reason);
 
@@ -696,11 +708,19 @@ int bt_hci_le_read_max_data_len(uint16_t *tx_octets, uint16_t *tx_time);
 
 bool bt_drv_quirk_no_auto_dle(void);
 
+/**
+ * @brief Translate an HCI or LMP Core version code for diagnostics.
+ * @param[in] core_version Version code returned by Read Local Version Information.
+ * @return Version string, or "unknown" for a code outside the supported table.
+ */
+const char *bt_hci_get_ver_str(uint8_t core_version);
+
 static inline bool bt_drv_quirk_no_adv_term_on_dir_timeout(void)
 {
-	/* A build-time constant, so the code it guards is left out of builds without the quirk */
-	return DT_ENUM_HAS_VALUE(DT_CHOSEN(zephyr_bt_hci), bt_hci_quirks,
-				 no_adv_term_on_dir_timeout);
+	return bt_dev.hci && (bt_dev.hci->quirks & BT_HCI_QUIRK_NO_ADV_TERM_ON_DIR_TIMEOUT);
 }
 
 void bt_tx_irq_raise(void);
+
+/** @brief Initialize the Host receive buffer pools before transport startup. */
+void bt_buf_init(void);

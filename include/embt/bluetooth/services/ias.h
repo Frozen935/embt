@@ -17,10 +17,8 @@
  * as a part of ongoing development.
  */
 
-#include <embt/sys/util_macro.h>
+#include <embt/base/util_macro.h>
 #include <embt/bluetooth/conn.h>
-#include <embt/sys/iterable_sections.h>
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -38,6 +36,7 @@ enum bt_ias_alert_lvl {
 
 /** @brief Immediate Alert Service callback structure. */
 struct bt_ias_cb {
+	struct bt_ias_cb *next; /**< Internal explicit-registration link. */
 	/**
 	 * @brief Callback function to stop alert.
 	 *
@@ -71,8 +70,15 @@ int bt_ias_local_alert_stop(void);
  *
  *  @param _name Name of callback structure.
  */
-#define BT_IAS_CB_DEFINE(_name)                                                                    \
-	static const STRUCT_SECTION_ITERABLE(bt_ias_cb, _CONCAT(bt_ias_cb_, _name))
+/**
+ * @brief Register persistent callback storage before enabling the component.
+ * @param[in,out] cb Callback object that outlives all component operations.
+ * @return Zero, -EINVAL for NULL, or -EALREADY for duplicate registration.
+ * @note The owner serializes registration against callback dispatch.
+ */
+int bt_ias_cb_register(struct bt_ias_cb *cb);
+
+#define BT_IAS_CB_DEFINE(_name) static struct bt_ias_cb bt_ias_cb_ ## _name
 
 struct bt_ias_client_cb {
 	/** @brief Callback function for bt_ias_discover.
