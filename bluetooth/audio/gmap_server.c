@@ -3,6 +3,9 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
+#undef LOG_TAG
+#define LOG_TAG "bt_gmap_server"
+#include <base/log.h>
 #include <errno.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -10,7 +13,7 @@
 #include <string.h>
 #include <sys/types.h>
 
-#include <zephyr/autoconf.h>
+#include <embt/autoconf.h>
 #include <zephyr/bluetooth/audio/gmap.h>
 #include <zephyr/bluetooth/conn.h>
 #include <zephyr/bluetooth/gatt.h>
@@ -19,8 +22,6 @@
 #include <zephyr/sys/util_macro.h>
 
 #include "audio_internal.h"
-
-LOG_MODULE_REGISTER(bt_gmap_server, CONFIG_BT_GMAP_LOG_LEVEL);
 
 #define BT_GMAP_ROLE_MASK                                                                          \
 	(BT_GMAP_ROLE_UGG | BT_GMAP_ROLE_UGT | BT_GMAP_ROLE_BGS | BT_GMAP_ROLE_BGR)

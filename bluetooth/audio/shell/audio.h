@@ -13,6 +13,7 @@
 #ifndef AUDIO_SHELL_AUDIO_H
 #define AUDIO_SHELL_AUDIO_H
 
+#include <base/base.h>
 #include <errno.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -21,7 +22,7 @@
 #include <string.h>
 #include <sys/types.h>
 
-#include <zephyr/autoconf.h>
+#include <embt/autoconf.h>
 #include <zephyr/bluetooth/assigned_numbers.h>
 #include <zephyr/bluetooth/audio/ascs.h>
 #include <zephyr/bluetooth/bluetooth.h>
@@ -29,7 +30,6 @@
 #include <zephyr/bluetooth/hci_types.h>
 #include <zephyr/bluetooth/iso.h>
 #include <zephyr/shell/shell.h>
-#include <zephyr/sys/atomic_types.h>
 #include <zephyr/sys/byteorder.h>
 #include <zephyr/sys/util.h>
 #include <zephyr/sys/util_macro.h>
@@ -109,7 +109,7 @@ struct shell_stream {
 			int64_t connected_at_ticks;
 			uint16_t seq_num;
 #if defined(CONFIG_LIBLC3)
-			atomic_t lc3_enqueue_cnt;
+			bt_atomic_t lc3_enqueue_cnt;
 			bool active;
 			size_t encoded_cnt;
 			size_t lc3_sdu_cnt;

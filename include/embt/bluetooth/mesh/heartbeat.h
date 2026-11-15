@@ -12,8 +12,8 @@
 
 #include <stdint.h>
 
-#include <zephyr/sys/iterable_sections.h>
-#include <zephyr/sys/slist.h>
+#include <embt/sys/iterable_sections.h>
+#include <embt/sys/slist.h>
 
 /**
  * @brief Heartbeat

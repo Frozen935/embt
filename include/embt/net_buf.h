@@ -10,10 +10,11 @@
 #ifndef ZEPHYR_INCLUDE_NET_BUF_H_
 #define ZEPHYR_INCLUDE_NET_BUF_H_
 
+#include <embt/storage.h>
 #include <stddef.h>
-#include <zephyr/types.h>
-#include <zephyr/sys/util.h>
-#include <zephyr/sys/iterable_sections.h>
+#include <embt/types.h>
+#include <embt/sys/util.h>
+#include <embt/sys/iterable_sections.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -72,7 +73,7 @@ extern "C" {
  * @param _size Maximum data storage for the buffer.
  */
 #define NET_BUF_SIMPLE_DEFINE_STATIC(_name, _size)        \
-	static __noinit uint8_t net_buf_data_##_name[_size]; \
+	static uint8_t net_buf_data_##_name[_size]; \
 	static struct net_buf_simple _name = {            \
 		.data   = net_buf_data_##_name,           \
 		.len    = 0,                              \
@@ -1066,11 +1067,11 @@ struct net_buf {
 	struct net_buf *frags;
 
 	/** Reference count, packed alongside three adjacent uint8_t
-	 *  fields (`flags`, `pool_id`, `user_data_size`) in a single
-	 *  atomic_t-sized slot.
+	 *  fields (`flags`, `_reserved`, `user_data_size`) in a single
+	 *  long-sized slot.
 	 *
-	 * `ref_word` is the atomic_t view used by net_buf internals for
-	 * ref/unref; `ref`, `flags`, `pool_id` and `user_data_size` are
+	 * `ref_word` is the long view used by net_buf internals for
+	 * ref/unref; `ref`, `flags`, `_reserved` and `user_data_size` are
 	 * byte-level views into the same storage.
 	 *
 	 * Incrementing and decrementing ref_word adds or subtracts 1
@@ -1081,8 +1082,8 @@ struct net_buf {
 	 * only the ref byte changes -- the other three bytes are
 	 * untouched.
 	 *
-	 * On 32-bit architectures atomic_t is 4 bytes and the byte
-	 * struct fills the slot exactly. On 64-bit, atomic_t is 8 bytes;
+	 * On 32-bit architectures long is 4 bytes and the byte
+	 * struct fills the slot exactly. On 64-bit, long is 8 bytes;
 	 * the upper 4 bytes are alignment padding that struct net_buf
 	 * already required (the next field is an 8-byte-aligned
 	 * pointer), so this union does not grow struct net_buf there
@@ -1090,7 +1091,7 @@ struct net_buf {
 	 * 4 bytes of explicit padding so `ref` still sits at the LSB of
 	 * ref_word.
 	 *
-	 * `flags`, `pool_id` and `user_data_size` are written exactly
+	 * `flags`, `_reserved` and `user_data_size` are written exactly
 	 * once at allocation time on a single thread and are read-only
 	 * thereafter, so plain uint8_t reads from non-atomic call sites
 	 * remain safe. `flags` is also legally written from a context
@@ -1099,11 +1100,11 @@ struct net_buf {
 	 */
 	union {
 		/** @cond INTERNAL_HIDDEN */
-		atomic_t ref_word;
+		long ref_word;
 		/** @endcond */
 		struct {
-#if defined(CONFIG_BIG_ENDIAN)
-			/* atomic_t is typedef'd as long (BUILD_ASSERTed in
+#if defined(CONFIG_EMBT_BIG_ENDIAN)
+			/* long is typedef'd as long (BUILD_ASSERTed in
 			 * lib/net_buf/buf.c); on a 64-bit big-endian build
 			 * the byte struct needs 4 bytes of padding so that
 			 * `ref` lands on the least-significant byte of
@@ -1117,8 +1118,8 @@ struct net_buf {
 			/** Size of user data on this buffer */
 			uint8_t user_data_size;
 
-			/** Where the buffer should go when freed up. */
-			uint8_t pool_id;
+			/** Reserved byte; pool ownership is held by the pool pointer. */
+			uint8_t _reserved;
 
 			/** Bit-field of buffer flags. */
 			uint8_t flags;
@@ -1132,14 +1133,17 @@ struct net_buf {
 			/** Bit-field of buffer flags. */
 			uint8_t flags;
 
-			/** Where the buffer should go when freed up. */
-			uint8_t pool_id;
+			/** Reserved byte; pool ownership is held by the pool pointer. */
+			uint8_t _reserved;
 
 			/** Size of user data on this buffer */
 			uint8_t user_data_size;
 #endif
 		};
 	};
+
+	/** Owning pool; valid for the entire buffer lifetime. */
+	struct net_buf_pool *pool;
 
 	/** Union for convenience access to the net_buf_simple members, also
 	 * preserving the old API.
@@ -1213,7 +1217,7 @@ struct net_buf_pool {
 
 #if defined(CONFIG_NET_BUF_POOL_USAGE)
 	/** Amount of available buffers in the pool. */
-	atomic_t avail_count;
+	long avail_count;
 
 	/** Total size of the pool. */
 	const uint16_t pool_size;
@@ -1237,14 +1241,12 @@ struct net_buf_pool {
 
 /** @cond INTERNAL_HIDDEN */
 #define NET_BUF_POOL_USAGE_INIT(_pool, _count) \
-	IF_ENABLED(CONFIG_NET_BUF_POOL_USAGE, (.avail_count = ATOMIC_INIT(_count),)) \
+	IF_ENABLED(CONFIG_NET_BUF_POOL_USAGE, (.avail_count = (_count),)) \
 	IF_ENABLED(CONFIG_NET_BUF_POOL_USAGE, (.max_used = 0,)) \
 	IF_ENABLED(CONFIG_NET_BUF_POOL_USAGE, (.name = STRINGIFY(_pool),))
 
 #define NET_BUF_POOL_INITIALIZER(_pool, _alloc, _bufs, _count, _ud_size, _destroy) \
 	{                                                                          \
-		.free = Z_LIFO_INITIALIZER(_pool.free),                            \
-		.lock = { },                                                       \
 		.buf_count = _count,                                               \
 		.uninit_count = _count,                                            \
 		.user_data_size = _ud_size,                                        \
@@ -1265,7 +1267,7 @@ struct net_buf_pool {
 	BUILD_ASSERT(sizeof(struct _net_buf_##_name) ==					       \
 		     ROUND_UP(sizeof(struct net_buf) + _ud_size, __alignof__(struct net_buf)), \
 		     "Size cannot be determined");					       \
-	static struct _net_buf_##_name _net_buf_##_name[_count] __noinit
+	static struct _net_buf_##_name _net_buf_##_name[_count]
 
 extern const struct net_buf_data_alloc net_buf_heap_alloc;
 /** @endcond */
@@ -1299,7 +1301,7 @@ extern const struct net_buf_data_alloc net_buf_heap_alloc;
  */
 #define NET_BUF_POOL_HEAP_DEFINE(_name, _count, _ud_size, _destroy)          \
 	_NET_BUF_ARRAY_DEFINE(_name, _count, _ud_size);                      \
-	static STRUCT_SECTION_ITERABLE(net_buf_pool, _name) =                \
+	static struct net_buf_pool _name =                \
 		NET_BUF_POOL_INITIALIZER(_name, &net_buf_heap_alloc,         \
 					 _net_buf_##_name, _count, _ud_size, \
 					 _destroy)
@@ -1344,7 +1346,7 @@ extern const struct net_buf_data_cb net_buf_fixed_cb;
  */
 #define NET_BUF_POOL_FIXED_DEFINE(_name, _count, _data_size, _ud_size, _destroy) \
 	_NET_BUF_ARRAY_DEFINE(_name, _count, _ud_size);                        \
-	static uint8_t __noinit net_buf_data_##_name[_count][_data_size] __net_buf_align; \
+	static uint8_t net_buf_data_##_name[_count][_data_size] __net_buf_align; \
 	static const struct net_buf_pool_fixed net_buf_fixed_##_name = {       \
 		.data_pool = (uint8_t *)net_buf_data_##_name,                  \
 	};                                                                     \
@@ -1353,7 +1355,7 @@ extern const struct net_buf_data_cb net_buf_fixed_cb;
 		.alloc_data = (void *)&net_buf_fixed_##_name,                  \
 		.max_alloc_size = _data_size,                                  \
 	};                                                                     \
-	static STRUCT_SECTION_ITERABLE(net_buf_pool, _name) =                  \
+	static struct net_buf_pool _name =                  \
 		NET_BUF_POOL_INITIALIZER(_name, &net_buf_fixed_alloc_##_name,  \
 					 _net_buf_##_name, _count, _ud_size,   \
 					 _destroy)
@@ -1394,7 +1396,7 @@ extern const struct net_buf_data_cb net_buf_var_cb;
 		.alloc_data = &net_buf_mem_pool_##_name,                       \
 		.max_alloc_size = 0,                                           \
 	};                                                                     \
-	static STRUCT_SECTION_ITERABLE(net_buf_pool, _name) =                  \
+	static struct net_buf_pool _name =                  \
 		NET_BUF_POOL_INITIALIZER(_name, &net_buf_data_alloc_##_name,   \
 					 _net_buf_##_name, _count, _ud_size,   \
 					 _destroy)
@@ -1439,7 +1441,7 @@ extern const struct net_buf_data_cb net_buf_var_cb;
 		.max_alloc_size = 0,                                           \
 		.alignment = _align,					       \
 	};                                                                     \
-	static STRUCT_SECTION_ITERABLE(net_buf_pool, _name) =                  \
+	static struct net_buf_pool _name =                  \
 		NET_BUF_POOL_INITIALIZER(_name, &net_buf_data_alloc_##_name,   \
 					 _net_buf_##_name, _count, _ud_size,   \
 					 _destroy)
@@ -1469,15 +1471,6 @@ extern const struct net_buf_data_cb net_buf_var_cb;
 	NET_BUF_POOL_FIXED_DEFINE(_name, _count, _size, _ud_size, _destroy)
 
 /**
- * @brief Looks up a pool based on its ID.
- *
- * @param id Pool ID (e.g. from buf->pool_id).
- *
- * @return Pointer to pool.
- */
-struct net_buf_pool *net_buf_pool_get(int id);
-
-/**
  * @brief Get a zero-based index for a buffer.
  *
  * This function will translate a buffer into a zero-based index,
@@ -1505,10 +1498,7 @@ int net_buf_id(const struct net_buf *buf);
  *
  * @return Number of buffers currently available in the pool
  */
-static inline size_t net_buf_get_available(struct net_buf_pool *pool)
-{
-	return (size_t)atomic_get(&pool->avail_count);
-}
+size_t net_buf_get_available(struct net_buf_pool *pool);
 
 /**
  * @brief Get the maximum number of buffers simultaneously claimed from a pool.
@@ -1604,19 +1594,7 @@ struct net_buf * __must_check net_buf_alloc_with_data(struct net_buf_pool *pool,
  *
  * @param buf Buffer to destroy.
  */
-static inline void net_buf_destroy(struct net_buf *buf)
-{
-	struct net_buf_pool *pool = net_buf_pool_get(buf->pool_id);
-
-	if (buf->__buf) {
-		if (!(buf->flags & NET_BUF_EXTERNAL_DATA)) {
-			pool->alloc->cb->unref(buf, buf->__buf);
-		}
-		buf->__buf = NULL;
-	}
-
-	k_lifo_put(&pool->free, buf);
-}
+void net_buf_destroy(struct net_buf *buf);
 
 /**
  * @brief Reset buffer
@@ -1733,10 +1711,7 @@ struct net_buf * __must_check net_buf_ref(struct net_buf *buf);
  *
  * @return The buffer originally pointed to by @p orig
  */
-static inline struct net_buf *__must_check net_buf_take(struct net_buf **orig)
-{
-	return (struct net_buf *)atomic_ptr_clear((atomic_ptr_t *)orig);
-}
+struct net_buf *__must_check net_buf_take(struct net_buf **orig);
 
 /**
  * @brief Move a buffer pointer without an atomic exchange.

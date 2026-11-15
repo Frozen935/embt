@@ -15,10 +15,10 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include <zephyr/autoconf.h>
+#include <embt/autoconf.h>
 #include <zephyr/bluetooth/conn.h>
 #include <zephyr/bluetooth/gatt.h>
-#include <zephyr/sys/atomic.h>
+#include <base/bt_atomic.h>
 
 enum bt_micp_mic_ctlr_flag {
 	BT_MICP_MIC_CTLR_FLAG_BUSY,
@@ -44,7 +44,7 @@ struct bt_micp_mic_ctlr {
 	struct bt_aics *aics[CONFIG_BT_MICP_MIC_CTLR_MAX_AICS_INST];
 #endif /* CONFIG_BT_MICP_MIC_CTLR_AICS */
 
-	ATOMIC_DEFINE(flags, BT_MICP_MIC_CTLR_FLAG_NUM_FLAGS);
+	BT_ATOMIC_DEFINE(flags, BT_MICP_MIC_CTLR_FLAG_NUM_FLAGS);
 };
 
 #endif /* ZEPHYR_INCLUDE_BLUETOOTH_AUDIO_MICP_INTERNAL_ */

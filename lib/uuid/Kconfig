@@ -17,7 +17,8 @@ config UUID_V4
 
 config UUID_V5
 	bool "UUID version 5 generation support"
-	depends on PSA_WANT_ALG_SHA_1
+	select PSA_CRYPTO
+	select PSA_WANT_ALG_SHA_1
 	help
 	  Enable generation of UUID v5.
 

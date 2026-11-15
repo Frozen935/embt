@@ -17,8 +17,8 @@
  * as a part of ongoing development.
  */
 
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/sys/iterable_sections.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/sys/iterable_sections.h>
 
 #ifdef __cplusplus
 extern "C" {

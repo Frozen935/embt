@@ -10,10 +10,11 @@
 #ifndef ZEPHYR_INCLUDE_BLUETOOTH_MESH_MAIN_H_
 #define ZEPHYR_INCLUDE_BLUETOOTH_MESH_MAIN_H_
 
+#include <embt/storage.h>
 #include <stdbool.h>
 #include <stdint.h>
 
-#include <zephyr/sys/iterable_sections.h>
+#include <embt/sys/iterable_sections.h>
 
 /**
  * @brief Provisioning

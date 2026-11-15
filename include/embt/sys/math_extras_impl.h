@@ -16,7 +16,7 @@
 #error "please include <sys/math_extras.h> instead of this file"
 #endif
 
-#include <zephyr/toolchain.h>
+#include <embt/toolchain.h>
 
 /** @cond INTERNAL_HIDDEN */
 

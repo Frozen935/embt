@@ -6,13 +6,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#undef LOG_TAG
+#define LOG_TAG "bt_vocs_client"
+#include <base/log.h>
+#include <base/base.h>
 #include <errno.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
 
-#include <zephyr/autoconf.h>
+#include <embt/autoconf.h>
 #include <zephyr/bluetooth/assigned_numbers.h>
 #include <zephyr/bluetooth/att.h>
 #include <zephyr/bluetooth/audio/audio.h>
@@ -23,13 +27,11 @@
 #include <zephyr/bluetooth/gatt.h>
 #include <zephyr/bluetooth/uuid.h>
 #include <zephyr/sys/__assert.h>
-#include <zephyr/sys/atomic.h>
+#include <base/bt_atomic.h>
 #include <zephyr/sys/util.h>
 #include <zephyr/types.h>
 
 #include "vocs_internal.h"
-
-LOG_MODULE_REGISTER(bt_vocs_client, CONFIG_BT_VOCS_CLIENT_LOG_LEVEL);
 
 static struct bt_vocs_client insts[CONFIG_BT_MAX_CONN * CONFIG_BT_VOCS_CLIENT_MAX_INSTANCE_COUNT];
 
@@ -40,7 +42,7 @@ static struct bt_vocs_client *lookup_vocs_by_handle(struct bt_conn *conn, uint16
 
 	for (int i = 0; i < ARRAY_SIZE(insts); i++) {
 		if (insts[i].conn == conn &&
-		    atomic_test_bit(insts[i].flags, BT_VOCS_CLIENT_FLAG_ACTIVE) &&
+		    bt_atomic_test_bit(insts[i].flags, BT_VOCS_CLIENT_FLAG_ACTIVE) &&
 		    insts[i].start_handle <= handle && insts[i].end_handle >= handle) {
 			return &insts[i];
 		}
@@ -129,7 +131,7 @@ static uint8_t vocs_client_read_offset_state_cb(struct bt_conn *conn, uint8_t er
 	}
 
 	LOG_DBG("Inst %p: err: 0x%02X", inst, err);
-	atomic_clear_bit(inst->flags, BT_VOCS_CLIENT_FLAG_BUSY);
+	bt_atomic_clear_bit(inst->flags, BT_VOCS_CLIENT_FLAG_BUSY);
 
 	if (cb_err) {
 		LOG_DBG("Offset state read failed: %d", err);
@@ -170,7 +172,7 @@ static uint8_t vocs_client_read_location_cb(struct bt_conn *conn, uint8_t err,
 	}
 
 	LOG_DBG("Inst %p: err: 0x%02X", inst, err);
-	atomic_clear_bit(inst->flags, BT_VOCS_CLIENT_FLAG_BUSY);
+	bt_atomic_clear_bit(inst->flags, BT_VOCS_CLIENT_FLAG_BUSY);
 
 	if (cb_err) {
 		LOG_DBG("Offset state read failed: %d", err);
@@ -221,7 +223,7 @@ static uint8_t internal_read_volume_offset_state_cb(struct bt_conn *conn, uint8_
 				inst->state.change_counter);
 
 			/* clear busy flag to reuse function */
-			atomic_clear_bit(inst->flags, BT_VOCS_CLIENT_FLAG_BUSY);
+			bt_atomic_clear_bit(inst->flags, BT_VOCS_CLIENT_FLAG_BUSY);
 			write_err = bt_vocs_client_state_set(inst, inst->cp.offset);
 			if (write_err) {
 				cb_err = BT_ATT_ERR_UNLIKELY;
@@ -237,8 +239,8 @@ static uint8_t internal_read_volume_offset_state_cb(struct bt_conn *conn, uint8_
 	}
 
 	if (cb_err) {
-		atomic_clear_bit(inst->flags, BT_VOCS_CLIENT_FLAG_CP_RETRIED);
-		atomic_clear_bit(inst->flags, BT_VOCS_CLIENT_FLAG_BUSY);
+		bt_atomic_clear_bit(inst->flags, BT_VOCS_CLIENT_FLAG_CP_RETRIED);
+		bt_atomic_clear_bit(inst->flags, BT_VOCS_CLIENT_FLAG_BUSY);
 
 		if (inst->cb && inst->cb->set_offset) {
 			inst->cb->set_offset(&inst->vocs, cb_err);
@@ -269,7 +271,7 @@ static void vocs_client_write_vocs_cp_cb(struct bt_conn *conn, uint8_t err,
 	 * the second time, we return an error to the application.
 	 */
 	if (cb_err == BT_VOCS_ERR_INVALID_COUNTER &&
-	    atomic_test_bit(inst->flags, BT_VOCS_CLIENT_FLAG_CP_RETRIED)) {
+	    bt_atomic_test_bit(inst->flags, BT_VOCS_CLIENT_FLAG_CP_RETRIED)) {
 		cb_err = BT_ATT_ERR_UNLIKELY;
 	} else if (cb_err == BT_VOCS_ERR_INVALID_COUNTER && inst->state_handle) {
 		LOG_DBG("Invalid change counter. Reading volume offset state from server.");
@@ -278,7 +280,7 @@ static void vocs_client_write_vocs_cp_cb(struct bt_conn *conn, uint8_t err,
 		inst->read_params.handle_count = 1U;
 		inst->read_params.single.handle = inst->state_handle;
 
-		atomic_set_bit(inst->flags, BT_VOCS_CLIENT_FLAG_CP_RETRIED);
+		bt_atomic_set_bit(inst->flags, BT_VOCS_CLIENT_FLAG_CP_RETRIED);
 
 		cb_err = bt_gatt_read(conn, &inst->read_params);
 		if (cb_err) {
@@ -289,8 +291,8 @@ static void vocs_client_write_vocs_cp_cb(struct bt_conn *conn, uint8_t err,
 		}
 	}
 
-	atomic_clear_bit(inst->flags, BT_VOCS_CLIENT_FLAG_CP_RETRIED);
-	atomic_clear_bit(inst->flags, BT_VOCS_CLIENT_FLAG_BUSY);
+	bt_atomic_clear_bit(inst->flags, BT_VOCS_CLIENT_FLAG_CP_RETRIED);
+	bt_atomic_clear_bit(inst->flags, BT_VOCS_CLIENT_FLAG_BUSY);
 
 	if (inst->cb && inst->cb->set_offset) {
 		inst->cb->set_offset(&inst->vocs, cb_err);
@@ -313,7 +315,7 @@ static uint8_t vocs_client_read_output_desc_cb(struct bt_conn *conn, uint8_t err
 	}
 
 	LOG_DBG("Inst %p: err: 0x%02X", inst, err);
-	atomic_clear_bit(inst->flags, BT_VOCS_CLIENT_FLAG_BUSY);
+	bt_atomic_clear_bit(inst->flags, BT_VOCS_CLIENT_FLAG_BUSY);
 
 	if (cb_err) {
 		LOG_DBG("Description read failed: %d", err);
@@ -356,7 +358,7 @@ static uint8_t vocs_discover_func(struct bt_conn *conn, const struct bt_gatt_att
 
 	if (!attr) {
 		LOG_DBG("Discovery complete for VOCS %p", inst);
-		atomic_clear_bit(inst->flags, BT_VOCS_CLIENT_FLAG_BUSY);
+		bt_atomic_clear_bit(inst->flags, BT_VOCS_CLIENT_FLAG_BUSY);
 		(void)memset(params, 0, sizeof(*params));
 
 		if (inst->cb && inst->cb->discover) {
@@ -392,7 +394,7 @@ static uint8_t vocs_discover_func(struct bt_conn *conn, const struct bt_gatt_att
 				sub_params->disc_params = &inst->location_ccc_disc_params;
 			}
 			if (chrc->properties & BT_GATT_CHRC_WRITE_WITHOUT_RESP) {
-				atomic_set_bit(inst->flags, BT_VOCS_CLIENT_FLAG_LOC_WRITABLE);
+				bt_atomic_set_bit(inst->flags, BT_VOCS_CLIENT_FLAG_LOC_WRITABLE);
 			}
 		} else if (!bt_uuid_cmp(chrc->uuid, BT_UUID_VOCS_CONTROL)) {
 			LOG_DBG("Control point");
@@ -405,7 +407,7 @@ static uint8_t vocs_discover_func(struct bt_conn *conn, const struct bt_gatt_att
 				sub_params->disc_params = &inst->desc_ccc_disc_params;
 			}
 			if (chrc->properties & BT_GATT_CHRC_WRITE_WITHOUT_RESP) {
-				atomic_set_bit(inst->flags, BT_VOCS_CLIENT_FLAG_DESC_WRITABLE);
+				bt_atomic_set_bit(inst->flags, BT_VOCS_CLIENT_FLAG_DESC_WRITABLE);
 			}
 		}
 
@@ -421,13 +423,13 @@ static uint8_t vocs_discover_func(struct bt_conn *conn, const struct bt_gatt_att
 			/* Set the end handle to the end of the ENTIRE service discovery */
 			sub_params->end_handle = inst->discover_params.end_handle;
 			sub_params->notify = vocs_client_notify_handler;
-			atomic_set_bit(sub_params->flags, BT_GATT_SUBSCRIBE_FLAG_VOLATILE);
+			bt_atomic_set_bit(sub_params->flags, BT_GATT_SUBSCRIBE_FLAG_VOLATILE);
 
 			err = bt_gatt_subscribe(conn, sub_params);
 			if (err != 0 && err != -EALREADY) {
 				LOG_WRN("Could not subscribe to handle %u", sub_params->ccc_handle);
 
-				atomic_clear_bit(inst->flags, BT_VOCS_CLIENT_FLAG_BUSY);
+				bt_atomic_clear_bit(inst->flags, BT_VOCS_CLIENT_FLAG_BUSY);
 
 				if (inst->cb && inst->cb->discover) {
 					inst->cb->discover(&inst->vocs, err);
@@ -460,7 +462,7 @@ int bt_vocs_client_state_get(struct bt_vocs_client *inst)
 		return -EINVAL;
 	}
 
-	if (atomic_test_and_set_bit(inst->flags, BT_VOCS_CLIENT_FLAG_BUSY)) {
+	if (bt_atomic_test_and_set_bit(inst->flags, BT_VOCS_CLIENT_FLAG_BUSY)) {
 		LOG_DBG("Instance is busy");
 		return -EBUSY;
 	}
@@ -472,7 +474,7 @@ int bt_vocs_client_state_get(struct bt_vocs_client *inst)
 
 	err = bt_gatt_read(inst->conn, &inst->read_params);
 	if (err != 0) {
-		atomic_clear_bit(inst->flags, BT_VOCS_CLIENT_FLAG_BUSY);
+		bt_atomic_clear_bit(inst->flags, BT_VOCS_CLIENT_FLAG_BUSY);
 	}
 
 	return err;
@@ -498,10 +500,10 @@ int bt_vocs_client_location_set(struct bt_vocs_client *inst, uint32_t location)
 	if (!inst->location_handle) {
 		LOG_DBG("Handle not set");
 		return -EINVAL;
-	} else if (!atomic_test_bit(inst->flags, BT_VOCS_CLIENT_FLAG_LOC_WRITABLE)) {
+	} else if (!bt_atomic_test_bit(inst->flags, BT_VOCS_CLIENT_FLAG_LOC_WRITABLE)) {
 		LOG_DBG("Location is not writable on peer service instance");
 		return -EPERM;
-	} else if (atomic_test_bit(inst->flags, BT_VOCS_CLIENT_FLAG_BUSY)) {
+	} else if (bt_atomic_test_bit(inst->flags, BT_VOCS_CLIENT_FLAG_BUSY)) {
 		LOG_DBG("Instance is busy");
 		return -EBUSY;
 	}
@@ -531,7 +533,7 @@ int bt_vocs_client_location_get(struct bt_vocs_client *inst)
 	if (!inst->location_handle) {
 		LOG_DBG("Handle not set");
 		return -EINVAL;
-	} else if (atomic_test_and_set_bit(inst->flags, BT_VOCS_CLIENT_FLAG_BUSY)) {
+	} else if (bt_atomic_test_and_set_bit(inst->flags, BT_VOCS_CLIENT_FLAG_BUSY)) {
 		LOG_DBG("Instance is busy");
 		return -EBUSY;
 	}
@@ -543,7 +545,7 @@ int bt_vocs_client_location_get(struct bt_vocs_client *inst)
 
 	err = bt_gatt_read(inst->conn, &inst->read_params);
 	if (err != 0) {
-		atomic_clear_bit(inst->flags, BT_VOCS_CLIENT_FLAG_BUSY);
+		bt_atomic_clear_bit(inst->flags, BT_VOCS_CLIENT_FLAG_BUSY);
 	}
 
 	return err;
@@ -571,7 +573,7 @@ int bt_vocs_client_state_set(struct bt_vocs_client *inst, int16_t offset)
 	if (!inst->control_handle) {
 		LOG_DBG("Handle not set");
 		return -EINVAL;
-	} else if (atomic_test_and_set_bit(inst->flags, BT_VOCS_CLIENT_FLAG_BUSY)) {
+	} else if (bt_atomic_test_and_set_bit(inst->flags, BT_VOCS_CLIENT_FLAG_BUSY)) {
 		LOG_DBG("Instance is busy");
 		return -EBUSY;
 	}
@@ -588,7 +590,7 @@ int bt_vocs_client_state_set(struct bt_vocs_client *inst, int16_t offset)
 
 	err = bt_gatt_write(inst->conn, &inst->write_params);
 	if (err != 0) {
-		atomic_clear_bit(inst->flags, BT_VOCS_CLIENT_FLAG_BUSY);
+		bt_atomic_clear_bit(inst->flags, BT_VOCS_CLIENT_FLAG_BUSY);
 	}
 
 	return err;
@@ -611,7 +613,7 @@ int bt_vocs_client_description_get(struct bt_vocs_client *inst)
 	if (!inst->desc_handle) {
 		LOG_DBG("Handle not set");
 		return -EINVAL;
-	} else if (atomic_test_and_set_bit(inst->flags, BT_VOCS_CLIENT_FLAG_BUSY)) {
+	} else if (bt_atomic_test_and_set_bit(inst->flags, BT_VOCS_CLIENT_FLAG_BUSY)) {
 		LOG_DBG("Instance is busy");
 		return -EBUSY;
 	}
@@ -623,7 +625,7 @@ int bt_vocs_client_description_get(struct bt_vocs_client *inst)
 
 	err = bt_gatt_read(inst->conn, &inst->read_params);
 	if (err != 0) {
-		atomic_clear_bit(inst->flags, BT_VOCS_CLIENT_FLAG_BUSY);
+		bt_atomic_clear_bit(inst->flags, BT_VOCS_CLIENT_FLAG_BUSY);
 	}
 
 	return err;
@@ -645,10 +647,10 @@ int bt_vocs_client_description_set(struct bt_vocs_client *inst,
 	if (!inst->desc_handle) {
 		LOG_DBG("Handle not set");
 		return -EINVAL;
-	} else if (!atomic_test_bit(inst->flags, BT_VOCS_CLIENT_FLAG_DESC_WRITABLE)) {
+	} else if (!bt_atomic_test_bit(inst->flags, BT_VOCS_CLIENT_FLAG_DESC_WRITABLE)) {
 		LOG_DBG("Description is not writable on peer service instance");
 		return -EPERM;
-	} else if (atomic_test_bit(inst->flags, BT_VOCS_CLIENT_FLAG_BUSY)) {
+	} else if (bt_atomic_test_bit(inst->flags, BT_VOCS_CLIENT_FLAG_BUSY)) {
 		LOG_DBG("Instance is busy");
 		return -EBUSY;
 	}
@@ -664,7 +666,7 @@ int bt_vocs_client_description_set(struct bt_vocs_client *inst,
 struct bt_vocs *bt_vocs_client_free_instance_get(void)
 {
 	for (int i = 0; i < ARRAY_SIZE(insts); i++) {
-		if (!atomic_test_and_set_bit(insts[i].flags, BT_VOCS_CLIENT_FLAG_ACTIVE)) {
+		if (!bt_atomic_test_and_set_bit(insts[i].flags, BT_VOCS_CLIENT_FLAG_ACTIVE)) {
 			insts[i].vocs.client_instance = true;
 			return &insts[i].vocs;
 		}
@@ -702,9 +704,9 @@ int bt_vocs_client_conn_get(const struct bt_vocs *vocs, struct bt_conn **conn)
 static void vocs_client_reset(struct bt_vocs_client *inst)
 {
 	memset(&inst->state, 0, sizeof(inst->state));
-	atomic_clear_bit(inst->flags, BT_VOCS_CLIENT_FLAG_LOC_WRITABLE);
-	atomic_clear_bit(inst->flags, BT_VOCS_CLIENT_FLAG_DESC_WRITABLE);
-	atomic_clear_bit(inst->flags, BT_VOCS_CLIENT_FLAG_CP_RETRIED);
+	bt_atomic_clear_bit(inst->flags, BT_VOCS_CLIENT_FLAG_LOC_WRITABLE);
+	bt_atomic_clear_bit(inst->flags, BT_VOCS_CLIENT_FLAG_DESC_WRITABLE);
+	bt_atomic_clear_bit(inst->flags, BT_VOCS_CLIENT_FLAG_CP_RETRIED);
 
 	inst->location = 0U;
 	inst->start_handle = 0U;
@@ -740,7 +742,7 @@ int bt_vocs_client_free_instance(struct bt_vocs *vocs)
 {
 	ARRAY_FOR_EACH_PTR(insts, inst) {
 		if (vocs == &inst->vocs) {
-			if (!atomic_test_bit(inst->flags, BT_VOCS_CLIENT_FLAG_ACTIVE)) {
+			if (!bt_atomic_test_bit(inst->flags, BT_VOCS_CLIENT_FLAG_ACTIVE)) {
 				return -EALREADY;
 			}
 
@@ -748,14 +750,14 @@ int bt_vocs_client_free_instance(struct bt_vocs *vocs)
 			 * eliminate, chance of any operations happening while we are free'ing this
 			 * instance.
 			 */
-			if (atomic_test_and_set_bit(inst->flags, BT_VOCS_CLIENT_FLAG_BUSY)) {
+			if (bt_atomic_test_and_set_bit(inst->flags, BT_VOCS_CLIENT_FLAG_BUSY)) {
 				return -EBUSY;
 			}
 
 			vocs_client_reset(inst);
 
-			atomic_clear_bit(inst->flags, BT_VOCS_CLIENT_FLAG_BUSY);
-			atomic_clear_bit(inst->flags, BT_VOCS_CLIENT_FLAG_ACTIVE);
+			bt_atomic_clear_bit(inst->flags, BT_VOCS_CLIENT_FLAG_BUSY);
+			bt_atomic_clear_bit(inst->flags, BT_VOCS_CLIENT_FLAG_ACTIVE);
 
 			return 0;
 		}
@@ -791,10 +793,10 @@ int bt_vocs_discover(struct bt_conn *conn, struct bt_vocs *vocs,
 
 	inst = CONTAINER_OF(vocs, struct bt_vocs_client, vocs);
 
-	if (!atomic_test_bit(inst->flags, BT_VOCS_CLIENT_FLAG_ACTIVE)) {
+	if (!bt_atomic_test_bit(inst->flags, BT_VOCS_CLIENT_FLAG_ACTIVE)) {
 		LOG_DBG("Inactive instance");
 		return -EINVAL;
-	} else if (atomic_test_and_set_bit(inst->flags, BT_VOCS_CLIENT_FLAG_BUSY)) {
+	} else if (bt_atomic_test_and_set_bit(inst->flags, BT_VOCS_CLIENT_FLAG_BUSY)) {
 		LOG_DBG("Instance is busy");
 		return -EBUSY;
 	}
@@ -824,7 +826,7 @@ int bt_vocs_discover(struct bt_conn *conn, struct bt_vocs *vocs,
 	return 0;
 
 cleanup:
-	atomic_clear_bit(inst->flags, BT_VOCS_CLIENT_FLAG_BUSY);
+	bt_atomic_clear_bit(inst->flags, BT_VOCS_CLIENT_FLAG_BUSY);
 	return err;
 }
 

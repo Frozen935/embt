@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#undef LOG_TAG
+#define LOG_TAG "bt_mesh_op_agg_srv"
+#include <base/log.h>
 #include <zephyr/bluetooth/mesh.h>
 
 #include "access.h"
@@ -13,9 +16,7 @@
 #include "transport.h"
 #include "op_agg.h"
 
-#define LOG_LEVEL CONFIG_BT_MESH_MODEL_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_mesh_op_agg_srv);
-
+#define LOG_LEVEL CONFIG_EMBT_LOG_LEVEL
 NET_BUF_SIMPLE_DEFINE_STATIC(sdu, BT_MESH_TX_SDU_MAX);
 
 /** Mesh Opcodes Aggregator Server Model Context */

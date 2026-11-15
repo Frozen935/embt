@@ -14,7 +14,7 @@
  * @details This driver is compliant with RFC9562: https://datatracker.ietf.org/doc/rfc9562/
  */
 
-#include <zephyr/types.h>
+#include <embt/types.h>
 
 #ifdef __cplusplus
 extern "C" {

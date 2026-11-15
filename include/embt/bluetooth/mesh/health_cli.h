@@ -10,7 +10,7 @@
 #ifndef ZEPHYR_INCLUDE_BLUETOOTH_MESH_HEALTH_CLI_H_
 #define ZEPHYR_INCLUDE_BLUETOOTH_MESH_HEALTH_CLI_H_
 
-#include <zephyr/bluetooth/mesh.h>
+#include <embt/bluetooth/mesh.h>
 
 /**
  * @brief Health Client Model

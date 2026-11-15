@@ -13,8 +13,9 @@
 #ifndef ZEPHYR_INCLUDE_BLUETOOTH_MESH_BLOB_SRV_H_
 #define ZEPHYR_INCLUDE_BLUETOOTH_MESH_BLOB_SRV_H_
 
-#include <zephyr/bluetooth/mesh/access.h>
-#include <zephyr/bluetooth/mesh/blob.h>
+#include <limits.h>
+#include <embt/bluetooth/mesh/access.h>
+#include <embt/bluetooth/mesh/blob.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -154,7 +155,7 @@ struct bt_mesh_blob_srv {
 		uint8_t ttl;
 
 		/* Bitfield of pending blocks. */
-		ATOMIC_DEFINE(blocks, BT_MESH_BLOB_BLOCKS_MAX);
+		long blocks[((BT_MESH_BLOB_BLOCKS_MAX) + sizeof(long) * CHAR_BIT - 1) / (sizeof(long) * CHAR_BIT)];
 	} state;
 
 	/* Pull mode (Pull BLOB Transfer Mode) behavior. */

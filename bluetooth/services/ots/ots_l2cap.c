@@ -4,6 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#undef LOG_TAG
+#define LOG_TAG "bt_ots"
+#include <base/log.h>
+#include <base/base.h>
 #include <zephyr/types.h>
 #include <stddef.h>
 #include <string.h>
@@ -19,9 +23,7 @@
  * If only OTC is used, the OTS log module must be registered here.
  */
 #if defined(CONFIG_BT_OTS)
-LOG_MODULE_DECLARE(bt_ots, CONFIG_BT_OTS_LOG_LEVEL);
 #elif defined(CONFIG_BT_OTS_CLIENT)
-LOG_MODULE_REGISTER(bt_ots, CONFIG_BT_OTS_CLIENT_LOG_LEVEL);
 #endif
 
 /* According to Bluetooth specification Assigned Numbers that are used in the
@@ -124,9 +126,9 @@ static int l2cap_recv(struct bt_l2cap_chan *chan, struct net_buf *buf)
 	return l2cap_ctx->rx_done(l2cap_ctx, chan->conn, buf);
 }
 
-static void l2cap_status(struct bt_l2cap_chan *chan, atomic_t *status)
+static void l2cap_status(struct bt_l2cap_chan *chan, bt_atomic_t *status)
 {
-	LOG_DBG("Channel %p status %lu", chan, atomic_get(status));
+	LOG_DBG("Channel %p status %lu", chan, bt_atomic_get(status));
 }
 
 static void l2cap_connected(struct bt_l2cap_chan *chan)

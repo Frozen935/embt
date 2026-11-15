@@ -4,12 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#undef LOG_TAG
+#define LOG_TAG "bt_cap_stream"
+#include <base/log.h>
 #include <errno.h>
 #include <stddef.h>
 #include <stdbool.h>
 #include <stdint.h>
 
-#include <zephyr/autoconf.h>
+#include <embt/autoconf.h>
 #include <zephyr/bluetooth/audio/ascs.h>
 #include <zephyr/bluetooth/audio/audio.h>
 #include <zephyr/bluetooth/audio/bap.h>
@@ -23,8 +26,6 @@
 #include <zephyr/sys/util_macro.h>
 
 #include "cap_internal.h"
-
-LOG_MODULE_REGISTER(bt_cap_stream, CONFIG_BT_CAP_STREAM_LOG_LEVEL);
 
 static bool stream_is_central(struct bt_bap_stream *bap_stream)
 {

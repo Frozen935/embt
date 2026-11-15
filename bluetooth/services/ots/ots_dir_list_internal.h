@@ -12,7 +12,7 @@
 #include <stdint.h>
 #include <sys/types.h>
 
-#include <zephyr/autoconf.h>
+#include <embt/autoconf.h>
 #include <zephyr/bluetooth/uuid.h>
 #include <zephyr/net_buf.h>
 #include <zephyr/sys/util.h>

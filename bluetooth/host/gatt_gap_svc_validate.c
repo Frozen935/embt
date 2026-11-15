@@ -6,10 +6,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#undef LOG_TAG
+#define LOG_TAG "bt_gatt"
+#include <base/log.h>
+#include <base/base.h>
 #include <errno.h>
 
-#include <zephyr/bluetooth/gatt.h>
-#include <zephyr/bluetooth/uuid.h>
+#include <embt/bluetooth/gatt.h>
+#include <embt/bluetooth/uuid.h>
 
 
 static uint8_t gap_service_check_cb(const struct bt_gatt_attr *attr,

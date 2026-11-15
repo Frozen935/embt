@@ -27,7 +27,7 @@
 #ifndef ZEPHYR_INCLUDE_SYS_MATH_EXTRAS_H_
 #define ZEPHYR_INCLUDE_SYS_MATH_EXTRAS_H_
 
-#include <zephyr/types.h>
+#include <embt/types.h>
 #include <stdbool.h>
 #include <stddef.h>
 
@@ -209,6 +209,6 @@ static void i128_multiply_i64_i64(int64_t a, int64_t b, int128_t *result);
 
 /**@}*/
 
-#include <zephyr/sys/math_extras_impl.h>
+#include <embt/sys/math_extras_impl.h>
 
 #endif /* ZEPHYR_INCLUDE_SYS_MATH_EXTRAS_H_ */

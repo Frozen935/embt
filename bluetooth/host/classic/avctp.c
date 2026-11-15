@@ -10,10 +10,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#undef LOG_TAG
+#define LOG_TAG "bt_avctp"
+#include <base/log.h>
 #include <string.h>
 #include <strings.h>
 #include <errno.h>
-#include <zephyr/sys/atomic.h>
+#include <base/bt_atomic.h>
 #include <zephyr/sys/byteorder.h>
 #include <zephyr/sys/util.h>
 
@@ -27,9 +30,7 @@
 #include <host/conn_internal.h>
 #include "l2cap_br_internal.h"
 
-#define LOG_LEVEL CONFIG_BT_AVCTP_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_avctp);
-
+#define LOG_LEVEL CONFIG_EMBT_LOG_LEVEL
 /** @brief AVCTP Header Sizes for different packet types */
 #define BT_AVCTP_HDR_SIZE_SINGLE        (sizeof(struct bt_avctp_header_single))
 #define BT_AVCTP_HDR_SIZE_START         (sizeof(struct bt_avctp_header_start))

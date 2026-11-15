@@ -7,10 +7,14 @@
  *
  */
 
+#undef LOG_TAG
+#define LOG_TAG "bt_avdtp"
+#include <base/log.h>
+#include <base/base.h>
 #include <string.h>
 #include <strings.h>
 #include <errno.h>
-#include <zephyr/sys/atomic.h>
+#include <base/bt_atomic.h>
 #include <zephyr/sys/byteorder.h>
 #include <zephyr/sys/util.h>
 
@@ -24,9 +28,7 @@
 #include "l2cap_br_internal.h"
 #include "avdtp_internal.h"
 
-#define LOG_LEVEL CONFIG_BT_AVDTP_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_avdtp);
-
+#define LOG_LEVEL CONFIG_EMBT_LOG_LEVEL
 #define AVDTP_MSG_MASK GENMASK(1, 0)
 #define AVDTP_PKT_MASK GENMASK(3, 2)
 #define AVDTP_TID_MASK GENMASK(7, 4)

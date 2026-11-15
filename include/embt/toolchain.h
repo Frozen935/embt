@@ -52,18 +52,18 @@
  */
 #include <toolchain/other.h>
 #elif defined(__XCC__)
-#include <zephyr/toolchain/xcc.h>
+#include <embt/toolchain/xcc.h>
 #elif defined(__CCAC__)
-#include <zephyr/toolchain/mwdt.h>
+#include <embt/toolchain/mwdt.h>
 #elif defined(__ARMCOMPILER_VERSION)
-#include <zephyr/toolchain/armclang.h>
+#include <embt/toolchain/armclang.h>
 #elif defined(__IAR_SYSTEMS_ICC__)
-#include <zephyr/toolchain/iar.h>
+#include <embt/toolchain/iar.h>
 #elif defined(__llvm__) ||                                                                         \
 	(defined(_LINKER) && (defined(__LLD_LINKER_CMD__) || defined(__ELD_LINKER_CMD__)))
-#include <zephyr/toolchain/llvm.h>
+#include <embt/toolchain/llvm.h>
 #elif defined(__GNUC__) || (defined(_LINKER) && defined(__GCC_LINKER_CMD__))
-#include <zephyr/toolchain/gcc.h>
+#include <embt/toolchain/gcc.h>
 #else
 #error "Invalid/unknown toolchain configuration"
 #endif
@@ -416,19 +416,19 @@
 
 #else
 
-#if (defined(CONFIG_BIG_ENDIAN) && (__BYTE_ORDER__ != __ORDER_BIG_ENDIAN__)) || \
-    (defined(CONFIG_LITTLE_ENDIAN) && (__BYTE_ORDER__ != __ORDER_LITTLE_ENDIAN__))
+#if (defined(CONFIG_EMBT_BIG_ENDIAN) && (__BYTE_ORDER__ != __ORDER_BIG_ENDIAN__)) || \
+    (defined(CONFIG_EMBT_LITTLE_ENDIAN) && (__BYTE_ORDER__ != __ORDER_LITTLE_ENDIAN__))
 
 #  error "Kconfig/toolchain endianness mismatch:"
 
 #  if (__BYTE_ORDER__ != __ORDER_BIG_ENDIAN__) && (__BYTE_ORDER__ != __ORDER_LITTLE_ENDIAN__)
 #    error "Unknown __BYTE_ORDER__ value"
 #  else
-#    ifdef CONFIG_BIG_ENDIAN
-#      error "CONFIG_BIG_ENDIAN but __ORDER_LITTLE_ENDIAN__"
+#    ifdef CONFIG_EMBT_BIG_ENDIAN
+#      error "CONFIG_EMBT_BIG_ENDIAN but __ORDER_LITTLE_ENDIAN__"
 #    endif
-#    ifdef CONFIG_LITTLE_ENDIAN
-#      error "CONFIG_LITTLE_ENDIAN but __ORDER_BIG_ENDIAN__"
+#    ifdef CONFIG_EMBT_LITTLE_ENDIAN
+#      error "CONFIG_EMBT_LITTLE_ENDIAN but __ORDER_BIG_ENDIAN__"
 #   endif
 # endif
 

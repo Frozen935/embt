@@ -13,8 +13,8 @@
 #ifndef ZEPHYR_INCLUDE_SYS_ITERABLE_SECTIONS_H_
 #define ZEPHYR_INCLUDE_SYS_ITERABLE_SECTIONS_H_
 
-#include <zephyr/sys/__assert.h>
-#include <zephyr/toolchain.h>
+#include <embt/sys/__assert.h>
+#include <embt/toolchain.h>
 
 #ifdef __cplusplus
 extern "C" {

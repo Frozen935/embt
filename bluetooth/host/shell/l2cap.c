@@ -10,27 +10,27 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <base/base.h>
+#include <shell/bt_shell.h>
+#include <getopt.h>
 #include <errno.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include <zephyr/bluetooth/hci.h>
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/hci_types.h>
-#include <zephyr/bluetooth/l2cap.h>
-#include <zephyr/bluetooth/classic/rfcomm.h>
-#include <zephyr/bluetooth/classic/sdp.h>
-#include <zephyr/net_buf.h>
-#include <zephyr/settings/settings.h>
-#include <zephyr/shell/shell.h>
-#include <zephyr/shell/shell_string_conv.h>
-#include <zephyr/sys/atomic_types.h>
-#include <zephyr/sys/byteorder.h>
-#include <zephyr/sys/time_units.h>
-#include <zephyr/sys/util.h>
+#include <embt/bluetooth/hci.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/hci_types.h>
+#include <embt/bluetooth/l2cap.h>
+#include <embt/bluetooth/classic/rfcomm.h>
+#include <embt/bluetooth/classic/sdp.h>
+#include <embt/net_buf.h>
+#include <embt/settings/settings.h>
+#include <embt/sys/byteorder.h>
+#include <embt/sys/time_units.h>
+#include <embt/sys/util.h>
 
 #include "common/bt_shell_private.h"
 #include "host/shell/bt.h"
@@ -66,22 +66,23 @@ static bool metrics;
 static int l2cap_recv_metrics(struct bt_l2cap_chan *chan, struct net_buf *buf)
 {
 	static uint32_t len;
-	static uint32_t cycle_stamp;
+	static uint64_t time_stamp;
 	uint32_t delta;
 
-	delta = k_cycle_get_32() - cycle_stamp;
-	delta = (uint32_t)k_cyc_to_ns_floor64(delta);
+	uint64_t now = (uint64_t)k_uptime_get();
+
+	delta = (uint32_t)MIN((now - time_stamp) * 1000000U, (uint64_t)UINT32_MAX);
 
 	/* if last data rx-ed was greater than 1 second in the past,
 	 * reset the metrics.
 	 */
-	if (delta > NSEC_PER_SEC) {
+	if (delta > 1000000000ULL) {
 		len = 0U;
 		l2cap_rate = 0U;
-		cycle_stamp = k_cycle_get_32();
+		time_stamp = now;
 	} else {
 		len += buf->len;
-		l2cap_rate = ((uint64_t)len << 3) * NSEC_PER_SEC / delta;
+		l2cap_rate = ((uint64_t)len << 3) * 1000000000ULL / delta;
 	}
 
 	return 0;
@@ -134,9 +135,9 @@ static void l2cap_sent(struct bt_l2cap_chan *chan)
 	bt_shell_print("Outgoing data channel %p transmitted", chan);
 }
 
-static void l2cap_status(struct bt_l2cap_chan *chan, atomic_t *status)
+static void l2cap_status(struct bt_l2cap_chan *chan, long *status)
 {
-	bt_shell_print("Channel %p status %u", chan, (uint32_t)*status);
+	bt_shell_print("Channel %p status %u", chan, (uint32_t)bt_l2cap_chan_status_get(chan));
 }
 
 static void l2cap_connected(struct bt_l2cap_chan *chan)
@@ -241,12 +242,12 @@ static struct bt_l2cap_server server = {
 	.accept		= l2cap_accept,
 };
 
-static int cmd_register(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_register(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	const char *policy;
 
 	if (server.psm) {
-		shell_error(sh, "Already registered");
+		bt_shell_session_error(sh, "Already registered");
 		return -ENOEXEC;
 	}
 
@@ -269,11 +270,11 @@ static int cmd_register(const struct shell *sh, size_t argc, char *argv[])
 	}
 
 	if (bt_l2cap_server_register(&server) < 0) {
-		shell_error(sh, "Unable to register psm");
+		bt_shell_session_error(sh, "Unable to register psm");
 		server.psm = 0U;
 		return -ENOEXEC;
 	} else {
-		shell_print(sh, "L2CAP psm %u sec_level %u registered",
+		bt_shell_session_print(sh, "L2CAP psm %u sec_level %u registered",
 			    server.psm, server.sec_level);
 	}
 
@@ -281,60 +282,60 @@ static int cmd_register(const struct shell *sh, size_t argc, char *argv[])
 }
 
 #if defined(CONFIG_BT_L2CAP_ECRED)
-static int cmd_ecred_reconfigure(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_ecred_reconfigure(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	struct bt_l2cap_chan *l2cap_ecred_chans[] = { &l2ch_chan.ch.chan, NULL };
 	uint16_t mtu;
 	int err = 0;
 
 	if (!default_conn) {
-		shell_error(sh, "Not connected");
+		bt_shell_session_error(sh, "Not connected");
 		return -ENOEXEC;
 	}
 
 	if (!l2ch_chan.ch.chan.conn) {
-		shell_error(sh, "Channel not connected");
+		bt_shell_session_error(sh, "Channel not connected");
 		return -ENOEXEC;
 	}
 
-	mtu = shell_strtoul(argv[1], 10, &err);
+	mtu = bt_shell_strtoul(argv[1], 10, &err);
 	if (err) {
-		shell_error(sh, "Unable to parse MTU (err %d)", err);
+		bt_shell_session_error(sh, "Unable to parse MTU (err %d)", err);
 
 		return -ENOEXEC;
 	}
 
 	err = bt_l2cap_ecred_chan_reconfigure(l2cap_ecred_chans, mtu);
 	if (err < 0) {
-		shell_error(sh, "Unable to reconfigure channel (err %d)", err);
+		bt_shell_session_error(sh, "Unable to reconfigure channel (err %d)", err);
 	} else {
-		shell_print(sh, "L2CAP reconfiguration pending");
+		bt_shell_session_print(sh, "L2CAP reconfiguration pending");
 	}
 
 	return err;
 }
 
-static int cmd_ecred_connect(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_ecred_connect(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	struct bt_l2cap_chan *l2cap_ecred_chans[] = { &l2ch_chan.ch.chan, NULL };
 	uint16_t psm;
 	int err = 0;
 
 	if (!default_conn) {
-		shell_error(sh, "Not connected");
+		bt_shell_session_error(sh, "Not connected");
 
 		return -ENOEXEC;
 	}
 
 	if (l2ch_chan.ch.chan.conn) {
-		shell_error(sh, "Channel already in use");
+		bt_shell_session_error(sh, "Channel already in use");
 
 		return -ENOEXEC;
 	}
 
-	psm = shell_strtoul(argv[1], 16, &err);
+	psm = bt_shell_strtoul(argv[1], 16, &err);
 	if (err) {
-		shell_error(sh, "Unable to parse PSM (err %d)", err);
+		bt_shell_session_error(sh, "Unable to parse PSM (err %d)", err);
 
 		return err;
 	}
@@ -342,9 +343,9 @@ static int cmd_ecred_connect(const struct shell *sh, size_t argc, char *argv[])
 	if (argc > 2) {
 		int sec;
 
-		sec = shell_strtoul(argv[2], 10, &err);
+		sec = bt_shell_strtoul(argv[2], 10, &err);
 		if (err) {
-			shell_error(sh, "Unable to parse security level (err %d)", err);
+			bt_shell_session_error(sh, "Unable to parse security level (err %d)", err);
 
 			return err;
 		}
@@ -354,27 +355,27 @@ static int cmd_ecred_connect(const struct shell *sh, size_t argc, char *argv[])
 
 	err = bt_l2cap_ecred_chan_connect(default_conn, l2cap_ecred_chans, psm);
 	if (err < 0) {
-		shell_error(sh, "Unable to connect to psm %u (err %d)", psm, err);
+		bt_shell_session_error(sh, "Unable to connect to psm %u (err %d)", psm, err);
 	} else {
-		shell_print(sh, "L2CAP connection pending");
+		bt_shell_session_print(sh, "L2CAP connection pending");
 	}
 
 	return err;
 }
 #endif /* CONFIG_BT_L2CAP_ECRED */
 
-static int cmd_connect(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_connect(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint16_t psm;
 	int err;
 
 	if (!default_conn) {
-		shell_error(sh, "Not connected");
+		bt_shell_session_error(sh, "Not connected");
 		return -ENOEXEC;
 	}
 
 	if (l2ch_chan.ch.chan.conn) {
-		shell_error(sh, "Channel already in use");
+		bt_shell_session_error(sh, "Channel already in use");
 		return -ENOEXEC;
 	}
 
@@ -390,27 +391,27 @@ static int cmd_connect(const struct shell *sh, size_t argc, char *argv[])
 
 	err = bt_l2cap_chan_connect(default_conn, &l2ch_chan.ch.chan, psm);
 	if (err < 0) {
-		shell_error(sh, "Unable to connect to psm %u (err %d)", psm, err);
+		bt_shell_session_error(sh, "Unable to connect to psm %u (err %d)", psm, err);
 	} else {
-		shell_print(sh, "L2CAP connection pending");
+		bt_shell_session_print(sh, "L2CAP connection pending");
 	}
 
 	return err;
 }
 
-static int cmd_disconnect(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_disconnect(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 
 	err = bt_l2cap_chan_disconnect(&l2ch_chan.ch.chan);
 	if (err) {
-		shell_print(sh, "Unable to disconnect: %u", -err);
+		bt_shell_session_print(sh, "Unable to disconnect: %u", -err);
 	}
 
 	return err;
 }
 
-static int cmd_send(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_send(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	static uint8_t buf_data[DATA_MTU] = { [0 ... (DATA_MTU - 1)] = 0xff };
 	int ret, len = DATA_MTU, count = 1;
@@ -423,7 +424,7 @@ static int cmd_send(const struct shell *sh, size_t argc, char *argv[])
 	if (argc > 2) {
 		len = strtoul(argv[2], NULL, 10);
 		if (len > DATA_MTU) {
-			shell_print(sh, "Length exceeds TX MTU for the channel");
+			bt_shell_session_print(sh, "Length exceeds TX MTU for the channel");
 			return -ENOEXEC;
 		}
 	}
@@ -431,15 +432,15 @@ static int cmd_send(const struct shell *sh, size_t argc, char *argv[])
 	len = MIN(l2ch_chan.ch.tx.mtu, len);
 
 	while (count--) {
-		shell_print(sh, "Rem %d", count);
+		bt_shell_session_print(sh, "Rem %d", count);
 		buf = net_buf_alloc(&data_tx_pool, K_SECONDS(2));
 		if (!buf) {
 			if (l2ch_chan.ch.state != BT_L2CAP_CONNECTED) {
-				shell_print(sh, "Channel disconnected, stopping TX");
+				bt_shell_session_print(sh, "Channel disconnected, stopping TX");
 
 				return -EAGAIN;
 			}
-			shell_print(sh, "Allocation timeout, stopping TX");
+			bt_shell_session_print(sh, "Allocation timeout, stopping TX");
 
 			return -EAGAIN;
 		}
@@ -448,7 +449,7 @@ static int cmd_send(const struct shell *sh, size_t argc, char *argv[])
 		net_buf_add_mem(buf, buf_data, len);
 		ret = bt_l2cap_chan_send(&l2ch_chan.ch.chan, buf);
 		if (ret < 0) {
-			shell_print(sh, "Unable to send: %d", -ret);
+			bt_shell_session_print(sh, "Unable to send: %d", -ret);
 			net_buf_unref(buf);
 			return -ENOEXEC;
 		}
@@ -457,24 +458,24 @@ static int cmd_send(const struct shell *sh, size_t argc, char *argv[])
 	return 0;
 }
 
-static int cmd_recv(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_recv(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	if (argc > 1) {
 		l2cap_recv_delay_ms = strtoul(argv[1], NULL, 10);
 	} else {
-		shell_print(sh, "l2cap receive delay: %u ms",
+		bt_shell_session_print(sh, "l2cap receive delay: %u ms",
 			    l2cap_recv_delay_ms);
 	}
 
 	return 0;
 }
 
-static int cmd_metrics(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_metrics(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	const char *action;
 
 	if (argc < 2) {
-		shell_print(sh, "l2cap rate: %u bps.", l2cap_rate);
+		bt_shell_session_print(sh, "l2cap rate: %u bps.", l2cap_rate);
 
 		return 0;
 	}
@@ -486,20 +487,20 @@ static int cmd_metrics(const struct shell *sh, size_t argc, char *argv[])
 	} else if (!strcmp(action, "off")) {
 		metrics = false;
 	} else {
-		shell_help(sh);
+		bt_shell_help(sh);
 		return 0;
 	}
 
-	shell_print(sh, "l2cap metrics %s.", action);
+	bt_shell_session_print(sh, "l2cap metrics %s.", action);
 	return 0;
 }
 
-static int cmd_allowlist_add(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_allowlist_add(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int i;
 
 	if (!default_conn) {
-		shell_error(sh, "Not connected");
+		bt_shell_session_error(sh, "Not connected");
 		return 0;
 	}
 
@@ -513,10 +514,10 @@ static int cmd_allowlist_add(const struct shell *sh, size_t argc, char *argv[])
 	return -ENOMEM;
 }
 
-static int cmd_allowlist_remove(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_allowlist_remove(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	if (!default_conn) {
-		shell_error(sh, "Not connected");
+		bt_shell_session_error(sh, "Not connected");
 		return 0;
 	}
 
@@ -527,43 +528,61 @@ static int cmd_allowlist_remove(const struct shell *sh, size_t argc, char *argv[
 
 #define HELP_NONE "[none]"
 
-SHELL_STATIC_SUBCMD_SET_CREATE(allowlist_cmds,
-	SHELL_CMD_ARG(add, NULL, HELP_NONE, cmd_allowlist_add, 1, 0),
-	SHELL_CMD_ARG(remove, NULL, HELP_NONE, cmd_allowlist_remove, 1, 0),
-	SHELL_SUBCMD_SET_END
+BT_SHELL_STATIC_SUBCMD_SET_CREATE(allowlist_cmds,
+	BT_SHELL_CMD_ARG(add, NULL, HELP_NONE, cmd_allowlist_add, 1, 0),
+	BT_SHELL_CMD_ARG(remove, NULL, HELP_NONE, cmd_allowlist_remove, 1, 0),
+	BT_SHELL_SUBCMD_SET_END
 );
 
-SHELL_STATIC_SUBCMD_SET_CREATE(l2cap_cmds,
-	SHELL_CMD_ARG(connect, NULL, "<psm> [sec_level]", cmd_connect, 2, 1),
-	SHELL_CMD_ARG(disconnect, NULL, HELP_NONE, cmd_disconnect, 1, 0),
-	SHELL_CMD_ARG(metrics, NULL, "<value on, off>", cmd_metrics, 1, 1),
-	SHELL_CMD_ARG(recv, NULL, "[delay (in milliseconds)]", cmd_recv, 1, 1),
-	SHELL_CMD_ARG(register, NULL, "<psm> [sec_level] "
+BT_SHELL_STATIC_SUBCMD_SET_CREATE(l2cap_cmds,
+	BT_SHELL_CMD_ARG(connect, NULL, "<psm> [sec_level]", cmd_connect, 2, 1),
+	BT_SHELL_CMD_ARG(disconnect, NULL, HELP_NONE, cmd_disconnect, 1, 0),
+	BT_SHELL_CMD_ARG(metrics, NULL, "<value on, off>", cmd_metrics, 1, 1),
+	BT_SHELL_CMD_ARG(recv, NULL, "[delay (in milliseconds)]", cmd_recv, 1, 1),
+	BT_SHELL_CMD_ARG(register, NULL, "<psm> [sec_level] "
 		      "[policy: allowlist, 16byte_key]", cmd_register, 2, 2),
-	SHELL_CMD_ARG(send, NULL, "[number of packets] [length of packet(s)]",
+	BT_SHELL_CMD_ARG(send, NULL, "[number of packets] [length of packet(s)]",
 		      cmd_send, 1, 2),
-	SHELL_CMD_ARG(allowlist, &allowlist_cmds, HELP_NONE, NULL, 1, 0),
+	BT_SHELL_CMD_ARG(allowlist, &allowlist_cmds, HELP_NONE, NULL, 1, 0),
 #if defined(CONFIG_BT_L2CAP_ECRED)
-	SHELL_CMD_ARG(ecred-connect, NULL, "<psm (hex)> [sec_level (dec)]",
+	BT_SHELL_CMD_ARG(ecred-connect, NULL, "<psm (hex)> [sec_level (dec)]",
 		cmd_ecred_connect, 2, 1),
-	SHELL_CMD_ARG(ecred-reconfigure, NULL, "<mtu (dec)>",
+	BT_SHELL_CMD_ARG(ecred-reconfigure, NULL, "<mtu (dec)>",
 		cmd_ecred_reconfigure, 1, 1),
 #endif /* CONFIG_BT_L2CAP_ECRED */
-	SHELL_SUBCMD_SET_END
+	BT_SHELL_SUBCMD_SET_END
 );
 
-static int cmd_l2cap(const struct shell *sh, size_t argc, char **argv)
+static int cmd_l2cap(const struct bt_shell *sh, size_t argc, char **argv)
 {
 	if (argc == 1) {
-		shell_help(sh);
+		bt_shell_help(sh);
 		/* shell returns 1 when help is printed */
 		return 1;
 	}
 
-	shell_error(sh, "%s unknown parameter: %s", argv[0], argv[1]);
+	bt_shell_session_error(sh, "%s unknown parameter: %s", argv[0], argv[1]);
 
 	return -ENOEXEC;
 }
 
-SHELL_CMD_ARG_REGISTER(l2cap, &l2cap_cmds, "Bluetooth L2CAP shell commands",
+BT_SHELL_CMD_ARG_REGISTER(l2cap, &l2cap_cmds, "Bluetooth L2CAP shell commands",
 		       cmd_l2cap, 1, 1);
+
+int bt_shell_l2cap_callbacks_init(void)
+{
+	static bool registered;
+	int err;
+
+	if (registered) {
+		return 0;
+	}
+#if defined(CONFIG_BT_CONN)
+	err = bt_conn_cb_register(&bt_conn_cb_l2cap_conn_callbacks);
+	if (err) {
+		return err;
+	}
+#endif
+	registered = true;
+	return 0;
+}

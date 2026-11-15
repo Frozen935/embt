@@ -21,9 +21,9 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include <zephyr/bluetooth/classic/hid.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/net_buf.h>
+#include <embt/bluetooth/classic/hid.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/net_buf.h>
 
 #ifdef __cplusplus
 extern "C" {

@@ -4,11 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <base/base.h>
 #include <stddef.h>
 #include <stdint.h>
 
-#include <zephyr/bluetooth/addr.h>
-#include <zephyr/settings/settings.h>
+#include <embt/bluetooth/addr.h>
+#include <embt/settings/settings.h>
 #include "common/bt_settings_commit.h"
 
 /* Max settings key length (with all components) */

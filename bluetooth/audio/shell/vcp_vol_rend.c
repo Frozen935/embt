@@ -14,7 +14,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#include <zephyr/autoconf.h>
+#include <embt/autoconf.h>
 #include <zephyr/bluetooth/audio/aics.h>
 #include <zephyr/bluetooth/audio/vocs.h>
 #include <zephyr/bluetooth/conn.h>

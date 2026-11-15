@@ -13,11 +13,11 @@
 #ifndef ZEPHYR_INCLUDE_BLUETOOTH_MESH_CDB_H_
 #define ZEPHYR_INCLUDE_BLUETOOTH_MESH_CDB_H_
 
+#include <limits.h>
 #include <stdbool.h>
 #include <stdint.h>
 
-#include <zephyr/sys/atomic.h>
-#include <zephyr/bluetooth/mesh.h>
+#include <embt/bluetooth/mesh.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -52,7 +52,7 @@ struct bt_mesh_cdb_node {
 	/** Device key */
 	struct bt_mesh_key dev_key;
 	/** Node flags */
-	ATOMIC_DEFINE(flags, BT_MESH_CDB_NODE_FLAG_COUNT);
+	long flags[((BT_MESH_CDB_NODE_FLAG_COUNT) + sizeof(long) * CHAR_BIT - 1) / (sizeof(long) * CHAR_BIT)];
 };
 /* doc string cdb node end */
 
@@ -99,7 +99,7 @@ struct bt_mesh_cdb {
 	/** Lowest available unicast address for provisioning */
 	uint16_t lowest_avail_addr;
 	/** Flags for CDB state (private) */
-	ATOMIC_DEFINE(flags, BT_MESH_CDB_FLAG_COUNT);
+	long flags[((BT_MESH_CDB_FLAG_COUNT) + sizeof(long) * CHAR_BIT - 1) / (sizeof(long) * CHAR_BIT)];
 	/** Nodes in the mesh network */
 	struct bt_mesh_cdb_node nodes[NODE_COUNT];
 	/** Subnets in the mesh network */

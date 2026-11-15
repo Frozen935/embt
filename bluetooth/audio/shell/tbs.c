@@ -8,6 +8,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <base/base.h>
 #include <errno.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -15,7 +16,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#include <zephyr/autoconf.h>
+#include <embt/autoconf.h>
 #include <zephyr/bluetooth/addr.h>
 #include <zephyr/bluetooth/assigned_numbers.h>
 #include <zephyr/bluetooth/audio/tbs.h>
@@ -743,7 +744,7 @@ static int cmd_tbs_print_calls(const struct shell *sh, size_t argc,
 	ARG_UNUSED(argc);
 	ARG_UNUSED(argv);
 
-	if (IS_ENABLED(CONFIG_BT_TBS_LOG_LEVEL_DBG)) {
+	if ((CONFIG_EMBT_LOG_LEVEL >= 4)) {
 		bt_tbs_dbg_print_calls();
 		return 0;
 	}

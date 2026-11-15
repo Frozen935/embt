@@ -30,7 +30,7 @@
 #define TOOLCHAIN_HAS_C_AUTO_TYPE 1
 #endif
 
-#include <zephyr/toolchain/gcc.h>
+#include <embt/toolchain/gcc.h>
 
 /* clear out common version. The build assert assert from gcc.h is defined to be empty */
 #undef BUILD_ASSERT

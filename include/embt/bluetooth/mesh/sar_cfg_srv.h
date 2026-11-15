@@ -10,8 +10,8 @@
 #ifndef ZEPHYR_INCLUDE_BLUETOOTH_MESH_SAR_CFG_SRV_H_
 #define ZEPHYR_INCLUDE_BLUETOOTH_MESH_SAR_CFG_SRV_H_
 
-#include <zephyr/bluetooth/mesh.h>
-#include <zephyr/bluetooth/mesh/sar_cfg.h>
+#include <embt/bluetooth/mesh.h>
+#include <embt/bluetooth/mesh/sar_cfg.h>
 
 /**
  * @brief Bluetooth Mesh

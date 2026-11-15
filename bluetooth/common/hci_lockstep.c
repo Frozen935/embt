@@ -6,21 +6,27 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#undef LOG_TAG
+#define LOG_TAG "bt_hci_lockstep"
+#include <base/log.h>
+#include <base/base.h>
 #include <errno.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
-#include <zephyr/bluetooth/hci_pkt.h>
-#include <zephyr/bluetooth/hci_types.h>
-#include <zephyr/drivers/bluetooth/hci_lockstep.h>
-#include <zephyr/net_buf.h>
-#include <zephyr/sys/util.h>
+#include <embt/bluetooth/hci_pkt.h>
+#include <embt/bluetooth/hci_types.h>
+
+#include "common/hci_lockstep.h"
+
+#include <embt/net_buf.h>
+#include <embt/sys/util.h>
 
 /* The log level symbol exists only in builds with the Bluetooth Kconfig
  * tree; the helper also builds without it (see tests/bluetooth/hci_pkt).
  */
-#if defined(CONFIG_BT_HCI_DRIVER_LOG_LEVEL)
+#if defined(CONFIG_EMBT_LOG_LEVEL)
 #endif
 
 /* The Bluetooth Host's own command timeout */
@@ -55,7 +61,7 @@ static void lockstep_state_reset(struct bt_hci_lockstep *ls)
 	ls->status = BT_HCI_ERR_SUCCESS;
 }
 
-void bt_hci_lockstep_init(struct bt_hci_lockstep *ls, const struct device *dev,
+void bt_hci_lockstep_init(struct bt_hci_lockstep *ls, const struct bt_hci_transport *dev,
 			  bt_hci_lockstep_send_t send)
 {
 	*ls = (struct bt_hci_lockstep){

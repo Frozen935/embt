@@ -12,12 +12,13 @@
 
 #ifndef __BT_H
 #define __BT_H
+#include <shell/bt_shell.h>
 #include <stddef.h>
 #include <stdint.h>
 
-#include <zephyr/autoconf.h>
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/net_buf.h>
+#include <embt/autoconf.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/net_buf.h>
 #include <sys/types.h>
 
 extern struct bt_conn *default_conn;

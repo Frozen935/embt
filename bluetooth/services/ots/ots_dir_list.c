@@ -4,13 +4,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#undef LOG_TAG
+#define LOG_TAG "bt_ots"
+#include <base/log.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
 #include <sys/types.h>
 
-#include <zephyr/autoconf.h>
+#include <embt/autoconf.h>
 #include <zephyr/bluetooth/services/ots.h>
 #include <zephyr/bluetooth/uuid.h>
 #include <zephyr/net_buf.h>
@@ -24,8 +27,6 @@
 #include "ots_internal.h"
 #include "ots_obj_manager_internal.h"
 #include "ots_dir_list_internal.h"
-
-LOG_MODULE_DECLARE(bt_ots, CONFIG_BT_OTS_LOG_LEVEL);
 
 BUILD_ASSERT(sizeof(CONFIG_BT_OTS_DIR_LIST_OBJ_NAME) - 1U <= CONFIG_BT_OTS_OBJ_MAX_NAME_LEN,
 	     "BT_OTS_DIR_LIST_OBJ_NAME shall be less than or equal to "

@@ -8,6 +8,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#undef LOG_TAG
+#define LOG_TAG "hrs"
+#include <base/log.h>
+#include <base/base.h>
 #include <zephyr/types.h>
 #include <stddef.h>
 #include <string.h>
@@ -20,10 +24,7 @@
 #include <zephyr/bluetooth/gatt.h>
 #include <zephyr/bluetooth/services/hrs.h>
 
-#define LOG_LEVEL CONFIG_BT_HRS_LOG_LEVEL
-LOG_MODULE_REGISTER(hrs);
-
-
+#define LOG_LEVEL CONFIG_EMBT_LOG_LEVEL
 #define GATT_PERM_READ_MASK     (BT_GATT_PERM_READ | \
 				 BT_GATT_PERM_READ_ENCRYPT | \
 				 BT_GATT_PERM_READ_AUTHEN)

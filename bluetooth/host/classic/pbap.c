@@ -6,6 +6,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#undef LOG_TAG
+#define LOG_TAG "bt_pbap"
+#include <base/log.h>
+#include <base/base.h>
 #include <errno.h>
 #include <zephyr/types.h>
 #include <stddef.h>
@@ -28,9 +32,7 @@
 #include "obex_internal.h"
 #include "pbap_internal.h"
 
-#define LOG_LEVEL CONFIG_BT_PBAP_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_pbap);
-
+#define LOG_LEVEL CONFIG_EMBT_LOG_LEVEL
 #define PBAP_PWD_MAX_LENGTH 16U
 #define PBAP_POOL_BUF_SIZE                                                                         \
 	MAX(BT_RFCOMM_BUF_SIZE(CONFIG_BT_GOEP_RFCOMM_MTU),                                         \
@@ -209,7 +211,7 @@ static void pbap_pce_rfcomm_transport_connected(struct bt_conn *conn, struct bt_
 {
 	struct bt_pbap_pce *pbap_pce = CONTAINER_OF(goep, struct bt_pbap_pce, _goep);
 
-	atomic_set(&pbap_pce->_transport_state, BT_PBAP_TRANSPORT_STATE_CONNECTED);
+	bt_atomic_set(&pbap_pce->_transport_state, BT_PBAP_TRANSPORT_STATE_CONNECTED);
 
 	if (pbap_pce->cb != NULL && pbap_pce->cb->rfcomm_connected != NULL) {
 		pbap_pce->cb->rfcomm_connected(conn, pbap_pce);
@@ -220,8 +222,8 @@ static void pbap_pce_rfcomm_transport_disconnected(struct bt_goep *goep)
 {
 	struct bt_pbap_pce *pbap_pce = CONTAINER_OF(goep, struct bt_pbap_pce, _goep);
 
-	atomic_set(&pbap_pce->_transport_state, BT_PBAP_TRANSPORT_STATE_DISCONNECTED);
-	atomic_set(&pbap_pce->_state, BT_PBAP_STATE_DISCONNECTED);
+	bt_atomic_set(&pbap_pce->_transport_state, BT_PBAP_TRANSPORT_STATE_DISCONNECTED);
+	bt_atomic_set(&pbap_pce->_state, BT_PBAP_STATE_DISCONNECTED);
 	pbap_pce_clear_pending_request(pbap_pce);
 
 	if (pbap_pce->cb != NULL && pbap_pce->cb->rfcomm_disconnected != NULL) {
@@ -238,7 +240,7 @@ static void pbap_pce_l2cap_transport_connected(struct bt_conn *conn, struct bt_g
 {
 	struct bt_pbap_pce *pbap_pce = CONTAINER_OF(goep, struct bt_pbap_pce, _goep);
 
-	atomic_set(&pbap_pce->_transport_state, BT_PBAP_TRANSPORT_STATE_CONNECTED);
+	bt_atomic_set(&pbap_pce->_transport_state, BT_PBAP_TRANSPORT_STATE_CONNECTED);
 
 	if (pbap_pce->cb != NULL && pbap_pce->cb->l2cap_connected != NULL) {
 		pbap_pce->cb->l2cap_connected(conn, pbap_pce);
@@ -249,8 +251,8 @@ static void pbap_pce_l2cap_transport_disconnected(struct bt_goep *goep)
 {
 	struct bt_pbap_pce *pbap_pce = CONTAINER_OF(goep, struct bt_pbap_pce, _goep);
 
-	atomic_set(&pbap_pce->_transport_state, BT_PBAP_TRANSPORT_STATE_DISCONNECTED);
-	atomic_set(&pbap_pce->_state, BT_PBAP_STATE_DISCONNECTED);
+	bt_atomic_set(&pbap_pce->_transport_state, BT_PBAP_TRANSPORT_STATE_DISCONNECTED);
+	bt_atomic_set(&pbap_pce->_state, BT_PBAP_STATE_DISCONNECTED);
 	pbap_pce_clear_pending_request(pbap_pce);
 
 	if (pbap_pce->cb != NULL && pbap_pce->cb->l2cap_disconnected != NULL) {
@@ -272,7 +274,7 @@ static int bt_pbap_transport_connect(struct bt_conn *conn, struct bt_pbap_pce *p
 		return -EINVAL;
 	}
 
-	if (atomic_get(&pbap_pce->_transport_state) != BT_PBAP_TRANSPORT_STATE_DISCONNECTED) {
+	if (bt_atomic_get(&pbap_pce->_transport_state) != BT_PBAP_TRANSPORT_STATE_DISCONNECTED) {
 		return -EINPROGRESS;
 	}
 
@@ -289,7 +291,7 @@ static int bt_pbap_transport_connect(struct bt_conn *conn, struct bt_pbap_pce *p
 	}
 
 	if (err == 0) {
-		atomic_set(&pbap_pce->_transport_state, BT_PBAP_TRANSPORT_STATE_CONNECTING);
+		bt_atomic_set(&pbap_pce->_transport_state, BT_PBAP_TRANSPORT_STATE_CONNECTING);
 	}
 
 	return err;
@@ -303,7 +305,7 @@ static int bt_pbap_transport_disconnect(struct bt_pbap_pce *pbap_pce, bool is_rf
 		return -EINVAL;
 	}
 
-	if (atomic_get(&pbap_pce->_transport_state) != BT_PBAP_TRANSPORT_STATE_CONNECTED) {
+	if (bt_atomic_get(&pbap_pce->_transport_state) != BT_PBAP_TRANSPORT_STATE_CONNECTED) {
 		return -EINPROGRESS;
 	}
 
@@ -314,7 +316,7 @@ static int bt_pbap_transport_disconnect(struct bt_pbap_pce *pbap_pce, bool is_rf
 	}
 
 	if (err == 0) {
-		atomic_set(&pbap_pce->_transport_state, BT_PBAP_TRANSPORT_STATE_DISCONNECTING);
+		bt_atomic_set(&pbap_pce->_transport_state, BT_PBAP_TRANSPORT_STATE_DISCONNECTING);
 	}
 
 	return err;
@@ -350,11 +352,11 @@ static void pce_connect(struct bt_obex_client *client, uint8_t rsp_code, uint8_t
 	pbap_pce = CONTAINER_OF(client, struct bt_pbap_pce, _client);
 
 	if (rsp_code == BT_PBAP_RSP_CODE_OK) {
-		atomic_set(&pbap_pce->_state, BT_PBAP_STATE_CONNECTED);
+		bt_atomic_set(&pbap_pce->_state, BT_PBAP_STATE_CONNECTED);
 		bt_obex_get_header_conn_id(buf, &pbap_pce->_conn_id);
 
 	} else if (rsp_code != BT_PBAP_RSP_CODE_UNAUTH) {
-		atomic_set(&pbap_pce->_state, BT_PBAP_STATE_DISCONNECTED);
+		bt_atomic_set(&pbap_pce->_state, BT_PBAP_STATE_DISCONNECTED);
 	} else {
 		/* nothing to do*/
 	}
@@ -369,10 +371,10 @@ static void pce_disconnect(struct bt_obex_client *client, uint8_t rsp_code, stru
 	struct bt_pbap_pce *pbap_pce = CONTAINER_OF(client, struct bt_pbap_pce, _client);
 
 	if (rsp_code == BT_OBEX_RSP_CODE_SUCCESS) {
-		atomic_set(&pbap_pce->_state, BT_PBAP_STATE_DISCONNECTED);
+		bt_atomic_set(&pbap_pce->_state, BT_PBAP_STATE_DISCONNECTED);
 		pbap_pce_clear_pending_request(pbap_pce);
 	} else {
-		atomic_set(&pbap_pce->_state, BT_PBAP_STATE_CONNECTED);
+		bt_atomic_set(&pbap_pce->_state, BT_PBAP_STATE_CONNECTED);
 	}
 
 	if (pbap_pce->cb != NULL && pbap_pce->cb->disconnect != NULL) {
@@ -461,14 +463,14 @@ int bt_pbap_pce_connect(struct bt_pbap_pce *pbap_pce, uint16_t mopl, struct net_
 	bool allocated = false;
 	uint8_t uuid128[BT_UUID_SIZE_128];
 
-	if (atomic_get(&pbap_pce->_transport_state) != BT_PBAP_TRANSPORT_STATE_CONNECTED) {
+	if (bt_atomic_get(&pbap_pce->_transport_state) != BT_PBAP_TRANSPORT_STATE_CONNECTED) {
 		LOG_ERR("Transport connection is not established");
 		return -EINVAL;
 	}
 
-	if (atomic_get(&pbap_pce->_state) != BT_PBAP_STATE_DISCONNECTED &&
-	    atomic_get(&pbap_pce->_state) != BT_PBAP_STATE_CONNECTING) {
-		LOG_ERR("Invalid state %u", (uint8_t)atomic_get(&pbap_pce->_state));
+	if (bt_atomic_get(&pbap_pce->_state) != BT_PBAP_STATE_DISCONNECTED &&
+	    bt_atomic_get(&pbap_pce->_state) != BT_PBAP_STATE_CONNECTING) {
+		LOG_ERR("Invalid state %u", (uint8_t)bt_atomic_get(&pbap_pce->_state));
 		return -EINVAL;
 	}
 
@@ -504,7 +506,7 @@ int bt_pbap_pce_connect(struct bt_pbap_pce *pbap_pce, uint16_t mopl, struct net_
 		goto failed;
 	}
 
-	atomic_set(&pbap_pce->_state, BT_PBAP_STATE_CONNECTING);
+	bt_atomic_set(&pbap_pce->_state, BT_PBAP_STATE_CONNECTING);
 	return 0;
 
 failed:
@@ -523,8 +525,8 @@ int bt_pbap_pce_disconnect(struct bt_pbap_pce *pbap_pce, struct net_buf *buf)
 		return -EINVAL;
 	}
 
-	if (atomic_get(&pbap_pce->_state) != BT_PBAP_STATE_CONNECTED) {
-		LOG_ERR("Invalid state %u", (uint8_t)atomic_get(&pbap_pce->_state));
+	if (bt_atomic_get(&pbap_pce->_state) != BT_PBAP_STATE_CONNECTED) {
+		LOG_ERR("Invalid state %u", (uint8_t)bt_atomic_get(&pbap_pce->_state));
 		return -EINVAL;
 	}
 
@@ -557,7 +559,7 @@ int bt_pbap_pce_disconnect(struct bt_pbap_pce *pbap_pce, struct net_buf *buf)
 		goto failed;
 	}
 
-	atomic_set(&pbap_pce->_state, BT_PBAP_STATE_DISCONNECTING);
+	bt_atomic_set(&pbap_pce->_state, BT_PBAP_STATE_DISCONNECTING);
 	return 0;
 failed:
 	if (allocated) {
@@ -708,8 +710,8 @@ int bt_pbap_pce_set_phone_book(struct bt_pbap_pce *pbap_pce, uint8_t flags, stru
 {
 	int err;
 
-	if (atomic_get(&pbap_pce->_state) != BT_PBAP_STATE_CONNECTED) {
-		LOG_ERR("Invalid state %u", (uint8_t)atomic_get(&pbap_pce->_state));
+	if (bt_atomic_get(&pbap_pce->_state) != BT_PBAP_STATE_CONNECTED) {
+		LOG_ERR("Invalid state %u", (uint8_t)bt_atomic_get(&pbap_pce->_state));
 		return -EINVAL;
 	}
 
@@ -747,8 +749,8 @@ int bt_pbap_pce_abort(struct bt_pbap_pce *pbap_pce, struct net_buf *buf)
 		return -EINVAL;
 	}
 
-	if (atomic_get(&pbap_pce->_state) != BT_PBAP_STATE_CONNECTED) {
-		LOG_ERR("Invalid state %u", (uint8_t)atomic_get(&pbap_pce->_state));
+	if (bt_atomic_get(&pbap_pce->_state) != BT_PBAP_STATE_CONNECTED) {
+		LOG_ERR("Invalid state %u", (uint8_t)bt_atomic_get(&pbap_pce->_state));
 		return -EINVAL;
 	}
 
@@ -917,7 +919,7 @@ static void pbap_pse_clear_pending_request(struct bt_pbap_pse *pbap_pse)
 {
 	pbap_pse->_req_cb = NULL;
 	pbap_pse->_optype = NULL;
-	atomic_clear(&pbap_pse->_flags);
+	bt_atomic_clear(&pbap_pse->_flags);
 }
 
 static void pse_connect(struct bt_obex_server *server, uint8_t version, uint16_t mopl,
@@ -925,7 +927,7 @@ static void pse_connect(struct bt_obex_server *server, uint8_t version, uint16_t
 {
 	struct bt_pbap_pse *pbap_pse = CONTAINER_OF(server, struct bt_pbap_pse, _server);
 
-	atomic_set(&pbap_pse->_state, BT_PBAP_STATE_CONNECTING);
+	bt_atomic_set(&pbap_pse->_state, BT_PBAP_STATE_CONNECTING);
 
 	if (pbap_pse->cb != NULL && pbap_pse->cb->connect != NULL) {
 		pbap_pse->cb->connect(pbap_pse, version, mopl, buf);
@@ -936,7 +938,7 @@ static void pse_disconnect(struct bt_obex_server *server, struct net_buf *buf)
 {
 	struct bt_pbap_pse *pbap_pse = CONTAINER_OF(server, struct bt_pbap_pse, _server);
 
-	atomic_set(&pbap_pse->_state, BT_PBAP_STATE_DISCONNECTING);
+	bt_atomic_set(&pbap_pse->_state, BT_PBAP_STATE_DISCONNECTING);
 
 	if (pbap_pse->cb != NULL && pbap_pse->cb->disconnect != NULL) {
 		pbap_pse->cb->disconnect(pbap_pse, buf);
@@ -1061,7 +1063,7 @@ static void pse_rfcomm_transport_connected(struct bt_conn *conn, struct bt_goep 
 {
 	struct bt_pbap_pse *pbap_pse = CONTAINER_OF(goep, struct bt_pbap_pse, _goep);
 
-	atomic_set(&pbap_pse->_transport_state, BT_PBAP_TRANSPORT_STATE_CONNECTED);
+	bt_atomic_set(&pbap_pse->_transport_state, BT_PBAP_TRANSPORT_STATE_CONNECTED);
 
 	if (pbap_pse->cb != NULL && pbap_pse->cb->rfcomm_connected != NULL) {
 		pbap_pse->cb->rfcomm_connected(conn, pbap_pse);
@@ -1072,8 +1074,8 @@ static void pse_rfcomm_transport_disconnected(struct bt_goep *goep)
 {
 	struct bt_pbap_pse *pbap_pse = CONTAINER_OF(goep, struct bt_pbap_pse, _goep);
 
-	atomic_set(&pbap_pse->_transport_state, BT_PBAP_TRANSPORT_STATE_DISCONNECTED);
-	atomic_set(&pbap_pse->_state, BT_PBAP_STATE_DISCONNECTED);
+	bt_atomic_set(&pbap_pse->_transport_state, BT_PBAP_TRANSPORT_STATE_DISCONNECTED);
+	bt_atomic_set(&pbap_pse->_state, BT_PBAP_STATE_DISCONNECTED);
 	pbap_pse_clear_pending_request(pbap_pse);
 
 	if (pbap_pse->cb != NULL && pbap_pse->cb->rfcomm_disconnected != NULL) {
@@ -1090,7 +1092,7 @@ static void pse_l2cap_transport_connected(struct bt_conn *conn, struct bt_goep *
 {
 	struct bt_pbap_pse *pbap_pse = CONTAINER_OF(goep, struct bt_pbap_pse, _goep);
 
-	atomic_set(&pbap_pse->_transport_state, BT_PBAP_TRANSPORT_STATE_CONNECTED);
+	bt_atomic_set(&pbap_pse->_transport_state, BT_PBAP_TRANSPORT_STATE_CONNECTED);
 
 	if (pbap_pse->cb != NULL && pbap_pse->cb->l2cap_connected != NULL) {
 		pbap_pse->cb->l2cap_connected(conn, pbap_pse);
@@ -1101,8 +1103,8 @@ static void pse_l2cap_transport_disconnected(struct bt_goep *goep)
 {
 	struct bt_pbap_pse *pbap_pse = CONTAINER_OF(goep, struct bt_pbap_pse, _goep);
 
-	atomic_set(&pbap_pse->_transport_state, BT_PBAP_TRANSPORT_STATE_DISCONNECTED);
-	atomic_set(&pbap_pse->_state, BT_PBAP_STATE_DISCONNECTED);
+	bt_atomic_set(&pbap_pse->_transport_state, BT_PBAP_TRANSPORT_STATE_DISCONNECTED);
+	bt_atomic_set(&pbap_pse->_state, BT_PBAP_STATE_DISCONNECTED);
 	pbap_pse_clear_pending_request(pbap_pse);
 
 	if (pbap_pse->cb != NULL && pbap_pse->cb->l2cap_disconnected != NULL) {
@@ -1139,7 +1141,7 @@ static int pbap_pse_rfcomm_accept(struct bt_conn *conn,
 	BT_GOEP_INIT_V1(&pbap_pse->_goep, &pbap_pse->_goep_transport.v1);
 	*goep = &pbap_pse->_goep;
 
-	atomic_set(&pbap_pse->_transport_state, BT_PBAP_TRANSPORT_STATE_CONNECTING);
+	bt_atomic_set(&pbap_pse->_transport_state, BT_PBAP_TRANSPORT_STATE_CONNECTING);
 
 	return 0;
 }
@@ -1168,7 +1170,7 @@ static int pbap_pse_l2cap_accept(struct bt_conn *conn,
 	BT_GOEP_INIT_V2(&pbap_pse->_goep, &pbap_pse->_goep_transport.v2);
 	*goep = &pbap_pse->_goep;
 
-	atomic_set(&pbap_pse->_transport_state, BT_PBAP_TRANSPORT_STATE_CONNECTING);
+	bt_atomic_set(&pbap_pse->_transport_state, BT_PBAP_TRANSPORT_STATE_CONNECTING);
 
 	return 0;
 }
@@ -1289,8 +1291,8 @@ int bt_pbap_pse_connect_rsp(struct bt_pbap_pse *pbap_pse, uint16_t mopl, uint8_t
 		return -EINVAL;
 	}
 
-	if (atomic_get(&pbap_pse->_state) != BT_PBAP_STATE_CONNECTING) {
-		LOG_ERR("Invalid state %u", (uint8_t)atomic_get(&pbap_pse->_state));
+	if (bt_atomic_get(&pbap_pse->_state) != BT_PBAP_STATE_CONNECTING) {
+		LOG_ERR("Invalid state %u", (uint8_t)bt_atomic_get(&pbap_pse->_state));
 		return -EINVAL;
 	}
 
@@ -1338,8 +1340,8 @@ int bt_pbap_pse_connect_rsp(struct bt_pbap_pse *pbap_pse, uint16_t mopl, uint8_t
 		goto failed;
 	}
 
-	atomic_set(&pbap_pse->_state, BT_PBAP_STATE_CONNECTED);
-	atomic_set(&pbap_pse->_flags, 0);
+	bt_atomic_set(&pbap_pse->_state, BT_PBAP_STATE_CONNECTED);
+	bt_atomic_set(&pbap_pse->_flags, 0);
 	return 0;
 failed:
 	if (allocated) {
@@ -1354,8 +1356,8 @@ static int pbap_pse_get_rsp(struct bt_pbap_pse *pbap_pse, uint8_t rsp_code, stru
 	int err;
 	bool clear_bit = false;
 
-	if (atomic_get(&pbap_pse->_state) != BT_PBAP_STATE_CONNECTED) {
-		LOG_ERR("Invalid state %u", (uint8_t)atomic_get(&pbap_pse->_state));
+	if (bt_atomic_get(&pbap_pse->_state) != BT_PBAP_STATE_CONNECTED) {
+		LOG_ERR("Invalid state %u", (uint8_t)bt_atomic_get(&pbap_pse->_state));
 		return -EINVAL;
 	}
 
@@ -1364,7 +1366,7 @@ static int pbap_pse_get_rsp(struct bt_pbap_pse *pbap_pse, uint8_t rsp_code, stru
 		return -EINVAL;
 	}
 
-	if (!atomic_test_and_set_bit(&pbap_pse->_flags, BT_PBAP_FLAG_RSP_ONGOING)) {
+	if (!bt_atomic_test_and_set_bit(&pbap_pse->_flags, BT_PBAP_FLAG_RSP_ONGOING)) {
 		clear_bit = true;
 		if (pbap_pse->_goep.v2 != NULL && rsp_code == BT_OBEX_RSP_CODE_SUCCESS) {
 			err = bt_pbap_check_srm(buf);
@@ -1388,7 +1390,7 @@ static int pbap_pse_get_rsp(struct bt_pbap_pse *pbap_pse, uint8_t rsp_code, stru
 	return 0;
 
 failed:
-	atomic_set_bit_to(&pbap_pse->_flags, BT_PBAP_FLAG_RSP_ONGOING, !clear_bit);
+	bt_atomic_set_bit_to(&pbap_pse->_flags, BT_PBAP_FLAG_RSP_ONGOING, !clear_bit);
 	return err;
 }
 
@@ -1416,8 +1418,8 @@ int bt_pbap_pse_set_phone_book_rsp(struct bt_pbap_pse *pbap_pse, uint8_t rsp_cod
 	int err;
 	bool allocated = false;
 
-	if (atomic_get(&pbap_pse->_state) != BT_PBAP_STATE_CONNECTED) {
-		LOG_ERR("Invalid state %u", (uint8_t)atomic_get(&pbap_pse->_state));
+	if (bt_atomic_get(&pbap_pse->_state) != BT_PBAP_STATE_CONNECTED) {
+		LOG_ERR("Invalid state %u", (uint8_t)bt_atomic_get(&pbap_pse->_state));
 		return -EINVAL;
 	}
 
@@ -1449,8 +1451,8 @@ int bt_pbap_pse_disconnect_rsp(struct bt_pbap_pse *pbap_pse, uint8_t rsp_code, s
 		return -EINVAL;
 	}
 
-	if (atomic_get(&pbap_pse->_state) != BT_PBAP_STATE_DISCONNECTING) {
-		LOG_ERR("Invalid state %u", (uint8_t)atomic_get(&pbap_pse->_state));
+	if (bt_atomic_get(&pbap_pse->_state) != BT_PBAP_STATE_DISCONNECTING) {
+		LOG_ERR("Invalid state %u", (uint8_t)bt_atomic_get(&pbap_pse->_state));
 		return -EINVAL;
 	}
 
@@ -1461,10 +1463,10 @@ int bt_pbap_pse_disconnect_rsp(struct bt_pbap_pse *pbap_pse, uint8_t rsp_code, s
 	}
 
 	if (rsp_code == BT_OBEX_RSP_CODE_SUCCESS) {
-		atomic_set(&pbap_pse->_state, BT_PBAP_STATE_DISCONNECTED);
+		bt_atomic_set(&pbap_pse->_state, BT_PBAP_STATE_DISCONNECTED);
 		pbap_pse_clear_pending_request(pbap_pse);
 	} else {
-		atomic_set(&pbap_pse->_state, BT_PBAP_STATE_CONNECTED);
+		bt_atomic_set(&pbap_pse->_state, BT_PBAP_STATE_CONNECTED);
 	}
 
 	return 0;
@@ -1478,8 +1480,8 @@ int bt_pbap_pse_abort_rsp(struct bt_pbap_pse *pbap_pse, uint8_t rsp_code, struct
 		return -EINVAL;
 	}
 
-	if (atomic_get(&pbap_pse->_state) != BT_PBAP_STATE_CONNECTED) {
-		LOG_ERR("Invalid state %u", (uint8_t)atomic_get(&pbap_pse->_state));
+	if (bt_atomic_get(&pbap_pse->_state) != BT_PBAP_STATE_CONNECTED) {
+		LOG_ERR("Invalid state %u", (uint8_t)bt_atomic_get(&pbap_pse->_state));
 		return -EINVAL;
 	}
 

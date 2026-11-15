@@ -5,10 +5,11 @@
 #ifndef __BT_CRYPTO_H
 #define __BT_CRYPTO_H
 
+#include <base/base.h>
 #include <stddef.h>
 #include <stdint.h>
 
-#include <zephyr/bluetooth/bluetooth.h>
+#include <embt/bluetooth/bluetooth.h>
 
 /**
  * @brief Cypher based Message Authentication Code (CMAC) with AES 128 bit

@@ -5,13 +5,17 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
+#undef LOG_TAG
+#define LOG_TAG "bt_cs"
+#include <base/log.h>
+#include <base/base.h>
 #include <errno.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
 
-#include <zephyr/autoconf.h>
+#include <embt/autoconf.h>
 #include <zephyr/bluetooth/conn.h>
 #include <zephyr/bluetooth/cs.h>
 #include <zephyr/bluetooth/hci.h>
@@ -24,9 +28,7 @@
 
 #include "conn_internal.h"
 
-#define LOG_LEVEL CONFIG_BT_HCI_CORE_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_cs);
-
+#define LOG_LEVEL CONFIG_EMBT_LOG_LEVEL
 #if defined(CONFIG_BT_CHANNEL_SOUNDING_TEST)
 static struct bt_le_cs_test_cb cs_test_callbacks;
 #endif

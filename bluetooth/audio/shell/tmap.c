@@ -9,10 +9,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <base/base.h>
 #include <errno.h>
 #include <stddef.h>
 
-#include <zephyr/autoconf.h>
+#include <embt/autoconf.h>
 #include <zephyr/bluetooth/audio/tmap.h>
 #include <zephyr/bluetooth/conn.h>
 #include <zephyr/shell/shell.h>

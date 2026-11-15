@@ -4,12 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#undef LOG_TAG
+#define LOG_TAG "bas"
+#include <base/log.h>
 #include <zephyr/sys/byteorder.h>
 #include <zephyr/bluetooth/services/bas.h>
 #include <zephyr/bluetooth/gatt.h>
 #include "bas_internal.h"
-
-LOG_MODULE_DECLARE(bas, CONFIG_BT_BAS_LOG_LEVEL);
 
 /* The battery level status of a battery. */
 static struct bt_bas_bls bls;

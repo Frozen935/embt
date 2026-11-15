@@ -2,6 +2,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#undef LOG_TAG
+#define LOG_TAG "bt_encrypted_ad_data"
+#include <base/log.h>
 #include <zephyr/bluetooth/ead.h>
 #include <zephyr/bluetooth/crypto.h>
 #include <zephyr/bluetooth/bluetooth.h>
@@ -26,8 +29,6 @@
  */
 static uint8_t bt_ead_aad[] = {0xEA};
 BUILD_ASSERT(sizeof(bt_ead_aad) == BT_EAD_AAD_SIZE);
-
-LOG_MODULE_REGISTER(bt_encrypted_ad_data, CONFIG_BT_EAD_LOG_LEVEL);
 
 static int bt_ead_generate_randomizer(uint8_t randomizer[BT_EAD_RANDOMIZER_SIZE])
 {

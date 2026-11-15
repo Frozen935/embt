@@ -4,14 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#undef LOG_TAG
+#define LOG_TAG "bt_mesh_op_agg"
+#include <base/log.h>
 #include <zephyr/bluetooth/mesh.h>
 
 #include "foundation.h"
 #include "op_agg.h"
 
-#define LOG_LEVEL CONFIG_BT_MESH_MODEL_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_mesh_op_agg);
-
+#define LOG_LEVEL CONFIG_EMBT_LOG_LEVEL
 #define IS_LENGTH_LONG(buf) ((buf)->data[0] & 1)
 #define LENGTH_SHORT_MAX BIT_MASK(7)
 

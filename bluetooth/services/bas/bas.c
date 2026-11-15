@@ -10,6 +10,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#undef LOG_TAG
+#define LOG_TAG "bas"
+#include <base/log.h>
 #include <errno.h>
 #include <zephyr/sys/__assert.h>
 #include <stdbool.h>
@@ -24,9 +27,7 @@
 #include <zephyr/bluetooth/services/bas.h>
 #include "bas_internal.h"
 
-#define LOG_LEVEL CONFIG_BT_BAS_LOG_LEVEL
-LOG_MODULE_REGISTER(bas, CONFIG_BT_BAS_LOG_LEVEL);
-
+#define LOG_LEVEL CONFIG_EMBT_LOG_LEVEL
 static uint8_t battery_level = 100U;
 
 static void blvl_ccc_cfg_changed(const struct bt_gatt_attr *attr, uint16_t value)

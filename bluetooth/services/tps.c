@@ -8,6 +8,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#undef LOG_TAG
+#define LOG_TAG "tps"
+#include <base/log.h>
 #include <errno.h>
 #include <zephyr/types.h>
 
@@ -17,9 +20,7 @@
 #include <zephyr/bluetooth/uuid.h>
 #include <zephyr/bluetooth/hci.h>
 
-#define LOG_LEVEL CONFIG_BT_TPS_LOG_LEVEL
-LOG_MODULE_REGISTER(tps);
-
+#define LOG_LEVEL CONFIG_EMBT_LOG_LEVEL
 static ssize_t read_tx_power_level(struct bt_conn *conn,
 				   const struct bt_gatt_attr *attr, void *buf,
 				   uint16_t len, uint16_t offset)

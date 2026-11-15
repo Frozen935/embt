@@ -4,13 +4,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#undef LOG_TAG
+#define LOG_TAG "bt_cap_handover"
+#include <base/log.h>
 #include <errno.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
 
-#include <zephyr/autoconf.h>
+#include <embt/autoconf.h>
 #include <zephyr/bluetooth/addr.h>
 #include <zephyr/bluetooth/audio/audio.h>
 #include <zephyr/bluetooth/audio/bap.h>
@@ -28,8 +31,6 @@
 #include "cap_internal.h"
 #include "common/bt_str.h"
 #include "csip_internal.h"
-
-LOG_MODULE_REGISTER(bt_cap_handover, CONFIG_BT_CAP_HANDOVER_LOG_LEVEL);
 
 static const struct bt_cap_handover_cb *cap_cb;
 

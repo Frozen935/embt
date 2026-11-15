@@ -4,14 +4,18 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
+#undef LOG_TAG
+#define LOG_TAG "bt_data"
+#include <base/log.h>
+#include <base/base.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
 
-#include <zephyr/autoconf.h>
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/net_buf.h>
+#include <embt/autoconf.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/net_buf.h>
 
 void bt_data_parse(struct net_buf_simple *ad,
 		   bool (*func)(struct bt_data *data, void *user_data),

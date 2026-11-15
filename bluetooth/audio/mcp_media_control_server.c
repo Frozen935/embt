@@ -6,6 +6,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#undef LOG_TAG
+#define LOG_TAG "bt_mcp_media_control_server"
+#include <base/log.h>
+#include <base/base.h>
 #include <errno.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -13,7 +17,7 @@
 #include <string.h>
 #include <sys/types.h>
 
-#include <zephyr/autoconf.h>
+#include <embt/autoconf.h>
 #include <zephyr/bluetooth/audio/ccid.h>
 #include <zephyr/bluetooth/audio/mcp.h>
 #include <zephyr/bluetooth/audio/mcs.h>
@@ -24,7 +28,7 @@
 #include <zephyr/bluetooth/uuid.h>
 #include <zephyr/net_buf.h>
 #include <zephyr/sys/__assert.h>
-#include <zephyr/sys/atomic.h>
+#include <base/bt_atomic.h>
 #include <zephyr/sys/time_units.h>
 #include <zephyr/sys/util.h>
 #include <zephyr/sys/util_macro.h>
@@ -32,8 +36,6 @@
 
 #include "mcs_internal.h"
 #include "mcp_internal.h"
-
-LOG_MODULE_REGISTER(bt_mcp_media_control_server, CONFIG_BT_MCP_MEDIA_CONTROL_SERVER_LOG_LEVEL);
 
 #define TRACK_STATUS_INVALID 0x00U
 #define TRACK_STATUS_VALID 0x01U
@@ -307,7 +309,7 @@ struct obj_t {
 	};
 	struct net_buf_simple *content;
 
-	ATOMIC_DEFINE(flags, BT_MCP_OBJ_FLAG_NUM_FLAGS);
+	BT_ATOMIC_DEFINE(flags, BT_MCP_OBJ_FLAG_NUM_FLAGS);
 };
 
 static struct obj_t obj = {
@@ -702,7 +704,7 @@ static void on_obj_selected(struct bt_ots *ots, struct bt_conn *conn,
 	ARG_UNUSED(ots);
 	ARG_UNUSED(conn);
 
-	if (atomic_test_and_set_bit(obj.flags, BT_MCP_OBJ_FLAG_BUSY)) {
+	if (bt_atomic_test_and_set_bit(obj.flags, BT_MCP_OBJ_FLAG_BUSY)) {
 		/* TODO: Can there be a collision between select and internal */
 		/* activities, like adding new objects? */
 		LOG_ERR("Object busy - select not performed");
@@ -737,12 +739,12 @@ static void on_obj_selected(struct bt_ots *ots, struct bt_conn *conn,
 		(void)setup_group_object(media_player.group);
 	} else {
 		LOG_ERR("Unknown Object ID");
-		atomic_clear_bit(obj.flags, BT_MCP_OBJ_FLAG_BUSY);
+		bt_atomic_clear_bit(obj.flags, BT_MCP_OBJ_FLAG_BUSY);
 		return;
 	}
 
 	obj.selected_id = id;
-	atomic_clear_bit(obj.flags, BT_MCP_OBJ_FLAG_BUSY);
+	bt_atomic_clear_bit(obj.flags, BT_MCP_OBJ_FLAG_BUSY);
 }
 
 static int on_obj_created(struct bt_ots *ots, struct bt_conn *conn, uint64_t id,
@@ -818,14 +820,14 @@ static ssize_t on_object_send(struct bt_ots *ots, struct bt_conn *conn,
 	ARG_UNUSED(ots);
 	ARG_UNUSED(conn);
 
-	if (atomic_test_and_set_bit(obj.flags, BT_MCP_OBJ_FLAG_BUSY)) {
+	if (bt_atomic_test_and_set_bit(obj.flags, BT_MCP_OBJ_FLAG_BUSY)) {
 		/* TODO: Can there be a collision between select and internal */
 		/* activities, like adding new objects? */
 		LOG_ERR("Object busy");
 		return -EBUSY;
 	}
 
-	if (IS_ENABLED(CONFIG_BT_MCP_MEDIA_CONTROL_SERVER_LOG_LEVEL_DBG)) {
+	if ((CONFIG_EMBT_LOG_LEVEL >= 4)) {
 		char t[BT_OTS_OBJ_ID_STR_LEN];
 		(void)bt_ots_obj_id_to_str(id, t, sizeof(t));
 		LOG_DBG("Object Id %s, offset %lu, length %zu", t, (long)offset, len);
@@ -833,30 +835,30 @@ static ssize_t on_object_send(struct bt_ots *ots, struct bt_conn *conn,
 
 	if (id != obj.selected_id) {
 		LOG_ERR("Read from unselected object");
-		atomic_clear_bit(obj.flags, BT_MCP_OBJ_FLAG_BUSY);
+		bt_atomic_clear_bit(obj.flags, BT_MCP_OBJ_FLAG_BUSY);
 		return -EINVAL;
 	}
 
 	if (!data) {
 		LOG_DBG("Read complete");
-		atomic_clear_bit(obj.flags, BT_MCP_OBJ_FLAG_BUSY);
+		bt_atomic_clear_bit(obj.flags, BT_MCP_OBJ_FLAG_BUSY);
 		return 0;
 	}
 
 	if (offset >= obj.content->len) {
 		LOG_DBG("Offset too large");
-		atomic_clear_bit(obj.flags, BT_MCP_OBJ_FLAG_BUSY);
+		bt_atomic_clear_bit(obj.flags, BT_MCP_OBJ_FLAG_BUSY);
 		return -EINVAL;
 	}
 
-	if (IS_ENABLED(CONFIG_BT_MCP_MEDIA_CONTROL_SERVER_LOG_LEVEL_DBG)) {
+	if ((CONFIG_EMBT_LOG_LEVEL >= 4)) {
 		if (len > obj.content->len - offset) {
 			LOG_DBG("Requested len too large");
 		}
 	}
 
 	*data = &obj.content->data[offset];
-	atomic_clear_bit(obj.flags, BT_MCP_OBJ_FLAG_BUSY);
+	bt_atomic_clear_bit(obj.flags, BT_MCP_OBJ_FLAG_BUSY);
 
 	return MIN(len, obj.content->len - offset);
 }
@@ -1353,7 +1355,7 @@ static uint8_t inactive_state_command_handler(const struct bt_mcs_cmd *command)
 	uint8_t result_code = BT_MCS_OPC_NTF_SUCCESS;
 
 	LOG_DBG("Command opcode: %d", command->opcode);
-	if (IS_ENABLED(CONFIG_BT_MCP_MEDIA_CONTROL_SERVER_LOG_LEVEL_DBG)) {
+	if ((CONFIG_EMBT_LOG_LEVEL >= 4)) {
 		if (command->use_param) {
 			LOG_DBG("Command parameter: %d", command->param);
 		}
@@ -1429,7 +1431,7 @@ static uint8_t playing_state_command_handler(const struct bt_mcs_cmd *command)
 	uint8_t result_code = BT_MCS_OPC_NTF_SUCCESS;
 
 	LOG_DBG("Command opcode: %d", command->opcode);
-	if (IS_ENABLED(CONFIG_BT_MCP_MEDIA_CONTROL_SERVER_LOG_LEVEL_DBG)) {
+	if ((CONFIG_EMBT_LOG_LEVEL >= 4)) {
 		if (command->use_param) {
 			LOG_DBG("Command parameter: %d", command->param);
 		}
@@ -1553,7 +1555,7 @@ static uint8_t paused_state_command_handler(const struct bt_mcs_cmd *command)
 	uint8_t result_code = BT_MCS_OPC_NTF_SUCCESS;
 
 	LOG_DBG("Command opcode: %d", command->opcode);
-	if (IS_ENABLED(CONFIG_BT_MCP_MEDIA_CONTROL_SERVER_LOG_LEVEL_DBG)) {
+	if ((CONFIG_EMBT_LOG_LEVEL >= 4)) {
 		if (command->use_param) {
 			LOG_DBG("Command parameter: %d", command->param);
 		}
@@ -1701,7 +1703,7 @@ static uint8_t seeking_state_command_handler(const struct bt_mcs_cmd *command)
 	uint8_t result_code = BT_MCS_OPC_NTF_SUCCESS;
 
 	LOG_DBG("Command opcode: %d", command->opcode);
-	if (IS_ENABLED(CONFIG_BT_MCP_MEDIA_CONTROL_SERVER_LOG_LEVEL_DBG)) {
+	if ((CONFIG_EMBT_LOG_LEVEL >= 4)) {
 		if (command->use_param) {
 			LOG_DBG("Command parameter: %d", command->param);
 		}
@@ -3041,7 +3043,7 @@ int bt_mcp_media_control_server_register(void)
 	 * MCS has to be registered before we add the objects, as we need the OTS that is registered
 	 * and included by MCS.
 	 */
-	if (atomic_test_and_set_bit(obj.flags, BT_MCP_OBJ_FLAG_BUSY)) {
+	if (bt_atomic_test_and_set_bit(obj.flags, BT_MCP_OBJ_FLAG_BUSY)) {
 		LOG_ERR("Object busy");
 		return -EBUSY;
 	}
@@ -3049,7 +3051,7 @@ int bt_mcp_media_control_server_register(void)
 	ret = bt_mcs_init(&ots_cbs);
 	if (ret < 0) {
 		LOG_ERR("Could not init MCS: %d", ret);
-		atomic_clear_bit(obj.flags, BT_MCP_OBJ_FLAG_BUSY);
+		bt_atomic_clear_bit(obj.flags, BT_MCP_OBJ_FLAG_BUSY);
 
 		return ret;
 	}
@@ -3084,7 +3086,7 @@ int bt_mcp_media_control_server_register(void)
 	ret = add_current_track_segments_object(&media_player);
 	__ASSERT(ret == 0, "Error adding Track Segments Object to OTS, error %d", ret);
 
-	atomic_clear_bit(obj.flags, BT_MCP_OBJ_FLAG_BUSY);
+	bt_atomic_clear_bit(obj.flags, BT_MCP_OBJ_FLAG_BUSY);
 #endif /* CONFIG_BT_MCP_MEDIA_CONTROL_SERVER_OBJECTS */
 
 	/* Set up the calls structure */
@@ -3134,7 +3136,7 @@ int bt_mcp_media_control_server_register(void)
 	return 0;
 }
 
-#if CONFIG_BT_MCP_MEDIA_CONTROL_SERVER_LOG_LEVEL_DBG /* Special commands for debugging */
+#if (CONFIG_EMBT_LOG_LEVEL >= 4) /* Special commands for debugging */
 
 void bt_mcp_debug_dump_state(void)
 {
@@ -3223,7 +3225,7 @@ void bt_mcp_debug_dump_state(void)
 	}
 #endif /* CONFIG_BT_MCP_MEDIA_CONTROL_SERVER_OBJECTS */
 }
-#endif /* CONFIG_BT_MCP_MEDIA_CONTROL_SERVER_LOG_LEVEL_DBG */
+#endif /* (CONFIG_EMBT_LOG_LEVEL >= 4) */
 
 #if defined(CONFIG_BT_TESTING) /* Special commands for testing */
 

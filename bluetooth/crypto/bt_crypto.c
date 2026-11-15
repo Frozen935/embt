@@ -2,10 +2,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#undef LOG_TAG
+#define LOG_TAG "bt_crypto"
+#include <base/log.h>
 #include <errno.h>
 #include <string.h>
 
-#include <zephyr/sys/byteorder.h>
+#include <embt/sys/byteorder.h>
 
 #include "psa/crypto.h"
 

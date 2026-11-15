@@ -4,7 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <zephyr/sys/crc.h>
+#include <base/base.h>
+#include <embt/sys/crc.h>
 
 uint32_t __weak crc32_k_4_2_update(uint32_t crc, const uint8_t *const data, const size_t len)
 {

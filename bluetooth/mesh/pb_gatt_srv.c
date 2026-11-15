@@ -5,6 +5,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#undef LOG_TAG
+#define LOG_TAG "bt_mesh_pb_gatt_srv"
+#include <base/log.h>
+#include <base/base.h>
 #include <zephyr/sys/byteorder.h>
 
 #include <zephyr/net_buf.h>
@@ -29,9 +33,7 @@
 #include "proxy_msg.h"
 #include "pb_gatt_srv.h"
 
-#define LOG_LEVEL CONFIG_BT_MESH_PROV_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_mesh_pb_gatt_srv);
-
+#define LOG_LEVEL CONFIG_EMBT_LOG_LEVEL
 #define ADV_OPT_PROV                                                           \
 	(BT_LE_ADV_OPT_CONN | BT_LE_ADV_OPT_SCANNABLE | ADV_OPT_USE_IDENTITY)
 

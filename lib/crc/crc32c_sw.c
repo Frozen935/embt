@@ -4,7 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <zephyr/sys/crc.h>
+#include <base/base.h>
+#include <embt/sys/crc.h>
 
 /* crc table generated from polynomial 0x1EDC6F41UL (Castagnoli) */
 static const uint32_t crc32c_table[16] = {

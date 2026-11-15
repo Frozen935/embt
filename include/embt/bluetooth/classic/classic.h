@@ -21,11 +21,11 @@
 #include <stdbool.h>
 #include <string.h>
 
-#include <zephyr/sys/util.h>
-#include <zephyr/net_buf.h>
-#include <zephyr/bluetooth/addr.h>
-#include <zephyr/bluetooth/data.h>
-#include <zephyr/bluetooth/hci_types.h>
+#include <embt/sys/util.h>
+#include <embt/net_buf.h>
+#include <embt/bluetooth/addr.h>
+#include <embt/bluetooth/data.h>
+#include <embt/bluetooth/hci_types.h>
 
 #ifdef __cplusplus
 extern "C" {

@@ -5,26 +5,27 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#undef LOG_TAG
+#define LOG_TAG "bt_ccp_call_control_client"
+#include <base/log.h>
 #include <errno.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
 
-#include <zephyr/autoconf.h>
+#include <embt/autoconf.h>
 #include <zephyr/bluetooth/assigned_numbers.h>
 #include <zephyr/bluetooth/audio/tbs.h>
 #include <zephyr/bluetooth/audio/ccp.h>
 #include <zephyr/bluetooth/conn.h>
 #include <zephyr/bluetooth/hci_types.h>
 #include <zephyr/sys/__assert.h>
-#include <zephyr/sys/atomic.h>
+#include <base/bt_atomic.h>
 #include <zephyr/sys/slist.h>
 #include <zephyr/sys/util.h>
 #include <zephyr/sys/util_macro.h>
 #include <zephyr/toolchain.h>
-
-LOG_MODULE_REGISTER(bt_ccp_call_control_client, CONFIG_BT_CCP_CALL_CONTROL_CLIENT_LOG_LEVEL);
 
 static sys_slist_t ccp_call_control_client_cbs =
 	SYS_SLIST_STATIC_INIT(&ccp_call_control_client_cbs);
@@ -46,7 +47,7 @@ struct bt_ccp_call_control_client {
 		bearers[CONFIG_BT_CCP_CALL_CONTROL_CLIENT_BEARER_COUNT];
 	struct bt_conn *conn;
 
-	ATOMIC_DEFINE(flags, CCP_CALL_CONTROL_CLIENT_FLAG_NUM_FLAGS);
+	BT_ATOMIC_DEFINE(flags, CCP_CALL_CONTROL_CLIENT_FLAG_NUM_FLAGS);
 };
 
 static struct bt_ccp_call_control_client clients[CONFIG_BT_MAX_CONN];
@@ -143,7 +144,7 @@ static void tbs_client_discover_cb(struct bt_conn *conn, int err, uint8_t tbs_co
 
 	populate_bearers(client, &bearers);
 
-	atomic_clear_bit(client->flags, CCP_CALL_CONTROL_CLIENT_FLAG_BUSY);
+	bt_atomic_clear_bit(client->flags, CCP_CALL_CONTROL_CLIENT_FLAG_BUSY);
 
 	SYS_SLIST_FOR_EACH_CONTAINER_SAFE(&ccp_call_control_client_cbs, listener, next, _node) {
 		if (listener->discover != NULL) {
@@ -181,7 +182,7 @@ int bt_ccp_call_control_client_discover(struct bt_conn *conn,
 	}
 
 	client = get_client_by_conn(conn);
-	if (atomic_test_and_set_bit(client->flags, CCP_CALL_CONTROL_CLIENT_FLAG_BUSY)) {
+	if (bt_atomic_test_and_set_bit(client->flags, CCP_CALL_CONTROL_CLIENT_FLAG_BUSY)) {
 		return -EBUSY;
 	}
 
@@ -211,7 +212,7 @@ int bt_ccp_call_control_client_discover(struct bt_conn *conn,
 	return 0;
 
 cleanup:
-	atomic_clear_bit(client->flags, CCP_CALL_CONTROL_CLIENT_FLAG_BUSY);
+	bt_atomic_clear_bit(client->flags, CCP_CALL_CONTROL_CLIENT_FLAG_BUSY);
 	return err;
 }
 
@@ -297,7 +298,7 @@ validate_bearer_and_get_client(const struct bt_ccp_call_control_client_bearer *b
 		return -EFAULT;
 	}
 
-	if (atomic_test_and_set_bit((*client)->flags, CCP_CALL_CONTROL_CLIENT_FLAG_BUSY)) {
+	if (bt_atomic_test_and_set_bit((*client)->flags, CCP_CALL_CONTROL_CLIENT_FLAG_BUSY)) {
 		LOG_DBG("Client %p identified by bearer %p is busy", *client, bearer);
 
 		return -EBUSY;
@@ -314,7 +315,7 @@ static void tbs_client_read_bearer_provider_name_cb(struct bt_conn *conn, int er
 	struct bt_ccp_call_control_client_cb *listener, *next;
 	struct bt_ccp_call_control_client_bearer *bearer;
 
-	atomic_clear_bit(client->flags, CCP_CALL_CONTROL_CLIENT_FLAG_BUSY);
+	bt_atomic_clear_bit(client->flags, CCP_CALL_CONTROL_CLIENT_FLAG_BUSY);
 
 	bearer = get_bearer_by_tbs_index(client, inst_index);
 	if (bearer == NULL) {
@@ -348,7 +349,7 @@ int bt_ccp_call_control_client_read_bearer_provider_name(
 
 	err = bt_tbs_client_read_bearer_provider_name(client->conn, bearer->tbs_index);
 	if (err != 0) {
-		atomic_clear_bit(client->flags, CCP_CALL_CONTROL_CLIENT_FLAG_BUSY);
+		bt_atomic_clear_bit(client->flags, CCP_CALL_CONTROL_CLIENT_FLAG_BUSY);
 
 		/* Return expected return values directly */
 		if (err == -ENOTCONN || err == -EBUSY) {
@@ -374,7 +375,7 @@ static void tbs_client_read_bearer_uci_cb(struct bt_conn *conn, int err, uint8_t
 	struct bt_ccp_call_control_client_cb *listener, *next;
 	struct bt_ccp_call_control_client_bearer *bearer;
 
-	atomic_clear_bit(client->flags, CCP_CALL_CONTROL_CLIENT_FLAG_BUSY);
+	bt_atomic_clear_bit(client->flags, CCP_CALL_CONTROL_CLIENT_FLAG_BUSY);
 
 	bearer = get_bearer_by_tbs_index(client, inst_index);
 	if (bearer == NULL) {
@@ -407,7 +408,7 @@ int bt_ccp_call_control_client_read_bearer_uci(struct bt_ccp_call_control_client
 
 	err = bt_tbs_client_read_bearer_uci(client->conn, bearer->tbs_index);
 	if (err != 0) {
-		atomic_clear_bit(client->flags, CCP_CALL_CONTROL_CLIENT_FLAG_BUSY);
+		bt_atomic_clear_bit(client->flags, CCP_CALL_CONTROL_CLIENT_FLAG_BUSY);
 
 		/* Return expected return values directly */
 		if (err == -ENOTCONN || err == -EBUSY) {
@@ -433,7 +434,7 @@ static void tbs_client_read_bearer_tech_cb(struct bt_conn *conn, int err, uint8_
 	struct bt_ccp_call_control_client_cb *listener, *next;
 	struct bt_ccp_call_control_client_bearer *bearer;
 
-	atomic_clear_bit(client->flags, CCP_CALL_CONTROL_CLIENT_FLAG_BUSY);
+	bt_atomic_clear_bit(client->flags, CCP_CALL_CONTROL_CLIENT_FLAG_BUSY);
 
 	bearer = get_bearer_by_tbs_index(client, inst_index);
 	if (bearer == NULL) {
@@ -466,7 +467,7 @@ int bt_ccp_call_control_client_read_bearer_tech(struct bt_ccp_call_control_clien
 
 	err = bt_tbs_client_read_technology(client->conn, bearer->tbs_index);
 	if (err != 0) {
-		atomic_clear_bit(client->flags, CCP_CALL_CONTROL_CLIENT_FLAG_BUSY);
+		bt_atomic_clear_bit(client->flags, CCP_CALL_CONTROL_CLIENT_FLAG_BUSY);
 
 		/* Return expected return values directly */
 		if (err == -ENOTCONN || err == -EBUSY) {
@@ -492,7 +493,7 @@ static void tbs_client_read_bearer_uri_schemes_cb(struct bt_conn *conn, int err,
 	struct bt_ccp_call_control_client_cb *listener, *next;
 	struct bt_ccp_call_control_client_bearer *bearer;
 
-	atomic_clear_bit(client->flags, CCP_CALL_CONTROL_CLIENT_FLAG_BUSY);
+	bt_atomic_clear_bit(client->flags, CCP_CALL_CONTROL_CLIENT_FLAG_BUSY);
 
 	bearer = get_bearer_by_tbs_index(client, inst_index);
 	if (bearer == NULL) {
@@ -526,7 +527,7 @@ int bt_ccp_call_control_client_read_bearer_uri_schemes(
 
 	err = bt_tbs_client_read_uri_list(client->conn, bearer->tbs_index);
 	if (err != 0) {
-		atomic_clear_bit(client->flags, CCP_CALL_CONTROL_CLIENT_FLAG_BUSY);
+		bt_atomic_clear_bit(client->flags, CCP_CALL_CONTROL_CLIENT_FLAG_BUSY);
 
 		/* Return expected return values directly */
 		if (err == -ENOTCONN || err == -EBUSY) {

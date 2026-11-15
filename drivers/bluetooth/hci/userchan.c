@@ -6,14 +6,20 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <zephyr/sys/util.h>
+
+
+#undef LOG_TAG
+#define LOG_TAG "bt_driver"
+#include <base/log.h>
+#include <base/base.h>
+#include <embt/sys/util.h>
 
 #include <errno.h>
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
-#include <zephyr/sys/byteorder.h>
+#include <embt/sys/byteorder.h>
 
 #include "nsi_host_trampolines.h"
 #include "nsi_errno.h"
@@ -21,10 +27,10 @@
 #include "cmdline.h" /* native_sim command line options header */
 #include "userchan_bottom.h"
 
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/buf.h>
-#include <zephyr/bluetooth/hci.h>
-#include <zephyr/drivers/bluetooth.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/buf.h>
+#include <embt/bluetooth/hci.h>
+#include <embt/drivers/bluetooth.h>
 
 #define DT_DRV_COMPAT zephyr_bt_hci_userchan
 

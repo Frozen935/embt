@@ -4,6 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#undef LOG_TAG
+#define LOG_TAG "bt_mesh_lpn"
+#include <base/log.h>
+#include <base/base.h>
 #include <stdint.h>
 #include <zephyr/sys/byteorder.h>
 #include <zephyr/sys/iterable_sections.h>
@@ -21,9 +25,7 @@
 #include "lpn.h"
 #include "statistic.h"
 
-#define LOG_LEVEL CONFIG_BT_MESH_LOW_POWER_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_mesh_lpn);
-
+#define LOG_LEVEL CONFIG_EMBT_LOG_LEVEL
 /**
  * Log modes other than the deferred may cause unintended delays during processing of log messages.
  * This in turns will affect scheduling of the receive delay and receive window.
@@ -88,7 +90,7 @@ LOG_MODULE_REGISTER(bt_mesh_lpn);
 /* 1 transmission, 20ms interval */
 #define POLL_XMIT BT_MESH_TRANSMIT(0, 20)
 
-#if defined(CONFIG_BT_MESH_LOW_POWER_LOG_LEVEL_DBG)
+#if (CONFIG_EMBT_LOG_LEVEL >= 4)
 static const char *state2str(int state)
 {
 	switch (state) {
@@ -114,7 +116,7 @@ static const char *state2str(int state)
 		return "(unknown)";
 	}
 }
-#endif /* CONFIG_BT_MESH_LOW_POWER_LOG_LEVEL_DBG */
+#endif /* (CONFIG_EMBT_LOG_LEVEL >= 4) */
 
 static int32_t poll_timeout(struct bt_mesh_lpn *lpn)
 {
@@ -137,48 +139,48 @@ static int32_t poll_timeout(struct bt_mesh_lpn *lpn)
 
 static inline void lpn_set_state(int state)
 {
-#if defined(CONFIG_BT_MESH_LOW_POWER_LOG_LEVEL_DBG)
+#if (CONFIG_EMBT_LOG_LEVEL >= 4)
 	LOG_DBG("%s -> %s", state2str(bt_mesh.lpn.state), state2str(state));
 #endif
 	bt_mesh.lpn.state = state;
 }
 
-static inline void group_zero(atomic_t *target)
+static inline void group_zero(bt_atomic_t *target)
 {
 #if CONFIG_BT_MESH_LPN_GROUPS > 32
 	int i;
 
 	for (i = 0; i < ARRAY_SIZE(bt_mesh.lpn.added); i++) {
-		atomic_set(&target[i], 0);
+		bt_atomic_set(&target[i], 0);
 	}
 #else
-	atomic_set(target, 0);
+	bt_atomic_set(target, 0);
 #endif
 }
 
-static inline void group_set(atomic_t *target, atomic_t *source)
+static inline void group_set(bt_atomic_t *target, bt_atomic_t *source)
 {
 #if CONFIG_BT_MESH_LPN_GROUPS > 32
 	int i;
 
 	for (i = 0; i < ARRAY_SIZE(bt_mesh.lpn.added); i++) {
-		(void)atomic_or(&target[i], atomic_get(&source[i]));
+		(void)bt_atomic_or(&target[i], bt_atomic_get(&source[i]));
 	}
 #else
-	(void)atomic_or(target, atomic_get(source));
+	(void)bt_atomic_or(target, bt_atomic_get(source));
 #endif
 }
 
-static inline void group_clear(atomic_t *target, atomic_t *source)
+static inline void group_clear(bt_atomic_t *target, bt_atomic_t *source)
 {
 #if CONFIG_BT_MESH_LPN_GROUPS > 32
 	int i;
 
 	for (i = 0; i < ARRAY_SIZE(bt_mesh.lpn.added); i++) {
-		(void)atomic_and(&target[i], ~atomic_get(&source[i]));
+		(void)bt_atomic_and(&target[i], ~bt_atomic_get(&source[i]));
 	}
 #else
-	(void)atomic_and(target, ~atomic_get(source));
+	(void)bt_atomic_and(target, ~bt_atomic_get(source));
 #endif
 }
 
@@ -405,7 +407,7 @@ static void req_send_end(int err, void *user_data)
 
 	lpn->adv_duration = k_uptime_get_32() - lpn->adv_start_time;
 
-#if defined(CONFIG_BT_MESH_LOW_POWER_LOG_LEVEL_DBG)
+#if (CONFIG_EMBT_LOG_LEVEL >= 4)
 	LOG_DBG("req 0x%02x duration %u err %d state %s", lpn->sent_req, lpn->adv_duration, err,
 		state2str(lpn->state));
 #endif
@@ -740,7 +742,7 @@ static void lpn_group_add(uint16_t group)
 
 	for (i = 0; i < ARRAY_SIZE(lpn->groups); i++) {
 		if (lpn->groups[i] == group) {
-			atomic_clear_bit(lpn->to_remove, i);
+			bt_atomic_clear_bit(lpn->to_remove, i);
 			return;
 		}
 
@@ -765,9 +767,9 @@ static void lpn_group_del(uint16_t group)
 
 	for (i = 0; i < ARRAY_SIZE(lpn->groups); i++) {
 		if (lpn->groups[i] == group) {
-			if (atomic_test_bit(lpn->added, i) ||
-			    atomic_test_bit(lpn->pending, i)) {
-				atomic_set_bit(lpn->to_remove, i);
+			if (bt_atomic_test_bit(lpn->added, i) ||
+			    bt_atomic_test_bit(lpn->pending, i)) {
+				bt_atomic_set_bit(lpn->to_remove, i);
 				lpn->groups_changed = 1U;
 			} else {
 				lpn->groups[i] = BT_MESH_ADDR_UNASSIGNED;
@@ -776,16 +778,16 @@ static void lpn_group_del(uint16_t group)
 	}
 }
 
-static inline int group_popcount(atomic_t *target)
+static inline int group_popcount(bt_atomic_t *target)
 {
 #if CONFIG_BT_MESH_LPN_GROUPS > 32
 	int i, count = 0;
 
 	for (i = 0; i < ARRAY_SIZE(bt_mesh.lpn.added); i++) {
-		count += POPCOUNT(atomic_get(&target[i]));
+		count += POPCOUNT(bt_atomic_get(&target[i]));
 	}
 #else
-	return POPCOUNT(atomic_get(target));
+	return POPCOUNT(bt_atomic_get(target));
 #endif
 }
 
@@ -821,11 +823,11 @@ static bool sub_update(uint8_t op)
 		}
 
 		if (op == TRANS_CTL_OP_FRIEND_SUB_ADD) {
-			if (atomic_test_bit(lpn->added, i)) {
+			if (bt_atomic_test_bit(lpn->added, i)) {
 				continue;
 			}
 		} else {
-			if (!atomic_test_bit(lpn->to_remove, i)) {
+			if (!bt_atomic_test_bit(lpn->to_remove, i)) {
 				continue;
 			}
 		}
@@ -836,7 +838,7 @@ static bool sub_update(uint8_t op)
 		}
 
 		req.addr_list[g++] = sys_cpu_to_be16(lpn->groups[i]);
-		atomic_set_bit(lpn->pending, i);
+		bt_atomic_set_bit(lpn->pending, i);
 
 		if (g == ARRAY_SIZE(req.addr_list)) {
 			break;
@@ -893,7 +895,7 @@ static void lpn_timeout(struct k_work *work)
 {
 	struct bt_mesh_lpn *lpn = &bt_mesh.lpn;
 
-#if defined(CONFIG_BT_MESH_LOW_POWER_LOG_LEVEL_DBG)
+#if (CONFIG_EMBT_LOG_LEVEL >= 4)
 	LOG_DBG("state: %s", state2str(lpn->state));
 #endif
 
@@ -1028,8 +1030,8 @@ int bt_mesh_lpn_friend_sub_cfm(struct bt_mesh_net_rx *rx,
 		group_clear(lpn->added, lpn->pending);
 
 		for (i = 0; i < ARRAY_SIZE(lpn->groups); i++) {
-			if (atomic_test_and_clear_bit(lpn->pending, i) &&
-			    atomic_test_and_clear_bit(lpn->to_remove, i)) {
+			if (bt_atomic_test_and_clear_bit(lpn->pending, i) &&
+			    bt_atomic_test_and_clear_bit(lpn->to_remove, i)) {
 				lpn->groups[i] = BT_MESH_ADDR_UNASSIGNED;
 			}
 		}
@@ -1080,8 +1082,8 @@ int bt_mesh_lpn_friend_update(struct bt_mesh_net_rx *rx,
 		return 0;
 	}
 
-	if (atomic_test_bit(bt_mesh.flags, BT_MESH_IVU_INITIATOR) &&
-	    (atomic_test_bit(bt_mesh.flags, BT_MESH_IVU_IN_PROGRESS) ==
+	if (bt_atomic_test_bit(bt_mesh.flags, BT_MESH_IVU_INITIATOR) &&
+	    (bt_atomic_test_bit(bt_mesh.flags, BT_MESH_IVU_IN_PROGRESS) ==
 	     BT_MESH_IV_UPDATE(msg->flags))) {
 		bt_mesh_beacon_ivu_initiator(false);
 	}

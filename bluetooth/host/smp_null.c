@@ -9,6 +9,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#undef LOG_TAG
+#define LOG_TAG "bt_smp"
+#include <base/log.h>
+#include <base/base.h>
 #include <errno.h>
 #include <stddef.h>
 
@@ -17,7 +21,7 @@
 #include <zephyr/bluetooth/buf.h>
 #include <zephyr/bluetooth/l2cap.h>
 #include <zephyr/net_buf.h>
-#include <zephyr/sys/atomic.h>
+#include <base/bt_atomic.h>
 #include <zephyr/sys/util.h>
 #include <zephyr/toolchain.h>
 
@@ -26,9 +30,7 @@
 #include "l2cap_internal.h"
 #include "smp.h"
 
-#define LOG_LEVEL CONFIG_BT_HCI_CORE_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_smp);
-
+#define LOG_LEVEL CONFIG_EMBT_LOG_LEVEL
 static struct bt_l2cap_le_chan bt_smp_pool[CONFIG_BT_MAX_CONN];
 
 int bt_smp_sign_verify(struct bt_conn *conn, struct net_buf *buf)

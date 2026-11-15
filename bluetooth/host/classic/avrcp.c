@@ -10,9 +10,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#undef LOG_TAG
+#define LOG_TAG "bt_avrcp"
+#include <base/log.h>
 #include <string.h>
 #include <errno.h>
-#include <zephyr/sys/atomic.h>
+#include <base/bt_atomic.h>
 #include <zephyr/sys/byteorder.h>
 #include <zephyr/sys/util.h>
 #include <zephyr/sys/printk.h>
@@ -28,9 +31,7 @@
 #include "avctp_internal.h"
 #include "avrcp_internal.h"
 
-#define LOG_LEVEL CONFIG_BT_AVRCP_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_avrcp);
-
+#define LOG_LEVEL CONFIG_EMBT_LOG_LEVEL
 struct bt_avrcp {
 	struct bt_avctp session;
 	/* ACL connection handle */
@@ -980,12 +981,12 @@ static void bt_avrcp_tg_process_continuing_cmd(struct bt_avrcp_tg *tg, bool abor
 	pdu_id = net_buf_pull_u8(buf);
 
 	/* Clear TX_ONGOING and update TID */
-	atomic_clear_bit(tx->flags, BT_AVRCP_TG_FLAG_TX_ONGOING);
+	bt_atomic_clear_bit(tx->flags, BT_AVRCP_TG_FLAG_TX_ONGOING);
 	tx->tid = tid;
 
 	if (abort_continuing) {
 		/* ABORT_CONTINUING: set abort flag, clear sending flag */
-		atomic_set_bit(tx->flags, BT_AVRCP_TG_FLAG_ABORT_CONTINUING);
+		bt_atomic_set_bit(tx->flags, BT_AVRCP_TG_FLAG_ABORT_CONTINUING);
 
 		/* Same PDU is ACCEPTED; otherwise REJECTED */
 		tx->rsp = (pdu_id == tx->pdu_id) ? BT_AVRCP_RSP_ACCEPTED : BT_AVRCP_RSP_REJECTED;
@@ -1035,7 +1036,7 @@ static void bt_avrcp_tg_vendor_tx_work(struct k_work *work)
 	__ASSERT_NO_MSG(buf->user_data_size >= sizeof(*tx));
 	tx = net_buf_user_data(buf);
 
-	if (atomic_test_bit(tx->flags, BT_AVRCP_TG_FLAG_TX_ONGOING)) {
+	if (bt_atomic_test_bit(tx->flags, BT_AVRCP_TG_FLAG_TX_ONGOING)) {
 		return;
 	}
 	/* Calculate maximum payload size per fragment */
@@ -1060,7 +1061,7 @@ static void bt_avrcp_tg_vendor_tx_work(struct k_work *work)
 	bt_avrcp_pkt_type_t pkt_type = BT_AVRCP_PKT_TYPE_SINGLE;
 	uint16_t chunk_size = MIN(max_payload_size, buf->len);
 
-	if (atomic_test_and_clear_bit(tx->flags, BT_AVRCP_TG_FLAG_ABORT_CONTINUING) ||
+	if (bt_atomic_test_and_clear_bit(tx->flags, BT_AVRCP_TG_FLAG_ABORT_CONTINUING) ||
 	    (tx->rsp == BT_AVRCP_RSP_REJECTED)) {
 		LOG_WRN("Abort to continuing send OR REJECT");
 		struct net_buf *rsp_buf;
@@ -1112,7 +1113,7 @@ static void bt_avrcp_tg_vendor_tx_work(struct k_work *work)
 		goto done;
 	}
 
-	atomic_set_bit(tx->flags, BT_AVRCP_TG_FLAG_TX_ONGOING);
+	bt_atomic_set_bit(tx->flags, BT_AVRCP_TG_FLAG_TX_ONGOING);
 	net_buf_pull_mem(buf, chunk_size);
 
 	tx->sent_len += chunk_size;
@@ -1148,8 +1149,8 @@ static int bt_avrcp_tg_send_vendor_rsp(struct bt_avrcp_tg *tg, uint8_t tid, uint
 	tx->rsp = result;
 	tx->pdu_id = pdu_id;
 	tx->sent_len = 0U;
-	atomic_clear_bit(tx->flags, BT_AVRCP_TG_FLAG_TX_ONGOING);
-	atomic_clear_bit(tx->flags, BT_AVRCP_TG_FLAG_ABORT_CONTINUING);
+	bt_atomic_clear_bit(tx->flags, BT_AVRCP_TG_FLAG_TX_ONGOING);
+	bt_atomic_clear_bit(tx->flags, BT_AVRCP_TG_FLAG_ABORT_CONTINUING);
 
 	LOG_DBG("Sending vendor dependent response: tid=%u, total_len=%u", tid, buf->len);
 	avrcp_tg_lock(tg);

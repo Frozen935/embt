@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <base/base.h>
 #include <errno.h>
 #include <zephyr/types.h>
 #include <stddef.h>
@@ -78,7 +79,7 @@ struct bt_spp_endpoint {
 	enum bt_spp_mode mode;
 
 	/** Connection state (atomic) */
-	atomic_t state;
+	bt_atomic_t state;
 
 	/** Hold the credit for incoming data */
 	bool hold_credit;
@@ -245,7 +246,7 @@ static void bt_spp_connected(struct bt_rfcomm_dlc *dlci)
 {
 	struct bt_spp_endpoint *ep = SPP_EP_FROM_DLC(dlci);
 
-	atomic_set(&ep->state, SPP_STATE_CONNECTED);
+	bt_atomic_set(&ep->state, SPP_STATE_CONNECTED);
 	bt_shell_print("SPP: connected (ep=%p, channel=%u)", ep, ep->channel);
 }
 
@@ -253,7 +254,7 @@ static void bt_spp_disconnected(struct bt_rfcomm_dlc *dlci)
 {
 	struct bt_spp_endpoint *ep = SPP_EP_FROM_DLC(dlci);
 
-	atomic_set(&ep->state, SPP_STATE_DISCONNECTED);
+	bt_atomic_set(&ep->state, SPP_STATE_DISCONNECTED);
 	bt_shell_print("SPP: disconnected (ep=%p)", ep);
 
 	net_buf_fifo_purge(&ep->rx_fifo);
@@ -325,13 +326,13 @@ static int bt_spp_accept(struct bt_conn *conn, struct bt_rfcomm_server *server,
 {
 	struct bt_spp_server *spp = CONTAINER_OF(server, struct bt_spp_server, rfcomm_server);
 
-	if (atomic_get(&spp->ep.state) != SPP_STATE_DISCONNECTED) {
+	if (bt_atomic_get(&spp->ep.state) != SPP_STATE_DISCONNECTED) {
 		bt_shell_error("SPP: reject incoming RFCOMM (state=%ld)",
-			       (long)atomic_get(&spp->ep.state));
+			       (long)bt_atomic_get(&spp->ep.state));
 		return -EALREADY;
 	}
 
-	atomic_set(&spp->ep.state, SPP_STATE_CONNECTING);
+	bt_atomic_set(&spp->ep.state, SPP_STATE_CONNECTING);
 	k_fifo_init(&spp->ep.rx_fifo);
 	spp->ep.rfcomm_dlc.ops = &spp_rfcomm_ops;
 	spp->ep.rfcomm_dlc.mtu = SPP_RFCOMM_MTU;
@@ -534,7 +535,7 @@ static uint8_t sdp_discover_cb(struct bt_conn *conn, struct bt_sdp_client_result
 	return BT_SDP_DISCOVER_UUID_STOP;
 
 exit:
-	atomic_set(&spp->ep.state, SPP_STATE_DISCONNECTED);
+	bt_atomic_set(&spp->ep.state, SPP_STATE_DISCONNECTED);
 	return BT_SDP_DISCOVER_UUID_STOP;
 }
 
@@ -542,9 +543,9 @@ static int bt_spp_connect(struct bt_conn *conn, struct bt_spp_client *spp)
 {
 	int err;
 
-	if (atomic_get(&spp->ep.state) != SPP_STATE_DISCONNECTED) {
+	if (bt_atomic_get(&spp->ep.state) != SPP_STATE_DISCONNECTED) {
 		bt_shell_error("SPP: connect rejected (state=%ld)",
-			       (long)atomic_get(&spp->ep.state));
+			       (long)bt_atomic_get(&spp->ep.state));
 		return -EALREADY;
 	}
 
@@ -573,7 +574,7 @@ static int bt_spp_connect(struct bt_conn *conn, struct bt_spp_client *spp)
 		return -EINVAL;
 	}
 
-	atomic_set(&spp->ep.state, SPP_STATE_CONNECTING);
+	bt_atomic_set(&spp->ep.state, SPP_STATE_CONNECTING);
 	return 0;
 }
 
@@ -592,9 +593,9 @@ static int cmd_spp_connect_by_uuid(const struct shell *sh, size_t argc, char *ar
 		return -ENOEXEC;
 	}
 
-	if (atomic_get(&default_spp_client.ep.state) != SPP_STATE_DISCONNECTED) {
+	if (bt_atomic_get(&default_spp_client.ep.state) != SPP_STATE_DISCONNECTED) {
 		shell_error(sh, "SPP: connect rejected (state=%ld)",
-			    (long)atomic_get(&default_spp_client.ep.state));
+			    (long)bt_atomic_get(&default_spp_client.ep.state));
 		return -EALREADY;
 	}
 
@@ -645,9 +646,9 @@ static int cmd_spp_connect_by_channel(const struct shell *sh, size_t argc, char 
 		return -EINVAL;
 	}
 
-	if (atomic_get(&default_spp_client.ep.state) != SPP_STATE_DISCONNECTED) {
+	if (bt_atomic_get(&default_spp_client.ep.state) != SPP_STATE_DISCONNECTED) {
 		shell_error(sh, "SPP: connect rejected (state=%ld)",
-			    (long)atomic_get(&default_spp_client.ep.state));
+			    (long)bt_atomic_get(&default_spp_client.ep.state));
 		return -EALREADY;
 	}
 
@@ -683,11 +684,11 @@ static int cmd_spp_connect_by_channel(const struct shell *sh, size_t argc, char 
 
 static struct bt_spp_endpoint *bt_spp_get_active_ep(void)
 {
-	if (atomic_get(&default_spp_client.ep.state) != SPP_STATE_DISCONNECTED) {
+	if (bt_atomic_get(&default_spp_client.ep.state) != SPP_STATE_DISCONNECTED) {
 		return &default_spp_client.ep;
 	}
 
-	if (atomic_get(&default_spp_server.ep.state) != SPP_STATE_DISCONNECTED) {
+	if (bt_atomic_get(&default_spp_server.ep.state) != SPP_STATE_DISCONNECTED) {
 		return &default_spp_server.ep;
 	}
 
@@ -766,7 +767,7 @@ static int cmd_spp_disconnect(const struct shell *sh, size_t argc, char *argv[])
 		return -ENOEXEC;
 	}
 
-	atomic_set(&ep->state, SPP_STATE_DISCONNECTING);
+	bt_atomic_set(&ep->state, SPP_STATE_DISCONNECTING);
 
 	shell_print(sh, "SPP: disconnecting...");
 	return 0;

@@ -16,8 +16,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include <zephyr/toolchain.h>
-#include <zephyr/sys/util_macro.h>
+#include <embt/toolchain.h>
+#include <embt/sys/util_macro.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -57,12 +57,12 @@ extern "C" {
 #endif
 
 /* Plain division for a constant divisor */
-#if defined(CONFIG_64BIT) || defined(CONFIG_NO_OPTIMIZATIONS) || defined(Z_DIV64_NO_BUILTINS)
+#if defined(CONFIG_EMBT_64BIT) || defined(CONFIG_NO_OPTIMIZATIONS) || defined(Z_DIV64_NO_BUILTINS)
 #define Z_DIV64_PLAIN
 #endif
 
 /* Plain division for a run-time divisor */
-#if defined(CONFIG_64BIT) || defined(Z_DIV64_NO_BUILTINS)
+#if defined(CONFIG_EMBT_64BIT) || defined(Z_DIV64_NO_BUILTINS)
 #define Z_DIV64_PLAIN_RECIP
 #endif
 

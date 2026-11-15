@@ -10,6 +10,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#undef LOG_TAG
+#define LOG_TAG "bt_dis"
+#include <base/log.h>
+#include <base/base.h>
 #include <zephyr/types.h>
 #include <stddef.h>
 #include <string.h>
@@ -26,9 +30,7 @@
 #include <zephyr/sys/byteorder.h>
 #include <zephyr/bluetooth/byteorder.h>
 
-#define LOG_LEVEL CONFIG_BT_SERVICE_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_dis);
-
+#define LOG_LEVEL CONFIG_EMBT_LOG_LEVEL
 #if CONFIG_BT_DIS_PNP
 struct dis_pnp {
 	uint8_t pnp_vid_src;

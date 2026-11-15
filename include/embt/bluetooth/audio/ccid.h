@@ -26,7 +26,7 @@
 
 #include <stdint.h>
 
-#include <zephyr/bluetooth/gatt.h>
+#include <embt/bluetooth/gatt.h>
 
 #ifdef __cplusplus
 extern "C" {

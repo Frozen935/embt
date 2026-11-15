@@ -28,9 +28,9 @@
 
 #include <stdbool.h>
 #include <stdint.h>
-#include <zephyr/bluetooth/services/ots.h>
-#include <zephyr/sys/util.h>
-#include <zephyr/sys/util_macro.h>
+#include <embt/bluetooth/services/ots.h>
+#include <embt/sys/util.h>
+#include <embt/sys/util_macro.h>
 
 #ifdef __cplusplus
 extern "C" {

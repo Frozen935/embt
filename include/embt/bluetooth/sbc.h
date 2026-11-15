@@ -10,7 +10,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <string.h>
-#include <zephyr/toolchain.h>
+#include <embt/toolchain.h>
 #include "sbc_encoder.h"
 #include "oi_codec_sbc.h"
 #include "oi_status.h"

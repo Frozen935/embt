@@ -10,9 +10,10 @@
 #ifndef ZEPHYR_INCLUDE_BLUETOOTH_MESH_PROXY_H_
 #define ZEPHYR_INCLUDE_BLUETOOTH_MESH_PROXY_H_
 
+#include <embt/storage.h>
 #include <stdint.h>
 
-#include <zephyr/sys/iterable_sections.h>
+#include <embt/sys/iterable_sections.h>
 
 /**
  * @brief Proxy

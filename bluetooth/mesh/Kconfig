@@ -1471,7 +1471,6 @@ config BT_MESH_CRYPTO_LIB
 	select PSA_WANT_ALG_SHA_256
 	select PSA_WANT_ALG_ECDH
 	select PSA_WANT_ECC_SECP_R1_256
-	imply MBEDTLS_AES_ROM_TABLES if PSA_CRYPTO_PROVIDER_MBEDTLS
 	help
 	  Crypto library support for mesh security.
 
@@ -1905,7 +1904,7 @@ config BT_MESH_SELF_TEST
 
 config BT_MESH_STATISTIC
 	bool "Mesh communication statistics [EXPERIMENTAL]"
-	select EXPERIMENTAL
+	select EMBT_EXPERIMENTAL
 	help
 	  The module gathers statistics of received, relayed, and transmitted
 	  frames. This helps to estimate the quality of the communication and

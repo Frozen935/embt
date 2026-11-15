@@ -21,8 +21,8 @@
  * @{
  */
 
-#include <zephyr/sys/util_macro.h>
-#include <zephyr/toolchain.h>
+#include <embt/sys/util_macro.h>
+#include <embt/toolchain.h>
 
 #ifdef __cplusplus
 extern "C" {

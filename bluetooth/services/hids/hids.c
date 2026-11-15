@@ -4,6 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#undef LOG_TAG
+#define LOG_TAG "bt_hids"
+#include <base/log.h>
+#include <base/base.h>
 #include <errno.h>
 #include <stddef.h>
 #include <string.h>
@@ -19,8 +23,6 @@
 #include <zephyr/types.h>
 
 #include "hids_internal.h"
-
-LOG_MODULE_REGISTER(bt_hids, CONFIG_BT_HIDS_LOG_LEVEL);
 
 BUILD_ASSERT(HIDS_REPORT_COUNT > 0, "The HID Service needs at least one Report characteristic");
 

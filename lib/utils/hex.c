@@ -4,10 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <base/base.h>
 #include <stddef.h>
-#include <zephyr/types.h>
+#include <embt/types.h>
 #include <errno.h>
-#include <zephyr/sys/util.h>
+#include <embt/sys/util.h>
 
 int char2hex(char c, uint8_t *x)
 {

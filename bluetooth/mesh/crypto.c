@@ -5,6 +5,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#undef LOG_TAG
+#define LOG_TAG "bt_mesh_crypto"
+#include <base/log.h>
 #include <string.h>
 #include <stdbool.h>
 #include <errno.h>
@@ -16,9 +19,7 @@
 #include "mesh.h"
 #include "crypto.h"
 
-#define LOG_LEVEL CONFIG_BT_MESH_CRYPTO_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_mesh_crypto);
-
+#define LOG_LEVEL CONFIG_EMBT_LOG_LEVEL
 #define NET_MIC_LEN(pdu) (((pdu)[1] & 0x80) ? 8 : 4)
 #define APP_MIC_LEN(aszmic) ((aszmic) ? 8 : 4)
 

@@ -3,6 +3,9 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
+#undef LOG_TAG
+#define LOG_TAG "bt_mesh_hb"
+#include <base/log.h>
 #include <zephyr/bluetooth/mesh.h>
 #include <zephyr/sys/iterable_sections.h>
 
@@ -16,9 +19,7 @@
 #include "heartbeat.h"
 #include "foundation.h"
 
-#define LOG_LEVEL CONFIG_BT_MESH_TRANS_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_mesh_hb);
-
+#define LOG_LEVEL CONFIG_EMBT_LOG_LEVEL
 /* Heartbeat Publication information for persistent storage. */
 struct hb_pub_val {
 	uint16_t dst;

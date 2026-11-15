@@ -4,6 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#undef LOG_TAG
+#define LOG_TAG "bt_mesh_proxy_client"
+#include <base/log.h>
+#include <base/base.h>
 #include <zephyr/sys/byteorder.h>
 
 #include <zephyr/net_buf.h>
@@ -26,9 +30,7 @@
 #include "proxy_msg.h"
 #include "crypto.h"
 
-#define LOG_LEVEL CONFIG_BT_MESH_PROXY_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_mesh_proxy_client);
-
+#define LOG_LEVEL CONFIG_EMBT_LOG_LEVEL
 static struct bt_mesh_proxy_server {
 	struct bt_mesh_proxy_role *role;
 	bool link_opened;

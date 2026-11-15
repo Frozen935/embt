@@ -1,18 +1,23 @@
 # SPDX-License-Identifier: Apache-2.0
 
-zephyr_sources_ifdef(CONFIG_BT_ANS ans.c)
+if(CONFIG_BT_ANS OR CONFIG_BT_DIS OR CONFIG_BT_GAP_SVC OR CONFIG_BT_CTS OR
+   CONFIG_BT_ETS OR CONFIG_BT_HRS OR CONFIG_BT_TPS)
+  embt_library(embt_services)
 
-zephyr_sources_ifdef(CONFIG_BT_DIS dis.c)
+  embt_library_sources_ifdef(CONFIG_BT_ANS ans.c)
 
-zephyr_sources_ifdef(CONFIG_BT_GAP_SVC gap_svc.c)
+  embt_library_sources_ifdef(CONFIG_BT_DIS dis.c)
 
-zephyr_sources_ifdef(CONFIG_BT_CTS cts.c)
+  embt_library_sources_ifdef(CONFIG_BT_GAP_SVC gap_svc.c)
 
-zephyr_sources_ifdef(CONFIG_BT_ETS ets.c)
+  embt_library_sources_ifdef(CONFIG_BT_CTS cts.c)
 
-zephyr_sources_ifdef(CONFIG_BT_HRS hrs.c)
+  embt_library_sources_ifdef(CONFIG_BT_ETS ets.c)
 
-zephyr_sources_ifdef(CONFIG_BT_TPS tps.c)
+  embt_library_sources_ifdef(CONFIG_BT_HRS hrs.c)
+
+  embt_library_sources_ifdef(CONFIG_BT_TPS tps.c)
+endif()
 
 if(CONFIG_BT_BAS)
   add_subdirectory(bas)

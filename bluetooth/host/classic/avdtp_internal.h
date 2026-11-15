@@ -77,7 +77,7 @@ struct bt_avdtp_sep_info;
 
 /** @brief AVDTP SEID Information AVDTP_SPEC V13 Table 8.8 */
 struct bt_avdtp_sep_data {
-#ifdef CONFIG_LITTLE_ENDIAN
+#ifdef CONFIG_EMBT_LITTLE_ENDIAN
 	uint8_t rfa0: 1;
 	uint8_t inuse: 1;
 	uint8_t id: 6;
@@ -120,7 +120,7 @@ struct bt_avdtp_continue_end_sig_hdr {
 } __packed;
 
 struct bt_avdtp_media_hdr {
-#ifdef CONFIG_LITTLE_ENDIAN
+#ifdef CONFIG_EMBT_LITTLE_ENDIAN
 	uint8_t CSRC_count: 4;
 	uint8_t header_extension: 1;
 	uint8_t padding: 1;
@@ -201,7 +201,7 @@ struct bt_avdtp_content_protection_capabilities {
 } __packed;
 
 struct bt_avdtp_header_compression_capabilities {
-#ifdef CONFIG_LITTLE_ENDIAN
+#ifdef CONFIG_EMBT_LITTLE_ENDIAN
 	uint8_t reserved : 5;
 	uint8_t recovery : 1;
 	uint8_t media : 1;
@@ -211,7 +211,7 @@ struct bt_avdtp_header_compression_capabilities {
 	uint8_t media : 1;
 	uint8_t recovery : 1;
 	uint8_t reserved : 5;
-#endif /* CONFIG_LITTLE_ENDIAN */
+#endif /* CONFIG_EMBT_LITTLE_ENDIAN */
 } __packed;
 
 struct bt_avdtp_multiplexing_capabilities {

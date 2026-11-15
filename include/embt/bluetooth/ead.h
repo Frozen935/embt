@@ -2,13 +2,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <embt/storage.h>
 #include <stddef.h>
 #include <stdint.h>
 
 #ifndef ZEPHYR_INCLUDE_BLUETOOTH_EAD_H_
 #define ZEPHYR_INCLUDE_BLUETOOTH_EAD_H_
 
-#include <zephyr/bluetooth/bluetooth.h>
+#include <embt/bluetooth/bluetooth.h>
 
 #ifdef __cplusplus
 extern "C" {

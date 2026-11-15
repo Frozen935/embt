@@ -13,7 +13,7 @@
 #ifndef ZEPHYR_INCLUDE_BLUETOOTH_MESH_BRG_CFG_CLI_H__
 #define ZEPHYR_INCLUDE_BLUETOOTH_MESH_BRG_CFG_CLI_H__
 
-#include <zephyr/bluetooth/mesh/brg_cfg.h>
+#include <embt/bluetooth/mesh/brg_cfg.h>
 
 #ifdef __cplusplus
 extern "C" {

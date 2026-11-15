@@ -9,6 +9,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <base/base.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -18,8 +19,7 @@
 #include <zephyr/bluetooth/addr.h>
 #include <zephyr/bluetooth/buf.h>
 #include <zephyr/drivers/uart_pipe.h>
-#include <zephyr/sys/atomic.h>
-#include <zephyr/sys/atomic_types.h>
+#include <base/bt_atomic.h>
 #include <zephyr/sys/byteorder.h>
 #include <zephyr/sys/printk-hooks.h>
 #include <zephyr/sys/libc-hooks.h>
@@ -54,45 +54,45 @@ enum {
 	BT_CONSOLE_BUSY,
 };
 
-static atomic_t flags;
+static bt_atomic_t flags;
 
 static struct {
-	atomic_t cmd;
-	atomic_t evt;
-	atomic_t acl_tx;
-	atomic_t acl_rx;
+	bt_atomic_t cmd;
+	bt_atomic_t evt;
+	bt_atomic_t acl_tx;
+	bt_atomic_t acl_rx;
 #if defined(CONFIG_BT_CLASSIC)
-	atomic_t sco_tx;
-	atomic_t sco_rx;
+	bt_atomic_t sco_tx;
+	bt_atomic_t sco_rx;
 #endif
-	atomic_t other;
+	bt_atomic_t other;
 } drops;
 
 static void drop_add(uint16_t opcode)
 {
 	switch (opcode) {
 	case BT_MONITOR_COMMAND_PKT:
-		atomic_inc(&drops.cmd);
+		bt_atomic_inc(&drops.cmd);
 		break;
 	case BT_MONITOR_EVENT_PKT:
-		atomic_inc(&drops.evt);
+		bt_atomic_inc(&drops.evt);
 		break;
 	case BT_MONITOR_ACL_TX_PKT:
-		atomic_inc(&drops.acl_tx);
+		bt_atomic_inc(&drops.acl_tx);
 		break;
 	case BT_MONITOR_ACL_RX_PKT:
-		atomic_inc(&drops.acl_rx);
+		bt_atomic_inc(&drops.acl_rx);
 		break;
 #if defined(CONFIG_BT_CLASSIC)
 	case BT_MONITOR_SCO_TX_PKT:
-		atomic_inc(&drops.sco_tx);
+		bt_atomic_inc(&drops.sco_tx);
 		break;
 	case BT_MONITOR_SCO_RX_PKT:
-		atomic_inc(&drops.sco_rx);
+		bt_atomic_inc(&drops.sco_rx);
 		break;
 #endif
 	default:
-		atomic_inc(&drops.other);
+		bt_atomic_inc(&drops.other);
 		break;
 	}
 }
@@ -169,7 +169,7 @@ static void monitor_poll_send(const struct bt_monitor_data *frags, size_t count)
  */
 static uint8_t monitor_tx_data[CONFIG_BT_DEBUG_MONITOR_UART_BUFFER_SIZE];
 static struct ring_buf monitor_tx_buf = RING_BUF_INIT(monitor_tx_data, sizeof(monitor_tx_data));
-static atomic_t monitor_tx_busy;
+static bt_atomic_t monitor_tx_busy;
 static struct k_spinlock monitor_tx_lock;
 /* Set on panic or when the UART driver lacks interrupt support */
 static bool poll_mode;
@@ -196,15 +196,15 @@ static void monitor_uart_tx(void)
 		 * would defeat the backoff.
 		 */
 		uart_irq_tx_disable(monitor_dev);
-		atomic_set(&monitor_tx_busy, 0);
+		bt_atomic_set(&monitor_tx_busy, 0);
 		return;
 	}
 
 	uart_irq_tx_disable(monitor_dev);
-	atomic_set(&monitor_tx_busy, 0);
+	bt_atomic_set(&monitor_tx_busy, 0);
 
 	/* Close the race with a producer that committed while TX was disabled. */
-	if (!ring_buf_is_empty(&monitor_tx_buf) && atomic_cas(&monitor_tx_busy, 0, 1)) {
+	if (!ring_buf_is_empty(&monitor_tx_buf) && bt_atomic_cas(&monitor_tx_busy, 0, 1)) {
 		uart_irq_tx_enable(monitor_dev);
 	}
 }
@@ -234,7 +234,7 @@ static bool monitor_send(const struct bt_monitor_data *frags, size_t count)
 		return false;
 	}
 
-	if (atomic_cas(&monitor_tx_busy, 0, 1)) {
+	if (bt_atomic_cas(&monitor_tx_busy, 0, 1)) {
 		uart_irq_tx_enable(monitor_dev);
 	}
 
@@ -251,22 +251,22 @@ static bool monitor_send(const struct bt_monitor_data *frags, size_t count)
 #endif /* CONFIG_BT_DEBUG_MONITOR_UART */
 
 static void encode_drops(struct bt_monitor_hdr *hdr, uint8_t type,
-			 atomic_t *val)
+			 bt_atomic_t *val)
 {
-	atomic_val_t count;
+	bt_atomic_val_t count;
 
-	count = atomic_set(val, 0);
+	count = bt_atomic_set(val, 0);
 	if (count) {
 		hdr->ext[hdr->hdr_len++] = type;
 		hdr->ext[hdr->hdr_len++] = MIN(count, 255);
 		if (count > 255) {
 			/* Keep the surplus for the next record */
-			atomic_add(val, count - 255);
+			bt_atomic_add(val, count - 255);
 		}
 	}
 }
 
-static atomic_t *drop_counter(uint8_t type)
+static bt_atomic_t *drop_counter(uint8_t type)
 {
 	switch (type) {
 	case BT_MONITOR_COMMAND_DROPS:
@@ -299,10 +299,10 @@ static void restore_drops(const struct bt_monitor_hdr *hdr)
 {
 	/* The timestamp is always encoded first, drop pairs follow */
 	for (uint8_t i = sizeof(struct bt_monitor_ts32); i + 1U < hdr->hdr_len; i += 2U) {
-		atomic_t *counter = drop_counter(hdr->ext[i]);
+		bt_atomic_t *counter = drop_counter(hdr->ext[i]);
 
 		if (counter != NULL) {
-			atomic_add(counter, hdr->ext[i + 1]);
+			bt_atomic_add(counter, hdr->ext[i + 1]);
 		}
 	}
 }
@@ -384,7 +384,7 @@ void bt_monitor_send(uint16_t opcode, const void *data, size_t len)
 		{ data, len },
 	};
 
-	if (atomic_test_and_set_bit(&flags, BT_LOG_BUSY)) {
+	if (bt_atomic_test_and_set_bit(&flags, BT_LOG_BUSY)) {
 		drop_add(opcode);
 		return;
 	}
@@ -397,7 +397,7 @@ void bt_monitor_send(uint16_t opcode, const void *data, size_t len)
 		drop_add(opcode);
 	}
 
-	atomic_clear_bit(&flags, BT_LOG_BUSY);
+	bt_atomic_clear_bit(&flags, BT_LOG_BUSY);
 }
 
 void bt_monitor_new_index(uint8_t type, uint8_t bus, const bt_addr_t *addr,
@@ -420,13 +420,13 @@ static int monitor_console_out(int c)
 	static char buf[MONITOR_MSG_MAX];
 	static size_t len;
 
-	if (atomic_test_and_set_bit(&flags, BT_CONSOLE_BUSY)) {
+	if (bt_atomic_test_and_set_bit(&flags, BT_CONSOLE_BUSY)) {
 		return c;
 	}
 
 	if (c != '\n' && len < sizeof(buf) - 1) {
 		buf[len++] = c;
-		atomic_clear_bit(&flags, BT_CONSOLE_BUSY);
+		bt_atomic_clear_bit(&flags, BT_CONSOLE_BUSY);
 		return c;
 	}
 
@@ -435,7 +435,7 @@ static int monitor_console_out(int c)
 	bt_monitor_send(BT_MONITOR_SYSTEM_NOTE, buf, len);
 	len = 0;
 
-	atomic_clear_bit(&flags, BT_CONSOLE_BUSY);
+	bt_atomic_clear_bit(&flags, BT_CONSOLE_BUSY);
 
 	return c;
 }
@@ -521,7 +521,7 @@ static void monitor_log_process(const struct log_backend *const backend,
 	 */
 	ts_us = log_output_timestamp_to_us(log_msg_get_timestamp(&msg->log));
 
-	if (atomic_test_and_set_bit(&flags, BT_LOG_BUSY)) {
+	if (bt_atomic_test_and_set_bit(&flags, BT_LOG_BUSY)) {
 		drop_add(BT_MONITOR_USER_LOGGING);
 		return;
 	}
@@ -539,7 +539,7 @@ static void monitor_log_process(const struct log_backend *const backend,
 		drop_add(BT_MONITOR_USER_LOGGING);
 	}
 
-	atomic_clear_bit(&flags, BT_LOG_BUSY);
+	bt_atomic_clear_bit(&flags, BT_LOG_BUSY);
 }
 
 static void monitor_log_panic(const struct log_backend *const backend)
@@ -560,7 +560,7 @@ static void monitor_log_panic(const struct log_backend *const backend)
 	 * producer still commits stays buffered and untransmitted, which is
 	 * accepted in panic context.
 	 */
-	atomic_set(&monitor_tx_busy, 1);
+	bt_atomic_set(&monitor_tx_busy, 1);
 	uart_irq_tx_disable(monitor_dev);
 
 	/* Serialize with a UART ISR that may be consuming on another CPU.

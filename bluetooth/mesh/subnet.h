@@ -7,6 +7,7 @@
 #ifndef ZEPHYR_SUBSYS_BLUETOOTH_MESH_SUBNET_H_
 #define ZEPHYR_SUBSYS_BLUETOOTH_MESH_SUBNET_H_
 
+#include <base/base.h>
 #include <stdint.h>
 #include <sys/types.h>
 

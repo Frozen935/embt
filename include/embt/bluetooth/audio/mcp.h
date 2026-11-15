@@ -32,7 +32,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include <zephyr/bluetooth/audio/mcs.h>
+#include <embt/bluetooth/audio/mcs.h>
 
 #ifdef __cplusplus
 extern "C" {

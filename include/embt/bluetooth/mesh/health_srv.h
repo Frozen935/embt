@@ -17,8 +17,8 @@
  * @{
  */
 
-#include <zephyr/bluetooth/mesh.h>
-#include <zephyr/bluetooth/byteorder.h>
+#include <embt/bluetooth/mesh.h>
+#include <embt/bluetooth/byteorder.h>
 
 #ifdef __cplusplus
 extern "C" {

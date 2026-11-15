@@ -7,13 +7,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#undef LOG_TAG
+#define LOG_TAG "bt_iso"
+#include <base/log.h>
+#include <base/base.h>
 #include <errno.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
 
-#include <zephyr/autoconf.h>
+#include <embt/autoconf.h>
 #include <zephyr/bluetooth/buf.h>
 #include <zephyr/bluetooth/gap.h>
 #include <zephyr/bluetooth/hci.h>
@@ -23,7 +27,7 @@
 #include <zephyr/bluetooth/iso.h>
 #include <zephyr/net_buf.h>
 #include <zephyr/sys/__assert.h>
-#include <zephyr/sys/atomic.h>
+#include <base/bt_atomic.h>
 #include <zephyr/sys/byteorder.h>
 #include <zephyr/sys/slist.h>
 #include <zephyr/sys/util.h>
@@ -36,8 +40,6 @@
 #include "host/conn_internal.h"
 #include "iso_internal.h"
 
-LOG_MODULE_REGISTER(bt_iso, CONFIG_BT_ISO_LOG_LEVEL);
-
 #if defined(CONFIG_BT_DEBUG_ISO_DATA)
 #define BT_ISO_DATA_DBG(fmt, ...) LOG_DBG(fmt, ##__VA_ARGS__)
 #else
@@ -47,13 +49,13 @@ LOG_MODULE_REGISTER(bt_iso, CONFIG_BT_ISO_LOG_LEVEL);
 #define iso_chan(_iso) ((_iso)->iso.chan);
 
 #if defined(CONFIG_BT_ISO_RX)
-static atomic_ptr_t buf_rx_freed_cb;
+static bt_atomic_ptr_t buf_rx_freed_cb;
 
 static void iso_rx_buf_destroy(struct net_buf *buf)
 {
 	bt_iso_buf_rx_freed_cb_t cb;
 
-	cb = (bt_iso_buf_rx_freed_cb_t)atomic_ptr_get(&buf_rx_freed_cb);
+	cb = (bt_iso_buf_rx_freed_cb_t)bt_atomic_ptr_get(&buf_rx_freed_cb);
 
 	net_buf_destroy(buf);
 
@@ -599,7 +601,7 @@ const char *bt_iso_chan_state_str(enum bt_iso_state state)
 	}
 }
 
-#if defined(CONFIG_BT_ISO_LOG_LEVEL_DBG)
+#if (CONFIG_EMBT_LOG_LEVEL >= 4)
 
 void bt_iso_chan_set_state_debug(struct bt_iso_chan *chan, enum bt_iso_state state,
 				 const char *func, int line)
@@ -640,7 +642,7 @@ void bt_iso_chan_set_state(struct bt_iso_chan *chan, enum bt_iso_state state)
 {
 	chan->state = state;
 }
-#endif /* CONFIG_BT_ISO_LOG_LEVEL_DBG */
+#endif /* (CONFIG_EMBT_LOG_LEVEL >= 4) */
 
 int bt_iso_chan_get_info(const struct bt_iso_chan *chan, struct bt_iso_info *info)
 {
@@ -678,7 +680,7 @@ struct net_buf *bt_iso_get_rx(k_timeout_t timeout)
 
 void bt_iso_buf_rx_freed_cb_set(bt_iso_buf_rx_freed_cb_t cb)
 {
-	atomic_ptr_set(&buf_rx_freed_cb, (void *)cb);
+	bt_atomic_ptr_set(&buf_rx_freed_cb, (void *)cb);
 }
 
 void bt_iso_recv(struct bt_conn *iso, struct net_buf *buf, uint8_t flags)
@@ -2577,7 +2579,7 @@ static struct bt_iso_big *get_free_big(void)
 	 */
 
 	for (size_t i = 0; i < ARRAY_SIZE(bigs); i++) {
-		if (!atomic_test_and_set_bit(bigs[i].flags, BT_BIG_INITIALIZED)) {
+		if (!bt_atomic_test_and_set_bit(bigs[i].flags, BT_BIG_INITIALIZED)) {
 			bigs[i].handle = i;
 			sys_slist_init(&bigs[i].bis_channels);
 			return &bigs[i];
@@ -2592,7 +2594,7 @@ static struct bt_iso_big *get_free_big(void)
 static struct bt_iso_big *big_lookup_flag(int bit)
 {
 	for (size_t i = 0; i < ARRAY_SIZE(bigs); i++) {
-		if (atomic_test_bit(bigs[i].flags, bit)) {
+		if (bt_atomic_test_bit(bigs[i].flags, bit)) {
 			return &bigs[i];
 		}
 	}
@@ -2619,7 +2621,7 @@ static void big_disconnect(struct bt_iso_big *big, uint8_t reason)
 {
 	struct bt_iso_chan *bis;
 
-	atomic_set_bit(big->flags, BT_BIG_BUSY);
+	bt_atomic_set_bit(big->flags, BT_BIG_BUSY);
 
 	SYS_SLIST_FOR_EACH_CONTAINER(&big->bis_channels, bis, node) {
 		bis->iso->err = reason;
@@ -2973,7 +2975,7 @@ int bt_iso_big_create(struct bt_le_ext_adv *padv, struct bt_iso_big_create_param
 		return -EINVAL;
 	}
 
-	if (!atomic_test_bit(padv->flags, BT_PER_ADV_PARAMS_SET)) {
+	if (!bt_atomic_test_bit(padv->flags, BT_PER_ADV_PARAMS_SET)) {
 		LOG_DBG("PA params not set; invalid adv object");
 		return -EINVAL;
 	}
@@ -3083,7 +3085,7 @@ void hci_le_big_complete(struct net_buf *buf)
 	}
 
 	big = lookup_big_by_handle(evt->big_handle);
-	atomic_clear_bit(big->flags, BT_BIG_PENDING);
+	bt_atomic_clear_bit(big->flags, BT_BIG_PENDING);
 
 	LOG_DBG("BIG[%u] %p completed, status 0x%02x %s", big->handle, big, evt->status,
 		bt_hci_err_to_str(evt->status));
@@ -3097,7 +3099,7 @@ void hci_le_big_complete(struct net_buf *buf)
 		return;
 	}
 
-	atomic_set_bit(big->flags, BT_BIG_BUSY);
+	bt_atomic_set_bit(big->flags, BT_BIG_BUSY);
 	i = 0;
 	SYS_SLIST_FOR_EACH_CONTAINER(&big->bis_channels, bis, node) {
 		const uint16_t handle = evt->handle[i++];
@@ -3108,7 +3110,7 @@ void hci_le_big_complete(struct net_buf *buf)
 		bt_conn_set_state(iso_conn, BT_CONN_CONNECTED);
 	}
 
-	atomic_clear_bit(big->flags, BT_BIG_BUSY);
+	bt_atomic_clear_bit(big->flags, BT_BIG_BUSY);
 
 	if (!sys_slist_is_empty(&iso_big_cbs)) {
 		struct bt_iso_big_cb *listener;
@@ -3196,12 +3198,12 @@ int bt_iso_big_terminate(struct bt_iso_big *big)
 		return -EINVAL;
 	}
 
-	if (!atomic_test_bit(big->flags, BT_BIG_INITIALIZED) || !big->num_bis) {
+	if (!bt_atomic_test_bit(big->flags, BT_BIG_INITIALIZED) || !big->num_bis) {
 		LOG_DBG("BIG not initialized");
 		return -EINVAL;
 	}
 
-	if (atomic_test_bit(big->flags, BT_BIG_BUSY)) {
+	if (bt_atomic_test_bit(big->flags, BT_BIG_BUSY)) {
 		LOG_DBG("BIG %p is busy", big);
 		return -EBUSY;
 	}
@@ -3290,7 +3292,7 @@ void hci_le_big_sync_established(struct net_buf *buf)
 	}
 
 	big = lookup_big_by_handle(evt->big_handle);
-	atomic_clear_bit(big->flags, BT_BIG_SYNCING);
+	bt_atomic_clear_bit(big->flags, BT_BIG_SYNCING);
 
 	LOG_DBG("BIG[%u] %p sync established, status 0x%02x %s", big->handle, big, evt->status,
 		bt_hci_err_to_str(evt->status));
@@ -3304,7 +3306,7 @@ void hci_le_big_sync_established(struct net_buf *buf)
 		return;
 	}
 
-	atomic_set_bit(big->flags, BT_BIG_BUSY);
+	bt_atomic_set_bit(big->flags, BT_BIG_BUSY);
 	i = 0;
 	SYS_SLIST_FOR_EACH_CONTAINER(&big->bis_channels, bis, node) {
 		const uint16_t handle = evt->handle[i++];
@@ -3315,7 +3317,7 @@ void hci_le_big_sync_established(struct net_buf *buf)
 		bt_conn_set_state(iso_conn, BT_CONN_CONNECTED);
 	}
 
-	atomic_clear_bit(big->flags, BT_BIG_BUSY);
+	bt_atomic_clear_bit(big->flags, BT_BIG_BUSY);
 
 	if (!sys_slist_is_empty(&iso_big_cbs)) {
 		struct bt_iso_big_cb *listener;
@@ -3418,7 +3420,7 @@ int bt_iso_big_sync(struct bt_le_per_adv_sync *sync, struct bt_iso_big_sync_para
 		return -EINVAL;
 	}
 
-	if (!atomic_test_bit(sync->flags, BT_PER_ADV_SYNC_SYNCED)) {
+	if (!bt_atomic_test_bit(sync->flags, BT_PER_ADV_SYNC_SYNCED)) {
 		LOG_DBG("PA sync not synced");
 		return -EINVAL;
 	}
@@ -3482,7 +3484,7 @@ int bt_iso_big_sync(struct bt_le_per_adv_sync *sync, struct bt_iso_big_sync_para
 	bitfield_copy = param->bis_bitfield;
 	bis_channels = param->bis_channels;
 	for (uint8_t i = 0; i < param->num_bis; i++) {
-		const uint8_t bis_number = find_lsb_set(bitfield_copy);
+		const uint8_t bis_number = __builtin_ffs((int)bitfield_copy);
 
 		/* pop the least significant bit from the bitfield */
 		bitfield_copy &= ~BIT(bis_number - 1U);
@@ -3490,7 +3492,7 @@ int bt_iso_big_sync(struct bt_le_per_adv_sync *sync, struct bt_iso_big_sync_para
 		/* The least significant bit will be the bis_number, so that if the bitfield is
 		 * 0b0101 then the first pop will be 1 and the bitfield_copy will be 0b0100 and
 		 * then the second pop will be 3 and the bitfield_copy will be 0b0000
-		 * Since find_lsb_set returns the index starting from 1 we can use the result
+		 * Since __builtin_ffs returns the index starting from 1 we can use the result
 		 * directly as the bis_numbers also start from 1.
 		 */
 		err = big_init_bis(big, bis_channels[i], bis_number, false);

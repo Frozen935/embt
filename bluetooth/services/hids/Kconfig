@@ -6,7 +6,7 @@
 menuconfig BT_HIDS
 	bool "HID Service (HIDS) [EXPERIMENTAL]"
 	depends on BT_GATT_DYNAMIC_DB
-	select EXPERIMENTAL
+	select EMBT_EXPERIMENTAL
 	help
 	  Enable the HID Service server. Provides a HID Service with a
 	  configurable Report Map and Input, Output and Feature reports.

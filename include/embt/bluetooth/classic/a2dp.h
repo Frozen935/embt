@@ -21,9 +21,9 @@
 
 #include <stdint.h>
 
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/l2cap.h>
-#include <zephyr/bluetooth/classic/avdtp.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/l2cap.h>
+#include <embt/bluetooth/classic/avdtp.h>
 
 #ifdef __cplusplus
 extern "C" {

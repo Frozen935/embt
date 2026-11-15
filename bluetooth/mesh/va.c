@@ -5,6 +5,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#undef LOG_TAG
+#define LOG_TAG "bt_mesh_va"
+#include <base/log.h>
+#include <base/base.h>
 #include <errno.h>
 #include <string.h>
 #include <stdlib.h>
@@ -23,9 +27,7 @@
 #include "crypto.h"
 #include "settings.h"
 
-#define LOG_LEVEL CONFIG_BT_MESH_TRANS_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_mesh_va);
-
+#define LOG_LEVEL CONFIG_EMBT_LOG_LEVEL
 static struct bt_mesh_va virtual_addrs[CONFIG_BT_MESH_LABEL_COUNT];
 
 /* Virtual Address information for persistent storage. */

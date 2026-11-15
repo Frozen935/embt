@@ -5,6 +5,10 @@
 
 /* ftp.c - Bluetooth File Transfer Profile handling */
 
+#undef LOG_TAG
+#define LOG_TAG "bt_ftp"
+#include <base/log.h>
+#include <base/base.h>
 #include <errno.h>
 #include <zephyr/types.h>
 #include <stddef.h>
@@ -17,9 +21,7 @@
 #include <zephyr/bluetooth/classic/goep.h>
 #include <zephyr/bluetooth/classic/ftp.h>
 
-#define LOG_LEVEL CONFIG_BT_FTP_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_ftp);
-
+#define LOG_LEVEL CONFIG_EMBT_LOG_LEVEL
 typedef void (*ftp_client_cb)(struct bt_ftp_client *client, uint8_t rsp_code, struct net_buf *buf);
 typedef void (*ftp_server_cb)(struct bt_ftp_server *server, bool final, struct net_buf *buf);
 
@@ -100,7 +102,7 @@ static int ftp_check_has_body(struct net_buf *buf)
 static void ftp_client_clear_pending(struct bt_ftp_client *client)
 {
 	client->_rsp_cb = NULL;
-	atomic_set(&client->_optype, BT_FTP_OP_NONE);
+	bt_atomic_set(&client->_optype, BT_FTP_OP_NONE);
 }
 
 static int ftp_check_action_id(struct net_buf *buf, uint8_t expected_id)
@@ -247,7 +249,7 @@ static int ftp_client_transport_connect(struct bt_conn *conn, struct bt_ftp_clie
 	__ASSERT(cb->push_file != NULL || cb->pull_file != NULL,
 		 "Neither push_file nor pull_file callback is registered");
 
-	if (atomic_get(&client->_goep._state) != BT_GOEP_TRANSPORT_DISCONNECTED) {
+	if (bt_atomic_get(&client->_goep._state) != BT_GOEP_TRANSPORT_DISCONNECTED) {
 		return -EINPROGRESS;
 	}
 
@@ -285,7 +287,7 @@ static int ftp_client_transport_disconnect(struct bt_ftp_client *client, bool is
 		return -EINVAL;
 	}
 
-	if (atomic_get(&client->_goep._state) != BT_GOEP_TRANSPORT_CONNECTED) {
+	if (bt_atomic_get(&client->_goep._state) != BT_GOEP_TRANSPORT_CONNECTED) {
 		return -EINPROGRESS;
 	}
 
@@ -429,13 +431,13 @@ int bt_ftp_client_connect(struct bt_ftp_client *client, struct net_buf *buf)
 		return -EINVAL;
 	}
 
-	if (atomic_get(&client->_goep._state) != BT_GOEP_TRANSPORT_CONNECTED) {
+	if (bt_atomic_get(&client->_goep._state) != BT_GOEP_TRANSPORT_CONNECTED) {
 		LOG_ERR("Transport not connected");
 		return -EINVAL;
 	}
 
-	if (atomic_get(&client->_client._state) != BT_OBEX_DISCONNECTED) {
-		LOG_ERR("Invalid OBEX state %u", (uint8_t)atomic_get(&client->_client._state));
+	if (bt_atomic_get(&client->_client._state) != BT_OBEX_DISCONNECTED) {
+		LOG_ERR("Invalid OBEX state %u", (uint8_t)bt_atomic_get(&client->_client._state));
 		return -EINVAL;
 	}
 
@@ -492,8 +494,8 @@ int bt_ftp_client_abort(struct bt_ftp_client *client, struct net_buf *buf)
 		return -EINVAL;
 	}
 
-	if (atomic_get(&client->_client._state) != BT_OBEX_CONNECTED) {
-		LOG_ERR("Invalid state %u", (uint8_t)atomic_get(&client->_client._state));
+	if (bt_atomic_get(&client->_client._state) != BT_OBEX_CONNECTED) {
+		LOG_ERR("Invalid state %u", (uint8_t)bt_atomic_get(&client->_client._state));
 		return -ENOTCONN;
 	}
 
@@ -545,8 +547,8 @@ int bt_ftp_client_disconnect(struct bt_ftp_client *client, struct net_buf *buf)
 		return -EINVAL;
 	}
 
-	if (atomic_get(&client->_client._state) != BT_OBEX_CONNECTED) {
-		LOG_ERR("Invalid state %u", (uint8_t)atomic_get(&client->_client._state));
+	if (bt_atomic_get(&client->_client._state) != BT_OBEX_CONNECTED) {
+		LOG_ERR("Invalid state %u", (uint8_t)bt_atomic_get(&client->_client._state));
 		return -ENOTCONN;
 	}
 
@@ -598,8 +600,8 @@ int bt_ftp_client_set_folder(struct bt_ftp_client *client, uint8_t flags, struct
 		return -EINVAL;
 	}
 
-	if (atomic_get(&client->_client._state) != BT_OBEX_CONNECTED) {
-		LOG_ERR("Invalid state %u", (uint8_t)atomic_get(&client->_client._state));
+	if (bt_atomic_get(&client->_client._state) != BT_OBEX_CONNECTED) {
+		LOG_ERR("Invalid state %u", (uint8_t)bt_atomic_get(&client->_client._state));
 		return -ENOTCONN;
 	}
 
@@ -655,8 +657,8 @@ int bt_ftp_client_pull_folder_listing(struct bt_ftp_client *client, bool final, 
 		return -EINVAL;
 	}
 
-	if (atomic_get(&client->_client._state) != BT_OBEX_CONNECTED) {
-		LOG_ERR("Invalid state %u", (uint8_t)atomic_get(&client->_client._state));
+	if (bt_atomic_get(&client->_client._state) != BT_OBEX_CONNECTED) {
+		LOG_ERR("Invalid state %u", (uint8_t)bt_atomic_get(&client->_client._state));
 		return -ENOTCONN;
 	}
 
@@ -665,7 +667,7 @@ int bt_ftp_client_pull_folder_listing(struct bt_ftp_client *client, bool final, 
 	 * - CONN_ID: must be present and match.
 	 * - TYPE: must be present and equal "x-obex/folder-listing".
 	 */
-	first = atomic_cas(&client->_optype, BT_FTP_OP_NONE, BT_FTP_OP_PULL_FOLDER_LISTING);
+	first = bt_atomic_cas(&client->_optype, BT_FTP_OP_NONE, BT_FTP_OP_PULL_FOLDER_LISTING);
 	if (first) {
 		err = ftp_check_conn_id(buf, client->_conn_id);
 		if (err != 0) {
@@ -681,7 +683,7 @@ int bt_ftp_client_pull_folder_listing(struct bt_ftp_client *client, bool final, 
 
 		client->_rsp_cb = client->_cb->pull_folder_listing;
 	} else {
-		if (atomic_get(&client->_optype) != BT_FTP_OP_PULL_FOLDER_LISTING) {
+		if (bt_atomic_get(&client->_optype) != BT_FTP_OP_PULL_FOLDER_LISTING) {
 			LOG_ERR("Previous operation is not completed");
 			err = -EBUSY;
 			goto failed;
@@ -712,15 +714,15 @@ int bt_ftp_client_push_file(struct bt_ftp_client *client, bool final, struct net
 		return -EINVAL;
 	}
 
-	if (atomic_get(&client->_client._state) != BT_OBEX_CONNECTED) {
-		LOG_ERR("Invalid state %u", (uint8_t)atomic_get(&client->_client._state));
+	if (bt_atomic_get(&client->_client._state) != BT_OBEX_CONNECTED) {
+		LOG_ERR("Invalid state %u", (uint8_t)bt_atomic_get(&client->_client._state));
 		return -ENOTCONN;
 	}
 
 	/*
 	 * First fragment: CONN_ID and NAME are mandatory.
 	 */
-	first = atomic_cas(&client->_optype, BT_FTP_OP_NONE, BT_FTP_OP_PUSH_FILE);
+	first = bt_atomic_cas(&client->_optype, BT_FTP_OP_NONE, BT_FTP_OP_PUSH_FILE);
 	if (first) {
 		err = ftp_check_conn_id(buf, client->_conn_id);
 		if (err != 0) {
@@ -742,7 +744,7 @@ int bt_ftp_client_push_file(struct bt_ftp_client *client, bool final, struct net
 
 		client->_rsp_cb = client->_cb->push_file;
 	} else {
-		if (atomic_get(&client->_optype) != BT_FTP_OP_PUSH_FILE) {
+		if (bt_atomic_get(&client->_optype) != BT_FTP_OP_PUSH_FILE) {
 			LOG_ERR("Previous operation is not completed");
 			err = -EBUSY;
 			goto failed;
@@ -783,15 +785,15 @@ int bt_ftp_client_pull_file(struct bt_ftp_client *client, bool final, struct net
 		return -EINVAL;
 	}
 
-	if (atomic_get(&client->_client._state) != BT_OBEX_CONNECTED) {
-		LOG_ERR("Invalid state %u", (uint8_t)atomic_get(&client->_client._state));
+	if (bt_atomic_get(&client->_client._state) != BT_OBEX_CONNECTED) {
+		LOG_ERR("Invalid state %u", (uint8_t)bt_atomic_get(&client->_client._state));
 		return -ENOTCONN;
 	}
 
 	/*
 	 * First fragment: CONN_ID and NAME are mandatory.
 	 */
-	first = atomic_cas(&client->_optype, BT_FTP_OP_NONE, BT_FTP_OP_PULL_FILE);
+	first = bt_atomic_cas(&client->_optype, BT_FTP_OP_NONE, BT_FTP_OP_PULL_FILE);
 	if (first) {
 		err = ftp_check_conn_id(buf, client->_conn_id);
 		if (err != 0) {
@@ -813,7 +815,7 @@ int bt_ftp_client_pull_file(struct bt_ftp_client *client, bool final, struct net
 
 		client->_rsp_cb = client->_cb->pull_file;
 	} else {
-		if (atomic_get(&client->_optype) != BT_FTP_OP_PULL_FILE) {
+		if (bt_atomic_get(&client->_optype) != BT_FTP_OP_PULL_FILE) {
 			LOG_ERR("Previous operation is not completed");
 			err = -EBUSY;
 			goto failed;
@@ -843,12 +845,12 @@ int bt_ftp_client_remove(struct bt_ftp_client *client, struct net_buf *buf)
 		return -EINVAL;
 	}
 
-	if (atomic_get(&client->_client._state) != BT_OBEX_CONNECTED) {
-		LOG_ERR("Invalid state %u", (uint8_t)atomic_get(&client->_client._state));
+	if (bt_atomic_get(&client->_client._state) != BT_OBEX_CONNECTED) {
+		LOG_ERR("Invalid state %u", (uint8_t)bt_atomic_get(&client->_client._state));
 		return -ENOTCONN;
 	}
 
-	if (!atomic_cas(&client->_optype, BT_FTP_OP_NONE, BT_FTP_OP_DELETE)) {
+	if (!bt_atomic_cas(&client->_optype, BT_FTP_OP_NONE, BT_FTP_OP_DELETE)) {
 		LOG_ERR("Previous operation is not completed");
 		return -EBUSY;
 	}
@@ -907,8 +909,8 @@ int bt_ftp_client_rename(struct bt_ftp_client *client, struct net_buf *buf)
 		return -EINVAL;
 	}
 
-	if (atomic_get(&client->_client._state) != BT_OBEX_CONNECTED) {
-		LOG_ERR("Invalid state %u", (uint8_t)atomic_get(&client->_client._state));
+	if (bt_atomic_get(&client->_client._state) != BT_OBEX_CONNECTED) {
+		LOG_ERR("Invalid state %u", (uint8_t)bt_atomic_get(&client->_client._state));
 		return -ENOTCONN;
 	}
 
@@ -917,7 +919,7 @@ int bt_ftp_client_rename(struct bt_ftp_client *client, struct net_buf *buf)
 		return err;
 	}
 
-	if (!atomic_cas(&client->_optype, BT_FTP_OP_NONE, BT_FTP_OP_RENAME)) {
+	if (!bt_atomic_cas(&client->_optype, BT_FTP_OP_NONE, BT_FTP_OP_RENAME)) {
 		LOG_ERR("Previous operation is not completed");
 		return -EBUSY;
 	}
@@ -980,8 +982,8 @@ int bt_ftp_client_copy(struct bt_ftp_client *client, struct net_buf *buf)
 		return -EINVAL;
 	}
 
-	if (atomic_get(&client->_client._state) != BT_OBEX_CONNECTED) {
-		LOG_ERR("Invalid state %u", (uint8_t)atomic_get(&client->_client._state));
+	if (bt_atomic_get(&client->_client._state) != BT_OBEX_CONNECTED) {
+		LOG_ERR("Invalid state %u", (uint8_t)bt_atomic_get(&client->_client._state));
 		return -ENOTCONN;
 	}
 
@@ -990,7 +992,7 @@ int bt_ftp_client_copy(struct bt_ftp_client *client, struct net_buf *buf)
 		return err;
 	}
 
-	if (!atomic_cas(&client->_optype, BT_FTP_OP_NONE, BT_FTP_OP_COPY)) {
+	if (!bt_atomic_cas(&client->_optype, BT_FTP_OP_NONE, BT_FTP_OP_COPY)) {
 		LOG_ERR("Previous operation is not completed");
 		return -EBUSY;
 	}
@@ -1053,8 +1055,8 @@ int bt_ftp_client_set_permission(struct bt_ftp_client *client, struct net_buf *b
 		return -EINVAL;
 	}
 
-	if (atomic_get(&client->_client._state) != BT_OBEX_CONNECTED) {
-		LOG_ERR("Invalid state %u", (uint8_t)atomic_get(&client->_client._state));
+	if (bt_atomic_get(&client->_client._state) != BT_OBEX_CONNECTED) {
+		LOG_ERR("Invalid state %u", (uint8_t)bt_atomic_get(&client->_client._state));
 		return -ENOTCONN;
 	}
 
@@ -1063,7 +1065,7 @@ int bt_ftp_client_set_permission(struct bt_ftp_client *client, struct net_buf *b
 		return err;
 	}
 
-	if (!atomic_cas(&client->_optype, BT_FTP_OP_NONE, BT_FTP_OP_SET_PERMISSION)) {
+	if (!bt_atomic_cas(&client->_optype, BT_FTP_OP_NONE, BT_FTP_OP_SET_PERMISSION)) {
 		LOG_ERR("Previous operation is not completed");
 		return -EBUSY;
 	}
@@ -1215,17 +1217,17 @@ static struct bt_sdp_record ftp_server_rec = BT_SDP_RECORD(ftp_server_attrs);
 static void ftp_server_clear_pending(struct bt_ftp_server *server)
 {
 	server->_req_cb = NULL;
-	atomic_set(&server->_optype, BT_FTP_OP_NONE);
+	bt_atomic_set(&server->_optype, BT_FTP_OP_NONE);
 }
 
 static uint32_t ftp_server_get_connect_id(void)
 {
-	static atomic_t connect_id;
+	static bt_atomic_t connect_id;
 	uint32_t id;
 
 	/* Skip 0, and 0xFFFFFFFF which is reserved and invalid (IrOBEX 1.5, section 2.2.11). */
 	do {
-		id = (uint32_t)atomic_inc(&connect_id) + 1U;
+		id = (uint32_t)bt_atomic_inc(&connect_id) + 1U;
 	} while (id == 0U || id == UINT32_MAX);
 
 	return id;
@@ -1351,13 +1353,13 @@ static void ftp_server_put(struct bt_obex_server *server, bool final, struct net
 				goto failed;
 			}
 
-			atomic_set(&s->_optype, BT_FTP_OP_DELETE);
+			bt_atomic_set(&s->_optype, BT_FTP_OP_DELETE);
 			s->_cb->remove(s, buf);
 			return;
 		}
 
 		s->_req_cb = s->_cb->push_file;
-		atomic_set(&s->_optype, BT_FTP_OP_PUSH_FILE);
+		bt_atomic_set(&s->_optype, BT_FTP_OP_PUSH_FILE);
 	}
 
 	if (s->_req_cb == NULL) {
@@ -1406,10 +1408,10 @@ static void ftp_server_get(struct bt_obex_server *server, bool final, struct net
 			}
 
 			s->_req_cb = s->_cb->pull_file;
-			atomic_set(&s->_optype, BT_FTP_OP_PULL_FILE);
+			bt_atomic_set(&s->_optype, BT_FTP_OP_PULL_FILE);
 		} else {
 			s->_req_cb = s->_cb->pull_folder_listing;
-			atomic_set(&s->_optype, BT_FTP_OP_PULL_FOLDER_LISTING);
+			bt_atomic_set(&s->_optype, BT_FTP_OP_PULL_FOLDER_LISTING);
 		}
 	}
 
@@ -1534,7 +1536,7 @@ static void ftp_server_action(struct bt_obex_server *server, bool final, struct 
 		goto failed;
 	}
 
-	atomic_set(&s->_optype, optype);
+	bt_atomic_set(&s->_optype, optype);
 	cb(s, buf);
 
 	return;
@@ -1579,7 +1581,7 @@ static int ftp_server_rfcomm_accept(struct bt_conn *conn,
 
 	__ASSERT(server != NULL && server->_cb != NULL,
 		 "accept() returned success without a valid registered server");
-	__ASSERT(atomic_get(&server->_goep._state) == BT_GOEP_TRANSPORT_DISCONNECTED,
+	__ASSERT(bt_atomic_get(&server->_goep._state) == BT_GOEP_TRANSPORT_DISCONNECTED,
 		 "accept() returned a server whose transport is still in use");
 
 	ftp_server_clear_pending(server);
@@ -1611,7 +1613,7 @@ static int ftp_server_l2cap_accept(struct bt_conn *conn,
 
 	__ASSERT(server != NULL && server->_cb != NULL,
 		 "accept() returned success without a valid registered server");
-	__ASSERT(atomic_get(&server->_goep._state) == BT_GOEP_TRANSPORT_DISCONNECTED,
+	__ASSERT(bt_atomic_get(&server->_goep._state) == BT_GOEP_TRANSPORT_DISCONNECTED,
 		 "accept() returned a server whose transport is still in use");
 
 	ftp_server_clear_pending(server);
@@ -1739,7 +1741,7 @@ static int ftp_server_transport_disconnect(struct bt_ftp_server *server, bool is
 		return -EINVAL;
 	}
 
-	if (atomic_get(&server->_goep._state) != BT_GOEP_TRANSPORT_CONNECTED) {
+	if (bt_atomic_get(&server->_goep._state) != BT_GOEP_TRANSPORT_CONNECTED) {
 		return -EINPROGRESS;
 	}
 
@@ -1771,8 +1773,8 @@ int bt_ftp_server_connect(struct bt_ftp_server *server, uint8_t rsp_code, struct
 		return -EINVAL;
 	}
 
-	if (atomic_get(&server->_server._state) != BT_OBEX_CONNECTING) {
-		LOG_ERR("Invalid OBEX state %u", (uint8_t)atomic_get(&server->_server._state));
+	if (bt_atomic_get(&server->_server._state) != BT_OBEX_CONNECTING) {
+		LOG_ERR("Invalid OBEX state %u", (uint8_t)bt_atomic_get(&server->_server._state));
 		return -EINVAL;
 	}
 
@@ -1844,8 +1846,8 @@ int bt_ftp_server_disconnect(struct bt_ftp_server *server, uint8_t rsp_code, str
 		return -EINVAL;
 	}
 
-	if (atomic_get(&server->_server._state) != BT_OBEX_DISCONNECTING) {
-		LOG_ERR("Invalid OBEX state %u", (uint8_t)atomic_get(&server->_server._state));
+	if (bt_atomic_get(&server->_server._state) != BT_OBEX_DISCONNECTING) {
+		LOG_ERR("Invalid OBEX state %u", (uint8_t)bt_atomic_get(&server->_server._state));
 		return -EINVAL;
 	}
 
@@ -1865,15 +1867,15 @@ static int ftp_server_rsp_prepare(struct bt_ftp_server *server, enum bt_ftp_op o
 		return -EINVAL;
 	}
 
-	if (atomic_get(&server->_server._state) != BT_OBEX_CONNECTED) {
-		LOG_ERR("Invalid state %u", (uint8_t)atomic_get(&server->_server._state));
+	if (bt_atomic_get(&server->_server._state) != BT_OBEX_CONNECTED) {
+		LOG_ERR("Invalid state %u", (uint8_t)bt_atomic_get(&server->_server._state));
 		return -ENOTCONN;
 	}
 
 	*req_cb = server->_req_cb;
 
 	if (rsp_code == BT_FTP_RSP_CODE_CONTINUE) {
-		if (atomic_get(&server->_optype) != op) {
+		if (bt_atomic_get(&server->_optype) != op) {
 			LOG_ERR("Invalid operation type");
 			return -EINVAL;
 		}
@@ -1881,7 +1883,7 @@ static int ftp_server_rsp_prepare(struct bt_ftp_server *server, enum bt_ftp_op o
 		return 0;
 	}
 
-	if (!atomic_cas(&server->_optype, op, BT_FTP_OP_NONE)) {
+	if (!bt_atomic_cas(&server->_optype, op, BT_FTP_OP_NONE)) {
 		LOG_ERR("Invalid operation type");
 		return -EINVAL;
 	}
@@ -1898,7 +1900,7 @@ static void ftp_server_rsp_restore(struct bt_ftp_server *server, enum bt_ftp_op 
 		return;
 	}
 
-	if (atomic_cas(&server->_optype, BT_FTP_OP_NONE, op)) {
+	if (bt_atomic_cas(&server->_optype, BT_FTP_OP_NONE, op)) {
 		server->_req_cb = req_cb;
 	}
 }
@@ -1906,14 +1908,14 @@ static void ftp_server_rsp_restore(struct bt_ftp_server *server, enum bt_ftp_op 
 int bt_ftp_server_abort(struct bt_ftp_server *server, uint8_t rsp_code, struct net_buf *buf)
 {
 	ftp_server_cb req_cb;
-	atomic_val_t optype;
+	bt_atomic_val_t optype;
 	int err;
 
 	if (server == NULL) {
 		return -EINVAL;
 	}
 
-	optype = atomic_get(&server->_optype);
+	optype = bt_atomic_get(&server->_optype);
 	err = ftp_server_rsp_prepare(server, optype, rsp_code, &req_cb);
 	if (err != 0) {
 		return err;
@@ -1937,8 +1939,8 @@ int bt_ftp_server_set_folder(struct bt_ftp_server *server, uint8_t rsp_code, str
 		return -EINVAL;
 	}
 
-	if (atomic_get(&server->_server._state) != BT_OBEX_CONNECTED) {
-		LOG_ERR("Invalid state %u", (uint8_t)atomic_get(&server->_server._state));
+	if (bt_atomic_get(&server->_server._state) != BT_OBEX_CONNECTED) {
+		LOG_ERR("Invalid state %u", (uint8_t)bt_atomic_get(&server->_server._state));
 		return -ENOTCONN;
 	}
 

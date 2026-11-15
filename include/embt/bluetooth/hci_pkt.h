@@ -13,8 +13,8 @@
 
 #include <stdint.h>
 
-#include <zephyr/bluetooth/hci_types.h>
-#include <zephyr/net_buf.h>
+#include <embt/bluetooth/hci_types.h>
+#include <embt/net_buf.h>
 
 #ifdef __cplusplus
 extern "C" {

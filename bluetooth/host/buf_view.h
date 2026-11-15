@@ -11,9 +11,10 @@
 #ifndef ZEPHYR_SUBSYS_BLUETOOTH_HOST_BUF_VIEW_H_
 #define ZEPHYR_SUBSYS_BLUETOOTH_HOST_BUF_VIEW_H_
 
+#include <base/base.h>
 #include <stddef.h>
 
-#include <zephyr/net_buf.h>
+#include <embt/net_buf.h>
 
 
 struct bt_buf_view_meta {

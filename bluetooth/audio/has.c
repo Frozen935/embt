@@ -4,6 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#undef LOG_TAG
+#define LOG_TAG "bt_has"
+#include <base/log.h>
+#include <base/base.h>
 #include <errno.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -11,7 +15,7 @@
 #include <string.h>
 #include <sys/types.h>
 
-#include <zephyr/autoconf.h>
+#include <embt/autoconf.h>
 #include <zephyr/bluetooth/audio/audio.h>
 #include <zephyr/bluetooth/audio/pacs.h>
 #include <zephyr/bluetooth/audio/has.h>
@@ -24,7 +28,7 @@
 #include <zephyr/net_buf.h>
 #include <zephyr/settings/settings.h>
 #include <zephyr/sys/__assert.h>
-#include <zephyr/sys/atomic.h>
+#include <base/bt_atomic.h>
 #include <zephyr/sys/slist.h>
 #include <zephyr/sys/util.h>
 #include <zephyr/sys/util_macro.h>
@@ -36,8 +40,6 @@
 #include "audio_internal.h"
 #include "common/bt_str.h"
 #include "has_internal.h"
-
-LOG_MODULE_REGISTER(bt_has, CONFIG_BT_HAS_LOG_LEVEL);
 
 /* The service allows operations with paired devices only.
  * The number of clients is set to maximum number of simultaneous connections to paired devices.
@@ -192,7 +194,7 @@ static struct client_context {
 	bt_addr_le_t addr;
 
 	/* Pending notification flags */
-	ATOMIC_DEFINE(flags, FLAG_NUM);
+	BT_ATOMIC_DEFINE(flags, FLAG_NUM);
 
 	/* Last notified preset index */
 	uint8_t last_preset_index_known;
@@ -390,7 +392,7 @@ static void security_changed(struct bt_conn *conn, bt_security_t level, enum bt_
 		return;
 	}
 
-	if (atomic_get(client->context->flags) != 0) {
+	if (bt_atomic_get(client->context->flags) != 0) {
 		notify_work_reschedule(client, K_NO_WAIT);
 	}
 }
@@ -443,12 +445,12 @@ static void notify_work_handler(struct k_work *work)
 	int err;
 
 	if (IS_ENABLED(CONFIG_BT_HAS_FEATURES_NOTIFIABLE) &&
-	    atomic_test_and_clear_bit(client->context->flags, FLAG_FEATURES_CHANGED) &&
+	    bt_atomic_test_and_clear_bit(client->context->flags, FLAG_FEATURES_CHANGED) &&
 	    bt_gatt_is_subscribed(client->conn, hearing_aid_features_attr, BT_GATT_CCC_NOTIFY)) {
 		err = bt_gatt_notify(client->conn, hearing_aid_features_attr, &has.features,
 				     sizeof(has.features));
 		if (err == -ENOMEM) {
-			atomic_set_bit(client->context->flags, FLAG_FEATURES_CHANGED);
+			bt_atomic_set_bit(client->context->flags, FLAG_FEATURES_CHANGED);
 			notify_work_reschedule(client, K_USEC(BT_AUDIO_NOTIFY_RETRY_DELAY_US));
 		} else if (err < 0) {
 			LOG_ERR("Notify features err %d", err);
@@ -456,37 +458,37 @@ static void notify_work_handler(struct k_work *work)
 	}
 
 #if defined(CONFIG_BT_HAS_PRESET_SUPPORT)
-	if (atomic_test_and_clear_bit(client->context->flags, FLAG_PENDING_READ_PRESET_RESPONSE)) {
+	if (bt_atomic_test_and_clear_bit(client->context->flags, FLAG_PENDING_READ_PRESET_RESPONSE)) {
 		err = read_preset_response(client);
 		if (err == -ENOMEM) {
-			atomic_set_bit(client->context->flags, FLAG_PENDING_READ_PRESET_RESPONSE);
+			bt_atomic_set_bit(client->context->flags, FLAG_PENDING_READ_PRESET_RESPONSE);
 			notify_work_reschedule(client, K_USEC(BT_AUDIO_NOTIFY_RETRY_DELAY_US));
 		} else if (err < 0) {
 			LOG_ERR("Notify read preset response err %d", err);
 		}
-	} else if (atomic_test_and_clear_bit(client->context->flags, FLAG_NOTIFY_PRESET_LIST)) {
+	} else if (bt_atomic_test_and_clear_bit(client->context->flags, FLAG_NOTIFY_PRESET_LIST)) {
 		err = preset_list_changed(client);
 		if (err == -ENOMEM) {
-			atomic_set_bit(client->context->flags, FLAG_NOTIFY_PRESET_LIST);
+			bt_atomic_set_bit(client->context->flags, FLAG_NOTIFY_PRESET_LIST);
 			notify_work_reschedule(client, K_USEC(BT_AUDIO_NOTIFY_RETRY_DELAY_US));
 		} else if (err < 0) {
 			LOG_ERR("Notify preset list changed err %d", err);
 		}
-	} else if (atomic_test_and_clear_bit(client->context->flags,
+	} else if (bt_atomic_test_and_clear_bit(client->context->flags,
 					     FLAG_NOTIFY_PRESET_LIST_GENERIC_UPDATE_TAIL)) {
 		err = preset_list_changed_generic_update_tail(client);
 		if (err == -ENOMEM) {
-			atomic_set_bit(client->context->flags,
+			bt_atomic_set_bit(client->context->flags,
 				       FLAG_NOTIFY_PRESET_LIST_GENERIC_UPDATE_TAIL);
 			notify_work_reschedule(client, K_USEC(BT_AUDIO_NOTIFY_RETRY_DELAY_US));
 		} else if (err < 0) {
 			LOG_ERR("Notify preset list changed generic update tail err %d", err);
 		}
-	} else if (atomic_test_and_clear_bit(client->context->flags,
+	} else if (bt_atomic_test_and_clear_bit(client->context->flags,
 					     FLAG_NOTIFY_PRESET_LIST_RECORD_DELETED_LAST)) {
 		err = preset_list_changed_record_deleted_last(client);
 		if (err == -ENOMEM) {
-			atomic_set_bit(client->context->flags,
+			bt_atomic_set_bit(client->context->flags,
 				       FLAG_NOTIFY_PRESET_LIST_RECORD_DELETED_LAST);
 			notify_work_reschedule(client, K_USEC(BT_AUDIO_NOTIFY_RETRY_DELAY_US));
 		} else if (err < 0) {
@@ -497,7 +499,7 @@ static void notify_work_handler(struct k_work *work)
 #endif /* CONFIG_BT_HAS_PRESET_SUPPORT */
 
 	if (IS_ENABLED(CONFIG_BT_HAS_PRESET_SUPPORT) &&
-	    atomic_test_and_clear_bit(client->context->flags, FLAG_ACTIVE_INDEX_CHANGED) &&
+	    bt_atomic_test_and_clear_bit(client->context->flags, FLAG_ACTIVE_INDEX_CHANGED) &&
 	    bt_gatt_is_subscribed(client->conn, active_preset_index_attr, BT_GATT_CCC_NOTIFY)) {
 		uint8_t active_index;
 
@@ -506,7 +508,7 @@ static void notify_work_handler(struct k_work *work)
 		err = bt_gatt_notify(client->conn, active_preset_index_attr,
 				     &active_index, sizeof(active_index));
 		if (err == -ENOMEM) {
-			atomic_set_bit(client->context->flags, FLAG_ACTIVE_INDEX_CHANGED);
+			bt_atomic_set_bit(client->context->flags, FLAG_ACTIVE_INDEX_CHANGED);
 			notify_work_reschedule(client, K_USEC(BT_AUDIO_NOTIFY_RETRY_DELAY_US));
 		} else if (err < 0) {
 			LOG_ERR("Notify active index err %d", err);
@@ -517,14 +519,14 @@ static void notify_work_handler(struct k_work *work)
 static void notify(struct has_client *client, enum flag_internal flag)
 {
 	if (client != NULL) {
-		atomic_set_bit(client->context->flags, flag);
+		bt_atomic_set_bit(client->context->flags, flag);
 		notify_work_reschedule(client, K_NO_WAIT);
 		return;
 	}
 
 	/* Mark notification to be sent to all clients */
 	for (size_t i = 0U; i < ARRAY_SIZE(contexts); i++) {
-		atomic_set_bit(contexts[i].flags, flag);
+		bt_atomic_set_bit(contexts[i].flags, flag);
 	}
 
 	for (size_t i = 0U; i < ARRAY_SIZE(has_client_list); i++) {
@@ -758,7 +760,7 @@ static void control_point_ntf_complete(struct bt_conn *conn, void *user_data)
 	LOG_DBG("conn %p", (void *)conn);
 
 	/* Resubmit if needed */
-	if (client != NULL && atomic_get(client->context->flags) != 0) {
+	if (client != NULL && bt_atomic_get(client->context->flags) != 0) {
 		notify_work_reschedule(client, K_NO_WAIT);
 	}
 }
@@ -838,7 +840,7 @@ static int control_point_send_all(struct net_buf_simple *buf)
 
 		if (client == NULL || client->conn == NULL) {
 			/* Mark preset changed operation as pending */
-			atomic_set_bit(context->flags, FLAG_NOTIFY_PRESET_LIST);
+			bt_atomic_set_bit(context->flags, FLAG_NOTIFY_PRESET_LIST);
 			continue;
 		}
 
@@ -966,7 +968,7 @@ static int settings_set_cb(const char *name, size_t len_rd, settings_read_cb rea
 	}
 
 	/* Notify all the characteristics values after reboot */
-	atomic_set(context->flags, BONDED_CLIENT_INIT_FLAGS);
+	bt_atomic_set(context->flags, BONDED_CLIENT_INIT_FLAGS);
 
 	return 0;
 }
@@ -1052,7 +1054,7 @@ static int read_preset_response(struct has_client *client)
 		client->read_presets_req.start_index = preset->index + 1;
 		client->read_presets_req.num_presets--;
 
-		atomic_set_bit(client->context->flags, FLAG_PENDING_READ_PRESET_RESPONSE);
+		bt_atomic_set_bit(client->context->flags, FLAG_PENDING_READ_PRESET_RESPONSE);
 		notify_work_reschedule(client, K_USEC(BT_AUDIO_NOTIFY_RETRY_DELAY_US));
 	}
 
@@ -1134,9 +1136,9 @@ static int preset_list_changed(struct has_client *client)
 
 	if (sys_slist_is_empty(&preset_list)) {
 		/* The preset list is empty. We need to indicate deletion of all presets */
-		atomic_set_bit(client->context->flags,
+		bt_atomic_set_bit(client->context->flags,
 			       FLAG_NOTIFY_PRESET_LIST_GENERIC_UPDATE_TAIL);
-		atomic_set_bit(client->context->flags,
+		bt_atomic_set_bit(client->context->flags,
 			       FLAG_NOTIFY_PRESET_LIST_RECORD_DELETED_LAST);
 		notify_work_reschedule(client, K_USEC(BT_AUDIO_NOTIFY_RETRY_DELAY_US));
 
@@ -1182,14 +1184,14 @@ static int preset_list_changed(struct has_client *client)
 		 *      (PrevIndex = current_preset_last, Index=previous_preset_last)
 		 *   2. Notify deletion of preset Index=previous_preset_last.
 		 */
-		atomic_set_bit(client->context->flags,
+		bt_atomic_set_bit(client->context->flags,
 			       FLAG_NOTIFY_PRESET_LIST_GENERIC_UPDATE_TAIL);
-		atomic_set_bit(client->context->flags,
+		bt_atomic_set_bit(client->context->flags,
 			       FLAG_NOTIFY_PRESET_LIST_RECORD_DELETED_LAST);
 	} else {
 		client->preset_changed_index_next = preset->index + 1;
 
-		atomic_set_bit(client->context->flags, FLAG_NOTIFY_PRESET_LIST);
+		bt_atomic_set_bit(client->context->flags, FLAG_NOTIFY_PRESET_LIST);
 	}
 
 	notify_work_reschedule(client, K_USEC(BT_AUDIO_NOTIFY_RETRY_DELAY_US));
@@ -1234,7 +1236,7 @@ static uint8_t handle_read_preset_req(struct bt_conn *conn, struct net_buf_simpl
 	}
 
 	/* Reject if already in progress */
-	if (atomic_test_bit(client->context->flags, FLAG_PENDING_READ_PRESET_RESPONSE)) {
+	if (bt_atomic_test_bit(client->context->flags, FLAG_PENDING_READ_PRESET_RESPONSE)) {
 		return BT_HAS_ERR_OPERATION_NOT_POSSIBLE;
 	}
 

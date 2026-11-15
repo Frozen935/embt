@@ -35,7 +35,7 @@ enum bt_mesh_settings_flag {
 	static int pre_##_set(const char *name, size_t len_rd, settings_read_cb read_cb,           \
 			      void *cb_arg)                                                        \
 	{                                                                                          \
-		if (!atomic_test_bit(bt_mesh.flags, BT_MESH_INIT)) {                               \
+		if (!bt_atomic_test_bit(bt_mesh.flags, BT_MESH_INIT)) {                               \
 			return 0;                                                                  \
 		}                                                                                  \
 		return _set(name, len_rd, read_cb, cb_arg);                                        \

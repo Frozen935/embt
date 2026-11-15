@@ -4,6 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#undef LOG_TAG
+#define LOG_TAG "bt_mesh_health_srv"
+#include <base/log.h>
+#include <base/base.h>
 #include <string.h>
 #include <errno.h>
 #include <stdbool.h>
@@ -20,9 +24,7 @@
 #include "access.h"
 #include "foundation.h"
 
-#define LOG_LEVEL CONFIG_BT_MESH_MODEL_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_mesh_health_srv);
-
+#define LOG_LEVEL CONFIG_EMBT_LOG_LEVEL
 #define HEALTH_TEST_STANDARD 0x00
 
 /* Health Server context of the primary element */

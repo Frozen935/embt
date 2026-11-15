@@ -28,10 +28,10 @@
 
 #include <stdbool.h>
 
-#include <zephyr/bluetooth/assigned_numbers.h>
-#include <zephyr/bluetooth/audio/audio.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/sys/slist.h>
+#include <embt/bluetooth/assigned_numbers.h>
+#include <embt/bluetooth/audio/audio.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/sys/slist.h>
 
 #ifdef __cplusplus
 extern "C" {

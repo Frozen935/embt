@@ -4,6 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#undef LOG_TAG
+#define LOG_TAG "bt_mesh_delayable_msg"
+#include <base/log.h>
+#include <base/base.h>
 #include <errno.h>
 #include <stdlib.h>
 #include <zephyr/sys/slist.h>
@@ -15,9 +19,7 @@
 #include "access.h"
 #include "net.h"
 
-#define LOG_LEVEL CONFIG_BT_MESH_ACCESS_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_mesh_delayable_msg);
-
+#define LOG_LEVEL CONFIG_EMBT_LOG_LEVEL
 static void delayable_msg_handler(struct k_work *w);
 static bool push_msg_from_delayable_msgs(void);
 
@@ -270,8 +272,8 @@ static bool send_delayable_msg(struct delayable_msg_ctx *msg)
 	 * the queue is drained, so either one means the stack is down. Never hand a message to the
 	 * transport in that state, however it ended up on busy_ctx.
 	 */
-	if (atomic_test_bit(bt_mesh.flags, BT_MESH_SUSPENDED) ||
-	    !atomic_test_bit(bt_mesh.flags, BT_MESH_VALID)) {
+	if (bt_atomic_test_bit(bt_mesh.flags, BT_MESH_SUSPENDED) ||
+	    !bt_atomic_test_bit(bt_mesh.flags, BT_MESH_VALID)) {
 		complete_delayable_msg(msg, -ENODEV);
 		return true;
 	}
@@ -346,7 +348,7 @@ int bt_mesh_delayable_msg_manage(struct bt_mesh_msg_ctx *ctx, struct net_buf_sim
 	int allocated_number = 0;
 	uint16_t len = buf->len;
 
-	if (atomic_test_bit(bt_mesh.flags, BT_MESH_SUSPENDED)) {
+	if (bt_atomic_test_bit(bt_mesh.flags, BT_MESH_SUSPENDED)) {
 		LOG_WRN("Refusing to allocate message context while suspended");
 		return -ENODEV;
 	}

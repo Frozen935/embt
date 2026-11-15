@@ -10,6 +10,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <base/base.h>
 #include <errno.h>
 #include <math.h>
 #include <stdbool.h>
@@ -18,7 +19,7 @@
 #include <string.h>
 #include <sys/types.h>
 
-#include <zephyr/autoconf.h>
+#include <embt/autoconf.h>
 #include <zephyr/bluetooth/addr.h>
 #include <zephyr/bluetooth/assigned_numbers.h>
 #include <zephyr/bluetooth/audio/ascs.h>
@@ -42,7 +43,7 @@
 #include <zephyr/shell/shell.h>
 #include <zephyr/shell/shell_string_conv.h>
 #include <zephyr/sys/__assert.h>
-#include <zephyr/sys/atomic.h>
+#include <base/bt_atomic.h>
 #include <zephyr/sys/byteorder.h>
 #include <zephyr/sys/printk.h>
 #include <zephyr/sys/time_units.h>
@@ -485,7 +486,7 @@ static void lc3_audio_send_data(struct shell_stream *sh_stream)
 		return;
 	}
 
-	if (atomic_get(&sh_stream->tx.lc3_enqueue_cnt) == 0U) {
+	if (bt_atomic_get(&sh_stream->tx.lc3_enqueue_cnt) == 0U) {
 		/* no op */
 		return;
 	}
@@ -511,7 +512,7 @@ static void lc3_audio_send_data(struct shell_stream *sh_stream)
 
 	sh_stream->tx.lc3_sdu_cnt++;
 	sh_stream->tx.seq_num++;
-	atomic_dec(&sh_stream->tx.lc3_enqueue_cnt);
+	bt_atomic_dec(&sh_stream->tx.lc3_enqueue_cnt);
 }
 
 static void lc3_sent_cb(struct bt_bap_stream *bap_stream)
@@ -522,7 +523,7 @@ static void lc3_sent_cb(struct bt_bap_stream *bap_stream)
 		return;
 	}
 
-	atomic_inc(&sh_stream->tx.lc3_enqueue_cnt);
+	bt_atomic_inc(&sh_stream->tx.lc3_enqueue_cnt);
 }
 
 static void encode_and_send_cb(struct shell_stream *sh_stream, void *user_data)
@@ -2974,7 +2975,7 @@ static void stream_started_cb(struct bt_bap_stream *bap_stream)
 
 #if defined(CONFIG_BT_AUDIO_TX)
 		if (sh_stream->is_tx) {
-			atomic_set(&sh_stream->tx.lc3_enqueue_cnt, PRIME_COUNT);
+			bt_atomic_set(&sh_stream->tx.lc3_enqueue_cnt, PRIME_COUNT);
 			sh_stream->tx.lc3_sdu_cnt = 0U;
 
 			if (sh_stream->tx.lc3_encoder == NULL) {

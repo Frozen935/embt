@@ -9,14 +9,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <base/base.h>
 #include <stdint.h>
 
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/buf.h>
-#include <zephyr/bluetooth/iso.h>
-#include <zephyr/net_buf.h>
-#include <zephyr/sys/atomic.h>
-#include <zephyr/sys/slist.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/buf.h>
+#include <embt/bluetooth/iso.h>
+#include <embt/net_buf.h>
+#include <embt/sys/slist.h>
+#include <embt/storage.h>
 
 enum bt_iso_cig_state {
 	BT_ISO_CIG_STATE_IDLE,
@@ -68,7 +69,7 @@ struct bt_iso_big {
 	/** The BIG handle */
 	uint8_t handle;
 
-	ATOMIC_DEFINE(flags, BT_BIG_NUM_FLAGS);
+	BT_ATOMIC_DEFINE(flags, BT_BIG_NUM_FLAGS);
 };
 
 #define iso(buf) ((struct bt_conn_rx *)net_buf_user_data(buf))
@@ -114,7 +115,7 @@ void bt_iso_connected(struct bt_conn *iso);
 /* Notify ISO channels of a disconnect event */
 void bt_iso_disconnected(struct bt_conn *iso);
 
-#if defined(CONFIG_BT_ISO_LOG_LEVEL_DBG)
+#if (CONFIG_EMBT_LOG_LEVEL >= 4)
 void bt_iso_chan_set_state_debug(struct bt_iso_chan *chan,
 				 enum bt_iso_state state,
 				 const char *func, int line);
@@ -122,7 +123,7 @@ void bt_iso_chan_set_state_debug(struct bt_iso_chan *chan,
 	bt_iso_chan_set_state_debug(_chan, _state, __func__, __LINE__)
 #else
 void bt_iso_chan_set_state(struct bt_iso_chan *chan, enum bt_iso_state state);
-#endif /* CONFIG_BT_ISO_LOG_LEVEL_DBG */
+#endif /* (CONFIG_EMBT_LOG_LEVEL >= 4) */
 
 /* Process incoming data for a connection */
 void bt_iso_recv(struct bt_conn *iso, struct net_buf *buf, uint8_t flags);

@@ -7,18 +7,19 @@
  * in a single printk call.
  */
 
+#include <base/base.h>
 #include <stddef.h>
 
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/hci.h>
-#include <zephyr/bluetooth/uuid.h>
-#include <zephyr/sys/util.h>
-#include <zephyr/types.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/hci.h>
+#include <embt/bluetooth/uuid.h>
+#include <embt/sys/util.h>
+#include <embt/types.h>
 
 const char *bt_hex(const void *buf, size_t len)
 {
 	static const char hex[] = "0123456789abcdef";
-	static char str[129];
+	static _Thread_local char str[129];
 	const uint8_t *b = buf;
 	size_t i;
 
@@ -36,7 +37,7 @@ const char *bt_hex(const void *buf, size_t len)
 
 const char *bt_uuid_str(const struct bt_uuid *uuid)
 {
-	static char str[BT_UUID_STR_LEN];
+	static _Thread_local char str[BT_UUID_STR_LEN];
 
 	bt_uuid_to_str(uuid, str, sizeof(str));
 

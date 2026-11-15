@@ -5,6 +5,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#undef LOG_TAG
+#define LOG_TAG "bt_mesh_app_keys"
+#include <base/log.h>
 #include <string.h>
 #include <stdlib.h>
 #include <zephyr/bluetooth/mesh.h>
@@ -24,9 +27,7 @@
 
 #include "common/bt_str.h"
 
-#define LOG_LEVEL CONFIG_BT_MESH_KEYS_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_mesh_app_keys);
-
+#define LOG_LEVEL CONFIG_EMBT_LOG_LEVEL
 /* Tracking of what storage changes are pending for App Keys. We track this in
  * a separate array here instead of within the respective bt_mesh_app_key
  * struct itself, since once a key gets deleted its struct becomes invalid
@@ -553,7 +554,7 @@ uint16_t bt_mesh_app_key_find(bool dev_key, uint8_t aid,
 			}
 
 #if defined(CONFIG_BT_MESH_RPR_SRV)
-			if (atomic_test_bit(bt_mesh.flags, BT_MESH_DEVKEY_CAND)) {
+			if (bt_atomic_test_bit(bt_mesh.flags, BT_MESH_DEVKEY_CAND)) {
 				err = cb(rx, &bt_mesh.dev_key_cand, cb_data);
 				if (!err) {
 					/* MshPRTv1.1: 3.6.4.2:

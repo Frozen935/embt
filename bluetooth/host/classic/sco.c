@@ -7,14 +7,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#undef LOG_TAG
+#define LOG_TAG "bt_sco"
+#include <base/log.h>
+#include <base/base.h>
 #include <errno.h>
 
-#include <zephyr/sys/atomic.h>
-#include <zephyr/sys/byteorder.h>
+#include <embt/sys/byteorder.h>
 
-#include <zephyr/bluetooth/hci.h>
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/conn.h>
+#include <embt/bluetooth/hci.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/conn.h>
 
 #include <common/bt_str.h>
 
@@ -83,11 +86,6 @@ static void notify_connected(struct bt_conn *conn)
 		}
 	}
 
-	STRUCT_SECTION_FOREACH(bt_sco_conn_cb, cb) {
-		if (cb->connected) {
-			cb->connected(conn, conn->err);
-		}
-	}
 }
 
 static void notify_disconnected(struct bt_conn *conn)
@@ -97,12 +95,6 @@ static void notify_disconnected(struct bt_conn *conn)
 	SYS_SLIST_FOR_EACH_CONTAINER(&sco_conn_cbs, callback, _node) {
 		if (callback->disconnected) {
 			callback->disconnected(conn, conn->err);
-		}
-	}
-
-	STRUCT_SECTION_FOREACH(bt_sco_conn_cb, cb) {
-		if (cb->disconnected) {
-			cb->disconnected(conn, conn->err);
 		}
 	}
 }
@@ -117,11 +109,6 @@ static void notify_setup_sco_cmd(struct bt_conn *conn, struct bt_hci_cp_setup_sy
 		}
 	}
 
-	STRUCT_SECTION_FOREACH(bt_sco_hci_cb, cb) {
-		if (cb->setup != NULL) {
-			cb->setup(conn, cp);
-		}
-	}
 }
 
 static void notify_accept_sco_req_cmd(struct bt_hci_cp_accept_sync_conn_req *cp)
@@ -131,12 +118,6 @@ static void notify_accept_sco_req_cmd(struct bt_hci_cp_accept_sync_conn_req *cp)
 	SYS_SLIST_FOR_EACH_CONTAINER(&sco_hci_cbs, callback, _node) {
 		if (callback->accept != NULL) {
 			callback->accept(cp);
-		}
-	}
-
-	STRUCT_SECTION_FOREACH(bt_sco_hci_cb, cb) {
-		if (cb->accept != NULL) {
-			cb->accept(cp);
 		}
 	}
 }
@@ -209,7 +190,7 @@ static uint8_t sco_server_check_security(struct bt_conn *conn)
 	return BT_HCI_ERR_INSUFFICIENT_SECURITY;
 }
 
-#if defined(CONFIG_BT_CONN_LOG_LEVEL_DBG)
+#if (CONFIG_EMBT_LOG_LEVEL >= 4)
 const char *bt_sco_chan_state_str(uint8_t state)
 {
 	switch (state) {
@@ -270,7 +251,7 @@ void bt_sco_chan_set_state(struct bt_sco_chan *chan, enum bt_sco_state state)
 {
 	chan->state = state;
 }
-#endif /* CONFIG_BT_CONN_LOG_LEVEL_DBG */
+#endif /* (CONFIG_EMBT_LOG_LEVEL >= 4) */
 
 
 static void bt_sco_chan_add(struct bt_conn *sco, struct bt_sco_chan *chan)

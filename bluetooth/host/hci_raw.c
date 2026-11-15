@@ -6,6 +6,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#undef LOG_TAG
+#define LOG_TAG "bt_hci_raw"
+#include <base/log.h>
+#include <base/base.h>
 #include <errno.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -20,7 +24,7 @@
 #include <zephyr/devicetree.h>
 #include <zephyr/drivers/bluetooth.h>
 #include <zephyr/net_buf.h>
-#include <zephyr/sys/atomic.h>
+#include <base/bt_atomic.h>
 #include <zephyr/sys/byteorder.h>
 #include <zephyr/sys/util_macro.h>
 #include <zephyr/toolchain.h>
@@ -29,9 +33,7 @@
 #include "hci_raw_internal.h"
 #include "monitor.h"
 
-#define LOG_LEVEL CONFIG_BT_HCI_CORE_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_hci_raw);
-
+#define LOG_LEVEL CONFIG_EMBT_LOG_LEVEL
 static struct k_fifo *raw_rx;
 
 static bt_buf_rx_freed_cb_t buf_rx_freed_cb;

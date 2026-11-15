@@ -4,6 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#undef LOG_TAG
+#define LOG_TAG "bt_mesh_settings"
+#include <base/log.h>
+#include <base/base.h>
 #include <errno.h>
 #include <sys/types.h>
 #include <zephyr/sys/util.h>
@@ -32,9 +36,7 @@
 #include "solicitation.h"
 #include "va.h"
 
-#define LOG_LEVEL CONFIG_BT_MESH_SETTINGS_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_mesh_settings);
-
+#define LOG_LEVEL CONFIG_EMBT_LOG_LEVEL
 #ifdef CONFIG_BT_MESH_RPL_STORE_TIMEOUT
 #define RPL_STORE_TIMEOUT CONFIG_BT_MESH_RPL_STORE_TIMEOUT
 #else
@@ -63,7 +65,7 @@ static K_THREAD_STACK_DEFINE(settings_work_stack, SETTINGS_WORKQ_STACK_SIZE);
 
 static struct k_work_delayable pending_store;
 static struct k_work_delayable rpl_pending_store;
-static ATOMIC_DEFINE(pending_flags, BT_MESH_SETTINGS_FLAG_COUNT);
+static BT_ATOMIC_DEFINE(pending_flags, BT_MESH_SETTINGS_FLAG_COUNT);
 
 int bt_mesh_settings_set(settings_read_cb read_cb, void *cb_arg,
 			 void *out, size_t read_len)
@@ -89,7 +91,7 @@ int bt_mesh_settings_set(settings_read_cb read_cb, void *cb_arg,
 #if defined(CONFIG_BT_SETTINGS)
 static int mesh_commit(void)
 {
-	if (!atomic_test_bit(bt_mesh.flags, BT_MESH_INIT)) {
+	if (!bt_atomic_test_bit(bt_mesh.flags, BT_MESH_INIT)) {
 		return 0;
 	}
 
@@ -111,7 +113,7 @@ static int mesh_commit(void)
 	bt_mesh_net_settings_commit();
 	bt_mesh_model_settings_commit();
 
-	atomic_set_bit(bt_mesh.flags, BT_MESH_VALID);
+	bt_atomic_set_bit(bt_mesh.flags, BT_MESH_VALID);
 
 	bt_mesh_start();
 
@@ -163,14 +165,14 @@ static void schedule_store(struct k_work_delayable *dwork, uint32_t timeout_ms)
 
 void bt_mesh_settings_store_schedule(enum bt_mesh_settings_flag flag)
 {
-	atomic_set_bit(pending_flags, flag);
+	bt_atomic_set_bit(pending_flags, flag);
 
 	if (RPL_OWN_TIMEOUT && (BIT(flag) & RPL_PENDING_BITS) != 0) {
 		schedule_store(&rpl_pending_store, RPL_STORE_TIMEOUT * MSEC_PER_SEC);
 		return;
 	}
 
-	if ((atomic_get(pending_flags) & NO_WAIT_PENDING_BITS) != 0) {
+	if ((bt_atomic_get(pending_flags) & NO_WAIT_PENDING_BITS) != 0) {
 		schedule_store(&pending_store, 0);
 	} else {
 		schedule_store(&pending_store, CONFIG_BT_MESH_STORE_TIMEOUT * MSEC_PER_SEC);
@@ -179,7 +181,7 @@ void bt_mesh_settings_store_schedule(enum bt_mesh_settings_flag flag)
 
 void bt_mesh_settings_store_cancel(enum bt_mesh_settings_flag flag)
 {
-	atomic_clear_bit(pending_flags, flag);
+	bt_atomic_clear_bit(pending_flags, flag);
 }
 
 /* Data other than the replay protection list is only stored through the settings subsystem. */
@@ -235,7 +237,7 @@ static void store_pending_flags(uint32_t mask)
 			continue;
 		}
 
-		if (!atomic_test_and_clear_bit(pending_flags, i)) {
+		if (!bt_atomic_test_and_clear_bit(pending_flags, i)) {
 			continue;
 		}
 

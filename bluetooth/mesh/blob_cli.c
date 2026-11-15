@@ -3,6 +3,9 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
+#undef LOG_TAG
+#define LOG_TAG "bt_mesh_blob_cli"
+#include <base/log.h>
 #include <string.h>
 #include <zephyr/bluetooth/mesh.h>
 #include <common/bt_str.h>
@@ -11,9 +14,7 @@
 #include "net.h"
 #include "transport.h"
 
-#define LOG_LEVEL CONFIG_BT_MESH_MODEL_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_mesh_blob_cli);
-
+#define LOG_LEVEL CONFIG_EMBT_LOG_LEVEL
 #define TARGETS_FOR_EACH(cli, target)                                          \
 	SYS_SLIST_FOR_EACH_CONTAINER((sys_slist_t *)&(cli)->inputs->targets,   \
 				     target, n)

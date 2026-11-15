@@ -3,13 +3,17 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
+#undef LOG_TAG
+#define LOG_TAG "bt_cap_common"
+#include <base/log.h>
+#include <base/base.h>
 #include <errno.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
 
-#include <zephyr/autoconf.h>
+#include <embt/autoconf.h>
 #include <zephyr/bluetooth/att.h>
 #include <zephyr/bluetooth/audio/cap.h>
 #include <zephyr/bluetooth/audio/csip.h>
@@ -18,7 +22,7 @@
 #include <zephyr/bluetooth/gatt.h>
 #include <zephyr/bluetooth/uuid.h>
 #include <zephyr/sys/__assert.h>
-#include <zephyr/sys/atomic.h>
+#include <base/bt_atomic.h>
 #include <zephyr/sys/check.h>
 #include <zephyr/sys/util.h>
 #include <zephyr/sys/util_macro.h>
@@ -26,8 +30,6 @@
 
 #include "cap_internal.h"
 #include "csip_internal.h"
-
-LOG_MODULE_REGISTER(bt_cap_common, CONFIG_BT_CAP_COMMON_LOG_LEVEL);
 
 #include "common/bt_str.h"
 
@@ -111,12 +113,12 @@ bool bt_cap_common_subproc_is_type(enum bt_cap_common_subproc_type subproc_type)
 #if defined(CONFIG_BT_CAP_HANDOVER)
 void bt_cap_common_set_handover_active(void)
 {
-	atomic_set_bit(active_proc.proc_state_flags, BT_CAP_COMMON_PROC_STATE_HANDOVER);
+	bt_atomic_set_bit(active_proc.proc_state_flags, BT_CAP_COMMON_PROC_STATE_HANDOVER);
 }
 
 bool bt_cap_common_active_proc_is_handover(void)
 {
-	return atomic_test_bit(active_proc.proc_state_flags, BT_CAP_COMMON_PROC_STATE_HANDOVER);
+	return bt_atomic_test_bit(active_proc.proc_state_flags, BT_CAP_COMMON_PROC_STATE_HANDOVER);
 }
 #endif /* CONFIG_BT_CAP_HANDOVER */
 
@@ -147,18 +149,18 @@ struct bt_conn *bt_cap_common_get_member_conn(enum bt_cap_set_type type,
 
 bool bt_cap_common_test_and_set_proc_active(void)
 {
-	return atomic_test_and_set_bit(active_proc.proc_state_flags,
+	return bt_atomic_test_and_set_bit(active_proc.proc_state_flags,
 				       BT_CAP_COMMON_PROC_STATE_ACTIVE);
 }
 
 bool bt_cap_common_proc_is_active(void)
 {
-	return atomic_test_bit(active_proc.proc_state_flags, BT_CAP_COMMON_PROC_STATE_ACTIVE);
+	return bt_atomic_test_bit(active_proc.proc_state_flags, BT_CAP_COMMON_PROC_STATE_ACTIVE);
 }
 
 bool bt_cap_common_proc_is_aborted(void)
 {
-	return atomic_test_bit(active_proc.proc_state_flags, BT_CAP_COMMON_PROC_STATE_ABORTED);
+	return bt_atomic_test_bit(active_proc.proc_state_flags, BT_CAP_COMMON_PROC_STATE_ABORTED);
 }
 
 bool bt_cap_common_proc_all_handled(void)
@@ -190,7 +192,7 @@ void bt_cap_common_abort_proc(struct bt_conn *conn, int err)
 
 	active_proc.err = err;
 	active_proc.failed_conn = conn;
-	atomic_set_bit(active_proc.proc_state_flags, BT_CAP_COMMON_PROC_STATE_ABORTED);
+	bt_atomic_set_bit(active_proc.proc_state_flags, BT_CAP_COMMON_PROC_STATE_ABORTED);
 }
 
 #if defined(CONFIG_BT_CAP_INITIATOR_UNICAST)

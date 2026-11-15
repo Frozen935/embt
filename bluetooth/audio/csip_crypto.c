@@ -9,11 +9,14 @@
  * in the CSIS spec is also provided as BE, and logging values as BE will make
  * it easier to compare.
  */
+#undef LOG_TAG
+#define LOG_TAG "bt_csip_crypto"
+#include <base/log.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
 
-#include <zephyr/autoconf.h>
+#include <embt/autoconf.h>
 #include <zephyr/bluetooth/audio/csip.h>
 #include <zephyr/bluetooth/crypto.h>
 #include <zephyr/sys/byteorder.h>
@@ -25,8 +28,6 @@
 #include "common/bt_str.h"
 
 #include "csip_crypto.h"
-
-LOG_MODULE_REGISTER(bt_csip_crypto, CONFIG_BT_CSIP_SET_MEMBER_CRYPTO_LOG_LEVEL);
 
 #define BT_CSIP_CRYPTO_PADDING_SIZE 13U
 #define BT_CSIP_PADDED_RAND_SIZE    (BT_CSIP_CRYPTO_PADDING_SIZE + BT_CSIP_CRYPTO_PRAND_SIZE)

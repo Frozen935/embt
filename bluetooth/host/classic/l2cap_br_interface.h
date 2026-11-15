@@ -14,10 +14,12 @@ struct bt_l2cap_br_fixed_chan {
 };
 
 #define BT_L2CAP_BR_CHANNEL_DEFINE(_name, _cid, _accept)		\
-	const STRUCT_SECTION_ITERABLE(bt_l2cap_br_fixed_chan, _name) = { \
+	const struct bt_l2cap_br_fixed_chan _name = { \
 				.cid = _cid,			\
 				.accept = _accept,		\
 			}
+
+int bt_l2cap_br_fixed_chan_register(const struct bt_l2cap_br_fixed_chan *channel);
 
 /* Initialize BR/EDR L2CAP signal layer */
 void bt_l2cap_br_init(void);

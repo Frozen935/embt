@@ -5,10 +5,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#undef LOG_TAG
+#define LOG_TAG "bt_aes_ccm"
+#include <base/log.h>
 #include <errno.h>
 #include <stdint.h>
 
-#include <zephyr/autoconf.h>
+#include <embt/autoconf.h>
 #include <zephyr/bluetooth/crypto.h>
 #include <psa/crypto.h>
 #include <psa/crypto_struct.h>
@@ -17,9 +20,7 @@
 
 #include "common/bt_str.h"
 
-#define LOG_LEVEL CONFIG_BT_HCI_CORE_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_aes_ccm);
-
+#define LOG_LEVEL CONFIG_EMBT_LOG_LEVEL
 static int psa_status_to_errno(psa_status_t status)
 {
 	if (status == PSA_ERROR_INVALID_ARGUMENT) {

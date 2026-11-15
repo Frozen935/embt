@@ -4,6 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#undef LOG_TAG
+#define LOG_TAG "bt_mesh_transport"
+#include <base/log.h>
+#include <base/base.h>
 #include <errno.h>
 #include <string.h>
 #include <stdlib.h>
@@ -34,9 +38,7 @@
 #include "transport.h"
 #include "va.h"
 
-#define LOG_LEVEL CONFIG_BT_MESH_TRANS_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_mesh_transport);
-
+#define LOG_LEVEL CONFIG_EMBT_LOG_LEVEL
 #define AID_MASK                    ((uint8_t)(BIT_MASK(6)))
 
 #define SEG(data)                   ((data)[0] >> 7)
@@ -253,7 +255,7 @@ static void seg_tx_reset(struct seg_tx *tx)
 	tx->seg_send_started = 0;
 	tx->ack_received = 0;
 
-	if (atomic_test_and_clear_bit(bt_mesh.flags, BT_MESH_IVU_PENDING)) {
+	if (bt_atomic_test_and_clear_bit(bt_mesh.flags, BT_MESH_IVU_PENDING)) {
 		LOG_DBG("Proceeding with pending IV Update");
 		/* bt_mesh_net_iv_update() will re-enable the flag if this
 		 * wasn't the only transfer.

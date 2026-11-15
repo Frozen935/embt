@@ -4,7 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <zephyr/sys/crc.h>
+#include <base/base.h>
+#include <embt/sys/crc.h>
 
 uint8_t __weak crc4(const uint8_t *src, size_t len, uint8_t polynomial, uint8_t initial_value,
 	     bool reversed)

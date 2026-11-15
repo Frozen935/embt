@@ -8,6 +8,9 @@
  * https://www.bluetooth.com/specifications/specs/alert-notification-service-1-0/
  */
 
+#undef LOG_TAG
+#define LOG_TAG "bt_ans"
+#include <base/log.h>
 #include <errno.h>
 #include <string.h>
 #include <zephyr/types.h>
@@ -17,8 +20,6 @@
 #include <zephyr/bluetooth/uuid.h>
 #include <zephyr/bluetooth/services/ans.h>
 #include <zephyr/sys/util_utf8.h>
-
-LOG_MODULE_REGISTER(bt_ans, CONFIG_BT_ANS_LOG_LEVEL);
 
 /*
  * This only enforces a necessary lower bound at build time. It does

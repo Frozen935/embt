@@ -17,7 +17,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include <zephyr/sys/util.h>
+#include <embt/sys/util.h>
 
 #ifdef __cplusplus
 extern "C" {
