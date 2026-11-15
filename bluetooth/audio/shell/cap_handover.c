@@ -6,6 +6,7 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
+#include <embt/base/util_macro.h>
 #include <errno.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -14,26 +15,24 @@
 #include <string.h>
 #include <sys/types.h>
 
-#include <zephyr/autoconf.h>
-#include <zephyr/bluetooth/audio/audio.h>
-#include <zephyr/bluetooth/audio/bap.h>
-#include <zephyr/bluetooth/audio/csip.h>
-#include <zephyr/bluetooth/crypto.h>
-#include <zephyr/bluetooth/gap.h>
-#include <zephyr/bluetooth/iso.h>
-#include <zephyr/bluetooth/uuid.h>
-#include <zephyr/net_buf.h>
-#include <zephyr/shell/shell_string_conv.h>
-#include <zephyr/sys/__assert.h>
-#include <zephyr/sys/byteorder.h>
-#include <zephyr/sys/util.h>
-#include <zephyr/toolchain.h>
-#include <zephyr/types.h>
-#include <zephyr/shell/shell.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/gatt.h>
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/audio/cap.h>
+#include <embt/autoconf.h>
+#include <embt/bluetooth/audio/audio.h>
+#include <embt/bluetooth/audio/bap.h>
+#include <embt/bluetooth/audio/csip.h>
+#include <embt/bluetooth/crypto.h>
+#include <embt/bluetooth/gap.h>
+#include <embt/bluetooth/iso.h>
+#include <embt/bluetooth/uuid.h>
+#include <embt/net_buf.h>
+#include <shell/bt_shell.h>
+#include <embt/base/assert.h>
+#include <embt/base/byteorder.h>
+#include <embt/base/util.h>
+#include <embt/compiler.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/gatt.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/audio/cap.h>
 
 #include "common/bt_shell_private.h"
 #include "host/shell/bt.h"
@@ -197,7 +196,7 @@ static int register_callbacks(void)
 }
 
 static int validate_and_parse_cmd_cap_handover_unicast_to_broadcast_args(
-	const struct shell *sh, size_t argc, char *argv[],
+	const struct bt_shell *sh, size_t argc, char *argv[],
 	const struct named_lc3_preset **named_preset,
 	uint8_t broadcast_code[BT_ISO_BROADCAST_CODE_SIZE], bool *encrypted)
 {
@@ -212,9 +211,9 @@ static int validate_and_parse_cmd_cap_handover_unicast_to_broadcast_args(
 
 			i++;
 			if (i == argc) {
-				shell_help(sh);
+				bt_shell_help(sh);
 
-				return SHELL_CMD_HELP_PRINTED;
+				return BT_SHELL_CMD_HELP_PRINTED;
 			}
 
 			arg = argv[i];
@@ -223,7 +222,7 @@ static int validate_and_parse_cmd_cap_handover_unicast_to_broadcast_args(
 					    BT_ISO_BROADCAST_CODE_SIZE);
 
 			if (bcode_len != BT_ISO_BROADCAST_CODE_SIZE) {
-				shell_error(sh, "Invalid Broadcast Code Length: %zu", bcode_len);
+				bt_shell_session_error(sh, "Invalid Broadcast Code Length: %zu", bcode_len);
 
 				return -ENOEXEC;
 			}
@@ -232,23 +231,23 @@ static int validate_and_parse_cmd_cap_handover_unicast_to_broadcast_args(
 		} else if (strcmp(arg, "preset") == 0) {
 			i++;
 			if (i == argc) {
-				shell_help(sh);
+				bt_shell_help(sh);
 
-				return SHELL_CMD_HELP_PRINTED;
+				return BT_SHELL_CMD_HELP_PRINTED;
 			}
 
 			arg = argv[i];
 
 			*named_preset = bap_get_named_preset(false, BT_AUDIO_DIR_SINK, arg);
 			if (*named_preset == NULL) {
-				shell_error(sh, "Unable to parse named_preset %s", arg);
+				bt_shell_session_error(sh, "Unable to parse named_preset %s", arg);
 
 				return -ENOEXEC;
 			}
 		} else {
-			shell_help(sh);
+			bt_shell_help(sh);
 
-			return SHELL_CMD_HELP_PRINTED;
+			return BT_SHELL_CMD_HELP_PRINTED;
 		}
 
 		i++;
@@ -257,7 +256,7 @@ static int validate_and_parse_cmd_cap_handover_unicast_to_broadcast_args(
 	return 0;
 }
 
-static int cmd_cap_handover_cancel(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_cap_handover_cancel(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 
@@ -266,14 +265,14 @@ static int cmd_cap_handover_cancel(const struct shell *sh, size_t argc, char *ar
 
 	err = bt_cap_handover_cancel();
 	if (err != 0) {
-		shell_print(sh, "Failed to cancel CAP handover procedure: %d", err);
+		bt_shell_session_print(sh, "Failed to cancel CAP handover procedure: %d", err);
 		return -ENOEXEC;
 	}
 
 	return 0;
 }
 
-static int cmd_cap_handover_unicast_to_broadcast(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_cap_handover_unicast_to_broadcast(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	const struct named_lc3_preset *named_preset = &default_broadcast_source_preset;
 	struct bt_cap_handover_unicast_to_broadcast_param param = {0};
@@ -284,37 +283,37 @@ static int cmd_cap_handover_unicast_to_broadcast(const struct shell *sh, size_t 
 	int err;
 
 	if (adv == NULL) {
-		shell_error(sh, "Extended advertising set is NULL");
+		bt_shell_session_error(sh, "Extended advertising set is NULL");
 
 		return -ENOEXEC;
 	}
 
 	err = bt_le_ext_adv_get_info(adv, &adv_info);
 	if (err != 0) {
-		shell_error(sh, "Failed to get adv info: %d", err);
+		bt_shell_session_error(sh, "Failed to get adv info: %d", err);
 		return -ENOEXEC;
 	}
 
 	if (default_unicast_group.cap_group == NULL) {
-		shell_error(sh, "CAP unicast group not created");
+		bt_shell_session_error(sh, "CAP unicast group not created");
 
 		return -ENOEXEC;
 	}
 
 	if (!default_unicast_group.is_cap) {
-		shell_error(sh, "Unicast group is not CAP");
+		bt_shell_session_error(sh, "Unicast group is not CAP");
 
 		return -ENOEXEC;
 	}
 
 	if (default_source.cap_source != NULL) {
-		shell_error(sh, "CAP Broadcast source already created");
+		bt_shell_session_error(sh, "CAP Broadcast source already created");
 
 		return -ENOEXEC;
 	}
 
 	if (default_source.handover_in_progress) {
-		shell_info(sh, "CAP Handover in progress");
+		bt_shell_session_info(sh, "CAP Handover in progress");
 
 		return -ENOEXEC;
 	}
@@ -342,23 +341,23 @@ static int cmd_cap_handover_unicast_to_broadcast(const struct shell *sh, size_t 
 	err = bt_cap_unicast_group_foreach_stream(default_unicast_group.cap_group,
 						  unicast_group_foreach_stream_cb, &lookup_data);
 	if (err == -ECANCELED) {
-		shell_error(sh, "BASS not discovered on all streams");
+		bt_shell_session_error(sh, "BASS not discovered on all streams");
 
 		return -ENOEXEC;
 	} else if (err != 0) {
-		shell_error(sh, "Failed to iterate on all streams: %d", err);
+		bt_shell_session_error(sh, "Failed to iterate on all streams: %d", err);
 
 		return -ENOEXEC;
 	}
 
 	if (lookup_data.active_sink_streams_cnt == 0U) {
-		shell_error(sh, "No active sink streams in group, cannot handover");
+		bt_shell_session_error(sh, "No active sink streams in group, cannot handover");
 
 		return -ENOEXEC;
 	}
 
 	if (lookup_data.active_sink_streams_cnt > MAX_CAP_BROADCAST_STREAMS) {
-		shell_error(sh, "Too many active sink streams (%zu > %d), cannot handover",
+		bt_shell_session_error(sh, "Too many active sink streams (%zu > %d), cannot handover",
 			    lookup_data.active_sink_streams_cnt, MAX_CAP_BROADCAST_STREAMS);
 
 		return -ENOEXEC;
@@ -369,12 +368,12 @@ static int cmd_cap_handover_unicast_to_broadcast(const struct shell *sh, size_t 
 	 */
 	err = bt_rand(&broadcast_id, BT_AUDIO_BROADCAST_ID_SIZE);
 	if (err != 0) {
-		shell_error(sh, "Unable to generate broadcast ID: %d", err);
+		bt_shell_session_error(sh, "Unable to generate broadcast ID: %d", err);
 
 		return -ENOEXEC;
 	}
 
-	shell_print(sh, "Generated broadcast_id 0x%06X", broadcast_id);
+	bt_shell_session_print(sh, "Generated broadcast_id 0x%06X", broadcast_id);
 
 	copy_broadcast_source_preset(&default_source, named_preset);
 
@@ -407,7 +406,7 @@ static int cmd_cap_handover_unicast_to_broadcast(const struct shell *sh, size_t 
 
 	err = bt_cap_handover_unicast_to_broadcast(&param);
 	if (err != 0) {
-		shell_error(sh, "Failed to handover unicast audio to broadcast: %d", err);
+		bt_shell_session_error(sh, "Failed to handover unicast audio to broadcast: %d", err);
 
 		return -ENOEXEC;
 	}
@@ -473,7 +472,7 @@ static void populate_active_stream_conns(struct bt_conn *conn, void *data)
 }
 
 static int validate_and_parse_cmd_cap_handover_broadcast_to_unicast(
-	const struct shell *sh, size_t argc, char *argv[],
+	const struct bt_shell *sh, size_t argc, char *argv[],
 	const struct named_lc3_preset **named_preset, bool *all_conn, size_t *conn_cnt)
 {
 	size_t i;
@@ -486,19 +485,19 @@ static int validate_and_parse_cmd_cap_handover_broadcast_to_unicast(
 		if (strcmp(arg, "conns") == 0) {
 			i++;
 			if (i == argc) {
-				shell_help(sh);
+				bt_shell_help(sh);
 
-				return SHELL_CMD_HELP_PRINTED;
+				return BT_SHELL_CMD_HELP_PRINTED;
 			}
 
 			if (strcmp(argv[i], "all") == 0) {
 				*all_conn = true;
 				*conn_cnt = 0;
 			} else {
-				unsigned long conn_cnt_arg = shell_strtoul(argv[i], 10, &err);
+				unsigned long conn_cnt_arg = bt_shell_strtoul(argv[i], 10, &err);
 
 				if (err != 0) {
-					shell_error(
+					bt_shell_session_error(
 						sh,
 						"Failed to parse conn_cnt argument: %s: %s (%d)",
 						arg, argv[i], err);
@@ -507,7 +506,7 @@ static int validate_and_parse_cmd_cap_handover_broadcast_to_unicast(
 				}
 
 				if (conn_cnt_arg > CONFIG_BT_MAX_CONN) {
-					shell_error(sh, "Invalid number of connections: %lu",
+					bt_shell_session_error(sh, "Invalid number of connections: %lu",
 						    conn_cnt_arg);
 
 					return -ENOEXEC;
@@ -518,23 +517,23 @@ static int validate_and_parse_cmd_cap_handover_broadcast_to_unicast(
 		} else if (strcmp(arg, "preset") == 0) {
 			i++;
 			if (i == argc) {
-				shell_help(sh);
+				bt_shell_help(sh);
 
-				return SHELL_CMD_HELP_PRINTED;
+				return BT_SHELL_CMD_HELP_PRINTED;
 			}
 
 			arg = argv[i];
 
 			*named_preset = bap_get_named_preset(true, BT_AUDIO_DIR_SINK, arg);
 			if (*named_preset == NULL) {
-				shell_error(sh, "Unable to parse named_preset %s", arg);
+				bt_shell_session_error(sh, "Unable to parse named_preset %s", arg);
 
 				return -ENOEXEC;
 			}
 		} else {
-			shell_help(sh);
+			bt_shell_help(sh);
 
-			return SHELL_CMD_HELP_PRINTED;
+			return BT_SHELL_CMD_HELP_PRINTED;
 		}
 
 		i++;
@@ -544,7 +543,7 @@ static int validate_and_parse_cmd_cap_handover_broadcast_to_unicast(
 }
 
 static int cap_handover_broadcast_to_unicast_init_stream_params(
-	const struct shell *sh, struct bt_conn *active_stream_conns[CONFIG_BT_MAX_CONN],
+	const struct bt_shell *sh, struct bt_conn *active_stream_conns[CONFIG_BT_MAX_CONN],
 	size_t conn_cnt, const struct named_lc3_preset *named_preset,
 	struct bt_cap_unicast_audio_start_param *start_param, size_t *stream_cnt)
 
@@ -555,13 +554,13 @@ static int cap_handover_broadcast_to_unicast_init_stream_params(
 	err = bt_cap_initiator_broadcast_foreach_stream(
 		default_source.cap_source, cap_initiator_broadcast_foreach_stream_cb, &lookup_data);
 	if (err != 0) {
-		shell_error(sh, "Broadcast source not actively streaming");
+		bt_shell_session_error(sh, "Broadcast source not actively streaming");
 
 		return -ENOEXEC;
 	}
 
 	if (MAX(lookup_data.cnt, conn_cnt) > CONFIG_BT_BAP_UNICAST_CLIENT_GROUP_STREAM_COUNT) {
-		shell_error(sh, "Cannot setup %zu unicast streams in a single group (max %d)",
+		bt_shell_session_error(sh, "Cannot setup %zu unicast streams in a single group (max %d)",
 			    MAX(lookup_data.cnt, conn_cnt),
 			    CONFIG_BT_BAP_UNICAST_CLIENT_GROUP_STREAM_COUNT);
 
@@ -596,7 +595,7 @@ static int cap_handover_broadcast_to_unicast_init_stream_params(
 					snks[bt_conn_index(active_stream_conns[i])][j];
 
 				if (snk_ep == NULL) {
-					shell_info(sh,
+					bt_shell_session_info(sh,
 						   "Could only setup %zu/%zu sink endpoints on %p",
 						   j, lookup_data.cnt, active_stream_conns[i]);
 					break;
@@ -637,7 +636,7 @@ static int cap_handover_broadcast_to_unicast_init_stream_params(
 			struct bt_bap_ep *snk_ep = snks[bt_conn_index(active_stream_conns[i])][0];
 
 			if (snk_ep == NULL) {
-				shell_info(sh, "Could not setup stream on %p",
+				bt_shell_session_info(sh, "Could not setup stream on %p",
 					   active_stream_conns[i]);
 				break;
 			}
@@ -655,7 +654,7 @@ static int cap_handover_broadcast_to_unicast_init_stream_params(
 			(*stream_cnt)++;
 		}
 	} else {
-		shell_error(sh, "Complex scenarios not supported; please use either\n"
+		bt_shell_session_error(sh, "Complex scenarios not supported; please use either\n"
 				"\t * one connection and multiple streams\n"
 				"\t * multiple connections and one stream\n"
 				"\t * an identical amount of connections and streams");
@@ -668,7 +667,7 @@ static int cap_handover_broadcast_to_unicast_init_stream_params(
 	return 0;
 }
 
-static int cmd_cap_handover_broadcast_to_unicast(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_cap_handover_broadcast_to_unicast(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	struct bt_cap_handover_broadcast_to_unicast_param param = {0};
 	struct bt_conn *active_stream_conns[CONFIG_BT_MAX_CONN] = {0};
@@ -678,13 +677,13 @@ static int cmd_cap_handover_broadcast_to_unicast(const struct shell *sh, size_t 
 	int err;
 
 	if (default_source.cap_source == NULL || !default_source.is_cap) {
-		shell_error(sh, "No CAP broadcast source");
+		bt_shell_session_error(sh, "No CAP broadcast source");
 
 		return -ENOEXEC;
 	}
 
 	if (default_source.handover_in_progress) {
-		shell_error(sh, "Handover already in progress");
+		bt_shell_session_error(sh, "Handover already in progress");
 
 		return -ENOEXEC;
 	}
@@ -719,7 +718,7 @@ static int cmd_cap_handover_broadcast_to_unicast(const struct shell *sh, size_t 
 	for (size_t i = 0U; i < ARRAY_SIZE(active_stream_conns); i++) {
 		if (active_stream_conns[i] == NULL) {
 			if (conn_cnt > i) {
-				shell_error(sh,
+				bt_shell_session_error(sh,
 					    "Cannot perform action on %zu connections, only %zu "
 					    "connected",
 					    conn_cnt, i);
@@ -732,7 +731,7 @@ static int cmd_cap_handover_broadcast_to_unicast(const struct shell *sh, size_t 
 
 		if (broadcast_assistant_recv_states[bt_conn_index(active_stream_conns[i])]
 			    .recv_state_count == 0U) {
-			shell_error(sh, "Conn %p has not discovered BASS, cannot perform handover",
+			bt_shell_session_error(sh, "Conn %p has not discovered BASS, cannot perform handover",
 				    active_stream_conns[i]);
 
 			return -ENOEXEC;
@@ -744,14 +743,14 @@ static int cmd_cap_handover_broadcast_to_unicast(const struct shell *sh, size_t 
 	}
 
 	if (conn_cnt == 0U) {
-		shell_error(sh, "No connections for action");
+		bt_shell_session_error(sh, "No connections for action");
 
 		return -ENOEXEC;
 	}
 
 	err = register_callbacks();
 	if (err != 0) {
-		shell_error(sh, "Failed to register callbacks: %d", err);
+		bt_shell_session_error(sh, "Failed to register callbacks: %d", err);
 
 		return -ENOEXEC;
 	}
@@ -777,7 +776,7 @@ static int cmd_cap_handover_broadcast_to_unicast(const struct shell *sh, size_t 
 			&broadcast_assistant_recv_states[bt_conn_index(active_stream_conns[i])];
 
 		if (!recv_state->default_source_big_synced) {
-			shell_error(sh, "Conn %p is not BIG synced to us, cannot perform handover",
+			bt_shell_session_error(sh, "Conn %p is not BIG synced to us, cannot perform handover",
 				    active_stream_conns[i]);
 
 			return -ENOEXEC;
@@ -800,7 +799,7 @@ static int cmd_cap_handover_broadcast_to_unicast(const struct shell *sh, size_t 
 
 	err = bt_cap_handover_broadcast_to_unicast(&param);
 	if (err != 0) {
-		shell_error(sh, "Failed to handover broadcast audio to unicast: %d", err);
+		bt_shell_session_error(sh, "Failed to handover broadcast audio to unicast: %d", err);
 
 		return -ENOEXEC;
 	}
@@ -810,30 +809,30 @@ static int cmd_cap_handover_broadcast_to_unicast(const struct shell *sh, size_t 
 	return 0;
 }
 
-static int cmd_cap_handover(const struct shell *sh, size_t argc, char **argv)
+static int cmd_cap_handover(const struct bt_shell *sh, size_t argc, char **argv)
 {
 	if (argc > 1) {
-		shell_error(sh, "%s unknown parameter: %s", argv[0], argv[1]);
+		bt_shell_session_error(sh, "%s unknown parameter: %s", argv[0], argv[1]);
 	} else {
-		shell_error(sh, "%s Missing subcommand", argv[0]);
+		bt_shell_session_error(sh, "%s Missing subcommand", argv[0]);
 	}
 
 	return -ENOEXEC;
 }
 
-SHELL_STATIC_SUBCMD_SET_CREATE(
+BT_SHELL_STATIC_SUBCMD_SET_CREATE(
 	cap_handover_cmds,
-	SHELL_CMD_ARG(cancel, NULL, "CAP Handover cancel current procedure",
+	BT_SHELL_CMD_ARG(cancel, NULL, "CAP Handover cancel current procedure",
 		      cmd_cap_handover_cancel, 1, 0),
-	SHELL_CMD_ARG(unicast_to_broadcast, NULL,
+	BT_SHELL_CMD_ARG(unicast_to_broadcast, NULL,
 		      "Handover current unicast group to broadcast (unicast group will be deleted) "
 		      "[enc <broadcast_code>] [preset <preset_name>]",
 		      cmd_cap_handover_unicast_to_broadcast, 1, 4),
-	SHELL_CMD_ARG(broadcast_to_unicast, NULL,
+	BT_SHELL_CMD_ARG(broadcast_to_unicast, NULL,
 		      "Handover current broadcast source to unicast (broadcast source will be "
 		      "deleted) [conns <count>|all] [preset <preset_name>]",
 		      cmd_cap_handover_broadcast_to_unicast, 1, 4),
-	SHELL_SUBCMD_SET_END);
+	BT_SHELL_SUBCMD_SET_END);
 
-SHELL_CMD_ARG_REGISTER(cap_handover, &cap_handover_cmds, "Bluetooth CAP handover shell commands",
+BT_SHELL_CMD_ARG_REGISTER(cap_handover, &cap_handover_cmds, "Bluetooth CAP handover shell commands",
 		       cmd_cap_handover, 1, 1);

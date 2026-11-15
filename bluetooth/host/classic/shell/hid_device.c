@@ -4,22 +4,23 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <embt/base/assert.h>
+#include <embt/base/util_macro.h>
 #include <errno.h>
-#include <zephyr/types.h>
+#include <stdint.h>
 #include <stddef.h>
 #include <string.h>
-#include <zephyr/sys/byteorder.h>
+#include <embt/base/byteorder.h>
 
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/classic/hid_device.h>
-#include <zephyr/bluetooth/classic/sdp.h>
-#include <zephyr/bluetooth/hci.h>
-#include <zephyr/bluetooth/l2cap.h>
-#include <zephyr/usb/class/hid.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/classic/hid_device.h>
+#include <embt/bluetooth/classic/sdp.h>
+#include <embt/bluetooth/hci.h>
+#include <embt/bluetooth/l2cap.h>
+#include <embt/bluetooth/classic/hid_descriptor.h>
 
-#include <zephyr/shell/shell.h>
-#include <zephyr/shell/shell_string_conv.h>
+#include <shell/bt_shell.h>
 
 #include <host/shell/bt.h>
 #include <common/bt_shell_private.h>
@@ -450,125 +451,125 @@ static const struct bt_hid_device_cb hid_cb = {
 	.suspend = hid_suspend_cb,
 };
 
-static int cmd_hid_register(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_hid_register(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 
 	if (hid_registered) {
-		shell_error(sh, "HID: already registered");
+		bt_shell_session_error(sh, "HID: already registered");
 		return -EALREADY;
 	}
 
 	err = bt_hid_device_register(&hid_cb);
 	if (err != 0) {
-		shell_error(sh, "HID: register failed (%d)", err);
+		bt_shell_session_error(sh, "HID: register failed (%d)", err);
 		return err;
 	}
 
 	err = bt_sdp_register_service(&hid_rec);
 	if (err != 0 && err != -EEXIST) {
-		shell_error(sh, "HID: SDP register failed (%d)", err);
+		bt_shell_session_error(sh, "HID: SDP register failed (%d)", err);
 		bt_hid_device_unregister();
 		return err;
 	}
 
 	hid_registered = true;
-	shell_print(sh, "HID: registered");
+	bt_shell_session_print(sh, "HID: registered");
 	return 0;
 }
 
-static int cmd_hid_unregister(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_hid_unregister(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 
 	if (!hid_registered) {
-		shell_error(sh, "HID: not registered");
+		bt_shell_session_error(sh, "HID: not registered");
 		return -ENOEXEC;
 	}
 
 	err = bt_hid_device_unregister();
 	if (err != 0) {
-		shell_error(sh, "HID: unregister failed (%d)", err);
+		bt_shell_session_error(sh, "HID: unregister failed (%d)", err);
 		return err;
 	}
 
 	hid_registered = false;
 	default_hid = NULL;
-	shell_print(sh, "HID: unregistered");
+	bt_shell_session_print(sh, "HID: unregistered");
 	return 0;
 }
 
-static int cmd_hid_connect(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_hid_connect(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 
 	if (!hid_registered) {
-		shell_error(sh, "HID: not registered");
+		bt_shell_session_error(sh, "HID: not registered");
 		return -ENOEXEC;
 	}
 
 	if (default_conn == NULL) {
-		shell_error(sh, "HID: not connected");
+		bt_shell_session_error(sh, "HID: not connected");
 		return -ENOEXEC;
 	}
 
 	err = bt_hid_device_connect(default_conn, &default_hid);
 	if (err != 0) {
-		shell_error(sh, "HID: connect failed (%d)", err);
+		bt_shell_session_error(sh, "HID: connect failed (%d)", err);
 		return -ENOEXEC;
 	}
 
 	return 0;
 }
 
-static int cmd_hid_disconnect(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_hid_disconnect(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 
 	if (!hid_registered) {
-		shell_error(sh, "HID: not registered");
+		bt_shell_session_error(sh, "HID: not registered");
 		return -ENOEXEC;
 	}
 
 	if (default_hid == NULL) {
-		shell_error(sh, "HID: not connected");
+		bt_shell_session_error(sh, "HID: not connected");
 		return -ENOEXEC;
 	}
 
 	err = bt_hid_device_disconnect(default_hid);
 	if (err != 0) {
-		shell_error(sh, "HID: disconnect failed (%d)", err);
+		bt_shell_session_error(sh, "HID: disconnect failed (%d)", err);
 		return -ENOEXEC;
 	}
 
 	return 0;
 }
 
-static int cmd_hid_send_report(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_hid_send_report(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	long button, dx, dy, wheel = 0;
 	struct net_buf *buf;
 	int err = 0;
 
 	if (!hid_registered) {
-		shell_error(sh, "HID: not registered");
+		bt_shell_session_error(sh, "HID: not registered");
 		return -ENOEXEC;
 	}
 
 	if (default_hid == NULL) {
-		shell_error(sh, "HID: not connected");
+		bt_shell_session_error(sh, "HID: not connected");
 		return -ENOEXEC;
 	}
 
-	button = shell_strtol(argv[1], 0, &err);
-	dx = shell_strtol(argv[2], 0, &err);
-	dy = shell_strtol(argv[3], 0, &err);
+	button = bt_shell_strtol(argv[1], 0, &err);
+	dx = bt_shell_strtol(argv[2], 0, &err);
+	dy = bt_shell_strtol(argv[3], 0, &err);
 	if (argc >= 5U) {
-		wheel = shell_strtol(argv[4], 0, &err);
+		wheel = bt_shell_strtol(argv[4], 0, &err);
 	}
 
 	if (err != 0) {
-		shell_error(sh, "HID: invalid parameter");
+		bt_shell_session_error(sh, "HID: invalid parameter");
 		return -EINVAL;
 	}
 
@@ -576,13 +577,13 @@ static int cmd_hid_send_report(const struct shell *sh, size_t argc, char *argv[]
 	    (dx < -127) || (dx > 127) ||
 	    (dy < -127) || (dy > 127) ||
 	    (!hid_boot_mode && ((wheel < -127) || (wheel > 127)))) {
-		shell_error(sh, "HID: value out of bounds");
+		bt_shell_session_error(sh, "HID: value out of bounds");
 		return -ERANGE;
 	}
 
 	buf = bt_hid_device_create_pdu(&pool);
 	if (buf == NULL) {
-		shell_error(sh, "HID: failed to create PDU");
+		bt_shell_session_error(sh, "HID: failed to create PDU");
 		return -ENOEXEC;
 	}
 
@@ -609,36 +610,42 @@ static int cmd_hid_send_report(const struct shell *sh, size_t argc, char *argv[]
 	err = bt_hid_device_input_report(default_hid, buf);
 	if (err != 0) {
 		net_buf_unref(buf);
-		shell_error(sh, "HID: send report failed (%d)", err);
+		bt_shell_session_error(sh, "HID: send report failed (%d)", err);
 		return -ENOEXEC;
 	}
 
 	return 0;
 }
 
-SHELL_STATIC_SUBCMD_SET_CREATE(hid_device_cmds,
-	SHELL_CMD_ARG(register, NULL, "register hid mouse device", cmd_hid_register, 1, 0),
-	SHELL_CMD_ARG(unregister, NULL, "unregister hid mouse device", cmd_hid_unregister, 1, 0),
-	SHELL_CMD_ARG(connect, NULL, "hid connect", cmd_hid_connect, 1, 0),
-	SHELL_CMD_ARG(disconnect, NULL, "hid disconnect", cmd_hid_disconnect, 1, 0),
-	SHELL_CMD_ARG(send, NULL,
+BT_SHELL_STATIC_SUBCMD_SET_CREATE(hid_device_cmds,
+	BT_SHELL_CMD_ARG(register, NULL, "register hid mouse device", cmd_hid_register, 1, 0),
+	BT_SHELL_CMD_ARG(unregister, NULL, "unregister hid mouse device", cmd_hid_unregister, 1, 0),
+	BT_SHELL_CMD_ARG(connect, NULL, "hid connect", cmd_hid_connect, 1, 0),
+	BT_SHELL_CMD_ARG(disconnect, NULL, "hid disconnect", cmd_hid_disconnect, 1, 0),
+	BT_SHELL_CMD_ARG(send, NULL,
 			  "send mouse report: <(button bits: "
 			  "0=Left,1=Right,2=Middle,b3..7=4..8)> <X> <Y> [wheel]",
 			  cmd_hid_send_report, 4, 1),
-	SHELL_SUBCMD_SET_END
+	BT_SHELL_SUBCMD_SET_END
 );
 
-static int cmd_hid_device(const struct shell *sh, size_t argc, char **argv)
+static int cmd_hid_device(const struct bt_shell *sh, size_t argc, char **argv)
 {
 	if (argc == 1U) {
-		shell_help(sh);
-		return SHELL_CMD_HELP_PRINTED;
+		bt_shell_help(sh);
+		return BT_SHELL_CMD_HELP_PRINTED;
 	}
 
-	shell_print(sh, "%s unknown parameter: %s", argv[0], argv[1]);
+	bt_shell_session_print(sh, "%s unknown parameter: %s", argv[0], argv[1]);
 
 	return -ENOEXEC;
 }
 
-SHELL_CMD_ARG_REGISTER(hid_device, &hid_device_cmds, "Bluetooth HID Device sh commands",
+BT_SHELL_CMD_ARG_REGISTER(hid_device, &hid_device_cmds, "Bluetooth HID Device sh commands",
 		       cmd_hid_device, 1, 1);
+
+/** @brief Initialize module-owned storage before protocol operations. */
+void bt_host_classic_shell_hid_device_storage_init(void)
+{
+	net_buf_pool_init(&pool);
+}

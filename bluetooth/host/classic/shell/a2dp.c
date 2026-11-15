@@ -4,28 +4,33 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <embt/base/time.h>
+#include <embt/base/assert.h>
 #include <errno.h>
-#include <zephyr/types.h>
+#include <stdint.h>
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
-#include <zephyr/sys/byteorder.h>
-#include <zephyr/sys/minmax.h>
+#include <embt/base/byteorder.h>
+#include <embt/base/minmax.h>
 
-#include <zephyr/settings/settings.h>
+#include <embt/settings/settings.h>
 
-#include <zephyr/bluetooth/hci.h>
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/l2cap.h>
-#include <zephyr/bluetooth/classic/a2dp_codec_sbc.h>
-#include <zephyr/bluetooth/classic/a2dp.h>
-#include <zephyr/bluetooth/classic/sdp.h>
+#include <embt/bluetooth/hci.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/l2cap.h>
+#include <embt/bluetooth/classic/a2dp_codec_sbc.h>
+#include <embt/bluetooth/classic/a2dp.h>
+#include <embt/bluetooth/classic/sdp.h>
 
-#include <zephyr/shell/shell.h>
+#include <shell/bt_shell.h>
 
 #include <host/shell/bt.h>
 #include <common/bt_shell_private.h>
+#if defined(CONFIG_EMBT_AUDIO_SHELL) && defined(CONFIG_EMBT_A2DP_PLAYER)
+#include <embt/audio/a2dp_player.h>
+#endif
 
 struct bt_a2dp *default_a2dp;
 static uint8_t a2dp_sink_sdp_registered;
@@ -41,6 +46,9 @@ static struct bt_a2dp_ep *found_peer_sbc_endpoint;
 static struct bt_a2dp_ep *registered_sbc_endpoint;
 static struct bt_a2dp_stream sbc_stream;
 static struct bt_a2dp_stream_ops stream_ops;
+#if defined(CONFIG_EMBT_AUDIO_SHELL) && defined(CONFIG_EMBT_A2DP_PLAYER)
+static struct bt_a2dp_player *sbc_player;
+#endif
 
 #if defined(CONFIG_BT_A2DP_SOURCE)
 static uint8_t media_data[] = {
@@ -301,6 +309,11 @@ static void app_connected(struct bt_a2dp *a2dp, int err)
 
 static void app_disconnected(struct bt_a2dp *a2dp)
 {
+#if defined(CONFIG_EMBT_AUDIO_SHELL) && defined(CONFIG_EMBT_A2DP_PLAYER)
+	if (sbc_player) {
+		bt_a2dp_player_close(&sbc_player);
+	}
+#endif
 	found_peer_sbc_endpoint = NULL;
 	bt_shell_print("a2dp disconnected");
 }
@@ -413,6 +426,20 @@ static void app_suspend_rsp(struct bt_a2dp_stream *stream, uint8_t rsp_err_code)
 static void stream_configured(struct bt_a2dp_stream *stream)
 {
 	bt_shell_print("stream configured");
+#if defined(CONFIG_EMBT_AUDIO_SHELL) && defined(CONFIG_EMBT_A2DP_PLAYER)
+	if (stream->local_ep == &sink_sbc_endpoint) {
+		uint32_t rate = bt_a2dp_sbc_get_sampling_frequency(
+			(struct bt_a2dp_codec_sbc_params *)stream->codec_config.codec_ie);
+		int err;
+		if (sbc_player) {
+			bt_a2dp_player_close(&sbc_player);
+		}
+		err = bt_a2dp_player_open(rate, "pulse", getenv("EMBT_AUDIO_DEVICE"), &sbc_player);
+		if (err) {
+			bt_shell_error("SBC playback open failed (%d)", err);
+		}
+	}
+#endif
 }
 
 static void stream_established(struct bt_a2dp_stream *stream)
@@ -423,16 +450,40 @@ static void stream_established(struct bt_a2dp_stream *stream)
 static void stream_released(struct bt_a2dp_stream *stream)
 {
 	bt_shell_print("stream released");
+#if defined(CONFIG_EMBT_AUDIO_SHELL) && defined(CONFIG_EMBT_A2DP_PLAYER)
+	if (sbc_player) {
+		bt_a2dp_player_close(&sbc_player);
+	}
+#endif
 }
 
 static void stream_started(struct bt_a2dp_stream *stream)
 {
 	bt_shell_print("stream started");
+#if defined(CONFIG_EMBT_AUDIO_SHELL) && defined(CONFIG_EMBT_A2DP_PLAYER)
+	if (sbc_player) {
+		int err = bt_a2dp_player_start(sbc_player);
+		if (err && err != -EBUSY) {
+			bt_shell_error("SBC playback start failed (%d)", err);
+		}
+	}
+#endif
 }
 
 static void stream_suspended(struct bt_a2dp_stream *stream)
 {
 	bt_shell_print("stream suspended");
+#if defined(CONFIG_EMBT_AUDIO_SHELL) && defined(CONFIG_EMBT_A2DP_PLAYER)
+	if (sbc_player) {
+		struct bt_a2dp_player_status status;
+		bt_a2dp_player_get_status(sbc_player, &status);
+		int err = status.audio.state == BT_AUDIO_STOPPED ? 0 :
+			bt_a2dp_player_stop(sbc_player, false);
+		if (err) {
+			bt_shell_error("SBC playback stop failed (%d)", err);
+		}
+	}
+#endif
 }
 
 #if defined(CONFIG_BT_A2DP_SINK)
@@ -444,11 +495,22 @@ static void sink_sbc_streamer_data(struct bt_a2dp_stream *stream, struct net_buf
 	if (buf->len < 1U) {
 		return;
 	}
+
+#if defined(CONFIG_EMBT_AUDIO_SHELL) && defined(CONFIG_EMBT_A2DP_PLAYER)
+	if (sbc_player) {
+		int err = bt_a2dp_player_receive(sbc_player, buf->data, buf->len, seq_num, ts);
+		if (err) {
+			bt_shell_error("SBC playback packet rejected (%d)", err);
+		}
+	}
+#endif
 	sbc_hdr = net_buf_pull_u8(buf);
 	bt_shell_print("received, num of frames: %d, data length:%d",
 		       (uint8_t)BT_A2DP_SBC_MEDIA_HDR_NUM_FRAMES_GET(sbc_hdr), buf->len);
-	bt_shell_print("data: %d, %d, %d, %d, %d, %d ......", buf->data[0],
-		buf->data[1], buf->data[2], buf->data[3], buf->data[4], buf->data[5]);
+	if (buf->len >= 6U) {
+		bt_shell_print("data: %d, %d, %d, %d, %d, %d ......", buf->data[0],
+			buf->data[1], buf->data[2], buf->data[3], buf->data[4], buf->data[5]);
+	}
 }
 
 static void stream_recv(struct bt_a2dp_stream *stream,
@@ -543,7 +605,7 @@ static struct bt_a2dp_cb a2dp_cb = {
 #endif
 };
 
-static int check_cb_registration(const struct shell *sh)
+static int check_cb_registration(const struct bt_shell *sh)
 {
 	if (!a2dp_cb_registered) {
 		bt_shell_error("need to register a2dp connection callbacks");
@@ -553,7 +615,7 @@ static int check_cb_registration(const struct shell *sh)
 	return 0;
 }
 
-static int cmd_register_cb(const struct shell *sh, int32_t argc, char *argv[])
+static int cmd_register_cb(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err = -1;
 
@@ -573,7 +635,7 @@ static int cmd_register_cb(const struct shell *sh, int32_t argc, char *argv[])
 	return 0;
 }
 
-static int cmd_register_ep(const struct shell *sh, int32_t argc, char *argv[])
+static int cmd_register_ep(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err = -1;
 	const char *type;
@@ -589,10 +651,10 @@ static int cmd_register_ep(const struct shell *sh, int32_t argc, char *argv[])
 	if (argc == 4) {
 		set_delay_report = true;
 		err = 0;
-		delay_report = shell_strtobool(argv[3], 10, &err);
+		delay_report = bt_shell_strtobool(argv[3], 10, &err);
 		if (err != 0) {
-			shell_help(sh);
-			return SHELL_CMD_HELP_PRINTED;
+			bt_shell_help(sh);
+			return BT_SHELL_CMD_HELP_PRINTED;
 		}
 	}
 
@@ -632,11 +694,11 @@ static int cmd_register_ep(const struct shell *sh, int32_t argc, char *argv[])
 				registered_sbc_endpoint = &source_sbc_endpoint;
 			}
 		} else {
-			shell_help(sh);
+			bt_shell_help(sh);
 			return 0;
 		}
 	} else {
-		shell_help(sh);
+		bt_shell_help(sh);
 		return 0;
 	}
 
@@ -647,7 +709,7 @@ static int cmd_register_ep(const struct shell *sh, int32_t argc, char *argv[])
 	return 0;
 }
 
-static int cmd_connect(const struct shell *sh, int32_t argc, char *argv[])
+static int cmd_connect(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	if (check_cb_registration(sh) != 0) {
 		return -ENOEXEC;
@@ -665,7 +727,7 @@ static int cmd_connect(const struct shell *sh, int32_t argc, char *argv[])
 	return 0;
 }
 
-static int cmd_disconnect(const struct shell *sh, int32_t argc, char *argv[])
+static int cmd_disconnect(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	if (check_cb_registration(sh) != 0) {
 		return -ENOEXEC;
@@ -696,7 +758,7 @@ static struct bt_a2dp_stream_ops stream_ops = {
 };
 
 BT_A2DP_SBC_EP_CFG_DEFAULT(sbc_cfg_default, A2DP_SBC_SAMP_FREQ_44100);
-static int cmd_configure(const struct shell *sh, int32_t argc, char *argv[])
+static int cmd_configure(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 
@@ -729,7 +791,7 @@ static int cmd_configure(const struct shell *sh, int32_t argc, char *argv[])
 	return 0;
 }
 
-static int cmd_reconfigure(const struct shell *sh, int32_t argc, char *argv[])
+static int cmd_reconfigure(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	if (check_cb_registration(sh) != 0) {
 		return -ENOEXEC;
@@ -764,7 +826,7 @@ static struct bt_a2dp_discover_param discover_param = {
 	.sep_count = 5,
 };
 
-static int cmd_get_peer_eps(const struct shell *sh, int32_t argc, char *argv[])
+static int cmd_get_peer_eps(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err = 0;
 
@@ -773,7 +835,7 @@ static int cmd_get_peer_eps(const struct shell *sh, int32_t argc, char *argv[])
 	}
 
 	if (default_a2dp != NULL) {
-		discover_param.avdtp_version = (uint16_t)shell_strtoul(argv[1], 0, &err);
+		discover_param.avdtp_version = (uint16_t)bt_shell_strtoul(argv[1], 0, &err);
 		if (err != 0) {
 			bt_shell_error("failed to parse avdtp version: %d", err);
 
@@ -791,7 +853,7 @@ static int cmd_get_peer_eps(const struct shell *sh, int32_t argc, char *argv[])
 	return 0;
 }
 
-static int cmd_establish(const struct shell *sh, int32_t argc, char *argv[])
+static int cmd_establish(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	if (check_cb_registration(sh) != 0) {
 		return -ENOEXEC;
@@ -803,7 +865,7 @@ static int cmd_establish(const struct shell *sh, int32_t argc, char *argv[])
 	return 0;
 }
 
-static int cmd_release(const struct shell *sh, int32_t argc, char *argv[])
+static int cmd_release(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	if (check_cb_registration(sh) != 0) {
 		return -ENOEXEC;
@@ -815,7 +877,7 @@ static int cmd_release(const struct shell *sh, int32_t argc, char *argv[])
 	return 0;
 }
 
-static int cmd_start(const struct shell *sh, int32_t argc, char *argv[])
+static int cmd_start(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	if (check_cb_registration(sh) != 0) {
 		return -ENOEXEC;
@@ -827,7 +889,7 @@ static int cmd_start(const struct shell *sh, int32_t argc, char *argv[])
 	return 0;
 }
 
-static int cmd_suspend(const struct shell *sh, int32_t argc, char *argv[])
+static int cmd_suspend(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	if (check_cb_registration(sh) != 0) {
 		return -ENOEXEC;
@@ -839,7 +901,7 @@ static int cmd_suspend(const struct shell *sh, int32_t argc, char *argv[])
 	return 0;
 }
 
-static int cmd_abort(const struct shell *sh, int32_t argc, char *argv[])
+static int cmd_abort(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	if (check_cb_registration(sh) != 0) {
 		return -ENOEXEC;
@@ -851,7 +913,7 @@ static int cmd_abort(const struct shell *sh, int32_t argc, char *argv[])
 	return 0;
 }
 
-static int cmd_send_media(const struct shell *sh, int32_t argc, char *argv[])
+static int cmd_send_media(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 #if defined(CONFIG_BT_A2DP_SOURCE)
 	struct net_buf *buf;
@@ -862,7 +924,7 @@ static int cmd_send_media(const struct shell *sh, int32_t argc, char *argv[])
 		return -ENOEXEC;
 	}
 
-	buf = bt_a2dp_stream_create_pdu(&a2dp_tx_pool, K_FOREVER);
+	buf = bt_a2dp_stream_create_pdu(&a2dp_tx_pool, BT_FOREVER);
 	if (buf == NULL) {
 		bt_shell_error("fail to allocate buffer");
 		return -ENOEXEC;
@@ -889,7 +951,7 @@ static int cmd_send_media(const struct shell *sh, int32_t argc, char *argv[])
 }
 
 #if defined(CONFIG_BT_A2DP_SINK)
-static int cmd_send_delay_report(const struct shell *sh, int32_t argc, char *argv[])
+static int cmd_send_delay_report(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 
@@ -906,7 +968,7 @@ static int cmd_send_delay_report(const struct shell *sh, int32_t argc, char *arg
 }
 #endif
 
-static int cmd_get_config(const struct shell *sh, int32_t argc, char *argv[])
+static int cmd_get_config(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	if (check_cb_registration(sh) != 0) {
 		return -ENOEXEC;
@@ -918,7 +980,7 @@ static int cmd_get_config(const struct shell *sh, int32_t argc, char *argv[])
 	return 0;
 }
 
-static int cmd_get_conn(const struct shell *sh, int32_t argc, char *argv[])
+static int cmd_get_conn(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	struct bt_conn *conn;
 
@@ -939,35 +1001,79 @@ static int cmd_get_conn(const struct shell *sh, int32_t argc, char *argv[])
 
 #define HELP_NONE "[none]"
 
-SHELL_STATIC_SUBCMD_SET_CREATE(a2dp_cmds,
-	SHELL_CMD_ARG(register_cb, NULL, "register a2dp connection callbacks",
+#if defined(CONFIG_EMBT_AUDIO_SHELL) && defined(CONFIG_EMBT_A2DP_PLAYER)
+/** @brief Report the shared player's decode and PCM delivery counters. */
+static int cmd_audio_status(const struct bt_shell *sh, size_t argc, char **argv)
+{
+	struct bt_a2dp_player_status status;
+	int err;
+	(void)argc;
+	(void)argv;
+	if (!sbc_player) {
+		return -ENODEV;
+	}
+	err = bt_a2dp_player_get_status(sbc_player, &status);
+	if (!err) {
+		bt_shell_session_print(sh,
+			"PCM state %u, decoded %llu, submitted %llu, consumed %llu, rejected %llu, error %d",
+			status.audio.state, (unsigned long long)status.decoded_frames,
+			(unsigned long long)status.audio.submitted_frames,
+			(unsigned long long)status.audio.consumed_frames,
+			(unsigned long long)status.rejected_packets, status.audio.error);
+	}
+	return err;
+}
+
+/** @brief Request an explicit playback drain or drop without blocking the shell. */
+static int cmd_audio_stop(const struct bt_shell *sh, size_t argc, char **argv)
+{
+	(void)sh;
+	(void)argc;
+	if (!sbc_player) {
+		return -ENODEV;
+	}
+	if (strcmp(argv[1], "drain") && strcmp(argv[1], "drop")) {
+		return -EINVAL;
+	}
+	return bt_a2dp_player_stop(sbc_player, !strcmp(argv[1], "drain"));
+}
+#endif
+
+BT_SHELL_STATIC_SUBCMD_SET_CREATE(a2dp_cmds,
+#if defined(CONFIG_EMBT_AUDIO_SHELL) && defined(CONFIG_EMBT_A2DP_PLAYER)
+	BT_SHELL_CMD_ARG(audio_status, NULL, "Report decoded and delivered PCM frames",
+			cmd_audio_status, 1, 0),
+	BT_SHELL_CMD_ARG(audio_stop, NULL, "<drain|drop> Stop PCM playback asynchronously",
+			cmd_audio_stop, 2, 0),
+#endif
+	BT_SHELL_CMD_ARG(register_cb, NULL, "register a2dp connection callbacks",
 			cmd_register_cb, 1, 0),
-	SHELL_CMD_ARG(register_ep, NULL,
+	BT_SHELL_CMD_ARG(register_ep, NULL,
 		      "<type: sink or source> <value: sbc> [delay report: true or false]",
 		      cmd_register_ep, 3, 1),
-	SHELL_CMD_ARG(connect, NULL, HELP_NONE, cmd_connect, 1, 0),
-	SHELL_CMD_ARG(disconnect, NULL, HELP_NONE, cmd_disconnect, 1, 0),
-	SHELL_CMD_ARG(discover_peer_eps, NULL, "<avdtp version value>", cmd_get_peer_eps, 2, 0),
-	SHELL_CMD_ARG(configure, NULL, "\"configure/enable the stream\"", cmd_configure, 1, 0),
-	SHELL_CMD_ARG(establish, NULL, "\"establish the stream\"", cmd_establish, 1, 0),
-	SHELL_CMD_ARG(reconfigure, NULL, "\"reconfigure the stream\"", cmd_reconfigure, 1, 0),
-	SHELL_CMD_ARG(release, NULL, "\"release the stream\"", cmd_release, 1, 0),
-	SHELL_CMD_ARG(start, NULL, "\"start the stream\"", cmd_start, 1, 0),
-	SHELL_CMD_ARG(suspend, NULL, "\"suspend the stream\"", cmd_suspend, 1, 0),
-	SHELL_CMD_ARG(abort, NULL, "\"abort the stream\"", cmd_abort, 1, 0),
-	SHELL_CMD_ARG(send_media, NULL, HELP_NONE, cmd_send_media, 1, 0),
+	BT_SHELL_CMD_ARG(connect, NULL, HELP_NONE, cmd_connect, 1, 0),
+	BT_SHELL_CMD_ARG(disconnect, NULL, HELP_NONE, cmd_disconnect, 1, 0),
+	BT_SHELL_CMD_ARG(discover_peer_eps, NULL, "<avdtp version value>", cmd_get_peer_eps, 2, 0),
+	BT_SHELL_CMD_ARG(configure, NULL, "\"configure/enable the stream\"", cmd_configure, 1, 0),
+	BT_SHELL_CMD_ARG(establish, NULL, "\"establish the stream\"", cmd_establish, 1, 0),
+	BT_SHELL_CMD_ARG(reconfigure, NULL, "\"reconfigure the stream\"", cmd_reconfigure, 1, 0),
+	BT_SHELL_CMD_ARG(release, NULL, "\"release the stream\"", cmd_release, 1, 0),
+	BT_SHELL_CMD_ARG(start, NULL, "\"start the stream\"", cmd_start, 1, 0),
+	BT_SHELL_CMD_ARG(suspend, NULL, "\"suspend the stream\"", cmd_suspend, 1, 0),
+	BT_SHELL_CMD_ARG(abort, NULL, "\"abort the stream\"", cmd_abort, 1, 0),
+	BT_SHELL_CMD_ARG(send_media, NULL, HELP_NONE, cmd_send_media, 1, 0),
 #if defined(CONFIG_BT_A2DP_SINK)
-	SHELL_CMD_ARG(send_delay_report, NULL, HELP_NONE, cmd_send_delay_report, 1, 0),
+	BT_SHELL_CMD_ARG(send_delay_report, NULL, HELP_NONE, cmd_send_delay_report, 1, 0),
 #endif
-	SHELL_CMD_ARG(get_config, NULL, HELP_NONE, cmd_get_config, 1, 0),
-	SHELL_CMD_ARG(get_conn, NULL, HELP_NONE, cmd_get_conn, 1, 0),
-	SHELL_SUBCMD_SET_END
+	BT_SHELL_CMD_ARG(get_config, NULL, HELP_NONE, cmd_get_config, 1, 0),
+	BT_SHELL_CMD_ARG(get_conn, NULL, HELP_NONE, cmd_get_conn, 1, 0),
+	BT_SHELL_SUBCMD_SET_END
 );
 
-static int cmd_a2dp(const struct shell *sh, size_t argc, char **argv)
+static int cmd_a2dp(const struct bt_shell *sh, size_t argc, char **argv)
 {
 	if (argc == 1) {
-		shell_help(sh);
+		bt_shell_help(sh);
 		/* sh returns 1 when help is printed */
 		return 1;
 	}
@@ -977,5 +1083,11 @@ static int cmd_a2dp(const struct shell *sh, size_t argc, char **argv)
 	return -ENOEXEC;
 }
 
-SHELL_CMD_ARG_REGISTER(a2dp, &a2dp_cmds, "Bluetooth A2DP sh commands",
+BT_SHELL_CMD_ARG_REGISTER(a2dp, &a2dp_cmds, "Bluetooth A2DP sh commands",
 			   cmd_a2dp, 1, 1);
+
+/** @brief Initialize module-owned storage before protocol operations. */
+void bt_host_classic_shell_a2dp_storage_init(void)
+{
+	net_buf_pool_init(&a2dp_tx_pool);
+}

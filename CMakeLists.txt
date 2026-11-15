@@ -140,6 +140,9 @@ add_executable(embt_link_check test/compile/link_check.c)
 target_link_libraries(embt_link_check PRIVATE
   "-Wl,--whole-archive" EmBT::embt "-Wl,--no-whole-archive")
 embt_test_instrument(embt_link_check)
+if(CONFIG_EMBT_AUDIO_SHELL)
+  target_link_libraries(embt_link_check PRIVATE EmBT::player)
+endif()
 
 if(BUILD_TESTING)
   add_subdirectory(test/bringup)

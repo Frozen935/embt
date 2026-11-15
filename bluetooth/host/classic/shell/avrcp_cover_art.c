@@ -8,21 +8,22 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <embt/base/assert.h>
 #include <errno.h>
-#include <zephyr/types.h>
+#include <stdint.h>
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
-#include <zephyr/sys/byteorder.h>
+#include <embt/base/byteorder.h>
 
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/hci.h>
-#include <zephyr/bluetooth/l2cap.h>
-#include <zephyr/bluetooth/classic/avrcp.h>
-#include <zephyr/bluetooth/classic/avrcp_cover_art.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/hci.h>
+#include <embt/bluetooth/l2cap.h>
+#include <embt/bluetooth/classic/avrcp.h>
+#include <embt/bluetooth/classic/avrcp_cover_art.h>
 
-#include <zephyr/shell/shell.h>
+#include <shell/bt_shell.h>
 
 #include <host/shell/bt.h>
 #include <common/bt_shell_private.h>
@@ -149,31 +150,31 @@ struct bt_avrcp_cover_art_tg_cb cover_art_tg_cb = {
 	.get_linked_thumbnail = tg_get_linked_thumbnail,
 };
 
-static int cmd_tg_reg(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_tg_reg(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 
 	err = bt_avrcp_cover_art_tg_cb_register(&cover_art_tg_cb);
 	if (err != 0) {
-		shell_error(sh, "Failed to reg cover art cb (err %d)", err);
+		bt_shell_session_error(sh, "Failed to reg cover art cb (err %d)", err);
 	}
 
 	return err;
 }
 
-static int cmd_tg_l2cap_disconnect(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_tg_l2cap_disconnect(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 
 	err = bt_avrcp_cover_art_tg_l2cap_disconnect(ca_tg);
 	if (err != 0) {
-		shell_error(sh, "L2CAP disconnect failed (err %d)", err);
+		bt_shell_session_error(sh, "L2CAP disconnect failed (err %d)", err);
 	}
 
 	return err;
 }
 
-static int parse_rsp_code(const struct shell *sh, size_t argc, char *argv[], uint8_t *rsp_code)
+static int parse_rsp_code(const struct bt_shell *sh, size_t argc, char *argv[], uint8_t *rsp_code)
 {
 	const char *rsp;
 
@@ -184,20 +185,20 @@ static int parse_rsp_code(const struct shell *sh, size_t argc, char *argv[], uin
 		*rsp_code = BT_OBEX_RSP_CODE_SUCCESS;
 	} else if (!strcmp(rsp, "error")) {
 		if (argc < 3) {
-			shell_error(sh, "[rsp_code] is needed if the rsp is %s", rsp);
-			shell_help(sh);
-			return SHELL_CMD_HELP_PRINTED;
+			bt_shell_session_error(sh, "[rsp_code] is needed if the rsp is %s", rsp);
+			bt_shell_help(sh);
+			return BT_SHELL_CMD_HELP_PRINTED;
 		}
 		*rsp_code = (uint8_t)strtoul(argv[2], NULL, 16);
 	} else {
-		shell_help(sh);
-		return SHELL_CMD_HELP_PRINTED;
+		bt_shell_help(sh);
+		return BT_SHELL_CMD_HELP_PRINTED;
 	}
 
 	return 0;
 }
 
-static int cmd_tg_connect(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_tg_connect(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint8_t rsp_code;
 	int err;
@@ -209,13 +210,13 @@ static int cmd_tg_connect(const struct shell *sh, size_t argc, char *argv[])
 
 	err = bt_avrcp_cover_art_tg_connect(ca_tg, rsp_code);
 	if (err != 0) {
-		shell_error(sh, "Cover art TG connect rsp failed (err %d)", err);
+		bt_shell_session_error(sh, "Cover art TG connect rsp failed (err %d)", err);
 	}
 
 	return err;
 }
 
-static int cmd_tg_disconnect(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_tg_disconnect(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint8_t rsp_code;
 	int err;
@@ -227,13 +228,13 @@ static int cmd_tg_disconnect(const struct shell *sh, size_t argc, char *argv[])
 
 	err = bt_avrcp_cover_art_tg_disconnect(ca_tg, rsp_code);
 	if (err != 0) {
-		shell_error(sh, "Cover art TG disconnect rsp failed (err %d)", err);
+		bt_shell_session_error(sh, "Cover art TG disconnect rsp failed (err %d)", err);
 	}
 
 	return err;
 }
 
-static int cmd_tg_abort(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_tg_abort(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint8_t rsp_code;
 	int err;
@@ -245,7 +246,7 @@ static int cmd_tg_abort(const struct shell *sh, size_t argc, char *argv[])
 
 	err = bt_avrcp_cover_art_tg_abort(ca_tg, rsp_code, NULL);
 	if (err != 0) {
-		shell_error(sh, "Cover art TG abort rsp failed (err %d)", err);
+		bt_shell_session_error(sh, "Cover art TG abort rsp failed (err %d)", err);
 	}
 
 	return err;
@@ -261,7 +262,7 @@ static int cmd_tg_abort(const struct shell *sh, size_t argc, char *argv[])
 	"<attachment content-type=\"audio/basic\" name=\"ABCD0001.wav\" size=\"102400\"/>"         \
 	"</image-properties>"
 
-static int cmd_tg_get_image_properties(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_tg_get_image_properties(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint8_t rsp_code;
 	const char *rsp;
@@ -273,16 +274,16 @@ static int cmd_tg_get_image_properties(const struct shell *sh, size_t argc, char
 	static uint16_t offset;
 
 	if (ca_tg == NULL) {
-		shell_error(sh, "Invalid Cover Art Target");
+		bt_shell_session_error(sh, "Invalid Cover Art Target");
 		return -ENOEXEC;
 	}
 
 	rsp = argv[1];
 	if (!strcmp(rsp, "error")) {
 		if (argc < 3) {
-			shell_error(sh, "[rsp_code] is needed if the rsp is %s", rsp);
-			shell_help(sh);
-			return SHELL_CMD_HELP_PRINTED;
+			bt_shell_session_error(sh, "[rsp_code] is needed if the rsp is %s", rsp);
+			bt_shell_help(sh);
+			return BT_SHELL_CMD_HELP_PRINTED;
 		}
 		rsp_code = (uint8_t)strtoul(argv[2], NULL, 16);
 
@@ -291,7 +292,7 @@ static int cmd_tg_get_image_properties(const struct shell *sh, size_t argc, char
 
 	buf = bt_avrcp_cover_art_tg_create_pdu(ca_tg, &tx_pool);
 	if (buf == NULL) {
-		shell_error(sh, "Fail to allocate tx buffer");
+		bt_shell_session_error(sh, "Fail to allocate tx buffer");
 		return -ENOBUFS;
 	}
 
@@ -299,7 +300,7 @@ static int cmd_tg_get_image_properties(const struct shell *sh, size_t argc, char
 						  sizeof(IMAGE_PROPERTIES_BODY) - offset,
 						  image_properties_body + offset, &len);
 	if (err != 0) {
-		shell_error(sh, "Fail to add body");
+		bt_shell_session_error(sh, "Fail to add body");
 	}
 
 	if (bt_obex_has_header(buf, BT_OBEX_HEADER_ID_END_BODY)) {
@@ -314,7 +315,7 @@ error_rsp:
 		if (buf != NULL) {
 			net_buf_unref(buf);
 		}
-		shell_error(sh, "Fail to send image properties rsp %d", err);
+		bt_shell_session_error(sh, "Fail to send image properties rsp %d", err);
 	} else {
 		if (rsp_code == BT_OBEX_RSP_CODE_CONTINUE) {
 			offset += len;
@@ -406,7 +407,7 @@ static const uint8_t jpeg_1000001[] = {
 	/* EOI (End of Image) */
 	0xFF, 0xD9};
 
-static int cmd_tg_get_image(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_tg_get_image(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint8_t rsp_code;
 	const char *rsp;
@@ -417,16 +418,16 @@ static int cmd_tg_get_image(const struct shell *sh, size_t argc, char *argv[])
 	static uint16_t offset;
 
 	if (ca_tg == NULL) {
-		shell_error(sh, "Invalid Cover Art Target");
+		bt_shell_session_error(sh, "Invalid Cover Art Target");
 		return -ENOEXEC;
 	}
 
 	rsp = argv[1];
 	if (!strcmp(rsp, "error")) {
 		if (argc < 3) {
-			shell_error(sh, "[rsp_code] is needed if the rsp is %s", rsp);
-			shell_help(sh);
-			return SHELL_CMD_HELP_PRINTED;
+			bt_shell_session_error(sh, "[rsp_code] is needed if the rsp is %s", rsp);
+			bt_shell_help(sh);
+			return BT_SHELL_CMD_HELP_PRINTED;
 		}
 		rsp_code = (uint8_t)strtoul(argv[2], NULL, 16);
 
@@ -435,14 +436,14 @@ static int cmd_tg_get_image(const struct shell *sh, size_t argc, char *argv[])
 
 	buf = bt_avrcp_cover_art_tg_create_pdu(ca_tg, &tx_pool);
 	if (buf == NULL) {
-		shell_error(sh, "Fail to allocate tx buffer");
+		bt_shell_session_error(sh, "Fail to allocate tx buffer");
 		return -ENOBUFS;
 	}
 
 	if (offset == 0) {
 		err = bt_obex_add_header_len(buf, sizeof(jpeg_1000001));
 		if (err != 0) {
-			shell_error(sh, "Fail to add len header %d", err);
+			bt_shell_session_error(sh, "Fail to add len header %d", err);
 			net_buf_unref(buf);
 			return err;
 		}
@@ -452,7 +453,7 @@ static int cmd_tg_get_image(const struct shell *sh, size_t argc, char *argv[])
 						  sizeof(jpeg_1000001) - offset,
 						  jpeg_1000001 + offset, &len);
 	if (err != 0) {
-		shell_error(sh, "Fail to add body");
+		bt_shell_session_error(sh, "Fail to add body");
 	}
 
 	if (bt_obex_has_header(buf, BT_OBEX_HEADER_ID_END_BODY)) {
@@ -467,7 +468,7 @@ error_rsp:
 		if (buf != NULL) {
 			net_buf_unref(buf);
 		}
-		shell_error(sh, "Fail to send get image rsp %d", err);
+		bt_shell_session_error(sh, "Fail to send get image rsp %d", err);
 	} else {
 		if (rsp_code == BT_OBEX_RSP_CODE_CONTINUE) {
 			offset += len;
@@ -478,7 +479,7 @@ error_rsp:
 	return err;
 }
 
-static int cmd_tg_get_linked_thumbnail(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_tg_get_linked_thumbnail(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint8_t rsp_code;
 	const char *rsp;
@@ -489,16 +490,16 @@ static int cmd_tg_get_linked_thumbnail(const struct shell *sh, size_t argc, char
 	static uint16_t offset;
 
 	if (ca_tg == NULL) {
-		shell_error(sh, "Invalid Cover Art Target");
+		bt_shell_session_error(sh, "Invalid Cover Art Target");
 		return -ENOEXEC;
 	}
 
 	rsp = argv[1];
 	if (!strcmp(rsp, "error")) {
 		if (argc < 3) {
-			shell_error(sh, "[rsp_code] is needed if the rsp is %s", rsp);
-			shell_help(sh);
-			return SHELL_CMD_HELP_PRINTED;
+			bt_shell_session_error(sh, "[rsp_code] is needed if the rsp is %s", rsp);
+			bt_shell_help(sh);
+			return BT_SHELL_CMD_HELP_PRINTED;
 		}
 		rsp_code = (uint8_t)strtoul(argv[2], NULL, 16);
 
@@ -507,7 +508,7 @@ static int cmd_tg_get_linked_thumbnail(const struct shell *sh, size_t argc, char
 
 	buf = bt_avrcp_cover_art_tg_create_pdu(ca_tg, &tx_pool);
 	if (buf == NULL) {
-		shell_error(sh, "Fail to allocate tx buffer");
+		bt_shell_session_error(sh, "Fail to allocate tx buffer");
 		return -ENOBUFS;
 	}
 
@@ -515,7 +516,7 @@ static int cmd_tg_get_linked_thumbnail(const struct shell *sh, size_t argc, char
 						  sizeof(jpeg_1000001) - offset,
 						  jpeg_1000001 + offset, &len);
 	if (err != 0) {
-		shell_error(sh, "Fail to add body");
+		bt_shell_session_error(sh, "Fail to add body");
 	}
 
 	if (bt_obex_has_header(buf, BT_OBEX_HEADER_ID_END_BODY)) {
@@ -530,7 +531,7 @@ error_rsp:
 		if (buf != NULL) {
 			net_buf_unref(buf);
 		}
-		shell_error(sh, "Fail to send get linked thumbnail rsp %d", err);
+		bt_shell_session_error(sh, "Fail to send get linked thumbnail rsp %d", err);
 	} else {
 		if (rsp_code == BT_OBEX_RSP_CODE_CONTINUE) {
 			offset += len;
@@ -631,13 +632,13 @@ static struct bt_avrcp_cover_art_ct_cb cover_art_ct_cb = {
 	.get_linked_thumbnail = ct_get_linked_thumbnail,
 };
 
-static int cmd_ct_reg(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_ct_reg(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 
 	err = bt_avrcp_cover_art_ct_cb_register(&cover_art_ct_cb);
 	if (err != 0) {
-		shell_error(sh, "Failed to reg cover art CT cb (err %d)", err);
+		bt_shell_session_error(sh, "Failed to reg cover art CT cb (err %d)", err);
 	}
 
 	return err;
@@ -645,73 +646,73 @@ static int cmd_ct_reg(const struct shell *sh, size_t argc, char *argv[])
 
 extern struct bt_avrcp_ct *default_ct;
 
-static int cmd_ct_l2cap_connect(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_ct_l2cap_connect(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint16_t psm;
 	int err = 0;
 
-	psm = shell_strtoul(argv[1], 16, &err);
+	psm = bt_shell_strtoul(argv[1], 16, &err);
 	if (err != 0) {
-		shell_error(sh, "Invalid PSM %s", argv[1]);
+		bt_shell_session_error(sh, "Invalid PSM %s", argv[1]);
 		return -ENOEXEC;
 	}
 
 	if (default_ct == NULL) {
-		shell_error(sh, "Invalid CT");
+		bt_shell_session_error(sh, "Invalid CT");
 		return -ENOEXEC;
 	}
 
 	err = bt_avrcp_cover_art_ct_l2cap_connect(default_ct, &ca_ct, psm);
 	if (err != 0) {
-		shell_error(sh, "L2CAP connect failed (err %d)", err);
+		bt_shell_session_error(sh, "L2CAP connect failed (err %d)", err);
 	}
 
 	return err;
 }
 
-static int cmd_ct_l2cap_disconnect(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_ct_l2cap_disconnect(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 
 	err = bt_avrcp_cover_art_ct_l2cap_disconnect(ca_ct);
 	if (err != 0) {
-		shell_error(sh, "L2CAP disconnect failed (err %d)", err);
+		bt_shell_session_error(sh, "L2CAP disconnect failed (err %d)", err);
 	}
 
 	return err;
 }
 
-static int cmd_ct_connect(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_ct_connect(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 
 	err = bt_avrcp_cover_art_ct_connect(ca_ct);
 	if (err != 0) {
-		shell_error(sh, "OBEX connect failed (err %d)", err);
+		bt_shell_session_error(sh, "OBEX connect failed (err %d)", err);
 	}
 
 	return err;
 }
 
-static int cmd_ct_disconnect(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_ct_disconnect(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 
 	err = bt_avrcp_cover_art_ct_disconnect(ca_ct);
 	if (err != 0) {
-		shell_error(sh, "OBEX disconnect failed (err %d)", err);
+		bt_shell_session_error(sh, "OBEX disconnect failed (err %d)", err);
 	}
 
 	return err;
 }
 
-static int cmd_ct_abort(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_ct_abort(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 
 	err = bt_avrcp_cover_art_ct_abort(ca_ct, NULL);
 	if (err != 0) {
-		shell_error(sh, "OBEX abort failed (err %d)", err);
+		bt_shell_session_error(sh, "OBEX abort failed (err %d)", err);
 	}
 
 	return err;
@@ -720,19 +721,19 @@ static int cmd_ct_abort(const struct shell *sh, size_t argc, char *argv[])
 #define IMAGE_HANDLE "\x00\x31\x00\x30\x00\x30\x00\x30\x00\x30\x00\x30\x00\x31\x00\x00"
 
 #if defined(CONFIG_BT_AVRCP_CT_COVER_ART_GET_IMAGE_PROPERTIES)
-static int cmd_ct_get_image_properties(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_ct_get_image_properties(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	struct net_buf *buf;
 	int err;
 
 	if (ca_ct == NULL) {
-		shell_error(sh, "Invalid Cover Art CT");
+		bt_shell_session_error(sh, "Invalid Cover Art CT");
 		return -ENOEXEC;
 	}
 
 	buf = bt_avrcp_cover_art_ct_create_pdu(ca_ct, &tx_pool);
 	if (buf == NULL) {
-		shell_error(sh, "Fail to allocate tx buffer");
+		bt_shell_session_error(sh, "Fail to allocate tx buffer");
 		return -ENOBUFS;
 	}
 
@@ -742,20 +743,20 @@ static int cmd_ct_get_image_properties(const struct shell *sh, size_t argc, char
 
 	err = bt_obex_add_header_conn_id(buf, ca_ct->client._conn_id);
 	if (err != 0) {
-		shell_error(sh, "Fail to add conn id header %d", err);
+		bt_shell_session_error(sh, "Fail to add conn id header %d", err);
 		goto failed;
 	}
 
 	err = bt_obex_add_header_type(buf, sizeof(BT_BIP_HDR_TYPE_GET_IMAGE_PROPERTIES),
 				      BT_BIP_HDR_TYPE_GET_IMAGE_PROPERTIES);
 	if (err != 0) {
-		shell_error(sh, "Fail to add type header %d", err);
+		bt_shell_session_error(sh, "Fail to add type header %d", err);
 		goto failed;
 	}
 
 	err = bt_bip_add_header_image_handle(buf, sizeof(IMAGE_HANDLE) - 1, IMAGE_HANDLE);
 	if (err != 0) {
-		shell_error(sh, "Fail to add image handle header %d", err);
+		bt_shell_session_error(sh, "Fail to add image handle header %d", err);
 		goto failed;
 	}
 
@@ -765,7 +766,7 @@ continue_req:
 		return 0;
 	}
 
-	shell_error(sh, "Fail to send get_image_properties req %d", err);
+	bt_shell_session_error(sh, "Fail to send get_image_properties req %d", err);
 
 failed:
 	net_buf_unref(buf);
@@ -780,19 +781,19 @@ failed:
 	"<image encoding=\"JPEG\" pixel=\"640*480\" size=\"100000\"/>"                             \
 	"</image-descriptor>"
 
-static int cmd_ct_get_image(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_ct_get_image(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	struct net_buf *buf;
 	int err;
 
 	if (ca_ct == NULL) {
-		shell_error(sh, "Invalid Cover Art CT");
+		bt_shell_session_error(sh, "Invalid Cover Art CT");
 		return -ENOEXEC;
 	}
 
 	buf = bt_avrcp_cover_art_ct_create_pdu(ca_ct, &tx_pool);
 	if (buf == NULL) {
-		shell_error(sh, "Fail to allocate tx buffer");
+		bt_shell_session_error(sh, "Fail to allocate tx buffer");
 		return -ENOBUFS;
 	}
 
@@ -802,26 +803,26 @@ static int cmd_ct_get_image(const struct shell *sh, size_t argc, char *argv[])
 
 	err = bt_obex_add_header_conn_id(buf, ca_ct->client._conn_id);
 	if (err != 0) {
-		shell_error(sh, "Fail to add conn id header %d", err);
+		bt_shell_session_error(sh, "Fail to add conn id header %d", err);
 		goto failed;
 	}
 
 	err = bt_obex_add_header_type(buf, sizeof(BT_BIP_HDR_TYPE_GET_IMAGE),
 				      BT_BIP_HDR_TYPE_GET_IMAGE);
 	if (err != 0) {
-		shell_error(sh, "Fail to add type header %d", err);
+		bt_shell_session_error(sh, "Fail to add type header %d", err);
 		goto failed;
 	}
 
 	err = bt_bip_add_header_image_handle(buf, sizeof(IMAGE_HANDLE) - 1, IMAGE_HANDLE);
 	if (err != 0) {
-		shell_error(sh, "Fail to add image handle header %d", err);
+		bt_shell_session_error(sh, "Fail to add image handle header %d", err);
 		goto failed;
 	}
 
 	err = bt_bip_add_header_image_desc(buf, sizeof(IMAGE_DESC), IMAGE_DESC);
 	if (err != 0) {
-		shell_error(sh, "Fail to add image descriptor header %d", err);
+		bt_shell_session_error(sh, "Fail to add image descriptor header %d", err);
 		goto failed;
 	}
 
@@ -831,7 +832,7 @@ continue_req:
 		return 0;
 	}
 
-	shell_error(sh, "Fail to send get_image req %d", err);
+	bt_shell_session_error(sh, "Fail to send get_image req %d", err);
 
 failed:
 	net_buf_unref(buf);
@@ -840,19 +841,19 @@ failed:
 #endif /* CONFIG_BT_AVRCP_CT_COVER_ART_GET_IMAGE */
 
 #if defined(CONFIG_BT_AVRCP_CT_COVER_ART_GET_LINKED_THUMBNAIL)
-static int cmd_ct_get_linked_thumbnail(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_ct_get_linked_thumbnail(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	struct net_buf *buf;
 	int err;
 
 	if (ca_ct == NULL) {
-		shell_error(sh, "Invalid Cover Art CT");
+		bt_shell_session_error(sh, "Invalid Cover Art CT");
 		return -ENOEXEC;
 	}
 
 	buf = bt_avrcp_cover_art_ct_create_pdu(ca_ct, &tx_pool);
 	if (buf == NULL) {
-		shell_error(sh, "Fail to allocate tx buffer");
+		bt_shell_session_error(sh, "Fail to allocate tx buffer");
 		return -ENOBUFS;
 	}
 
@@ -862,20 +863,20 @@ static int cmd_ct_get_linked_thumbnail(const struct shell *sh, size_t argc, char
 
 	err = bt_obex_add_header_conn_id(buf, ca_ct->client._conn_id);
 	if (err != 0) {
-		shell_error(sh, "Fail to add conn id header %d", err);
+		bt_shell_session_error(sh, "Fail to add conn id header %d", err);
 		goto failed;
 	}
 
 	err = bt_obex_add_header_type(buf, sizeof(BT_BIP_HDR_TYPE_GET_LINKED_THUMBNAIL),
 				      BT_BIP_HDR_TYPE_GET_LINKED_THUMBNAIL);
 	if (err != 0) {
-		shell_error(sh, "Fail to add type header %d", err);
+		bt_shell_session_error(sh, "Fail to add type header %d", err);
 		goto failed;
 	}
 
 	err = bt_bip_add_header_image_handle(buf, sizeof(IMAGE_HANDLE) - 1, IMAGE_HANDLE);
 	if (err != 0) {
-		shell_error(sh, "Fail to add image handle header %d", err);
+		bt_shell_session_error(sh, "Fail to add image handle header %d", err);
 		goto failed;
 	}
 
@@ -885,7 +886,7 @@ continue_req:
 		return 0;
 	}
 
-	shell_error(sh, "Fail to send get_linked_thumbnail req %d", err);
+	bt_shell_session_error(sh, "Fail to send get_linked_thumbnail req %d", err);
 
 failed:
 	net_buf_unref(buf);
@@ -900,60 +901,66 @@ failed:
 #define RSP_HELP_1 "<rsp: continue, success, error> [rsp_code]"
 #define RSP_HELP_2 "<rsp: noerror, error> [rsp_code]"
 
-SHELL_STATIC_SUBCMD_SET_CREATE(
-	tg_cmds, SHELL_CMD_ARG(reg, NULL, HELP_NONE, cmd_tg_reg, 1, 0),
-	SHELL_CMD_ARG(l2cap_disconnect, NULL, HELP_NONE, cmd_tg_l2cap_disconnect, 1, 0),
-	SHELL_CMD_ARG(connect, NULL, RSP_HELP_1, cmd_tg_connect, 2, 1),
-	SHELL_CMD_ARG(disconnect, NULL, RSP_HELP_1, cmd_tg_disconnect, 2, 1),
-	SHELL_CMD_ARG(abort, NULL, RSP_HELP_1, cmd_tg_abort, 2, 1),
-	SHELL_CMD_ARG(get_image_properties, NULL, RSP_HELP_2, cmd_tg_get_image_properties, 2, 1),
-	SHELL_CMD_ARG(get_image, NULL, RSP_HELP_2, cmd_tg_get_image, 2, 1),
-	SHELL_CMD_ARG(get_linked_thumbnail, NULL, RSP_HELP_2, cmd_tg_get_linked_thumbnail, 2, 1),
-	SHELL_SUBCMD_SET_END);
+BT_SHELL_STATIC_SUBCMD_SET_CREATE(
+	tg_cmds, BT_SHELL_CMD_ARG(reg, NULL, HELP_NONE, cmd_tg_reg, 1, 0),
+	BT_SHELL_CMD_ARG(l2cap_disconnect, NULL, HELP_NONE, cmd_tg_l2cap_disconnect, 1, 0),
+	BT_SHELL_CMD_ARG(connect, NULL, RSP_HELP_1, cmd_tg_connect, 2, 1),
+	BT_SHELL_CMD_ARG(disconnect, NULL, RSP_HELP_1, cmd_tg_disconnect, 2, 1),
+	BT_SHELL_CMD_ARG(abort, NULL, RSP_HELP_1, cmd_tg_abort, 2, 1),
+	BT_SHELL_CMD_ARG(get_image_properties, NULL, RSP_HELP_2, cmd_tg_get_image_properties, 2, 1),
+	BT_SHELL_CMD_ARG(get_image, NULL, RSP_HELP_2, cmd_tg_get_image, 2, 1),
+	BT_SHELL_CMD_ARG(get_linked_thumbnail, NULL, RSP_HELP_2, cmd_tg_get_linked_thumbnail, 2, 1),
+	BT_SHELL_SUBCMD_SET_END);
 #endif /* CONFIG_BT_AVRCP_TG_COVER_ART */
 
 #if defined(CONFIG_BT_AVRCP_CT_COVER_ART)
-SHELL_STATIC_SUBCMD_SET_CREATE(
-	ct_cmds, SHELL_CMD_ARG(reg, NULL, HELP_NONE, cmd_ct_reg, 1, 0),
-	SHELL_CMD_ARG(l2cap_connect, NULL, "<psm>", cmd_ct_l2cap_connect, 2, 0),
-	SHELL_CMD_ARG(l2cap_disconnect, NULL, HELP_NONE, cmd_ct_l2cap_disconnect, 1, 0),
-	SHELL_CMD_ARG(connect, NULL, HELP_NONE, cmd_ct_connect, 1, 0),
-	SHELL_CMD_ARG(disconnect, NULL, HELP_NONE, cmd_ct_disconnect, 1, 0),
-	SHELL_CMD_ARG(abort, NULL, HELP_NONE, cmd_ct_abort, 1, 0),
+BT_SHELL_STATIC_SUBCMD_SET_CREATE(
+	ct_cmds, BT_SHELL_CMD_ARG(reg, NULL, HELP_NONE, cmd_ct_reg, 1, 0),
+	BT_SHELL_CMD_ARG(l2cap_connect, NULL, "<psm>", cmd_ct_l2cap_connect, 2, 0),
+	BT_SHELL_CMD_ARG(l2cap_disconnect, NULL, HELP_NONE, cmd_ct_l2cap_disconnect, 1, 0),
+	BT_SHELL_CMD_ARG(connect, NULL, HELP_NONE, cmd_ct_connect, 1, 0),
+	BT_SHELL_CMD_ARG(disconnect, NULL, HELP_NONE, cmd_ct_disconnect, 1, 0),
+	BT_SHELL_CMD_ARG(abort, NULL, HELP_NONE, cmd_ct_abort, 1, 0),
 #if defined(CONFIG_BT_AVRCP_CT_COVER_ART_GET_IMAGE_PROPERTIES)
-	SHELL_CMD_ARG(get_image_properties, NULL, HELP_NONE, cmd_ct_get_image_properties, 1, 0),
+	BT_SHELL_CMD_ARG(get_image_properties, NULL, HELP_NONE, cmd_ct_get_image_properties, 1, 0),
 #endif /* CONFIG_BT_AVRCP_CT_COVER_ART_GET_IMAGE_PROPERTIES */
 #if defined(CONFIG_BT_AVRCP_CT_COVER_ART_GET_IMAGE)
-	SHELL_CMD_ARG(get_image, NULL, HELP_NONE, cmd_ct_get_image, 1, 0),
+	BT_SHELL_CMD_ARG(get_image, NULL, HELP_NONE, cmd_ct_get_image, 1, 0),
 #endif /* CONFIG_BT_AVRCP_CT_COVER_ART_GET_IMAGE */
 #if defined(CONFIG_BT_AVRCP_CT_COVER_ART_GET_LINKED_THUMBNAIL)
-	SHELL_CMD_ARG(get_linked_thumbnail, NULL, HELP_NONE, cmd_ct_get_linked_thumbnail, 1, 0),
+	BT_SHELL_CMD_ARG(get_linked_thumbnail, NULL, HELP_NONE, cmd_ct_get_linked_thumbnail, 1, 0),
 #endif /* CONFIG_BT_AVRCP_CT_COVER_ART_GET_LINKED_THUMBNAIL */
-	SHELL_SUBCMD_SET_END);
+	BT_SHELL_SUBCMD_SET_END);
 #endif /* CONFIG_BT_AVRCP_CT_COVER_ART */
 
-static int cmd_avrcp_cover_art(const struct shell *sh, size_t argc, char **argv)
+static int cmd_avrcp_cover_art(const struct bt_shell *sh, size_t argc, char **argv)
 {
 	if (argc == 1) {
-		shell_help(sh);
-		return SHELL_CMD_HELP_PRINTED;
+		bt_shell_help(sh);
+		return BT_SHELL_CMD_HELP_PRINTED;
 	}
 
-	shell_error(sh, "%s unknown parameter: %s", argv[0], argv[1]);
+	bt_shell_session_error(sh, "%s unknown parameter: %s", argv[0], argv[1]);
 
 	return -ENOEXEC;
 }
 
-SHELL_STATIC_SUBCMD_SET_CREATE(avrcp_cover_art_cmds,
+BT_SHELL_STATIC_SUBCMD_SET_CREATE(avrcp_cover_art_cmds,
 #if defined(CONFIG_BT_AVRCP_CT_COVER_ART)
-			       SHELL_CMD(ct, &ct_cmds, "AVRCP Cover Art CT shell commands",
+			       BT_SHELL_CMD(ct, &ct_cmds, "AVRCP Cover Art CT shell commands",
 					 cmd_avrcp_cover_art),
 #endif /* CONFIG_BT_AVRCP_CT_COVER_ART*/
 #if defined(CONFIG_BT_AVRCP_TG_COVER_ART)
-			       SHELL_CMD(tg, &tg_cmds, "AVRCP Cover Art TG shell commands",
+			       BT_SHELL_CMD(tg, &tg_cmds, "AVRCP Cover Art TG shell commands",
 					 cmd_avrcp_cover_art),
 #endif /* CONFIG_BT_AVRCP_TG_COVER_ART */
-			       SHELL_SUBCMD_SET_END);
+			       BT_SHELL_SUBCMD_SET_END);
 
-SHELL_CMD_ARG_REGISTER(avrcp_cover_art, &avrcp_cover_art_cmds,
+BT_SHELL_CMD_ARG_REGISTER(avrcp_cover_art, &avrcp_cover_art_cmds,
 		       "Bluetooth AVRCP Cover Art shell commands", cmd_avrcp_cover_art, 1, 1);
+
+/** @brief Initialize module-owned storage before protocol operations. */
+void bt_host_classic_shell_avrcp_cover_art_storage_init(void)
+{
+	net_buf_pool_init(&tx_pool);
+}

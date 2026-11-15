@@ -4,19 +4,20 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <embt/base/assert.h>
+#include <embt/base/util_macro.h>
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/classic/classic.h>
-#include <zephyr/bluetooth/classic/hid_host.h>
-#include <zephyr/bluetooth/classic/sdp.h>
-#include <zephyr/bluetooth/l2cap.h>
-#include <zephyr/shell/shell.h>
-#include <zephyr/shell/shell_string_conv.h>
-#include <zephyr/sys/util.h>
-#include <zephyr/usb/class/hid.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/classic/classic.h>
+#include <embt/bluetooth/classic/hid_host.h>
+#include <embt/bluetooth/classic/sdp.h>
+#include <embt/bluetooth/l2cap.h>
+#include <shell/bt_shell.h>
+#include <embt/base/util.h>
+#include <embt/bluetooth/classic/hid_descriptor.h>
 
 #include "host/shell/bt.h"
 #include "common/bt_shell_private.h"
@@ -32,7 +33,7 @@ NET_BUF_POOL_FIXED_DEFINE(hid_host_pool, HID_HOST_TX_BUF_COUNT,
 NET_BUF_POOL_FIXED_DEFINE(sdp_client_pool, CONFIG_BT_MAX_CONN, SDP_CLIENT_USER_BUF_LEN, 8, NULL);
 
 /* Report Descriptor item decoding. The item type and tag values come from
- * <zephyr/usb/class/hid.h>, which only provides the HID_ITEM() encoder, so the
+ * <embt/bluetooth/classic/hid_descriptor.h>, which only provides the HID_ITEM() encoder, so the
  * matching decode masks are defined here and checked against that encoder.
  */
 #define HID_ITEM_SIZE_MASK GENMASK(1, 0)
@@ -54,7 +55,7 @@ BUILD_ASSERT(HID_ITEM(0, 0, HID_ITEM_SIZE_4_BYTES) == HID_ITEM_SIZE_MASK,
 	     "HID item size decode mask does not match HID_ITEM()");
 
 /* Long item prefix, followed by bDataSize and bLongItemTag. Not covered by
- * <zephyr/usb/class/hid.h>, which only builds short items.
+ * <embt/bluetooth/classic/hid_descriptor.h>, which only builds short items.
  */
 #define HID_ITEM_LONG_PREFIX  0xfeU
 #define HID_ITEM_LONG_HDR_LEN 2U
@@ -653,77 +654,77 @@ static const struct bt_hid_host_cb host_cb = {
 	.vc_unplug = hid_vc_unplug_cb,
 };
 
-static int cmd_hid_register(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_hid_register(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 
 	if (hid_registered) {
-		shell_error(sh, "already registered");
+		bt_shell_session_error(sh, "already registered");
 		return -EALREADY;
 	}
 
 	err = bt_hid_host_register(&host_cb);
 	if (err != 0) {
-		shell_error(sh, "register failed (%d)", err);
+		bt_shell_session_error(sh, "register failed (%d)", err);
 		return err;
 	}
 
 	hid_registered = true;
-	shell_print(sh, "registered");
+	bt_shell_session_print(sh, "registered");
 	return 0;
 }
 
-static int cmd_hid_unregister(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_hid_unregister(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 
 	if (!hid_registered) {
-		shell_error(sh, "not registered");
+		bt_shell_session_error(sh, "not registered");
 		return -ENOEXEC;
 	}
 
 	err = bt_hid_host_unregister();
 	if (err != 0) {
-		shell_error(sh, "unregister failed (%d)", err);
+		bt_shell_session_error(sh, "unregister failed (%d)", err);
 		return err;
 	}
 
 	hid_registered = false;
 	default_hid = NULL;
-	shell_print(sh, "unregistered");
+	bt_shell_session_print(sh, "unregistered");
 	return 0;
 }
 
-static int cmd_hid_connect(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_hid_connect(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 
 	if (!hid_registered) {
-		shell_error(sh, "not registered");
+		bt_shell_session_error(sh, "not registered");
 		return -ENOEXEC;
 	}
 
 	if (default_conn == NULL) {
-		shell_error(sh, "not connected");
+		bt_shell_session_error(sh, "not connected");
 		return -ENOEXEC;
 	}
 
 	err = bt_hid_host_connect(default_conn, &default_hid);
 	if (err != 0) {
-		shell_error(sh, "connect failed (%d)", err);
+		bt_shell_session_error(sh, "connect failed (%d)", err);
 		return err;
 	}
 
 	return 0;
 }
 
-static int cmd_hid_sdp_discover(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_hid_sdp_discover(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	size_t index;
 	int err;
 
 	if (default_conn == NULL) {
-		shell_error(sh, "not connected");
+		bt_shell_session_error(sh, "not connected");
 		return -ENOEXEC;
 	}
 
@@ -731,7 +732,7 @@ static int cmd_hid_sdp_discover(const struct shell *sh, size_t argc, char *argv[
 	__ASSERT(index < ARRAY_SIZE(hid_discov), "Index is out of bounds");
 
 	if (hid_discov[index].pending) {
-		shell_error(sh, "a service record query is already outstanding");
+		bt_shell_session_error(sh, "a service record query is already outstanding");
 		return -EBUSY;
 	}
 
@@ -741,27 +742,27 @@ static int cmd_hid_sdp_discover(const struct shell *sh, size_t argc, char *argv[
 	err = bt_sdp_discover(default_conn, &hid_discov[index].params);
 	if (err != 0) {
 		hid_discov[index].pending = false;
-		shell_error(sh, "SDP discovery failed: err %d", err);
+		bt_shell_session_error(sh, "SDP discovery failed: err %d", err);
 		return -ENOEXEC;
 	}
 
-	shell_print(sh, "SDP discovery started");
+	bt_shell_session_print(sh, "SDP discovery started");
 
 	return 0;
 }
 
-static int cmd_hid_disconnect(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_hid_disconnect(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 
 	if (default_hid == NULL) {
-		shell_error(sh, "not connected");
+		bt_shell_session_error(sh, "not connected");
 		return -ENOEXEC;
 	}
 
 	err = bt_hid_host_disconnect(default_hid);
 	if (err != 0) {
-		shell_error(sh, "disconnect failed (%d)", err);
+		bt_shell_session_error(sh, "disconnect failed (%d)", err);
 		return err;
 	}
 
@@ -772,7 +773,7 @@ static int cmd_hid_disconnect(const struct shell *sh, size_t argc, char *argv[])
  * is how a second association is reached while both are up. Keyed by address as
  * the BR/EDR select command is, since an association belongs to one ACL.
  */
-static int cmd_hid_select(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_hid_select(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	const struct hid_peer *peer;
 	struct bt_conn *conn;
@@ -781,13 +782,13 @@ static int cmd_hid_select(const struct shell *sh, size_t argc, char *argv[])
 
 	err = bt_addr_from_str(argv[1], &addr);
 	if (err != 0) {
-		shell_error(sh, "invalid peer address (err %d)", err);
+		bt_shell_session_error(sh, "invalid peer address (err %d)", err);
 		return err;
 	}
 
 	conn = bt_conn_lookup_addr_br(&addr);
 	if (conn == NULL) {
-		shell_error(sh, "no matching connection");
+		bt_shell_session_error(sh, "no matching connection");
 		return -ENOEXEC;
 	}
 
@@ -795,37 +796,37 @@ static int cmd_hid_select(const struct shell *sh, size_t argc, char *argv[])
 	bt_conn_unref(conn);
 
 	if (peer->hid == NULL) {
-		shell_error(sh, "no HID association on that connection");
+		bt_shell_session_error(sh, "no HID association on that connection");
 		return -ENOEXEC;
 	}
 
 	default_hid = peer->hid;
-	shell_print(sh, "selected HID Host %p", default_hid);
+	bt_shell_session_print(sh, "selected HID Host %p", default_hid);
 
 	return 0;
 }
 
-static int cmd_hid_get_report(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_hid_get_report(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err = 0;
 	long type, report_id, buf_size;
 
 	if (default_hid == NULL) {
-		shell_error(sh, "not connected");
+		bt_shell_session_error(sh, "not connected");
 		return -ENOEXEC;
 	}
 
-	type = shell_strtol(argv[1], 0, &err);
-	report_id = shell_strtol(argv[2], 0, &err);
-	buf_size = shell_strtol(argv[3], 0, &err);
+	type = bt_shell_strtol(argv[1], 0, &err);
+	report_id = bt_shell_strtol(argv[2], 0, &err);
+	buf_size = bt_shell_strtol(argv[3], 0, &err);
 	if (err != 0) {
-		shell_error(sh, "invalid parameter");
+		bt_shell_session_error(sh, "invalid parameter");
 		return -EINVAL;
 	}
 
 	if (!IN_RANGE(type, BT_HID_REPORT_TYPE_INPUT, BT_HID_REPORT_TYPE_FEATURE) ||
 	    !IN_RANGE(report_id, 0, UINT8_MAX) || !IN_RANGE(buf_size, 0, UINT16_MAX)) {
-		shell_error(sh, "parameter out of range");
+		bt_shell_session_error(sh, "parameter out of range");
 		return -EINVAL;
 	}
 
@@ -835,47 +836,47 @@ static int cmd_hid_get_report(const struct shell *sh, size_t argc, char *argv[])
 					     : 0U,
 				     (uint16_t)buf_size);
 	if (err != 0) {
-		shell_error(sh, "get_report failed (%d)", err);
+		bt_shell_session_error(sh, "get_report failed (%d)", err);
 		return err;
 	}
 
 	return 0;
 }
 
-static int cmd_hid_set_report(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_hid_set_report(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	struct net_buf *buf;
 	int err = 0;
 	long type;
 
 	if (default_hid == NULL) {
-		shell_error(sh, "not connected");
+		bt_shell_session_error(sh, "not connected");
 		return -ENOEXEC;
 	}
 
-	type = shell_strtol(argv[1], 0, &err);
+	type = bt_shell_strtol(argv[1], 0, &err);
 	if ((err != 0) || (argc < 3)) {
-		shell_error(sh, "Usage: set_report <type> <hex...>, Report ID first if any");
+		bt_shell_session_error(sh, "Usage: set_report <type> <hex...>, Report ID first if any");
 		return -EINVAL;
 	}
 
 	if (!IN_RANGE(type, BT_HID_REPORT_TYPE_INPUT, BT_HID_REPORT_TYPE_FEATURE)) {
-		shell_error(sh, "invalid report type");
+		bt_shell_session_error(sh, "invalid report type");
 		return -EINVAL;
 	}
 
 	buf = bt_hid_host_create_pdu(&hid_host_pool);
 	if (buf == NULL) {
-		shell_error(sh, "no buffer");
+		bt_shell_session_error(sh, "no buffer");
 		return -ENOBUFS;
 	}
 
 	for (int i = 2; i < argc; i++) {
-		long val = shell_strtol(argv[i], 16, &err);
+		long val = bt_shell_strtol(argv[i], 16, &err);
 
 		if ((err != 0) || !IN_RANGE(val, 0, UINT8_MAX)) {
 			net_buf_unref(buf);
-			shell_error(sh, "invalid hex byte");
+			bt_shell_session_error(sh, "invalid hex byte");
 			return -EINVAL;
 		}
 		net_buf_add_u8(buf, (uint8_t)val);
@@ -884,39 +885,39 @@ static int cmd_hid_set_report(const struct shell *sh, size_t argc, char *argv[])
 	err = bt_hid_host_set_report(default_hid, (uint8_t)type, buf);
 	if (err != 0) {
 		net_buf_unref(buf);
-		shell_error(sh, "set_report failed (%d)", err);
+		bt_shell_session_error(sh, "set_report failed (%d)", err);
 		return err;
 	}
 
 	return 0;
 }
 
-static int cmd_hid_get_protocol(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_hid_get_protocol(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 
 	if (default_hid == NULL) {
-		shell_error(sh, "not connected");
+		bt_shell_session_error(sh, "not connected");
 		return -ENOEXEC;
 	}
 
 	err = bt_hid_host_get_protocol(default_hid);
 	if (err != 0) {
-		shell_error(sh, "get_protocol failed (%d)", err);
+		bt_shell_session_error(sh, "get_protocol failed (%d)", err);
 		return err;
 	}
 
 	return 0;
 }
 
-static int cmd_hid_set_protocol(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_hid_set_protocol(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	struct hid_peer *peer;
 	int err;
 	uint8_t protocol;
 
 	if (default_hid == NULL) {
-		shell_error(sh, "not connected");
+		bt_shell_session_error(sh, "not connected");
 		return -ENOEXEC;
 	}
 
@@ -925,7 +926,7 @@ static int cmd_hid_set_protocol(const struct shell *sh, size_t argc, char *argv[
 	} else if (strcmp(argv[1], "report") == 0) {
 		protocol = BT_HID_PROTOCOL_REPORT_MODE;
 	} else {
-		shell_error(sh, "Usage: set_protocol <boot|report>");
+		bt_shell_session_error(sh, "Usage: set_protocol <boot|report>");
 		return -EINVAL;
 	}
 
@@ -940,40 +941,40 @@ static int cmd_hid_set_protocol(const struct shell *sh, size_t argc, char *argv[
 
 	err = bt_hid_host_set_protocol(default_hid, protocol);
 	if (err != 0) {
-		shell_error(sh, "set_protocol failed (%d)", err);
+		bt_shell_session_error(sh, "set_protocol failed (%d)", err);
 		return err;
 	}
 
 	return 0;
 }
 
-static int cmd_hid_send(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_hid_send(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	struct net_buf *buf;
 	int err = 0;
 
 	if (default_hid == NULL) {
-		shell_error(sh, "not connected");
+		bt_shell_session_error(sh, "not connected");
 		return -ENOEXEC;
 	}
 
 	if (argc < 2) {
-		shell_error(sh, "Usage: send <hex...>, Report ID first if any");
+		bt_shell_session_error(sh, "Usage: send <hex...>, Report ID first if any");
 		return -EINVAL;
 	}
 
 	buf = bt_hid_host_create_pdu(&hid_host_pool);
 	if (buf == NULL) {
-		shell_error(sh, "no buffer");
+		bt_shell_session_error(sh, "no buffer");
 		return -ENOBUFS;
 	}
 
 	for (int i = 1; i < argc; i++) {
-		long val = shell_strtol(argv[i], 16, &err);
+		long val = bt_shell_strtol(argv[i], 16, &err);
 
 		if ((err != 0) || !IN_RANGE(val, 0, UINT8_MAX)) {
 			net_buf_unref(buf);
-			shell_error(sh, "invalid hex byte");
+			bt_shell_session_error(sh, "invalid hex byte");
 			return -EINVAL;
 		}
 		net_buf_add_u8(buf, (uint8_t)val);
@@ -982,60 +983,60 @@ static int cmd_hid_send(const struct shell *sh, size_t argc, char *argv[])
 	err = bt_hid_host_output_report(default_hid, buf);
 	if (err != 0) {
 		net_buf_unref(buf);
-		shell_error(sh, "send failed (%d)", err);
+		bt_shell_session_error(sh, "send failed (%d)", err);
 		return err;
 	}
 
-	shell_print(sh, "sent");
+	bt_shell_session_print(sh, "sent");
 	return 0;
 }
 
-static int cmd_hid_suspend(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_hid_suspend(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 
 	if (default_hid == NULL) {
-		shell_error(sh, "not connected");
+		bt_shell_session_error(sh, "not connected");
 		return -ENOEXEC;
 	}
 
 	err = bt_hid_host_suspend(default_hid);
 	if (err != 0) {
-		shell_error(sh, "suspend failed (%d)", err);
+		bt_shell_session_error(sh, "suspend failed (%d)", err);
 		return err;
 	}
 
-	shell_print(sh, "suspended");
+	bt_shell_session_print(sh, "suspended");
 	return 0;
 }
 
-static int cmd_hid_exit_suspend(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_hid_exit_suspend(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 
 	if (default_hid == NULL) {
-		shell_error(sh, "not connected");
+		bt_shell_session_error(sh, "not connected");
 		return -ENOEXEC;
 	}
 
 	err = bt_hid_host_exit_suspend(default_hid);
 	if (err != 0) {
-		shell_error(sh, "exit_suspend failed (%d)", err);
+		bt_shell_session_error(sh, "exit_suspend failed (%d)", err);
 		return err;
 	}
 
-	shell_print(sh, "exit_suspend");
+	bt_shell_session_print(sh, "exit_suspend");
 	return 0;
 }
 
-static int cmd_hid_vcu(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_hid_vcu(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	struct hid_peer *peer = NULL;
 	struct bt_conn *conn;
 	int err;
 
 	if (default_hid == NULL) {
-		shell_error(sh, "not connected");
+		bt_shell_session_error(sh, "not connected");
 		return -ENOEXEC;
 	}
 
@@ -1056,44 +1057,51 @@ static int cmd_hid_vcu(const struct shell *sh, size_t argc, char *argv[])
 		if (peer != NULL) {
 			peer->vcu_unplug_pending = false;
 		}
-		shell_error(sh, "vcu failed (%d)", err);
+		bt_shell_session_error(sh, "vcu failed (%d)", err);
 		return err;
 	}
 
 	return 0;
 }
 
-SHELL_STATIC_SUBCMD_SET_CREATE(hid_host_cmds,
-	SHELL_CMD_ARG(register, NULL, "register HID Host", cmd_hid_register, 1, 0),
-	SHELL_CMD_ARG(unregister, NULL, "unregister HID Host", cmd_hid_unregister, 1, 0),
-	SHELL_CMD_ARG(sdp_discover, NULL, "read the HID service record", cmd_hid_sdp_discover,
+BT_SHELL_STATIC_SUBCMD_SET_CREATE(hid_host_cmds,
+	BT_SHELL_CMD_ARG(register, NULL, "register HID Host", cmd_hid_register, 1, 0),
+	BT_SHELL_CMD_ARG(unregister, NULL, "unregister HID Host", cmd_hid_unregister, 1, 0),
+	BT_SHELL_CMD_ARG(sdp_discover, NULL, "read the HID service record", cmd_hid_sdp_discover,
 		      1, 0),
-	SHELL_CMD_ARG(connect, NULL, "connect to HID Device", cmd_hid_connect, 1, 0),
-	SHELL_CMD_ARG(disconnect, NULL, "disconnect", cmd_hid_disconnect, 1, 0),
-	SHELL_CMD_ARG(select, NULL, "<address: XX:XX:XX:XX:XX:XX>", cmd_hid_select, 2, 0),
-	SHELL_CMD_ARG(get_report, NULL, "<type> <id> <buf_size>", cmd_hid_get_report, 4, 0),
-	SHELL_CMD_ARG(set_report, NULL, "<type> <hex...>, Report ID first if the report has one",
+	BT_SHELL_CMD_ARG(connect, NULL, "connect to HID Device", cmd_hid_connect, 1, 0),
+	BT_SHELL_CMD_ARG(disconnect, NULL, "disconnect", cmd_hid_disconnect, 1, 0),
+	BT_SHELL_CMD_ARG(select, NULL, "<address: XX:XX:XX:XX:XX:XX>", cmd_hid_select, 2, 0),
+	BT_SHELL_CMD_ARG(get_report, NULL, "<type> <id> <buf_size>", cmd_hid_get_report, 4, 0),
+	BT_SHELL_CMD_ARG(set_report, NULL, "<type> <hex...>, Report ID first if the report has one",
 		      cmd_hid_set_report, 3, 8),
-	SHELL_CMD_ARG(get_protocol, NULL, "get protocol mode", cmd_hid_get_protocol, 1, 0),
-	SHELL_CMD_ARG(set_protocol, NULL, "<boot|report>", cmd_hid_set_protocol, 2, 0),
-	SHELL_CMD_ARG(send, NULL, "<hex...> output report, Report ID first if the report has one",
+	BT_SHELL_CMD_ARG(get_protocol, NULL, "get protocol mode", cmd_hid_get_protocol, 1, 0),
+	BT_SHELL_CMD_ARG(set_protocol, NULL, "<boot|report>", cmd_hid_set_protocol, 2, 0),
+	BT_SHELL_CMD_ARG(send, NULL, "<hex...> output report, Report ID first if the report has one",
 		      cmd_hid_send, 2, 8),
-	SHELL_CMD_ARG(suspend, NULL, "send SUSPEND", cmd_hid_suspend, 1, 0),
-	SHELL_CMD_ARG(exit_suspend, NULL, "send EXIT_SUSPEND", cmd_hid_exit_suspend, 1, 0),
-	SHELL_CMD_ARG(vcu, NULL, "virtual cable unplug", cmd_hid_vcu, 1, 0),
-	SHELL_SUBCMD_SET_END
+	BT_SHELL_CMD_ARG(suspend, NULL, "send SUSPEND", cmd_hid_suspend, 1, 0),
+	BT_SHELL_CMD_ARG(exit_suspend, NULL, "send EXIT_SUSPEND", cmd_hid_exit_suspend, 1, 0),
+	BT_SHELL_CMD_ARG(vcu, NULL, "virtual cable unplug", cmd_hid_vcu, 1, 0),
+	BT_SHELL_SUBCMD_SET_END
 );
 
-static int cmd_hid_host(const struct shell *sh, size_t argc, char **argv)
+static int cmd_hid_host(const struct bt_shell *sh, size_t argc, char **argv)
 {
 	if (argc == 1) {
-		shell_help(sh);
-		return SHELL_CMD_HELP_PRINTED;
+		bt_shell_help(sh);
+		return BT_SHELL_CMD_HELP_PRINTED;
 	}
 
-	shell_error(sh, "%s unknown parameter: %s", argv[0], argv[1]);
+	bt_shell_session_error(sh, "%s unknown parameter: %s", argv[0], argv[1]);
 	return -ENOEXEC;
 }
 
-SHELL_CMD_ARG_REGISTER(hid_host, &hid_host_cmds, "Bluetooth HID Host commands",
+BT_SHELL_CMD_ARG_REGISTER(hid_host, &hid_host_cmds, "Bluetooth HID Host commands",
 		       cmd_hid_host, 1, 0);
+
+/** @brief Initialize module-owned storage before protocol operations. */
+void bt_host_classic_shell_hid_host_storage_init(void)
+{
+	net_buf_pool_init(&hid_host_pool);
+	net_buf_pool_init(&sdp_client_pool);
+}

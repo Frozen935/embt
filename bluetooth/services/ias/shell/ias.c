@@ -7,14 +7,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <errno.h>
 #include <stdlib.h>
-#include <zephyr/types.h>
-#include <zephyr/bluetooth/conn.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <embt/bluetooth/conn.h>
 
-#include <zephyr/shell/shell.h>
-#include <zephyr/bluetooth/gatt.h>
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/services/ias.h>
+#include <shell/bt_shell.h>
+#include <embt/bluetooth/gatt.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/services/ias.h>
 
 #include "host/shell/bt.h"
 #include "common/bt_shell_private.h"
@@ -40,36 +42,36 @@ BT_IAS_CB_DEFINE(ias_callbacks) = {
 	.high_alert = alert_high_start,
 };
 
-static int cmd_ias_local_alert_stop(const struct shell *sh, size_t argc, char **argv)
+static int cmd_ias_local_alert_stop(const struct bt_shell *sh, size_t argc, char **argv)
 {
 	const int result = bt_ias_local_alert_stop();
 
 	if (result) {
-		shell_print(sh, "Local alert stop failed: %d", result);
+		bt_shell_session_print(sh, "Local alert stop failed: %d", result);
 	} else {
-		shell_print(sh, "Local alert stopped");
+		bt_shell_session_print(sh, "Local alert stopped");
 	}
 
 	return result;
 }
 
-static int cmd_ias(const struct shell *sh, size_t argc, char **argv)
+static int cmd_ias(const struct bt_shell *sh, size_t argc, char **argv)
 {
 	if (argc > 1) {
-		shell_error(sh, "%s unknown parameter: %s", argv[0], argv[1]);
+		bt_shell_session_error(sh, "%s unknown parameter: %s", argv[0], argv[1]);
 	} else {
-		shell_error(sh, "%s Missing subcommand", argv[0]);
+		bt_shell_session_error(sh, "%s Missing subcommand", argv[0]);
 	}
 
 	return -ENOEXEC;
 }
 
-SHELL_STATIC_SUBCMD_SET_CREATE(ias_cmds,
-	SHELL_CMD_ARG(local_alert_stop, NULL,
+BT_SHELL_STATIC_SUBCMD_SET_CREATE(ias_cmds,
+	BT_SHELL_CMD_ARG(local_alert_stop, NULL,
 		      "Stop alert locally",
 		      cmd_ias_local_alert_stop, 1, 0),
-	SHELL_SUBCMD_SET_END
+	BT_SHELL_SUBCMD_SET_END
 );
 
-SHELL_CMD_ARG_REGISTER(ias, &ias_cmds, "Bluetooth IAS shell commands",
+BT_SHELL_CMD_ARG_REGISTER(ias, &ias_cmds, "Bluetooth IAS shell commands",
 		       cmd_ias, 1, 1);

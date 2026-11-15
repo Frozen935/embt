@@ -9,20 +9,23 @@
  * Provide some Bluetooth shell commands that can be useful to applications.
  */
 
+#include <embt/base/assert.h>
+#include <embt/base/util_macro.h>
 #include <errno.h>
-#include <zephyr/types.h>
-#include <zephyr/sys/byteorder.h>
-#include <zephyr/sys/util.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <embt/base/byteorder.h>
+#include <embt/base/util.h>
 #include <string.h>
 
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/l2cap.h>
-#include <zephyr/bluetooth/classic/rfcomm.h>
-#include <zephyr/bluetooth/classic/sdp.h>
-#include <zephyr/bluetooth/classic/ftp.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/l2cap.h>
+#include <embt/bluetooth/classic/rfcomm.h>
+#include <embt/bluetooth/classic/sdp.h>
+#include <embt/bluetooth/classic/ftp.h>
 
-#include <zephyr/shell/shell.h>
+#include <shell/bt_shell.h>
 
 #include "host/shell/bt.h"
 #include "common/bt_shell_private.h"
@@ -144,7 +147,7 @@ static void ftp_parse_headers(struct net_buf *buf)
 	}
 }
 
-static int parse_srm(const struct shell *sh, size_t argc, char *argv[], bool *enable_srm)
+static int parse_srm(const struct bt_shell *sh, size_t argc, char *argv[], bool *enable_srm)
 {
 	ARG_UNUSED(sh);
 
@@ -158,7 +161,7 @@ static int parse_srm(const struct shell *sh, size_t argc, char *argv[], bool *en
 	return 0;
 }
 
-static int parse_srmp(const struct shell *sh, size_t argc, char *argv[], bool *enable_srmp)
+static int parse_srmp(const struct bt_shell *sh, size_t argc, char *argv[], bool *enable_srmp)
 {
 	ARG_UNUSED(sh);
 
@@ -547,15 +550,15 @@ static const struct bt_ftp_client_cb ftp_client_cb = {
 };
 
 /* Client shell commands */
-static int cmd_client_rfcomm_connect(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_client_rfcomm_connect(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err = 0;
 	uint8_t channel;
 	struct ftp_client_instance *inst;
 
-	channel = (uint8_t)shell_strtoul(argv[1], 16, &err);
+	channel = (uint8_t)bt_shell_strtoul(argv[1], 16, &err);
 	if (err != 0) {
-		shell_error(sh, "Invalid channel %s", argv[1]);
+		bt_shell_session_error(sh, "Invalid channel %s", argv[1]);
 		return -ENOEXEC;
 	}
 
@@ -567,13 +570,13 @@ static int cmd_client_rfcomm_connect(const struct shell *sh, size_t argc, char *
 	err = bt_ftp_client_rfcomm_connect(default_conn, &inst->client, &ftp_client_cb, channel);
 	if (err != 0) {
 		ftp_client_free(&inst->client);
-		shell_error(sh, "RFCOMM connect failed (err %d)", err);
+		bt_shell_session_error(sh, "RFCOMM connect failed (err %d)", err);
 	}
 
 	return err;
 }
 
-static int cmd_client_rfcomm_disconnect(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_client_rfcomm_disconnect(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 	struct ftp_client_instance *inst;
@@ -585,21 +588,21 @@ static int cmd_client_rfcomm_disconnect(const struct shell *sh, size_t argc, cha
 
 	err = bt_ftp_client_rfcomm_disconnect(&inst->client);
 	if (err != 0) {
-		shell_error(sh, "RFCOMM disconnect failed (err %d)", err);
+		bt_shell_session_error(sh, "RFCOMM disconnect failed (err %d)", err);
 	}
 
 	return err;
 }
 
-static int cmd_client_l2cap_connect(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_client_l2cap_connect(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err = 0;
 	uint16_t psm;
 	struct ftp_client_instance *inst;
 
-	psm = (uint16_t)shell_strtoul(argv[1], 16, &err);
+	psm = (uint16_t)bt_shell_strtoul(argv[1], 16, &err);
 	if (err != 0) {
-		shell_error(sh, "Invalid PSM %s", argv[1]);
+		bt_shell_session_error(sh, "Invalid PSM %s", argv[1]);
 		return -ENOEXEC;
 	}
 
@@ -611,13 +614,13 @@ static int cmd_client_l2cap_connect(const struct shell *sh, size_t argc, char *a
 	err = bt_ftp_client_l2cap_connect(default_conn, &inst->client, &ftp_client_cb, psm);
 	if (err != 0) {
 		ftp_client_free(&inst->client);
-		shell_error(sh, "L2CAP connect failed (err %d)", err);
+		bt_shell_session_error(sh, "L2CAP connect failed (err %d)", err);
 	}
 
 	return err;
 }
 
-static int cmd_client_l2cap_disconnect(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_client_l2cap_disconnect(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 	struct ftp_client_instance *inst;
@@ -629,13 +632,13 @@ static int cmd_client_l2cap_disconnect(const struct shell *sh, size_t argc, char
 
 	err = bt_ftp_client_l2cap_disconnect(&inst->client);
 	if (err != 0) {
-		shell_error(sh, "L2CAP disconnect failed (err %d)", err);
+		bt_shell_session_error(sh, "L2CAP disconnect failed (err %d)", err);
 	}
 
 	return err;
 }
 
-static int cmd_client_connect(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_client_connect(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 	struct net_buf *buf;
@@ -652,7 +655,7 @@ static int cmd_client_connect(const struct shell *sh, size_t argc, char *argv[])
 	if (argc > 1) {
 		pwd = argv[1];
 		if (strlen(pwd) > CONFIG_BT_OBEX_AUTH_PWD_LEN) {
-			shell_error(sh, "[password] too long (max %u)",
+			bt_shell_session_error(sh, "[password] too long (max %u)",
 				    CONFIG_BT_OBEX_AUTH_PWD_LEN);
 			return -EINVAL;
 		}
@@ -662,8 +665,8 @@ static int cmd_client_connect(const struct shell *sh, size_t argc, char *argv[])
 	 * password is given now, we cannot proceed with re-authentication.
 	 */
 	if (pwd == NULL && (inst->auth_state & PEER_AUTH_ENABLED) != 0) {
-		shell_error(sh, "[password] required: server requested authentication");
-		shell_error(sh, "usage: ftp client connect <password>");
+		bt_shell_session_error(sh, "[password] required: server requested authentication");
+		bt_shell_session_error(sh, "usage: ftp client connect <password>");
 		return -EINVAL;
 	}
 
@@ -677,7 +680,7 @@ static int cmd_client_connect(const struct shell *sh, size_t argc, char *argv[])
 
 	buf = bt_ftp_client_create_pdu(&inst->client, &ftp_client_tx_pool);
 	if (buf == NULL) {
-		shell_error(sh, "Fail to allocate tx buffer");
+		bt_shell_session_error(sh, "Fail to allocate tx buffer");
 		return -ENOBUFS;
 	}
 
@@ -685,7 +688,7 @@ static int cmd_client_connect(const struct shell *sh, size_t argc, char *argv[])
 	sys_memcpy_swap(val, uuid->val, BT_UUID_SIZE_128);
 	err = bt_obex_add_header_target(buf, BT_UUID_SIZE_128, val);
 	if (err != 0) {
-		shell_error(sh, "Fail to add target header (err %d)", err);
+		bt_shell_session_error(sh, "Fail to add target header (err %d)", err);
 		goto failed;
 	}
 
@@ -703,7 +706,7 @@ static int cmd_client_connect(const struct shell *sh, size_t argc, char *argv[])
 		err = bt_obex_generate_nonce((uint8_t *)inst->pwd, strlen(inst->pwd),
 					     inst->local_nonce);
 		if (err != 0) {
-			shell_error(sh, "Fail to calculate nonce (err %d)", err);
+			bt_shell_session_error(sh, "Fail to calculate nonce (err %d)", err);
 			goto failed;
 		}
 
@@ -713,7 +716,7 @@ static int cmd_client_connect(const struct shell *sh, size_t argc, char *argv[])
 
 		err = bt_obex_add_header_auth_challenge(buf, 1U, &challenge_data);
 		if (err != 0) {
-			shell_error(sh, "Fail to add auth challenge header (err %d)", err);
+			bt_shell_session_error(sh, "Fail to add auth challenge header (err %d)", err);
 			goto failed;
 		}
 
@@ -721,7 +724,7 @@ static int cmd_client_connect(const struct shell *sh, size_t argc, char *argv[])
 		err = bt_obex_calculate_request_digest((uint8_t *)inst->pwd, strlen(inst->pwd),
 						       inst->peer_nonce, digest);
 		if (err != 0) {
-			shell_error(sh, "Fail to calculate auth response (err %d)", err);
+			bt_shell_session_error(sh, "Fail to calculate auth response (err %d)", err);
 			goto failed;
 		}
 
@@ -731,7 +734,7 @@ static int cmd_client_connect(const struct shell *sh, size_t argc, char *argv[])
 
 		err = bt_obex_add_header_auth_rsp(buf, 1U, &challenge_data);
 		if (err != 0) {
-			shell_error(sh, "Fail to add auth response header (err %d)", err);
+			bt_shell_session_error(sh, "Fail to add auth response header (err %d)", err);
 			goto failed;
 		}
 
@@ -743,13 +746,13 @@ static int cmd_client_connect(const struct shell *sh, size_t argc, char *argv[])
 		return 0;
 	}
 
-	shell_error(sh, "Connect failed (err %d)", err);
+	bt_shell_session_error(sh, "Connect failed (err %d)", err);
 failed:
 	net_buf_unref(buf);
 	return err;
 }
 
-static int cmd_client_disconnect(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_client_disconnect(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 	struct ftp_client_instance *inst;
@@ -761,13 +764,13 @@ static int cmd_client_disconnect(const struct shell *sh, size_t argc, char *argv
 
 	err = bt_ftp_client_disconnect(&inst->client, NULL);
 	if (err != 0) {
-		shell_error(sh, "Disconnect failed (err %d)", err);
+		bt_shell_session_error(sh, "Disconnect failed (err %d)", err);
 	}
 
 	return err;
 }
 
-static int cmd_client_abort(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_client_abort(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 	struct ftp_client_instance *inst;
@@ -779,7 +782,7 @@ static int cmd_client_abort(const struct shell *sh, size_t argc, char *argv[])
 
 	err = bt_ftp_client_abort(&inst->client, NULL);
 	if (err != 0) {
-		shell_error(sh, "Abort failed (err %d)", err);
+		bt_shell_session_error(sh, "Abort failed (err %d)", err);
 	}
 
 	return err;
@@ -845,7 +848,7 @@ static int add_header_dest_name(struct net_buf *buf, const char *name)
 	return bt_obex_add_header_dest_name(buf, unicode_name_len, unicode_name);
 }
 
-static int cmd_client_set_folder(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_client_set_folder(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 	struct net_buf *buf;
@@ -869,9 +872,9 @@ static int cmd_client_set_folder(const struct shell *sh, size_t argc, char *argv
 			if (path[2] != '\0') {
 				name = &path[2];
 			} else {
-				shell_warn(sh, "Don't need to set current folder");
-				shell_help(sh);
-				return SHELL_CMD_HELP_PRINTED;
+				bt_shell_session_warn(sh, "Don't need to set current folder");
+				bt_shell_help(sh);
+				return BT_SHELL_CMD_HELP_PRINTED;
 			}
 		} else {
 			name = path;
@@ -880,20 +883,20 @@ static int cmd_client_set_folder(const struct shell *sh, size_t argc, char *argv
 
 	buf = bt_ftp_client_create_pdu(&inst->client, &ftp_client_tx_pool);
 	if (buf == NULL) {
-		shell_error(sh, "Fail to allocate tx buffer");
+		bt_shell_session_error(sh, "Fail to allocate tx buffer");
 		return -ENOBUFS;
 	}
 
 	err = bt_obex_add_header_conn_id(buf, inst->conn_id);
 	if (err != 0) {
-		shell_error(sh, "Fail to add conn id header (err %d)", err);
+		bt_shell_session_error(sh, "Fail to add conn id header (err %d)", err);
 		goto failed;
 	}
 
 	if (flags != BT_FTP_SET_FOLDER_FLAGS_UP) {
 		err = add_header_name(buf, name);
 		if (err != 0) {
-			shell_error(sh, "Fail to add name header (err %d)", err);
+			bt_shell_session_error(sh, "Fail to add name header (err %d)", err);
 			goto failed;
 		}
 	}
@@ -904,13 +907,13 @@ static int cmd_client_set_folder(const struct shell *sh, size_t argc, char *argv
 		return 0;
 	}
 
-	shell_error(sh, "Set folder failed (err %d)", err);
+	bt_shell_session_error(sh, "Set folder failed (err %d)", err);
 failed:
 	net_buf_unref(buf);
 	return err;
 }
 
-static int cmd_client_create_folder(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_client_create_folder(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 	struct net_buf *buf;
@@ -924,19 +927,19 @@ static int cmd_client_create_folder(const struct shell *sh, size_t argc, char *a
 
 	buf = bt_ftp_client_create_pdu(&inst->client, &ftp_client_tx_pool);
 	if (buf == NULL) {
-		shell_error(sh, "Fail to allocate tx buffer");
+		bt_shell_session_error(sh, "Fail to allocate tx buffer");
 		return -ENOBUFS;
 	}
 
 	err = bt_obex_add_header_conn_id(buf, inst->conn_id);
 	if (err != 0) {
-		shell_error(sh, "Fail to add conn id header (err %d)", err);
+		bt_shell_session_error(sh, "Fail to add conn id header (err %d)", err);
 		goto failed;
 	}
 
 	err = add_header_name(buf, name);
 	if (err != 0) {
-		shell_error(sh, "Fail to add name header (err %d)", err);
+		bt_shell_session_error(sh, "Fail to add name header (err %d)", err);
 		goto failed;
 	}
 
@@ -946,13 +949,13 @@ static int cmd_client_create_folder(const struct shell *sh, size_t argc, char *a
 		return 0;
 	}
 
-	shell_error(sh, "Create folder failed (err %d)", err);
+	bt_shell_session_error(sh, "Create folder failed (err %d)", err);
 failed:
 	net_buf_unref(buf);
 	return err;
 }
 
-static int cmd_client_pull_folder_listing(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_client_pull_folder_listing(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	struct net_buf *buf;
 	int err;
@@ -968,7 +971,7 @@ static int cmd_client_pull_folder_listing(const struct shell *sh, size_t argc, c
 
 	if (argc > 1 && strcmp(argv[1], "name") == 0) {
 		if (argc < 3) {
-			shell_error(sh, "[name_string] is needed if the name is present");
+			bt_shell_session_error(sh, "[name_string] is needed if the name is present");
 			return -EINVAL;
 		}
 		name = argv[2];
@@ -981,7 +984,7 @@ static int cmd_client_pull_folder_listing(const struct shell *sh, size_t argc, c
 
 	buf = bt_ftp_client_create_pdu(&inst->client, &ftp_client_tx_pool);
 	if (buf == NULL) {
-		shell_error(sh, "Fail to allocate tx buffer");
+		bt_shell_session_error(sh, "Fail to allocate tx buffer");
 		return -ENOBUFS;
 	}
 
@@ -989,7 +992,7 @@ static int cmd_client_pull_folder_listing(const struct shell *sh, size_t argc, c
 	if (inst->rsp_code == BT_OBEX_RSP_CODE_CONTINUE) {
 		err = add_header_srm_param(buf, inst->goep_v2 && enable_srmp);
 		if (err != 0) {
-			shell_error(sh, "Fail to add SRMP header (err %d)", err);
+			bt_shell_session_error(sh, "Fail to add SRMP header (err %d)", err);
 			goto failed;
 		}
 		goto continue_req;
@@ -998,32 +1001,32 @@ static int cmd_client_pull_folder_listing(const struct shell *sh, size_t argc, c
 	/* First request */
 	err = bt_obex_add_header_conn_id(buf, inst->conn_id);
 	if (err != 0) {
-		shell_error(sh, "Fail to add conn id header (err %d)", err);
+		bt_shell_session_error(sh, "Fail to add conn id header (err %d)", err);
 		goto failed;
 	}
 
 	err = add_header_srm(buf, inst->goep_v2 && enable_srm);
 	if (err != 0) {
-		shell_error(sh, "Fail to add SRM header (err %d)", err);
+		bt_shell_session_error(sh, "Fail to add SRM header (err %d)", err);
 		goto failed;
 	}
 
 	err = add_header_srm_param(buf, inst->goep_v2 && enable_srmp);
 	if (err != 0) {
-		shell_error(sh, "Fail to add SRMP header (err %d)", err);
+		bt_shell_session_error(sh, "Fail to add SRMP header (err %d)", err);
 		goto failed;
 	}
 
 	err = bt_obex_add_header_type(buf, sizeof(BT_FTP_FOLDER_LISTING_TYPE),
 				      BT_FTP_FOLDER_LISTING_TYPE);
 	if (err != 0) {
-		shell_error(sh, "Fail to add type header (err %d)", err);
+		bt_shell_session_error(sh, "Fail to add type header (err %d)", err);
 		goto failed;
 	}
 
 	err = add_header_name(buf, name);
 	if (err != 0) {
-		shell_error(sh, "Fail to add name header (err %d)", err);
+		bt_shell_session_error(sh, "Fail to add name header (err %d)", err);
 		goto failed;
 	}
 
@@ -1033,13 +1036,13 @@ continue_req:
 		return 0;
 	}
 
-	shell_error(sh, "Pull folder listing failed (err %d)", err);
+	bt_shell_session_error(sh, "Pull folder listing failed (err %d)", err);
 failed:
 	net_buf_unref(buf);
 	return err;
 }
 
-static int cmd_client_push_file(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_client_push_file(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	struct net_buf *buf;
 	int err;
@@ -1061,7 +1064,7 @@ static int cmd_client_push_file(const struct shell *sh, size_t argc, char *argv[
 
 	buf = bt_ftp_client_create_pdu(&inst->client, &ftp_client_tx_pool);
 	if (buf == NULL) {
-		shell_error(sh, "Fail to allocate tx buffer");
+		bt_shell_session_error(sh, "Fail to allocate tx buffer");
 		return -ENOBUFS;
 	}
 
@@ -1073,19 +1076,19 @@ static int cmd_client_push_file(const struct shell *sh, size_t argc, char *argv[
 	/* First packet */
 	err = bt_obex_add_header_conn_id(buf, inst->conn_id);
 	if (err != 0) {
-		shell_error(sh, "Fail to add conn id header (err %d)", err);
+		bt_shell_session_error(sh, "Fail to add conn id header (err %d)", err);
 		goto failed;
 	}
 
 	err = add_header_srm(buf, inst->goep_v2 && enable_srm);
 	if (err != 0) {
-		shell_error(sh, "Fail to add SRM header (err %d)", err);
+		bt_shell_session_error(sh, "Fail to add SRM header (err %d)", err);
 		goto failed;
 	}
 
 	err = add_header_name(buf, name);
 	if (err != 0) {
-		shell_error(sh, "Fail to add name header (err %d)", err);
+		bt_shell_session_error(sh, "Fail to add name header (err %d)", err);
 		goto failed;
 	}
 
@@ -1093,7 +1096,7 @@ continue_req:
 	err = bt_obex_add_header_body_or_end_body(buf, inst->mopl, body_len - inst->tx_cnt,
 						  (const uint8_t *)(body + inst->tx_cnt), &len);
 	if (err != 0) {
-		shell_error(sh, "Fail to add body (err %d)", err);
+		bt_shell_session_error(sh, "Fail to add body (err %d)", err);
 		goto failed;
 	}
 
@@ -1116,13 +1119,13 @@ continue_req:
 	}
 
 	inst->tx_cnt = old_tx_cnt;
-	shell_error(sh, "Push file failed (err %d)", err);
+	bt_shell_session_error(sh, "Push file failed (err %d)", err);
 failed:
 	net_buf_unref(buf);
 	return err;
 }
 
-static int cmd_client_pull_file(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_client_pull_file(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	struct net_buf *buf;
 	int err;
@@ -1141,7 +1144,7 @@ static int cmd_client_pull_file(const struct shell *sh, size_t argc, char *argv[
 
 	buf = bt_ftp_client_create_pdu(&inst->client, &ftp_client_tx_pool);
 	if (buf == NULL) {
-		shell_error(sh, "Fail to allocate tx buffer");
+		bt_shell_session_error(sh, "Fail to allocate tx buffer");
 		return -ENOBUFS;
 	}
 
@@ -1149,7 +1152,7 @@ static int cmd_client_pull_file(const struct shell *sh, size_t argc, char *argv[
 	if (inst->rsp_code == BT_OBEX_RSP_CODE_CONTINUE) {
 		err = add_header_srm_param(buf, inst->goep_v2 && enable_srmp);
 		if (err != 0) {
-			shell_error(sh, "Fail to add SRMP header (err %d)", err);
+			bt_shell_session_error(sh, "Fail to add SRMP header (err %d)", err);
 			goto failed;
 		}
 		goto continue_req;
@@ -1157,25 +1160,25 @@ static int cmd_client_pull_file(const struct shell *sh, size_t argc, char *argv[
 
 	err = bt_obex_add_header_conn_id(buf, inst->conn_id);
 	if (err != 0) {
-		shell_error(sh, "Fail to add conn id header (err %d)", err);
+		bt_shell_session_error(sh, "Fail to add conn id header (err %d)", err);
 		goto failed;
 	}
 
 	err = add_header_srm(buf, inst->goep_v2 && enable_srm);
 	if (err != 0) {
-		shell_error(sh, "Fail to add SRM header (err %d)", err);
+		bt_shell_session_error(sh, "Fail to add SRM header (err %d)", err);
 		goto failed;
 	}
 
 	err = add_header_srm_param(buf, inst->goep_v2 && enable_srmp);
 	if (err != 0) {
-		shell_error(sh, "Fail to add SRMP header (err %d)", err);
+		bt_shell_session_error(sh, "Fail to add SRMP header (err %d)", err);
 		goto failed;
 	}
 
 	err = add_header_name(buf, name);
 	if (err != 0) {
-		shell_error(sh, "Fail to add name header (err %d)", err);
+		bt_shell_session_error(sh, "Fail to add name header (err %d)", err);
 		goto failed;
 	}
 
@@ -1185,13 +1188,13 @@ continue_req:
 		return 0;
 	}
 
-	shell_error(sh, "Pull file failed (err %d)", err);
+	bt_shell_session_error(sh, "Pull file failed (err %d)", err);
 failed:
 	net_buf_unref(buf);
 	return err;
 }
 
-static int cmd_client_delete(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_client_delete(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	struct net_buf *buf;
 	int err;
@@ -1205,19 +1208,19 @@ static int cmd_client_delete(const struct shell *sh, size_t argc, char *argv[])
 
 	buf = bt_ftp_client_create_pdu(&inst->client, &ftp_client_tx_pool);
 	if (buf == NULL) {
-		shell_error(sh, "Fail to allocate tx buffer");
+		bt_shell_session_error(sh, "Fail to allocate tx buffer");
 		return -ENOBUFS;
 	}
 
 	err = bt_obex_add_header_conn_id(buf, inst->conn_id);
 	if (err != 0) {
-		shell_error(sh, "Fail to add conn id header (err %d)", err);
+		bt_shell_session_error(sh, "Fail to add conn id header (err %d)", err);
 		goto failed;
 	}
 
 	err = add_header_name(buf, name);
 	if (err != 0) {
-		shell_error(sh, "Fail to add name header (err %d)", err);
+		bt_shell_session_error(sh, "Fail to add name header (err %d)", err);
 		goto failed;
 	}
 
@@ -1226,13 +1229,13 @@ static int cmd_client_delete(const struct shell *sh, size_t argc, char *argv[])
 		return 0;
 	}
 
-	shell_error(sh, "Delete failed (err %d)", err);
+	bt_shell_session_error(sh, "Delete failed (err %d)", err);
 failed:
 	net_buf_unref(buf);
 	return err;
 }
 
-static int cmd_client_rename(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_client_rename(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	struct net_buf *buf;
 	int err;
@@ -1247,31 +1250,31 @@ static int cmd_client_rename(const struct shell *sh, size_t argc, char *argv[])
 
 	buf = bt_ftp_client_create_pdu(&inst->client, &ftp_client_tx_pool);
 	if (buf == NULL) {
-		shell_error(sh, "Fail to allocate tx buffer");
+		bt_shell_session_error(sh, "Fail to allocate tx buffer");
 		return -ENOBUFS;
 	}
 
 	err = bt_obex_add_header_conn_id(buf, inst->conn_id);
 	if (err != 0) {
-		shell_error(sh, "Fail to add conn id header (err %d)", err);
+		bt_shell_session_error(sh, "Fail to add conn id header (err %d)", err);
 		goto failed;
 	}
 
 	err = bt_obex_add_header_action_id(buf, BT_OBEX_ACTION_MOVE_RENAME);
 	if (err != 0) {
-		shell_error(sh, "Fail to add action id header (err %d)", err);
+		bt_shell_session_error(sh, "Fail to add action id header (err %d)", err);
 		goto failed;
 	}
 
 	err = add_header_name(buf, src_name);
 	if (err != 0) {
-		shell_error(sh, "Fail to add name header (err %d)", err);
+		bt_shell_session_error(sh, "Fail to add name header (err %d)", err);
 		goto failed;
 	}
 
 	err = add_header_dest_name(buf, dst_name);
 	if (err != 0) {
-		shell_error(sh, "Fail to add dest name header (err %d)", err);
+		bt_shell_session_error(sh, "Fail to add dest name header (err %d)", err);
 		goto failed;
 	}
 
@@ -1280,13 +1283,13 @@ static int cmd_client_rename(const struct shell *sh, size_t argc, char *argv[])
 		return 0;
 	}
 
-	shell_error(sh, "Rename failed (err %d)", err);
+	bt_shell_session_error(sh, "Rename failed (err %d)", err);
 failed:
 	net_buf_unref(buf);
 	return err;
 }
 
-static int cmd_client_copy(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_client_copy(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	struct net_buf *buf;
 	int err;
@@ -1301,31 +1304,31 @@ static int cmd_client_copy(const struct shell *sh, size_t argc, char *argv[])
 
 	buf = bt_ftp_client_create_pdu(&inst->client, &ftp_client_tx_pool);
 	if (buf == NULL) {
-		shell_error(sh, "Fail to allocate tx buffer");
+		bt_shell_session_error(sh, "Fail to allocate tx buffer");
 		return -ENOBUFS;
 	}
 
 	err = bt_obex_add_header_conn_id(buf, inst->conn_id);
 	if (err != 0) {
-		shell_error(sh, "Fail to add conn id header (err %d)", err);
+		bt_shell_session_error(sh, "Fail to add conn id header (err %d)", err);
 		goto failed;
 	}
 
 	err = bt_obex_add_header_action_id(buf, BT_OBEX_ACTION_COPY);
 	if (err != 0) {
-		shell_error(sh, "Fail to add action id header (err %d)", err);
+		bt_shell_session_error(sh, "Fail to add action id header (err %d)", err);
 		goto failed;
 	}
 
 	err = add_header_name(buf, src_name);
 	if (err != 0) {
-		shell_error(sh, "Fail to add name header (err %d)", err);
+		bt_shell_session_error(sh, "Fail to add name header (err %d)", err);
 		goto failed;
 	}
 
 	err = add_header_dest_name(buf, dst_name);
 	if (err != 0) {
-		shell_error(sh, "Fail to add dest name header (err %d)", err);
+		bt_shell_session_error(sh, "Fail to add dest name header (err %d)", err);
 		goto failed;
 	}
 
@@ -1334,13 +1337,13 @@ static int cmd_client_copy(const struct shell *sh, size_t argc, char *argv[])
 		return 0;
 	}
 
-	shell_error(sh, "Copy failed (err %d)", err);
+	bt_shell_session_error(sh, "Copy failed (err %d)", err);
 failed:
 	net_buf_unref(buf);
 	return err;
 }
 
-static int cmd_client_set_permission(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_client_set_permission(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	struct net_buf *buf;
 	int err = 0;
@@ -1379,7 +1382,7 @@ static int cmd_client_set_permission(const struct shell *sh, size_t argc, char *
 				perm_val |= BIT(7U); /* Modify */
 				break;
 			default:
-				shell_error(sh, "Invalid permission character '%c' in %s",
+				bt_shell_session_error(sh, "Invalid permission character '%c' in %s",
 					    perm_str[j], perm_str);
 				return -ENOEXEC;
 			}
@@ -1391,31 +1394,31 @@ static int cmd_client_set_permission(const struct shell *sh, size_t argc, char *
 
 	buf = bt_ftp_client_create_pdu(&inst->client, &ftp_client_tx_pool);
 	if (buf == NULL) {
-		shell_error(sh, "Fail to allocate tx buffer");
+		bt_shell_session_error(sh, "Fail to allocate tx buffer");
 		return -ENOBUFS;
 	}
 
 	err = bt_obex_add_header_conn_id(buf, inst->conn_id);
 	if (err != 0) {
-		shell_error(sh, "Fail to add conn id header (err %d)", err);
+		bt_shell_session_error(sh, "Fail to add conn id header (err %d)", err);
 		goto failed;
 	}
 
 	err = bt_obex_add_header_action_id(buf, BT_OBEX_ACTION_SET_PERM);
 	if (err != 0) {
-		shell_error(sh, "Fail to add action id header (err %d)", err);
+		bt_shell_session_error(sh, "Fail to add action id header (err %d)", err);
 		goto failed;
 	}
 
 	err = add_header_name(buf, name);
 	if (err != 0) {
-		shell_error(sh, "Fail to add name header (err %d)", err);
+		bt_shell_session_error(sh, "Fail to add name header (err %d)", err);
 		goto failed;
 	}
 
 	err = bt_obex_add_header_perm(buf, permission);
 	if (err != 0) {
-		shell_error(sh, "Fail to add permission header (err %d)", err);
+		bt_shell_session_error(sh, "Fail to add permission header (err %d)", err);
 		goto failed;
 	}
 
@@ -1424,7 +1427,7 @@ static int cmd_client_set_permission(const struct shell *sh, size_t argc, char *
 		return 0;
 	}
 
-	shell_error(sh, "Set permission failed (err %d)", err);
+	bt_shell_session_error(sh, "Set permission failed (err %d)", err);
 failed:
 	net_buf_unref(buf);
 	return err;
@@ -1723,7 +1726,7 @@ static struct bt_ftp_server_l2cap ftp_server_l2cap = {
 };
 
 /* Server shell commands */
-static int cmd_server_register(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_server_register(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 
@@ -1732,33 +1735,33 @@ static int cmd_server_register(const struct shell *sh, size_t argc, char *argv[]
 
 		err = bt_ftp_server_register(&inst->server, &ftp_server_cb);
 		if (err != 0) {
-			shell_error(sh, "Failed to register FTP server [%zu] (err %d)", i, err);
+			bt_shell_session_error(sh, "Failed to register FTP server [%zu] (err %d)", i, err);
 			return -ENOEXEC;
 		}
 	}
 
 	ftp_server_registered = true;
-	shell_print(sh, "FTP server(s) registered");
+	bt_shell_session_print(sh, "FTP server(s) registered");
 
 	return 0;
 }
 
-static int cmd_server_rfcomm_register(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_server_rfcomm_register(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 
 	err = bt_ftp_server_rfcomm_register(&ftp_server_rfcomm);
 	if (err != 0) {
-		shell_error(sh, "RFCOMM server register failed (err %d)", err);
+		bt_shell_session_error(sh, "RFCOMM server register failed (err %d)", err);
 		return err;
 	}
 
-	shell_print(sh, "FTP RFCOMM server registered, channel 0x%02x",
+	bt_shell_session_print(sh, "FTP RFCOMM server registered, channel 0x%02x",
 		    ftp_server_rfcomm.server.rfcomm.channel);
 	return 0;
 }
 
-static int cmd_server_rfcomm_disconnect(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_server_rfcomm_disconnect(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 	struct ftp_server_instance *inst;
@@ -1770,28 +1773,28 @@ static int cmd_server_rfcomm_disconnect(const struct shell *sh, size_t argc, cha
 
 	err = bt_ftp_server_rfcomm_disconnect(&inst->server);
 	if (err != 0) {
-		shell_error(sh, "RFCOMM disconnect failed (err %d)", err);
+		bt_shell_session_error(sh, "RFCOMM disconnect failed (err %d)", err);
 	}
 
 	return err;
 }
 
-static int cmd_server_l2cap_register(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_server_l2cap_register(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 
 	err = bt_ftp_server_l2cap_register(&ftp_server_l2cap);
 	if (err != 0) {
-		shell_error(sh, "L2CAP server register failed (err %d)", err);
+		bt_shell_session_error(sh, "L2CAP server register failed (err %d)", err);
 		return err;
 	}
 
-	shell_print(sh, "FTP L2CAP server registered, psm 0x%04x",
+	bt_shell_session_print(sh, "FTP L2CAP server registered, psm 0x%04x",
 		    ftp_server_l2cap.server.l2cap.psm);
 	return 0;
 }
 
-static int cmd_server_l2cap_disconnect(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_server_l2cap_disconnect(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 	struct ftp_server_instance *inst;
@@ -1803,7 +1806,7 @@ static int cmd_server_l2cap_disconnect(const struct shell *sh, size_t argc, char
 
 	err = bt_ftp_server_l2cap_disconnect(&inst->server);
 	if (err != 0) {
-		shell_error(sh, "L2CAP disconnect failed (err %d)", err);
+		bt_shell_session_error(sh, "L2CAP disconnect failed (err %d)", err);
 	}
 
 	return err;
@@ -1817,7 +1820,7 @@ static void ftp_server_clear_auth_state(struct ftp_server_instance *inst)
 	memset(inst->peer_nonce, 0, sizeof(inst->peer_nonce));
 }
 
-static int cmd_server_connect(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_server_connect(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 	struct net_buf *buf;
@@ -1836,50 +1839,50 @@ static int cmd_server_connect(const struct shell *sh, size_t argc, char *argv[])
 	if (strcmp(rsp, "unauth") == 0) {
 		rsp_code = BT_OBEX_RSP_CODE_UNAUTH;
 		if (argc < 3) {
-			shell_error(sh, "[password] is needed if the rsp is %s", rsp);
-			shell_help(sh);
-			return SHELL_CMD_HELP_PRINTED;
+			bt_shell_session_error(sh, "[password] is needed if the rsp is %s", rsp);
+			bt_shell_help(sh);
+			return BT_SHELL_CMD_HELP_PRINTED;
 		}
 		pwd = argv[2];
 	} else if (strcmp(rsp, "success") == 0) {
 		rsp_code = BT_OBEX_RSP_CODE_SUCCESS;
 		if (argc > 2) {
-			shell_warn(sh, "[password] arguments ignored");
+			bt_shell_session_warn(sh, "[password] arguments ignored");
 		}
 	} else if (strcmp(rsp, "error") == 0) {
 		if (argc < 3) {
-			shell_error(sh, "[rsp_code] is needed if the rsp is %s", rsp);
-			shell_help(sh);
-			return SHELL_CMD_HELP_PRINTED;
+			bt_shell_session_error(sh, "[rsp_code] is needed if the rsp is %s", rsp);
+			bt_shell_help(sh);
+			return BT_SHELL_CMD_HELP_PRINTED;
 		}
 		err = 0;
-		rsp_code = (uint8_t)shell_strtoul(argv[2], 16, &err);
+		rsp_code = (uint8_t)bt_shell_strtoul(argv[2], 16, &err);
 		if (err != 0) {
-			shell_error(sh, "Invalid rsp_code %s", argv[2]);
+			bt_shell_session_error(sh, "Invalid rsp_code %s", argv[2]);
 			return -ENOEXEC;
 		}
 
 		if (rsp_code == BT_OBEX_RSP_CODE_UNAUTH) {
 			if (argc < 4) {
-				shell_error(sh, "[password] is needed if the rsp_code is unauth");
-				shell_help(sh);
-				return SHELL_CMD_HELP_PRINTED;
+				bt_shell_session_error(sh, "[password] is needed if the rsp_code is unauth");
+				bt_shell_help(sh);
+				return BT_SHELL_CMD_HELP_PRINTED;
 			}
 			pwd = argv[3];
 		}
 	} else {
-		shell_help(sh);
-		return SHELL_CMD_HELP_PRINTED;
+		bt_shell_help(sh);
+		return BT_SHELL_CMD_HELP_PRINTED;
 	}
 
 	if (pwd != NULL && strlen(pwd) > CONFIG_BT_OBEX_AUTH_PWD_LEN) {
-		shell_error(sh, "[password] too long (max %u)", CONFIG_BT_OBEX_AUTH_PWD_LEN);
+		bt_shell_session_error(sh, "[password] too long (max %u)", CONFIG_BT_OBEX_AUTH_PWD_LEN);
 		return -EINVAL;
 	}
 
 	buf = bt_ftp_server_create_pdu(&inst->server, &ftp_server_tx_pool);
 	if (buf == NULL) {
-		shell_error(sh, "Fail to allocate tx buffer");
+		bt_shell_session_error(sh, "Fail to allocate tx buffer");
 		return -ENOBUFS;
 	}
 
@@ -1891,7 +1894,7 @@ static int cmd_server_connect(const struct shell *sh, size_t argc, char *argv[])
 			err = bt_obex_calculate_request_digest(
 				(uint8_t *)inst->pwd, strlen(inst->pwd), inst->peer_nonce, digest);
 			if (err != 0) {
-				shell_error(sh, "Fail to calculate auth response digest (err %d)",
+				bt_shell_session_error(sh, "Fail to calculate auth response digest (err %d)",
 					    err);
 				goto failed;
 			}
@@ -1902,7 +1905,7 @@ static int cmd_server_connect(const struct shell *sh, size_t argc, char *argv[])
 
 			err = bt_obex_add_header_auth_rsp(buf, 1U, &challenge_data);
 			if (err != 0) {
-				shell_error(sh, "Fail to add auth response header (err %d)", err);
+				bt_shell_session_error(sh, "Fail to add auth response header (err %d)", err);
 				goto failed;
 			}
 		}
@@ -1914,7 +1917,7 @@ static int cmd_server_connect(const struct shell *sh, size_t argc, char *argv[])
 		err = bt_obex_generate_nonce((uint8_t *)inst->pwd, strlen(inst->pwd),
 					     inst->local_nonce);
 		if (err != 0) {
-			shell_error(sh, "Fail to calculate nonce (err %d)", err);
+			bt_shell_session_error(sh, "Fail to calculate nonce (err %d)", err);
 			goto failed;
 		}
 
@@ -1924,7 +1927,7 @@ static int cmd_server_connect(const struct shell *sh, size_t argc, char *argv[])
 
 		err = bt_obex_add_header_auth_challenge(buf, 1U, &challenge_data);
 		if (err != 0) {
-			shell_error(sh, "Fail to add auth challenge header (err %d)", err);
+			bt_shell_session_error(sh, "Fail to add auth challenge header (err %d)", err);
 			goto failed;
 		}
 
@@ -1941,13 +1944,13 @@ static int cmd_server_connect(const struct shell *sh, size_t argc, char *argv[])
 		return 0;
 	}
 
-	shell_error(sh, "Connect response failed (err %d)", err);
+	bt_shell_session_error(sh, "Connect response failed (err %d)", err);
 failed:
 	net_buf_unref(buf);
 	return err;
 }
 
-static int parse_rsp_code(const struct shell *sh, size_t argc, char *argv[], uint8_t *rsp_code)
+static int parse_rsp_code(const struct bt_shell *sh, size_t argc, char *argv[], uint8_t *rsp_code)
 {
 	const char *rsp;
 	int err = 0;
@@ -1957,24 +1960,24 @@ static int parse_rsp_code(const struct shell *sh, size_t argc, char *argv[], uin
 		*rsp_code = BT_OBEX_RSP_CODE_SUCCESS;
 	} else if (strcmp(rsp, "error") == 0) {
 		if (argc < 3) {
-			shell_error(sh, "[rsp_code] is needed if the rsp is %s", rsp);
-			shell_help(sh);
-			return SHELL_CMD_HELP_PRINTED;
+			bt_shell_session_error(sh, "[rsp_code] is needed if the rsp is %s", rsp);
+			bt_shell_help(sh);
+			return BT_SHELL_CMD_HELP_PRINTED;
 		}
-		*rsp_code = (uint8_t)shell_strtoul(argv[2], 16, &err);
+		*rsp_code = (uint8_t)bt_shell_strtoul(argv[2], 16, &err);
 		if (err != 0) {
-			shell_error(sh, "Invalid rsp_code %s", argv[2]);
+			bt_shell_session_error(sh, "Invalid rsp_code %s", argv[2]);
 			return -ENOEXEC;
 		}
 	} else {
-		shell_help(sh);
-		return SHELL_CMD_HELP_PRINTED;
+		bt_shell_help(sh);
+		return BT_SHELL_CMD_HELP_PRINTED;
 	}
 
 	return 0;
 }
 
-static int parse_error_code(const struct shell *sh, size_t argc, char *argv[], uint8_t *rsp_code)
+static int parse_error_code(const struct bt_shell *sh, size_t argc, char *argv[], uint8_t *rsp_code)
 {
 	const char *rsp;
 	int err = 0;
@@ -1984,24 +1987,24 @@ static int parse_error_code(const struct shell *sh, size_t argc, char *argv[], u
 		*rsp_code = BT_OBEX_RSP_CODE_SUCCESS;
 	} else if (strcmp(rsp, "error") == 0) {
 		if (argc < 3) {
-			shell_error(sh, "[rsp_code] is needed if the rsp is %s", rsp);
-			shell_help(sh);
-			return SHELL_CMD_HELP_PRINTED;
+			bt_shell_session_error(sh, "[rsp_code] is needed if the rsp is %s", rsp);
+			bt_shell_help(sh);
+			return BT_SHELL_CMD_HELP_PRINTED;
 		}
-		*rsp_code = (uint8_t)shell_strtoul(argv[2], 16, &err);
+		*rsp_code = (uint8_t)bt_shell_strtoul(argv[2], 16, &err);
 		if (err != 0) {
-			shell_error(sh, "Invalid rsp_code %s", argv[2]);
+			bt_shell_session_error(sh, "Invalid rsp_code %s", argv[2]);
 			return -ENOEXEC;
 		}
 	} else {
-		shell_help(sh);
-		return SHELL_CMD_HELP_PRINTED;
+		bt_shell_help(sh);
+		return BT_SHELL_CMD_HELP_PRINTED;
 	}
 
 	return 0;
 }
 
-static int cmd_server_disconnect(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_server_disconnect(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 	struct ftp_server_instance *inst;
@@ -2019,13 +2022,13 @@ static int cmd_server_disconnect(const struct shell *sh, size_t argc, char *argv
 
 	err = bt_ftp_server_disconnect(&inst->server, rsp_code, NULL);
 	if (err != 0) {
-		shell_error(sh, "Disconnect response failed (err %d)", err);
+		bt_shell_session_error(sh, "Disconnect response failed (err %d)", err);
 	}
 
 	return err;
 }
 
-static int cmd_server_abort(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_server_abort(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 	struct ftp_server_instance *inst;
@@ -2045,13 +2048,13 @@ static int cmd_server_abort(const struct shell *sh, size_t argc, char *argv[])
 	if (err == 0) {
 		inst->tx_cnt = 0;
 	} else {
-		shell_error(sh, "Abort response failed (err %d)", err);
+		bt_shell_session_error(sh, "Abort response failed (err %d)", err);
 	}
 
 	return err;
 }
 
-static int cmd_server_set_folder(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_server_set_folder(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 	struct ftp_server_instance *inst;
@@ -2069,7 +2072,7 @@ static int cmd_server_set_folder(const struct shell *sh, size_t argc, char *argv
 
 	err = bt_ftp_server_set_folder(&inst->server, rsp_code, NULL);
 	if (err != 0) {
-		shell_error(sh, "Set folder response failed (err %d)", err);
+		bt_shell_session_error(sh, "Set folder response failed (err %d)", err);
 	}
 
 	return err;
@@ -2090,7 +2093,7 @@ static int cmd_server_set_folder(const struct shell *sh, size_t argc, char *argv
 	"<file name=\"notes.txt\" size=\"512\" created=\"20260104T010000Z\"/>\r\n"                 \
 	"</folder-listing>"
 
-static int cmd_server_pull_folder_listing(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_server_pull_folder_listing(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	struct net_buf *buf;
 	int err;
@@ -2118,7 +2121,7 @@ static int cmd_server_pull_folder_listing(const struct shell *sh, size_t argc, c
 
 	buf = bt_ftp_server_create_pdu(&inst->server, &ftp_server_tx_pool);
 	if (buf == NULL) {
-		shell_error(sh, "Fail to allocate tx buffer");
+		bt_shell_session_error(sh, "Fail to allocate tx buffer");
 		return -ENOBUFS;
 	}
 
@@ -2129,20 +2132,20 @@ static int cmd_server_pull_folder_listing(const struct shell *sh, size_t argc, c
 	/* Add SRM response header on first response packet */
 	err = add_header_srm(buf, inst->goep_v2 && enable_srm);
 	if (err != 0) {
-		shell_error(sh, "Fail to add SRM header (err %d)", err);
+		bt_shell_session_error(sh, "Fail to add SRM header (err %d)", err);
 		goto failed;
 	}
 
 	err = add_header_srm_param(buf, inst->goep_v2 && enable_srmp);
 	if (err != 0) {
-		shell_error(sh, "Fail to add SRMP header (err %d)", err);
+		bt_shell_session_error(sh, "Fail to add SRMP header (err %d)", err);
 		goto failed;
 	}
 
 	err = bt_obex_add_header_body_or_end_body(buf, inst->mopl, body_len - inst->tx_cnt,
 						  (const uint8_t *)(body + inst->tx_cnt), &len);
 	if (err != 0) {
-		shell_error(sh, "Fail to add body (err %d)", err);
+		bt_shell_session_error(sh, "Fail to add body (err %d)", err);
 		goto failed;
 	}
 
@@ -2165,13 +2168,13 @@ error_rsp:
 	}
 
 	inst->tx_cnt = old_tx_cnt;
-	shell_error(sh, "Pull folder listing response failed (err %d)", err);
+	bt_shell_session_error(sh, "Pull folder listing response failed (err %d)", err);
 failed:
 	net_buf_unref(buf);
 	return err;
 }
 
-static int cmd_server_push_file(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_server_push_file(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	struct net_buf *buf;
 	int err;
@@ -2195,7 +2198,7 @@ static int cmd_server_push_file(const struct shell *sh, size_t argc, char *argv[
 
 	buf = bt_ftp_server_create_pdu(&inst->server, &ftp_server_tx_pool);
 	if (buf == NULL) {
-		shell_error(sh, "Fail to allocate tx buffer");
+		bt_shell_session_error(sh, "Fail to allocate tx buffer");
 		return -ENOBUFS;
 	}
 
@@ -2205,13 +2208,13 @@ static int cmd_server_push_file(const struct shell *sh, size_t argc, char *argv[
 
 	err = add_header_srm(buf, inst->goep_v2 && enable_srm);
 	if (err != 0) {
-		shell_error(sh, "Fail to add SRM header (err %d)", err);
+		bt_shell_session_error(sh, "Fail to add SRM header (err %d)", err);
 		goto failed;
 	}
 
 	err = add_header_srm_param(buf, inst->goep_v2 && enable_srmp);
 	if (err != 0) {
-		shell_error(sh, "Fail to add SRMP header (err %d)", err);
+		bt_shell_session_error(sh, "Fail to add SRMP header (err %d)", err);
 		goto failed;
 	}
 
@@ -2225,13 +2228,13 @@ error_rsp:
 		return 0;
 	}
 
-	shell_error(sh, "Push file failed (err %d)", err);
+	bt_shell_session_error(sh, "Push file failed (err %d)", err);
 failed:
 	net_buf_unref(buf);
 	return err;
 }
 
-static int cmd_server_pull_file(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_server_pull_file(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	struct net_buf *buf;
 	int err;
@@ -2259,7 +2262,7 @@ static int cmd_server_pull_file(const struct shell *sh, size_t argc, char *argv[
 
 	buf = bt_ftp_server_create_pdu(&inst->server, &ftp_server_tx_pool);
 	if (buf == NULL) {
-		shell_error(sh, "Fail to allocate tx buffer");
+		bt_shell_session_error(sh, "Fail to allocate tx buffer");
 		return -ENOBUFS;
 	}
 
@@ -2270,20 +2273,20 @@ static int cmd_server_pull_file(const struct shell *sh, size_t argc, char *argv[
 	/* Add SRM response headers on first packet */
 	err = add_header_srm(buf, inst->goep_v2 && enable_srm);
 	if (err != 0) {
-		shell_error(sh, "Fail to add SRM header (err %d)", err);
+		bt_shell_session_error(sh, "Fail to add SRM header (err %d)", err);
 		goto failed;
 	}
 
 	err = add_header_srm_param(buf, inst->goep_v2 && enable_srmp);
 	if (err != 0) {
-		shell_error(sh, "Fail to add SRMP header (err %d)", err);
+		bt_shell_session_error(sh, "Fail to add SRMP header (err %d)", err);
 		goto failed;
 	}
 
 	err = bt_obex_add_header_body_or_end_body(buf, inst->mopl, body_len - inst->tx_cnt,
 						  (const uint8_t *)(body + inst->tx_cnt), &len);
 	if (err != 0) {
-		shell_error(sh, "Fail to add body (err %d)", err);
+		bt_shell_session_error(sh, "Fail to add body (err %d)", err);
 		goto failed;
 	}
 
@@ -2306,13 +2309,13 @@ error_rsp:
 	}
 
 	inst->tx_cnt = old_tx_cnt;
-	shell_error(sh, "Pull file response failed (err %d)", err);
+	bt_shell_session_error(sh, "Pull file response failed (err %d)", err);
 failed:
 	net_buf_unref(buf);
 	return err;
 }
 
-static int cmd_server_delete(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_server_delete(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 	struct ftp_server_instance *inst;
@@ -2330,13 +2333,13 @@ static int cmd_server_delete(const struct shell *sh, size_t argc, char *argv[])
 
 	err = bt_ftp_server_remove(&inst->server, rsp_code, NULL);
 	if (err != 0) {
-		shell_error(sh, "Delete response failed (err %d)", err);
+		bt_shell_session_error(sh, "Delete response failed (err %d)", err);
 	}
 
 	return err;
 }
 
-static int cmd_server_rename(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_server_rename(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 	struct ftp_server_instance *inst;
@@ -2354,13 +2357,13 @@ static int cmd_server_rename(const struct shell *sh, size_t argc, char *argv[])
 
 	err = bt_ftp_server_rename(&inst->server, rsp_code, NULL);
 	if (err != 0) {
-		shell_error(sh, "Rename response failed (err %d)", err);
+		bt_shell_session_error(sh, "Rename response failed (err %d)", err);
 	}
 
 	return err;
 }
 
-static int cmd_server_copy(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_server_copy(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 	struct ftp_server_instance *inst;
@@ -2378,13 +2381,13 @@ static int cmd_server_copy(const struct shell *sh, size_t argc, char *argv[])
 
 	err = bt_ftp_server_copy(&inst->server, rsp_code, NULL);
 	if (err != 0) {
-		shell_error(sh, "Copy response failed (err %d)", err);
+		bt_shell_session_error(sh, "Copy response failed (err %d)", err);
 	}
 
 	return err;
 }
 
-static int cmd_server_set_permission(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_server_set_permission(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 	struct ftp_server_instance *inst;
@@ -2402,21 +2405,21 @@ static int cmd_server_set_permission(const struct shell *sh, size_t argc, char *
 
 	err = bt_ftp_server_set_permission(&inst->server, rsp_code, NULL);
 	if (err != 0) {
-		shell_error(sh, "Set permission response failed (err %d)", err);
+		bt_shell_session_error(sh, "Set permission response failed (err %d)", err);
 	}
 
 	return err;
 }
 #endif /* CONFIG_BT_FTP_SERVER */
 
-static int cmd_common(const struct shell *sh, size_t argc, char **argv)
+static int cmd_common(const struct bt_shell *sh, size_t argc, char **argv)
 {
 	if (argc == 1) {
-		shell_help(sh);
-		return SHELL_CMD_HELP_PRINTED;
+		bt_shell_help(sh);
+		return BT_SHELL_CMD_HELP_PRINTED;
 	}
 
-	shell_error(sh, "%s unknown parameter: %s", argv[0], argv[1]);
+	bt_shell_session_error(sh, "%s unknown parameter: %s", argv[0], argv[1]);
 	return -ENOEXEC;
 }
 
@@ -2425,66 +2428,77 @@ static int cmd_common(const struct shell *sh, size_t argc, char **argv)
 #define RSP_HELP_2 "<rsp: noerror, error> [rsp_code] [srm] [srmp]"
 
 #if defined(CONFIG_BT_FTP_CLIENT)
-SHELL_STATIC_SUBCMD_SET_CREATE(
+BT_SHELL_STATIC_SUBCMD_SET_CREATE(
 	ftp_client_cmds,
-	SHELL_CMD_ARG(rfcomm_connect, NULL, "<channel>", cmd_client_rfcomm_connect, 2, 0),
-	SHELL_CMD_ARG(rfcomm_disconnect, NULL, HELP_NONE, cmd_client_rfcomm_disconnect, 1, 0),
-	SHELL_CMD_ARG(l2cap_connect, NULL, "<psm>", cmd_client_l2cap_connect, 2, 0),
-	SHELL_CMD_ARG(l2cap_disconnect, NULL, HELP_NONE, cmd_client_l2cap_disconnect, 1, 0),
-	SHELL_CMD_ARG(connect, NULL, "[password]", cmd_client_connect, 1, 1),
-	SHELL_CMD_ARG(disconnect, NULL, HELP_NONE, cmd_client_disconnect, 1, 0),
-	SHELL_CMD_ARG(abort, NULL, HELP_NONE, cmd_client_abort, 1, 0),
-	SHELL_CMD_ARG(set_folder, NULL, "<path: \"/\" | \"..\" | \"folder\">",
+	BT_SHELL_CMD_ARG(rfcomm_connect, NULL, "<channel>", cmd_client_rfcomm_connect, 2, 0),
+	BT_SHELL_CMD_ARG(rfcomm_disconnect, NULL, HELP_NONE, cmd_client_rfcomm_disconnect, 1, 0),
+	BT_SHELL_CMD_ARG(l2cap_connect, NULL, "<psm>", cmd_client_l2cap_connect, 2, 0),
+	BT_SHELL_CMD_ARG(l2cap_disconnect, NULL, HELP_NONE, cmd_client_l2cap_disconnect, 1, 0),
+	BT_SHELL_CMD_ARG(connect, NULL, "[password]", cmd_client_connect, 1, 1),
+	BT_SHELL_CMD_ARG(disconnect, NULL, HELP_NONE, cmd_client_disconnect, 1, 0),
+	BT_SHELL_CMD_ARG(abort, NULL, HELP_NONE, cmd_client_abort, 1, 0),
+	BT_SHELL_CMD_ARG(set_folder, NULL, "<path: \"/\" | \"..\" | \"folder\">",
 		      cmd_client_set_folder, 2, 0),
-	SHELL_CMD_ARG(create_folder, NULL, "<folder_name>", cmd_client_create_folder, 2, 0),
-	SHELL_CMD_ARG(pull_folder_listing, NULL, "[name <folder_name>] [srm] [srmp]",
+	BT_SHELL_CMD_ARG(create_folder, NULL, "<folder_name>", cmd_client_create_folder, 2, 0),
+	BT_SHELL_CMD_ARG(pull_folder_listing, NULL, "[name <folder_name>] [srm] [srmp]",
 		      cmd_client_pull_folder_listing, 1, 4),
-	SHELL_CMD_ARG(push_file, NULL, "<filename> [srm]", cmd_client_push_file, 2, 1),
-	SHELL_CMD_ARG(pull_file, NULL, "<filename> [srm] [srmp]", cmd_client_pull_file, 2, 2),
-	SHELL_CMD_ARG(delete, NULL, "<filename>", cmd_client_delete, 2, 0),
-	SHELL_CMD_ARG(rename, NULL, "<src_name> <dst_name>", cmd_client_rename, 3, 0),
-	SHELL_CMD_ARG(copy, NULL, "<src_name> <dst_name>", cmd_client_copy, 3, 0),
-	SHELL_CMD_ARG(set_permission, NULL,
+	BT_SHELL_CMD_ARG(push_file, NULL, "<filename> [srm]", cmd_client_push_file, 2, 1),
+	BT_SHELL_CMD_ARG(pull_file, NULL, "<filename> [srm] [srmp]", cmd_client_pull_file, 2, 2),
+	BT_SHELL_CMD_ARG(delete, NULL, "<filename>", cmd_client_delete, 2, 0),
+	BT_SHELL_CMD_ARG(rename, NULL, "<src_name> <dst_name>", cmd_client_rename, 3, 0),
+	BT_SHELL_CMD_ARG(copy, NULL, "<src_name> <dst_name>", cmd_client_copy, 3, 0),
+	BT_SHELL_CMD_ARG(set_permission, NULL,
 		      "<filename> <User: [r][w][d][m]> <Group: [r][w][d][m]> <Other: [r][w][d][m]>",
 		      cmd_client_set_permission, 5, 0),
-	SHELL_SUBCMD_SET_END);
+	BT_SHELL_SUBCMD_SET_END);
 #endif /* CONFIG_BT_FTP_CLIENT */
 
 #if defined(CONFIG_BT_FTP_SERVER)
-SHELL_STATIC_SUBCMD_SET_CREATE(
+BT_SHELL_STATIC_SUBCMD_SET_CREATE(
 	ftp_server_cmds,
-	SHELL_CMD_ARG(register, NULL, HELP_NONE, cmd_server_register, 1, 0),
-	SHELL_CMD_ARG(rfcomm_register, NULL, HELP_NONE, cmd_server_rfcomm_register, 1, 0),
-	SHELL_CMD_ARG(rfcomm_disconnect, NULL, HELP_NONE, cmd_server_rfcomm_disconnect, 1, 0),
-	SHELL_CMD_ARG(l2cap_register, NULL, HELP_NONE, cmd_server_l2cap_register, 1, 0),
-	SHELL_CMD_ARG(l2cap_disconnect, NULL, HELP_NONE, cmd_server_l2cap_disconnect, 1, 0),
-	SHELL_CMD_ARG(connect, NULL,
+	BT_SHELL_CMD_ARG(register, NULL, HELP_NONE, cmd_server_register, 1, 0),
+	BT_SHELL_CMD_ARG(rfcomm_register, NULL, HELP_NONE, cmd_server_rfcomm_register, 1, 0),
+	BT_SHELL_CMD_ARG(rfcomm_disconnect, NULL, HELP_NONE, cmd_server_rfcomm_disconnect, 1, 0),
+	BT_SHELL_CMD_ARG(l2cap_register, NULL, HELP_NONE, cmd_server_l2cap_register, 1, 0),
+	BT_SHELL_CMD_ARG(l2cap_disconnect, NULL, HELP_NONE, cmd_server_l2cap_disconnect, 1, 0),
+	BT_SHELL_CMD_ARG(connect, NULL,
 		      "<rsp: success | unauth <password> | error <rsp_code> [password]>\n"
 		      "[password] is required for error with rsp_code c1 (unauthorized)",
 		      cmd_server_connect, 2, 2),
-	SHELL_CMD_ARG(disconnect, NULL, RSP_HELP_1, cmd_server_disconnect, 2, 1),
-	SHELL_CMD_ARG(abort, NULL, RSP_HELP_1, cmd_server_abort, 2, 1),
-	SHELL_CMD_ARG(set_folder, NULL, RSP_HELP_1, cmd_server_set_folder, 2, 1),
-	SHELL_CMD_ARG(create_folder, NULL, RSP_HELP_1, cmd_server_set_folder, 2, 1),
-	SHELL_CMD_ARG(pull_folder_listing, NULL, RSP_HELP_2, cmd_server_pull_folder_listing, 2, 3),
-	SHELL_CMD_ARG(push_file, NULL, RSP_HELP_2, cmd_server_push_file, 2, 3),
-	SHELL_CMD_ARG(pull_file, NULL, RSP_HELP_2, cmd_server_pull_file, 2, 3),
-	SHELL_CMD_ARG(delete, NULL, RSP_HELP_1, cmd_server_delete, 2, 1),
-	SHELL_CMD_ARG(rename, NULL, RSP_HELP_1, cmd_server_rename, 2, 1),
-	SHELL_CMD_ARG(copy, NULL, RSP_HELP_1, cmd_server_copy, 2, 1),
-	SHELL_CMD_ARG(set_permission, NULL, RSP_HELP_1, cmd_server_set_permission, 2, 1),
-	SHELL_SUBCMD_SET_END);
+	BT_SHELL_CMD_ARG(disconnect, NULL, RSP_HELP_1, cmd_server_disconnect, 2, 1),
+	BT_SHELL_CMD_ARG(abort, NULL, RSP_HELP_1, cmd_server_abort, 2, 1),
+	BT_SHELL_CMD_ARG(set_folder, NULL, RSP_HELP_1, cmd_server_set_folder, 2, 1),
+	BT_SHELL_CMD_ARG(create_folder, NULL, RSP_HELP_1, cmd_server_set_folder, 2, 1),
+	BT_SHELL_CMD_ARG(pull_folder_listing, NULL, RSP_HELP_2, cmd_server_pull_folder_listing, 2, 3),
+	BT_SHELL_CMD_ARG(push_file, NULL, RSP_HELP_2, cmd_server_push_file, 2, 3),
+	BT_SHELL_CMD_ARG(pull_file, NULL, RSP_HELP_2, cmd_server_pull_file, 2, 3),
+	BT_SHELL_CMD_ARG(delete, NULL, RSP_HELP_1, cmd_server_delete, 2, 1),
+	BT_SHELL_CMD_ARG(rename, NULL, RSP_HELP_1, cmd_server_rename, 2, 1),
+	BT_SHELL_CMD_ARG(copy, NULL, RSP_HELP_1, cmd_server_copy, 2, 1),
+	BT_SHELL_CMD_ARG(set_permission, NULL, RSP_HELP_1, cmd_server_set_permission, 2, 1),
+	BT_SHELL_SUBCMD_SET_END);
 #endif /* CONFIG_BT_FTP_SERVER */
 
-SHELL_STATIC_SUBCMD_SET_CREATE(ftp_cmds,
+BT_SHELL_STATIC_SUBCMD_SET_CREATE(ftp_cmds,
 #if defined(CONFIG_BT_FTP_CLIENT)
-			       SHELL_CMD_ARG(client, &ftp_client_cmds, "FTP client commands",
+			       BT_SHELL_CMD_ARG(client, &ftp_client_cmds, "FTP client commands",
 					     cmd_common, 1, 0),
 #endif /* CONFIG_BT_FTP_CLIENT */
 #if defined(CONFIG_BT_FTP_SERVER)
-			       SHELL_CMD_ARG(server, &ftp_server_cmds, "FTP server commands",
+			       BT_SHELL_CMD_ARG(server, &ftp_server_cmds, "FTP server commands",
 					     cmd_common, 1, 0),
 #endif /* CONFIG_BT_FTP_SERVER */
-			       SHELL_SUBCMD_SET_END);
+			       BT_SHELL_SUBCMD_SET_END);
 
-SHELL_CMD_ARG_REGISTER(ftp, &ftp_cmds, "Bluetooth FTP shell commands", cmd_common, 1, 1);
+BT_SHELL_CMD_ARG_REGISTER(ftp, &ftp_cmds, "Bluetooth FTP shell commands", cmd_common, 1, 1);
+
+/** @brief Initialize module-owned storage before protocol operations. */
+void bt_host_classic_shell_ftp_storage_init(void)
+{
+#if (defined(CONFIG_BT_FTP_CLIENT))
+	net_buf_pool_init(&ftp_client_tx_pool);
+#endif
+#if (defined(CONFIG_BT_FTP_SERVER))
+	net_buf_pool_init(&ftp_server_tx_pool);
+#endif
+}

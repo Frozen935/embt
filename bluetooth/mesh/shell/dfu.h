@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <zephyr/shell/shell.h>
+#include <shell/bt_shell.h>
 
-void bt_mesh_shell_dfu_cmds_init(void);
+/**
+ * @brief Command table for the enabled Mesh firmware update shell operations.
+ */
+extern const struct bt_shell_cmd_entry dfu_cmds_entries[];

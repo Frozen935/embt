@@ -9,18 +9,20 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <embt/base/assert.h>
 #include <errno.h>
-#include <zephyr/types.h>
+#include <stddef.h>
+#include <stdint.h>
 #include <stdlib.h>
-#include <zephyr/sys/byteorder.h>
+#include <embt/base/byteorder.h>
 
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/l2cap.h>
-#include <zephyr/bluetooth/classic/rfcomm.h>
-#include <zephyr/bluetooth/classic/sdp.h>
-#include <zephyr/bluetooth/classic/pbap.h>
-#include <zephyr/shell/shell.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/l2cap.h>
+#include <embt/bluetooth/classic/rfcomm.h>
+#include <embt/bluetooth/classic/sdp.h>
+#include <embt/bluetooth/classic/pbap.h>
+#include <shell/bt_shell.h>
 
 #include <host/shell/bt.h>
 #include <common/bt_shell_private.h>
@@ -205,7 +207,7 @@ static void g_pbap_free(struct bt_pbap_app *pbap_app)
 	pbap_app->conn = NULL;
 }
 
-static int cmd_alloc_buf(const struct shell *sh, size_t argc, char **argv)
+static int cmd_alloc_buf(const struct bt_shell *sh, size_t argc, char **argv)
 {
 	if (g_pbap_app == NULL) {
 		bt_shell_error("g_pbap_app is not using");
@@ -230,7 +232,7 @@ static int cmd_alloc_buf(const struct shell *sh, size_t argc, char **argv)
 	return 0;
 }
 
-static int cmd_release_buf(const struct shell *sh, size_t argc, char **argv)
+static int cmd_release_buf(const struct bt_shell *sh, size_t argc, char **argv)
 {
 	if (g_pbap_app == NULL) {
 		bt_shell_error("No active PBAP session");
@@ -676,7 +678,7 @@ static struct bt_sdp_attribute pbap_pce_attrs[] = {
 
 static struct bt_sdp_record pbap_pce_rec = BT_SDP_RECORD(pbap_pce_attrs);
 
-static int cmd_pce_sdp_reg(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_pce_sdp_reg(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 	static bool pce_register;
@@ -792,22 +794,22 @@ static struct bt_sdp_discover_params discov_pse = {
 	.pool = &sdp_client_pool,
 };
 
-static int cmd_pce_sdp_discover(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_pce_sdp_discover(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 
 	if (default_conn == NULL) {
-		shell_print(sh, "Not connected");
+		bt_shell_session_print(sh, "Not connected");
 		return -ENOEXEC;
 	}
 
 	err = bt_sdp_discover(default_conn, &discov_pse);
 	if (err != 0) {
-		shell_error(sh, "SDP discovery failed: err %d", err);
+		bt_shell_session_error(sh, "SDP discovery failed: err %d", err);
 		return -ENOEXEC;
 	}
 
-	shell_print(sh, "SDP discovery started");
+	bt_shell_session_print(sh, "SDP discovery started");
 
 	return 0;
 }
@@ -1124,31 +1126,31 @@ static int pbap_pce_transport_disconnect(bool is_rfcomm)
 	return err;
 }
 
-static int cmd_connect_rfcomm(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_connect_rfcomm(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint8_t channel = (uint8_t)strtoul(argv[1], NULL, 16);
 
 	return pbap_pce_transport_connect(channel, 0);
 }
 
-static int cmd_connect_l2cap(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_connect_l2cap(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint16_t psm = (uint16_t)strtoul(argv[1], NULL, 16);
 
 	return pbap_pce_transport_connect(0, psm);
 }
 
-static int cmd_disconnect_rfcomm(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_disconnect_rfcomm(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	return pbap_pce_transport_disconnect(true);
 }
 
-static int cmd_disconnect_l2cap(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_disconnect_l2cap(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	return pbap_pce_transport_disconnect(false);
 }
 
-static int cmd_connect(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_connect(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 	uint16_t mopl = (uint16_t)strtoul(argv[1], NULL, 10);
@@ -1177,7 +1179,7 @@ failed:
 	return err;
 }
 
-static int cmd_disconnect(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_disconnect(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 
@@ -1334,7 +1336,7 @@ failed:
 	return err;
 }
 
-static int cmd_pull_phonebook(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_pull_phonebook(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	bool srmp = false;
 	int err;
@@ -1350,7 +1352,7 @@ static int cmd_pull_phonebook(const struct shell *sh, size_t argc, char *argv[])
 	return err;
 }
 
-static int cmd_pull_vcard_listing(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_pull_vcard_listing(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	bool srmp = false;
 	int err;
@@ -1366,7 +1368,7 @@ static int cmd_pull_vcard_listing(const struct shell *sh, size_t argc, char *arg
 	return err;
 }
 
-static int cmd_pull_vcard_entry(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_pull_vcard_entry(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	bool srmp = false;
 	int err;
@@ -1382,7 +1384,7 @@ static int cmd_pull_vcard_entry(const struct shell *sh, size_t argc, char *argv[
 	return err;
 }
 
-static int cmd_set_phone_book(const struct shell *sh, size_t argc, char **argv)
+static int cmd_set_phone_book(const struct bt_shell *sh, size_t argc, char **argv)
 {
 	uint16_t len = 0;
 	int err;
@@ -1429,7 +1431,7 @@ failed:
 	return err;
 }
 
-static int cmd_abort(const struct shell *sh, size_t argc, char **argv)
+static int cmd_abort(const struct bt_shell *sh, size_t argc, char **argv)
 {
 	int err;
 
@@ -1439,33 +1441,33 @@ static int cmd_abort(const struct shell *sh, size_t argc, char **argv)
 	}
 
 	if (g_pbap_app->conn == NULL) {
-		shell_error(sh, "No pbap transport connection");
+		bt_shell_session_error(sh, "No pbap transport connection");
 		return -ENOEXEC;
 	}
 
 	err = bt_pbap_pce_abort(&g_pbap_app->pbap_pce, g_pbap_app->tx_buf);
 	if (err != 0) {
-		shell_error(sh, "Fail to send abort req %d", err);
+		bt_shell_session_error(sh, "Fail to send abort req %d", err);
 	}
 
 	g_pbap_app->tx_buf = NULL;
 	return err;
 }
 
-SHELL_STATIC_SUBCMD_SET_CREATE(
-	pce_cmds, SHELL_CMD_ARG(sdp_reg, NULL, "", cmd_pce_sdp_reg, 1, 0),
-	SHELL_CMD_ARG(sdp_discover, NULL, "", cmd_pce_sdp_discover, 1, 0),
-	SHELL_CMD_ARG(connect_rfcomm, NULL, "<channel>", cmd_connect_rfcomm, 2, 0),
-	SHELL_CMD_ARG(disconnect_rfcomm, NULL, "", cmd_disconnect_rfcomm, 1, 0),
-	SHELL_CMD_ARG(connect_l2cap, NULL, "<channel>", cmd_connect_l2cap, 2, 0),
-	SHELL_CMD_ARG(disconnect_l2cap, NULL, "", cmd_disconnect_l2cap, 1, 0),
-	SHELL_CMD_ARG(connect, NULL, "<mopl>", cmd_connect, 2, 0),
-	SHELL_CMD_ARG(disconnect, NULL, "", cmd_disconnect, 1, 0),
-	SHELL_CMD_ARG(pull_pb, NULL, "<name> [srmp]", cmd_pull_phonebook, 2, 1),
-	SHELL_CMD_ARG(pull_vcard_listing, NULL, "<name> [srmp]", cmd_pull_vcard_listing, 2, 1),
-	SHELL_CMD_ARG(pull_vcard_entry, NULL, "<name> [srmp]", cmd_pull_vcard_entry, 2, 1),
-	SHELL_CMD_ARG(set_phone_book, NULL, "<Flags> [name]", cmd_set_phone_book, 2, 1),
-	SHELL_CMD_ARG(abort, NULL, "", cmd_abort, 1, 0), SHELL_SUBCMD_SET_END);
+BT_SHELL_STATIC_SUBCMD_SET_CREATE(
+	pce_cmds, BT_SHELL_CMD_ARG(sdp_reg, NULL, "", cmd_pce_sdp_reg, 1, 0),
+	BT_SHELL_CMD_ARG(sdp_discover, NULL, "", cmd_pce_sdp_discover, 1, 0),
+	BT_SHELL_CMD_ARG(connect_rfcomm, NULL, "<channel>", cmd_connect_rfcomm, 2, 0),
+	BT_SHELL_CMD_ARG(disconnect_rfcomm, NULL, "", cmd_disconnect_rfcomm, 1, 0),
+	BT_SHELL_CMD_ARG(connect_l2cap, NULL, "<channel>", cmd_connect_l2cap, 2, 0),
+	BT_SHELL_CMD_ARG(disconnect_l2cap, NULL, "", cmd_disconnect_l2cap, 1, 0),
+	BT_SHELL_CMD_ARG(connect, NULL, "<mopl>", cmd_connect, 2, 0),
+	BT_SHELL_CMD_ARG(disconnect, NULL, "", cmd_disconnect, 1, 0),
+	BT_SHELL_CMD_ARG(pull_pb, NULL, "<name> [srmp]", cmd_pull_phonebook, 2, 1),
+	BT_SHELL_CMD_ARG(pull_vcard_listing, NULL, "<name> [srmp]", cmd_pull_vcard_listing, 2, 1),
+	BT_SHELL_CMD_ARG(pull_vcard_entry, NULL, "<name> [srmp]", cmd_pull_vcard_entry, 2, 1),
+	BT_SHELL_CMD_ARG(set_phone_book, NULL, "<Flags> [name]", cmd_set_phone_book, 2, 1),
+	BT_SHELL_CMD_ARG(abort, NULL, "", cmd_abort, 1, 0), BT_SHELL_SUBCMD_SET_END);
 #endif /* CONFIG_BT_PBAP_PCE*/
 
 #if defined(CONFIG_BT_PBAP_PSE)
@@ -1687,12 +1689,12 @@ static int l2cap_accept(struct bt_conn *conn, struct bt_pbap_pse_l2cap *pbap_pse
 	return 0;
 }
 
-static int cmd_rfcomm_register(const struct shell *sh, size_t argc, char **argv)
+static int cmd_rfcomm_register(const struct bt_shell *sh, size_t argc, char **argv)
 {
 	int err;
 
 	if (rfcomm_server.server.rfcomm.channel != 0) {
-		shell_error(sh, "RFCOMM has been registered");
+		bt_shell_session_error(sh, "RFCOMM has been registered");
 		return -EBUSY;
 	}
 
@@ -1700,23 +1702,23 @@ static int cmd_rfcomm_register(const struct shell *sh, size_t argc, char **argv)
 	rfcomm_server.accept = rfcomm_accept;
 	err = bt_pbap_pse_rfcomm_register(&rfcomm_server);
 	if (err != 0) {
-		shell_error(sh, "Fail to register RFCOMM server (error %d)", err);
+		bt_shell_session_error(sh, "Fail to register RFCOMM server (error %d)", err);
 		rfcomm_server.server.rfcomm.channel = 0;
 		return -ENOEXEC;
 	}
 
-	shell_print(sh, "RFCOMM server (channel %02x) is registered",
+	bt_shell_session_print(sh, "RFCOMM server (channel %02x) is registered",
 		    rfcomm_server.server.rfcomm.channel);
 
 	return 0;
 }
 
-static int cmd_l2cap_register(const struct shell *sh, size_t argc, char **argv)
+static int cmd_l2cap_register(const struct bt_shell *sh, size_t argc, char **argv)
 {
 	int err;
 
 	if (l2cap_server.server.l2cap.psm != 0) {
-		shell_error(sh, "l2cap has been registered");
+		bt_shell_session_error(sh, "l2cap has been registered");
 		return -EBUSY;
 	}
 
@@ -1724,28 +1726,28 @@ static int cmd_l2cap_register(const struct shell *sh, size_t argc, char **argv)
 	l2cap_server.accept = l2cap_accept;
 	err = bt_pbap_pse_l2cap_register(&l2cap_server);
 	if (err != 0) {
-		shell_error(sh, "Fail to register L2CAP server (error %d)", err);
+		bt_shell_session_error(sh, "Fail to register L2CAP server (error %d)", err);
 		l2cap_server.server.l2cap.psm = 0;
 		return -ENOEXEC;
 	}
 
-	shell_print(sh, "L2cap server (psm %02x) is registered", l2cap_server.server.l2cap.psm);
+	bt_shell_session_print(sh, "L2cap server (psm %02x) is registered", l2cap_server.server.l2cap.psm);
 	return 0;
 }
 
-static int cmd_register(const struct shell *sh, size_t argc, char **argv)
+static int cmd_register(const struct bt_shell *sh, size_t argc, char **argv)
 {
 	int err;
 
 	g_pbap_app = g_pbap_allocate(NULL);
 	if (g_pbap_app == NULL) {
-		shell_error(sh, "PBAP instance not allocated");
+		bt_shell_session_error(sh, "PBAP instance not allocated");
 		return -EINVAL;
 	}
 
 	err = bt_pbap_pse_register(&g_pbap_app->pbap_pse, &pse_cb);
 	if (err != 0) {
-		shell_error(sh, "Fail to register server %d", err);
+		bt_shell_session_error(sh, "Fail to register server %d", err);
 	}
 
 	g_pbap_app->role = ROLE_PSE;
@@ -1753,7 +1755,7 @@ static int cmd_register(const struct shell *sh, size_t argc, char **argv)
 	return err;
 }
 
-static int cmd_connect_rsp(const struct shell *sh, size_t argc, char **argv)
+static int cmd_connect_rsp(const struct bt_shell *sh, size_t argc, char **argv)
 {
 	uint8_t rsp_code;
 	const char *rsp;
@@ -1783,19 +1785,19 @@ static int cmd_connect_rsp(const struct shell *sh, size_t argc, char **argv)
 		rsp_code = BT_OBEX_RSP_CODE_SUCCESS;
 	} else if (strcmp(rsp, "error") == 0) {
 		if (argc < 4) {
-			shell_error(sh, "[rsp_code] is needed if the rsp is %s", rsp);
-			shell_help(sh);
-			return SHELL_CMD_HELP_PRINTED;
+			bt_shell_session_error(sh, "[rsp_code] is needed if the rsp is %s", rsp);
+			bt_shell_help(sh);
+			return BT_SHELL_CMD_HELP_PRINTED;
 		}
 		rsp_code = (uint8_t)strtoul(argv[3], NULL, 16);
 	} else {
-		shell_help(sh);
-		return SHELL_CMD_HELP_PRINTED;
+		bt_shell_help(sh);
+		return BT_SHELL_CMD_HELP_PRINTED;
 	}
 
 	err = bt_pbap_pse_connect_rsp(&g_pbap_app->pbap_pse, mopl, rsp_code, g_pbap_app->tx_buf);
 	if (err != 0) {
-		shell_error(sh, "Fail to send conn rsp %d", err);
+		bt_shell_session_error(sh, "Fail to send conn rsp %d", err);
 		net_buf_unref(g_pbap_app->tx_buf);
 	}
 
@@ -1803,7 +1805,7 @@ static int cmd_connect_rsp(const struct shell *sh, size_t argc, char **argv)
 	return err;
 }
 
-static int cmd_disconnect_rsp(const struct shell *sh, size_t argc, char **argv)
+static int cmd_disconnect_rsp(const struct bt_shell *sh, size_t argc, char **argv)
 {
 	uint8_t rsp_code;
 	const char *rsp;
@@ -1829,19 +1831,19 @@ static int cmd_disconnect_rsp(const struct shell *sh, size_t argc, char **argv)
 		rsp_code = BT_OBEX_RSP_CODE_SUCCESS;
 	} else if (strcmp(rsp, "error") == 0) {
 		if (argc < 3) {
-			shell_error(sh, "[rsp_code] is needed if the rsp is %s", rsp);
-			shell_help(sh);
-			return SHELL_CMD_HELP_PRINTED;
+			bt_shell_session_error(sh, "[rsp_code] is needed if the rsp is %s", rsp);
+			bt_shell_help(sh);
+			return BT_SHELL_CMD_HELP_PRINTED;
 		}
 		rsp_code = (uint8_t)strtoul(argv[2], NULL, 16);
 	} else {
-		shell_help(sh);
-		return SHELL_CMD_HELP_PRINTED;
+		bt_shell_help(sh);
+		return BT_SHELL_CMD_HELP_PRINTED;
 	}
 
 	err = bt_pbap_pse_disconnect_rsp(&g_pbap_app->pbap_pse, rsp_code, g_pbap_app->tx_buf);
 	if (err != 0) {
-		shell_error(sh, "Fail to send conn rsp %d", err);
+		bt_shell_session_error(sh, "Fail to send conn rsp %d", err);
 		net_buf_unref(g_pbap_app->tx_buf);
 	}
 
@@ -1928,7 +1930,7 @@ static const struct pbap_pull_rsp_handler *pbap_get_pull_rsp_handler(const char 
 	return NULL;
 }
 
-static int pbap_parse_pull_rsp_code(const struct shell *sh, size_t argc, char *argv[],
+static int pbap_parse_pull_rsp_code(const struct bt_shell *sh, size_t argc, char *argv[],
 				    uint8_t *rsp_code, bool *srmp)
 {
 	const char *rsp;
@@ -1939,15 +1941,15 @@ static int pbap_parse_pull_rsp_code(const struct shell *sh, size_t argc, char *a
 
 	if (strcmp(rsp, "error") == 0) {
 		if (argc < 3) {
-			shell_error(sh, "[rsp_code] is needed if the rsp is %s", rsp);
-			shell_help(sh);
+			bt_shell_session_error(sh, "[rsp_code] is needed if the rsp is %s", rsp);
+			bt_shell_help(sh);
 			return -EINVAL;
 		}
 		*rsp_code = (uint8_t)strtoul(argv[++index], NULL, 16);
 	} else if (strcmp(rsp, "noerror") == 0) {
 		*rsp_code = BT_OBEX_RSP_CODE_SUCCESS;
 	} else {
-		shell_help(sh);
+		bt_shell_help(sh);
 		return -EINVAL;
 	}
 
@@ -1960,7 +1962,7 @@ static int pbap_parse_pull_rsp_code(const struct shell *sh, size_t argc, char *a
 	if (strcmp(argv[index], "srmp") == 0) {
 		*srmp = true;
 	} else {
-		shell_help(sh);
+		bt_shell_help(sh);
 		return -EINVAL;
 	}
 
@@ -2023,7 +2025,7 @@ static int pbap_pull_rsp_send_response(struct bt_pbap_app *pbap_app, const char 
 	return err;
 }
 
-static int pbap_pull_rsp(const struct shell *sh, size_t argc, char *argv[], const char *type)
+static int pbap_pull_rsp(const struct bt_shell *sh, size_t argc, char *argv[], const char *type)
 {
 	uint8_t rsp_code;
 	int err = 0;
@@ -2114,22 +2116,22 @@ failed:
 	return err;
 }
 
-static int cmd_pull_phone_book_rsp(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_pull_phone_book_rsp(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	return pbap_pull_rsp(sh, argc, argv, BT_PBAP_PULL_PHONE_BOOK_TYPE);
 }
 
-static int cmd_pull_vcard_listing_rsp(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_pull_vcard_listing_rsp(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	return pbap_pull_rsp(sh, argc, argv, BT_PBAP_PULL_VCARD_LISTING_TYPE);
 }
 
-static int cmd_pull_vcard_entry_rsp(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_pull_vcard_entry_rsp(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	return pbap_pull_rsp(sh, argc, argv, BT_PBAP_PULL_VCARD_ENTRY_TYPE);
 }
 
-static int cmd_set_phone_book_rsp(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_set_phone_book_rsp(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	const char *rsp;
 	uint8_t rsp_code;
@@ -2140,14 +2142,14 @@ static int cmd_set_phone_book_rsp(const struct shell *sh, size_t argc, char *arg
 		rsp_code = BT_OBEX_RSP_CODE_SUCCESS;
 	} else if (strcmp(rsp, "error") == 0) {
 		if (argc < 3) {
-			shell_error(sh, "[rsp_code] is needed if the rsp is %s", rsp);
-			shell_help(sh);
-			return SHELL_CMD_HELP_PRINTED;
+			bt_shell_session_error(sh, "[rsp_code] is needed if the rsp is %s", rsp);
+			bt_shell_help(sh);
+			return BT_SHELL_CMD_HELP_PRINTED;
 		}
 		rsp_code = (uint8_t)strtoul(argv[2], NULL, 16);
 	} else {
-		shell_help(sh);
-		return SHELL_CMD_HELP_PRINTED;
+		bt_shell_help(sh);
+		return BT_SHELL_CMD_HELP_PRINTED;
 	}
 
 	if (g_pbap_app == NULL) {
@@ -2162,7 +2164,7 @@ static int cmd_set_phone_book_rsp(const struct shell *sh, size_t argc, char *arg
 
 	err = bt_pbap_pse_set_phone_book_rsp(&g_pbap_app->pbap_pse, rsp_code, g_pbap_app->tx_buf);
 	if (err != 0) {
-		shell_error(sh, "Fail to send setpath rsp %d", err);
+		bt_shell_session_error(sh, "Fail to send setpath rsp %d", err);
 		net_buf_unref(g_pbap_app->tx_buf);
 	}
 
@@ -2170,7 +2172,7 @@ static int cmd_set_phone_book_rsp(const struct shell *sh, size_t argc, char *arg
 	return err;
 }
 
-static int cmd_abort_rsp(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_abort_rsp(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	const char *rsp;
 	uint8_t rsp_code;
@@ -2181,14 +2183,14 @@ static int cmd_abort_rsp(const struct shell *sh, size_t argc, char *argv[])
 		rsp_code = BT_OBEX_RSP_CODE_SUCCESS;
 	} else if (strcmp(rsp, "error") == 0) {
 		if (argc < 3) {
-			shell_error(sh, "[rsp_code] is needed if the rsp is %s", rsp);
-			shell_help(sh);
-			return SHELL_CMD_HELP_PRINTED;
+			bt_shell_session_error(sh, "[rsp_code] is needed if the rsp is %s", rsp);
+			bt_shell_help(sh);
+			return BT_SHELL_CMD_HELP_PRINTED;
 		}
 		rsp_code = (uint8_t)strtoul(argv[2], NULL, 16);
 	} else {
-		shell_help(sh);
-		return SHELL_CMD_HELP_PRINTED;
+		bt_shell_help(sh);
+		return BT_SHELL_CMD_HELP_PRINTED;
 	}
 
 	if (g_pbap_app == NULL) {
@@ -2203,7 +2205,7 @@ static int cmd_abort_rsp(const struct shell *sh, size_t argc, char *argv[])
 
 	err = bt_pbap_pse_abort_rsp(&g_pbap_app->pbap_pse, rsp_code, g_pbap_app->tx_buf);
 	if (err != 0) {
-		shell_error(sh, "Fail to send abort rsp %d", err);
+		bt_shell_session_error(sh, "Fail to send abort rsp %d", err);
 		net_buf_unref(g_pbap_app->tx_buf);
 	}
 
@@ -2215,28 +2217,28 @@ static int cmd_abort_rsp(const struct shell *sh, size_t argc, char *argv[])
 	return err;
 }
 
-SHELL_STATIC_SUBCMD_SET_CREATE(
-	pse_cmds, SHELL_CMD_ARG(rfcomm_register, NULL, "", cmd_rfcomm_register, 1, 0),
-	SHELL_CMD_ARG(l2cap_register, NULL, "", cmd_l2cap_register, 1, 0),
-	SHELL_CMD_ARG(register, NULL, "", cmd_register, 1, 0),
-	SHELL_CMD_ARG(connect_rsp, NULL, "<mopl> <rsp: unauth,success,error> [rsp_code]",
+BT_SHELL_STATIC_SUBCMD_SET_CREATE(
+	pse_cmds, BT_SHELL_CMD_ARG(rfcomm_register, NULL, "", cmd_rfcomm_register, 1, 0),
+	BT_SHELL_CMD_ARG(l2cap_register, NULL, "", cmd_l2cap_register, 1, 0),
+	BT_SHELL_CMD_ARG(register, NULL, "", cmd_register, 1, 0),
+	BT_SHELL_CMD_ARG(connect_rsp, NULL, "<mopl> <rsp: unauth,success,error> [rsp_code]",
 		      cmd_connect_rsp, 3, 1),
-	SHELL_CMD_ARG(disconnect_rsp, NULL, "<rsp: success,error> [rsp_code]", cmd_disconnect_rsp,
+	BT_SHELL_CMD_ARG(disconnect_rsp, NULL, "<rsp: success,error> [rsp_code]", cmd_disconnect_rsp,
 		      2, 1),
-	SHELL_CMD_ARG(pull_phone_book_rsp, NULL, "<rsp: noerror, error> [rsp_code] [srmp]",
+	BT_SHELL_CMD_ARG(pull_phone_book_rsp, NULL, "<rsp: noerror, error> [rsp_code] [srmp]",
 		      cmd_pull_phone_book_rsp, 2, 2),
-	SHELL_CMD_ARG(pull_vcard_listing_rsp, NULL, "<rsp: noerror, error> [rsp_code] [srmp]",
+	BT_SHELL_CMD_ARG(pull_vcard_listing_rsp, NULL, "<rsp: noerror, error> [rsp_code] [srmp]",
 		      cmd_pull_vcard_listing_rsp, 2, 2),
-	SHELL_CMD_ARG(pull_vcard_entry_rsp, NULL, "<rsp: noerror, error> [rsp_code] [srmp]",
+	BT_SHELL_CMD_ARG(pull_vcard_entry_rsp, NULL, "<rsp: noerror, error> [rsp_code] [srmp]",
 		      cmd_pull_vcard_entry_rsp, 2, 2),
-	SHELL_CMD_ARG(set_phone_book_rsp, NULL, "<rsp: success, error> [rsp_code]",
+	BT_SHELL_CMD_ARG(set_phone_book_rsp, NULL, "<rsp: success, error> [rsp_code]",
 		      cmd_set_phone_book_rsp, 2, 1),
-	SHELL_CMD_ARG(abort_rsp, NULL, "<rsp: success, error> [rsp_code]", cmd_abort_rsp, 2, 1),
-	SHELL_SUBCMD_SET_END);
+	BT_SHELL_CMD_ARG(abort_rsp, NULL, "<rsp: success, error> [rsp_code]", cmd_abort_rsp, 2, 1),
+	BT_SHELL_SUBCMD_SET_END);
 
 #endif /* CONFIG_BT_PBAP_PSE */
 
-static int cmd_add_auth_challenge(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_add_auth_challenge(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	size_t length;
 	int err;
@@ -2281,7 +2283,7 @@ static int cmd_add_auth_challenge(const struct shell *sh, size_t argc, char *arg
 	return 0;
 }
 
-static int cmd_add_auth_response(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_add_auth_response(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	size_t length;
 	int err;
@@ -2359,7 +2361,7 @@ static int add_header_appl_param(uint8_t tag_id, uint8_t length, uint8_t *data)
 	return 0;
 }
 
-static int cmd_add_order(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_add_order(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint8_t order;
 	const char *order_str = argv[1];
@@ -2378,7 +2380,7 @@ static int cmd_add_order(const struct shell *sh, size_t argc, char *argv[])
 	return add_header_appl_param(BT_PBAP_APPL_PARAM_TAG_ID_ORDER, sizeof(order), &order);
 }
 
-static int cmd_add_search_value(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_add_search_value(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint8_t length;
 
@@ -2392,7 +2394,7 @@ static int cmd_add_search_value(const struct shell *sh, size_t argc, char *argv[
 				     (uint8_t *)argv[1]);
 }
 
-static int cmd_add_search_property(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_add_search_property(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint8_t attr;
 	const char *attr_str = argv[1];
@@ -2412,7 +2414,7 @@ static int cmd_add_search_property(const struct shell *sh, size_t argc, char *ar
 				     &attr);
 }
 
-static int cmd_add_max_list_count(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_add_max_list_count(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint16_t count = (uint16_t)strtoul(argv[1], NULL, 16);
 	uint8_t data[2];
@@ -2421,7 +2423,7 @@ static int cmd_add_max_list_count(const struct shell *sh, size_t argc, char *arg
 	return add_header_appl_param(BT_PBAP_APPL_PARAM_TAG_ID_MAX_LIST_COUNT, sizeof(data), data);
 }
 
-static int cmd_add_list_start_offset(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_add_list_start_offset(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint16_t offset = (uint16_t)strtoul(argv[1], NULL, 16);
 	uint8_t data[2];
@@ -2431,13 +2433,13 @@ static int cmd_add_list_start_offset(const struct shell *sh, size_t argc, char *
 				     data);
 }
 
-static int cmd_add_property_selector(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_add_property_selector(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint64_t selector;
 	uint8_t data[8];
 	int err = 0;
 
-	selector = shell_strtoull(argv[1], 16, &err);
+	selector = bt_shell_strtoull(argv[1], 16, &err);
 	if (err != 0) {
 		bt_shell_error("Invalid PropertySelector value");
 		return -EINVAL;
@@ -2448,7 +2450,7 @@ static int cmd_add_property_selector(const struct shell *sh, size_t argc, char *
 				     data);
 }
 
-static int cmd_add_format(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_add_format(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint8_t format;
 	const char *format_str = argv[1];
@@ -2465,7 +2467,7 @@ static int cmd_add_format(const struct shell *sh, size_t argc, char *argv[])
 	return add_header_appl_param(BT_PBAP_APPL_PARAM_TAG_ID_FORMAT, sizeof(format), &format);
 }
 
-static int cmd_add_phonebook_size(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_add_phonebook_size(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint16_t size = (uint16_t)strtoul(argv[1], NULL, 16);
 	uint8_t data[2];
@@ -2474,7 +2476,7 @@ static int cmd_add_phonebook_size(const struct shell *sh, size_t argc, char *arg
 	return add_header_appl_param(BT_PBAP_APPL_PARAM_TAG_ID_PHONEBOOK_SIZE, sizeof(data), data);
 }
 
-static int cmd_add_new_missed_calls(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_add_new_missed_calls(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint8_t calls = (uint8_t)strtoul(argv[1], NULL, 16);
 
@@ -2482,7 +2484,7 @@ static int cmd_add_new_missed_calls(const struct shell *sh, size_t argc, char *a
 				     &calls);
 }
 
-static int cmd_add_primary_folder_version(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_add_primary_folder_version(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint8_t length;
 
@@ -2495,7 +2497,7 @@ static int cmd_add_primary_folder_version(const struct shell *sh, size_t argc, c
 				     (uint8_t *)argv[1]);
 }
 
-static int cmd_add_secondary_folder_version(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_add_secondary_folder_version(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint8_t length;
 
@@ -2508,13 +2510,13 @@ static int cmd_add_secondary_folder_version(const struct shell *sh, size_t argc,
 				     (uint8_t *)argv[1]);
 }
 
-static int cmd_add_vcard_selector(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_add_vcard_selector(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint64_t selector;
 	uint8_t data[8];
 	int err = 0;
 
-	selector = shell_strtoull(argv[1], 16, &err);
+	selector = bt_shell_strtoull(argv[1], 16, &err);
 	if (err != 0) {
 		bt_shell_error("Invalid vCardSelector value");
 		return -EINVAL;
@@ -2524,7 +2526,7 @@ static int cmd_add_vcard_selector(const struct shell *sh, size_t argc, char *arg
 	return add_header_appl_param(BT_PBAP_APPL_PARAM_TAG_ID_VCARD_SELECTOR, sizeof(data), data);
 }
 
-static int cmd_add_database_identifier(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_add_database_identifier(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint8_t length;
 
@@ -2537,7 +2539,7 @@ static int cmd_add_database_identifier(const struct shell *sh, size_t argc, char
 				     (uint8_t *)argv[1]);
 }
 
-static int cmd_add_vcard_selector_operator(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_add_vcard_selector_operator(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint8_t op;
 	const char *op_str = argv[1];
@@ -2555,7 +2557,7 @@ static int cmd_add_vcard_selector_operator(const struct shell *sh, size_t argc, 
 				     &op);
 }
 
-static int cmd_add_reset_new_missed_calls(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_add_reset_new_missed_calls(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint8_t reset = BT_PBAP_APPL_PARAM_RESET_NEW_MISSED_CALLS;
 
@@ -2563,7 +2565,7 @@ static int cmd_add_reset_new_missed_calls(const struct shell *sh, size_t argc, c
 				     sizeof(reset), &reset);
 }
 
-static int cmd_add_pbap_supported_features(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_add_pbap_supported_features(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint32_t features = BT_PBAP_SUPPORTED_FEATURE_DOWNLOAD | BT_PBAP_SUPPORTED_FEATURE_BROWSING;
 	uint8_t data[4];
@@ -2581,56 +2583,65 @@ static int cmd_add_pbap_supported_features(const struct shell *sh, size_t argc, 
 	return add_header_appl_param(BT_PBAP_APPL_PARAM_TAG_ID_SUPPORTED_FEATURES, sizeof(data),
 				     data);
 }
-SHELL_STATIC_SUBCMD_SET_CREATE(
+BT_SHELL_STATIC_SUBCMD_SET_CREATE(
 	add_appl_param,
-	SHELL_CMD_ARG(Order, NULL, "<indexed/alphanumeric/phonetic>", cmd_add_order, 2, 0),
-	SHELL_CMD_ARG(SearchValue, NULL, "<text>", cmd_add_search_value, 2, 0),
-	SHELL_CMD_ARG(SearchAttribute, NULL, "<name/number/sound> ", cmd_add_search_property, 2, 0),
-	SHELL_CMD_ARG(MaxListCount, NULL, "<0x0000-0xffff>", cmd_add_max_list_count, 2, 0),
-	SHELL_CMD_ARG(ListStartOffset, NULL, "<0x0000-0xffff>", cmd_add_list_start_offset, 2, 0),
-	SHELL_CMD_ARG(PropertySelector, NULL, "<64 bits mask : bt_pbap_appl_param_property_mask>",
+	BT_SHELL_CMD_ARG(Order, NULL, "<indexed/alphanumeric/phonetic>", cmd_add_order, 2, 0),
+	BT_SHELL_CMD_ARG(SearchValue, NULL, "<text>", cmd_add_search_value, 2, 0),
+	BT_SHELL_CMD_ARG(SearchAttribute, NULL, "<name/number/sound> ", cmd_add_search_property, 2, 0),
+	BT_SHELL_CMD_ARG(MaxListCount, NULL, "<0x0000-0xffff>", cmd_add_max_list_count, 2, 0),
+	BT_SHELL_CMD_ARG(ListStartOffset, NULL, "<0x0000-0xffff>", cmd_add_list_start_offset, 2, 0),
+	BT_SHELL_CMD_ARG(PropertySelector, NULL, "<64 bits mask : bt_pbap_appl_param_property_mask>",
 		      cmd_add_property_selector, 2, 0),
-	SHELL_CMD_ARG(Format, NULL, "<v2.1/v3.0>", cmd_add_format, 2, 0),
-	SHELL_CMD_ARG(PhonebookSize, NULL, "<0x0000-0xffff>", cmd_add_phonebook_size, 2, 0),
-	SHELL_CMD_ARG(NewMissedCalls, NULL, "<0x00-0xff>", cmd_add_new_missed_calls, 2, 0),
-	SHELL_CMD_ARG(PrimaryFolderVersion, NULL, "<16bytes>", cmd_add_primary_folder_version, 2,
+	BT_SHELL_CMD_ARG(Format, NULL, "<v2.1/v3.0>", cmd_add_format, 2, 0),
+	BT_SHELL_CMD_ARG(PhonebookSize, NULL, "<0x0000-0xffff>", cmd_add_phonebook_size, 2, 0),
+	BT_SHELL_CMD_ARG(NewMissedCalls, NULL, "<0x00-0xff>", cmd_add_new_missed_calls, 2, 0),
+	BT_SHELL_CMD_ARG(PrimaryFolderVersion, NULL, "<16bytes>", cmd_add_primary_folder_version, 2,
 		      0),
-	SHELL_CMD_ARG(SecondaryFolderVersion, NULL, "<16bytes>", cmd_add_secondary_folder_version,
+	BT_SHELL_CMD_ARG(SecondaryFolderVersion, NULL, "<16bytes>", cmd_add_secondary_folder_version,
 		      2, 0),
-	SHELL_CMD_ARG(vCardSelector, NULL, "<64 bits mask : bt_pbap_appl_param_property_mask>",
+	BT_SHELL_CMD_ARG(vCardSelector, NULL, "<64 bits mask : bt_pbap_appl_param_property_mask>",
 		      cmd_add_vcard_selector, 2, 0),
-	SHELL_CMD_ARG(DatabaseIdentifier, NULL, "<16bytes>", cmd_add_database_identifier, 2, 0),
-	SHELL_CMD_ARG(vCardSelectorOperator, NULL, "<or/and>", cmd_add_vcard_selector_operator, 2,
+	BT_SHELL_CMD_ARG(DatabaseIdentifier, NULL, "<16bytes>", cmd_add_database_identifier, 2, 0),
+	BT_SHELL_CMD_ARG(vCardSelectorOperator, NULL, "<or/and>", cmd_add_vcard_selector_operator, 2,
 		      0),
-	SHELL_CMD_ARG(ResetNewMissedCalls, NULL, "", cmd_add_reset_new_missed_calls, 1, 0),
-	SHELL_CMD_ARG(PbapSupportedFeatures, NULL, "[supported features]",
+	BT_SHELL_CMD_ARG(ResetNewMissedCalls, NULL, "", cmd_add_reset_new_missed_calls, 1, 0),
+	BT_SHELL_CMD_ARG(PbapSupportedFeatures, NULL, "[supported features]",
 		      cmd_add_pbap_supported_features, 1, 1),
-	SHELL_SUBCMD_SET_END);
+	BT_SHELL_SUBCMD_SET_END);
 
-static int cmd_common(const struct shell *sh, size_t argc, char **argv)
+static int cmd_common(const struct bt_shell *sh, size_t argc, char **argv)
 {
 	if (argc == 1) {
-		shell_help(sh);
-		return SHELL_CMD_HELP_PRINTED;
+		bt_shell_help(sh);
+		return BT_SHELL_CMD_HELP_PRINTED;
 	}
 
-	shell_error(sh, "%s unknown parameter: %s", argv[0], argv[1]);
+	bt_shell_session_error(sh, "%s unknown parameter: %s", argv[0], argv[1]);
 
 	return -ENOEXEC;
 }
 
-SHELL_STATIC_SUBCMD_SET_CREATE(
-	pbap_cmds, SHELL_CMD_ARG(alloc_buf, NULL, "Alloc tx buffer", cmd_alloc_buf, 1, 0),
-	SHELL_CMD_ARG(release_buf, NULL, "Free allocated tx buffer", cmd_release_buf, 1, 0),
+BT_SHELL_STATIC_SUBCMD_SET_CREATE(
+	pbap_cmds, BT_SHELL_CMD_ARG(alloc_buf, NULL, "Alloc tx buffer", cmd_alloc_buf, 1, 0),
+	BT_SHELL_CMD_ARG(release_buf, NULL, "Free allocated tx buffer", cmd_release_buf, 1, 0),
 #if defined(CONFIG_BT_PBAP_PCE)
-	SHELL_CMD_ARG(pce, &pce_cmds, "Client sets", cmd_common, 1, 0),
+	BT_SHELL_CMD_ARG(pce, &pce_cmds, "Client sets", cmd_common, 1, 0),
 #endif /* CONFIG_BT_PBAP_PCE */
 #if defined(CONFIG_BT_PBAP_PSE)
-	SHELL_CMD_ARG(pse, &pse_cmds, "Server sets", cmd_common, 1, 0),
+	BT_SHELL_CMD_ARG(pse, &pse_cmds, "Server sets", cmd_common, 1, 0),
 #endif /* CONFIG_BT_PBAP_PSE */
-	SHELL_CMD_ARG(add_header_auth_challenge, NULL, "<password>", cmd_add_auth_challenge, 2, 0),
-	SHELL_CMD_ARG(add_header_auth_response, NULL, "<password>", cmd_add_auth_response, 2, 0),
-	SHELL_CMD_ARG(add_ap, &add_appl_param, "add application param", cmd_common, 1, 0),
-	SHELL_SUBCMD_SET_END);
+	BT_SHELL_CMD_ARG(add_header_auth_challenge, NULL, "<password>", cmd_add_auth_challenge, 2, 0),
+	BT_SHELL_CMD_ARG(add_header_auth_response, NULL, "<password>", cmd_add_auth_response, 2, 0),
+	BT_SHELL_CMD_ARG(add_ap, &add_appl_param, "add application param", cmd_common, 1, 0),
+	BT_SHELL_SUBCMD_SET_END);
 
-SHELL_CMD_ARG_REGISTER(pbap, &pbap_cmds, "Bluetooth pbap shell commands", cmd_common, 1, 1);
+BT_SHELL_CMD_ARG_REGISTER(pbap, &pbap_cmds, "Bluetooth pbap shell commands", cmd_common, 1, 1);
+
+/** @brief Initialize module-owned storage before protocol operations. */
+void bt_host_classic_shell_pbap_storage_init(void)
+{
+	net_buf_pool_init(&tx_pool);
+#if (defined(CONFIG_BT_PBAP_PCE))
+	net_buf_pool_init(&sdp_client_pool);
+#endif
+}

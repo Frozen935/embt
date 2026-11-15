@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <zephyr/shell/shell.h>
+#include <shell/bt_shell.h>
 
 extern const struct bt_mesh_blob_io *bt_mesh_shell_blob_io;
 extern bool bt_mesh_shell_blob_valid;

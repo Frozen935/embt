@@ -6,17 +6,18 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <embt/base/assert.h>
 #include <errno.h>
-#include <zephyr/types.h>
+#include <stdint.h>
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
-#include <zephyr/shell/shell.h>
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/classic/sdp.h>
-#include <zephyr/bluetooth/classic/obex.h>
-#include <zephyr/bluetooth/classic/opp.h>
+#include <shell/bt_shell.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/classic/sdp.h>
+#include <embt/bluetooth/classic/obex.h>
+#include <embt/bluetooth/classic/opp.h>
 
 #include <host/shell/bt.h>
 #include <common/bt_shell_private.h>
@@ -288,12 +289,12 @@ static uint16_t ascii_to_utf16be(const char *str, uint8_t *out, uint16_t out_max
 }
 
 /* opp discover - run SDP discovery for OPP on the current ACL connection */
-static int cmd_opp_discover(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_opp_discover(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 
 	if (default_conn == NULL) {
-		shell_error(sh, "Not connected");
+		bt_shell_session_error(sh, "Not connected");
 		return -ENOEXEC;
 	}
 
@@ -301,26 +302,26 @@ static int cmd_opp_discover(const struct shell *sh, size_t argc, char *argv[])
 
 	err = bt_sdp_discover(default_conn, &opp_sdp_params);
 	if (err != 0) {
-		shell_error(sh, "SDP discover failed (err %d)", err);
+		bt_shell_session_error(sh, "SDP discover failed (err %d)", err);
 		return err;
 	}
 
-	shell_print(sh, "SDP discover started");
+	bt_shell_session_print(sh, "SDP discover started");
 	return 0;
 }
 
 /* opp transport_connect - connect RFCOMM using SDP-discovered channel */
-static int cmd_opp_transport_connect(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_opp_transport_connect(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 
 	if (default_conn == NULL) {
-		shell_error(sh, "Not connected");
+		bt_shell_session_error(sh, "Not connected");
 		return -ENOEXEC;
 	}
 
 	if (opp_rfcomm_channel == 0) {
-		shell_error(sh, "No RFCOMM channel - run 'opp discover' first");
+		bt_shell_session_error(sh, "No RFCOMM channel - run 'opp discover' first");
 		return -ENOENT;
 	}
 
@@ -328,7 +329,7 @@ static int cmd_opp_transport_connect(const struct shell *sh, size_t argc, char *
 	 * -EALREADY check inside bt_opp_client_transport_connect().
 	 */
 	if (opp_cli_transport_active) {
-		shell_error(sh, "OPP client transport already in use");
+		bt_shell_session_error(sh, "OPP client transport already in use");
 		return -EALREADY;
 	}
 
@@ -339,30 +340,30 @@ static int cmd_opp_transport_connect(const struct shell *sh, size_t argc, char *
 					      opp_rfcomm_channel);
 	if (err != 0) {
 		opp_cli_transport_active = false;
-		shell_error(sh, "transport connect failed (err %d)", err);
+		bt_shell_session_error(sh, "transport connect failed (err %d)", err);
 		return err;
 	}
 
-	shell_print(sh, "OPP transport connecting channel=%u", opp_rfcomm_channel);
+	bt_shell_session_print(sh, "OPP transport connecting channel=%u", opp_rfcomm_channel);
 	return 0;
 }
 
 /* opp transport_disconnect */
-static int cmd_opp_transport_disconnect(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_opp_transport_disconnect(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err = bt_opp_client_transport_disconnect(&opp_client);
 
 	if (err != 0) {
-		shell_error(sh, "transport disconnect failed (err %d)", err);
+		bt_shell_session_error(sh, "transport disconnect failed (err %d)", err);
 		return err;
 	}
 
-	shell_print(sh, "OPP transport disconnecting");
+	bt_shell_session_print(sh, "OPP transport disconnecting");
 	return 0;
 }
 
 /* opp connect [mopl] */
-static int cmd_opp_connect(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_opp_connect(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint16_t mopl = 0xffffU;
 	int err;
@@ -373,30 +374,30 @@ static int cmd_opp_connect(const struct shell *sh, size_t argc, char *argv[])
 
 	err = bt_opp_client_connect(&opp_client, mopl, NULL);
 	if (err != 0) {
-		shell_error(sh, "OBEX connect failed (err %d)", err);
+		bt_shell_session_error(sh, "OBEX connect failed (err %d)", err);
 		return err;
 	}
 
-	shell_print(sh, "OPP OBEX connecting mopl=%u", mopl);
+	bt_shell_session_print(sh, "OPP OBEX connecting mopl=%u", mopl);
 	return 0;
 }
 
 /* opp disconnect */
-static int cmd_opp_disconnect(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_opp_disconnect(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err = bt_opp_client_disconnect(&opp_client, NULL);
 
 	if (err != 0) {
-		shell_error(sh, "OBEX disconnect failed (err %d)", err);
+		bt_shell_session_error(sh, "OBEX disconnect failed (err %d)", err);
 		return err;
 	}
 
-	shell_print(sh, "OPP OBEX disconnecting");
+	bt_shell_session_print(sh, "OPP OBEX disconnecting");
 	return 0;
 }
 
 /* opp push <vcard|vcal|vnote|vmsg> - push a demo object of the specified type */
-static int cmd_opp_push(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_opp_push(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	struct net_buf *buf;
 	uint8_t name_utf16[32];
@@ -408,7 +409,7 @@ static int cmd_opp_push(const struct shell *sh, size_t argc, char *argv[])
 	int err;
 
 	if (argc < 2) {
-		shell_error(sh, "Usage: push <vcard|vcal|vnote|vmsg>");
+		bt_shell_session_error(sh, "Usage: push <vcard|vcal|vnote|vmsg>");
 		return -EINVAL;
 	}
 
@@ -429,7 +430,7 @@ static int cmd_opp_push(const struct shell *sh, size_t argc, char *argv[])
 		name_str = "msg.vmg";
 		data = opp_demo_vmsg;
 	} else {
-		shell_error(sh, "Unknown type '%s'. Use: vcard | vcal | vnote | vmsg", argv[1]);
+		bt_shell_session_error(sh, "Unknown type '%s'. Use: vcard | vcal | vnote | vmsg", argv[1]);
 		return -EINVAL;
 	}
 
@@ -437,7 +438,7 @@ static int cmd_opp_push(const struct shell *sh, size_t argc, char *argv[])
 
 	buf = bt_opp_client_create_pdu(&opp_client, NULL);
 	if (buf == NULL) {
-		shell_error(sh, "create PDU failed");
+		bt_shell_session_error(sh, "create PDU failed");
 		return -ENOMEM;
 	}
 
@@ -445,37 +446,37 @@ static int cmd_opp_push(const struct shell *sh, size_t argc, char *argv[])
 
 	err = bt_obex_add_header_name(buf, name_len, name_utf16);
 	if (err != 0) {
-		shell_error(sh, "Fail to add name header %d", err);
+		bt_shell_session_error(sh, "Fail to add name header %d", err);
 		goto failed;
 	}
 
 	err = bt_obex_add_header_type(buf, (uint16_t)(strlen(type_str) + 1),
 				      (const uint8_t *)type_str);
 	if (err != 0) {
-		shell_error(sh, "Fail to add type header %d", err);
+		bt_shell_session_error(sh, "Fail to add type header %d", err);
 		goto failed;
 	}
 
 	err = bt_obex_add_header_len(buf, (uint32_t)data_len);
 	if (err != 0) {
-		shell_error(sh, "Fail to add length header %d", err);
+		bt_shell_session_error(sh, "Fail to add length header %d", err);
 		goto failed;
 	}
 
 	err = bt_obex_add_header_end_body(buf, (uint16_t)data_len, (const uint8_t *)data);
 	if (err != 0) {
-		shell_error(sh, "Fail to add end-of-body header %d", err);
+		bt_shell_session_error(sh, "Fail to add end-of-body header %d", err);
 		goto failed;
 	}
 
 	/* Single-packet push: End-of-Body is already in buf, so final=true. */
 	err = bt_opp_client_push(&opp_client, true, buf);
 	if (err != 0) {
-		shell_error(sh, "push failed (err %d)", err);
+		bt_shell_session_error(sh, "push failed (err %d)", err);
 		goto failed;
 	}
 
-	shell_print(sh, "OPP pushing %s (%s)", argv[1], name_str);
+	bt_shell_session_print(sh, "OPP pushing %s (%s)", argv[1], name_str);
 	return 0;
 
 failed:
@@ -484,38 +485,38 @@ failed:
 }
 
 /* opp pull - pull server's default business card */
-static int cmd_opp_pull(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_opp_pull(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	struct net_buf *buf;
 	int err;
 
 	buf = bt_opp_client_create_pdu(&opp_client, NULL);
 	if (buf == NULL) {
-		shell_error(sh, "create PDU failed");
+		bt_shell_session_error(sh, "create PDU failed");
 		return -ENOMEM;
 	}
 
 	err = bt_obex_add_header_type(buf, (uint16_t)(strlen(BT_OPP_TYPE_VCARD) + 1),
 				      (const uint8_t *)BT_OPP_TYPE_VCARD);
 	if (err != 0) {
-		shell_error(sh, "Fail to add type header %d", err);
+		bt_shell_session_error(sh, "Fail to add type header %d", err);
 		goto failed;
 	}
 
 	/* IrOBEX 1.2 section 8.4: an empty Name header requests the default object. */
 	err = bt_obex_add_header_name(buf, 0, NULL);
 	if (err != 0) {
-		shell_error(sh, "Fail to add name header %d", err);
+		bt_shell_session_error(sh, "Fail to add name header %d", err);
 		goto failed;
 	}
 
 	err = bt_opp_client_pull(&opp_client, buf);
 	if (err != 0) {
-		shell_error(sh, "pull failed (err %d)", err);
+		bt_shell_session_error(sh, "pull failed (err %d)", err);
 		goto failed;
 	}
 
-	shell_print(sh, "OPP pulling business card");
+	bt_shell_session_print(sh, "OPP pulling business card");
 	return 0;
 
 failed:
@@ -524,7 +525,7 @@ failed:
 }
 
 /* opp exchange - Business Card Exchange: push own vCard then pull server's */
-static int cmd_opp_exchange(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_opp_exchange(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	/* Push phase (pull phase triggered from push callback in application). */
 	struct net_buf *buf;
@@ -534,13 +535,13 @@ static int cmd_opp_exchange(const struct shell *sh, size_t argc, char *argv[])
 	int err;
 
 	if (opp_cli_exchange_pending) {
-		shell_error(sh, "exchange already in progress");
+		bt_shell_session_error(sh, "exchange already in progress");
 		return -EBUSY;
 	}
 
 	buf = bt_opp_client_create_pdu(&opp_client, NULL);
 	if (buf == NULL) {
-		shell_error(sh, "create PDU failed");
+		bt_shell_session_error(sh, "create PDU failed");
 		return -ENOMEM;
 	}
 
@@ -548,26 +549,26 @@ static int cmd_opp_exchange(const struct shell *sh, size_t argc, char *argv[])
 
 	err = bt_obex_add_header_name(buf, name_len, name_utf16);
 	if (err != 0) {
-		shell_error(sh, "Fail to add name header %d", err);
+		bt_shell_session_error(sh, "Fail to add name header %d", err);
 		goto failed;
 	}
 
 	err = bt_obex_add_header_type(buf, (uint16_t)(strlen(BT_OPP_TYPE_VCARD) + 1),
 				      (const uint8_t *)BT_OPP_TYPE_VCARD);
 	if (err != 0) {
-		shell_error(sh, "Fail to add type header %d", err);
+		bt_shell_session_error(sh, "Fail to add type header %d", err);
 		goto failed;
 	}
 
 	err = bt_obex_add_header_len(buf, (uint32_t)data_len);
 	if (err != 0) {
-		shell_error(sh, "Fail to add length header %d", err);
+		bt_shell_session_error(sh, "Fail to add length header %d", err);
 		goto failed;
 	}
 
 	err = bt_obex_add_header_end_body(buf, (uint16_t)data_len, (const uint8_t *)opp_demo_vcard);
 	if (err != 0) {
-		shell_error(sh, "Fail to add end-of-body header %d", err);
+		bt_shell_session_error(sh, "Fail to add end-of-body header %d", err);
 		goto failed;
 	}
 
@@ -580,11 +581,11 @@ static int cmd_opp_exchange(const struct shell *sh, size_t argc, char *argv[])
 	err = bt_opp_client_push(&opp_client, true, buf);
 	if (err != 0) {
 		opp_cli_exchange_pending = false;
-		shell_error(sh, "exchange push failed (err %d)", err);
+		bt_shell_session_error(sh, "exchange push failed (err %d)", err);
 		goto failed;
 	}
 
-	shell_print(sh, "OPP Business Card Exchange: push started (pull will auto-trigger)");
+	bt_shell_session_print(sh, "OPP Business Card Exchange: push started (pull will auto-trigger)");
 	return 0;
 
 failed:
@@ -593,16 +594,16 @@ failed:
 }
 
 /* opp abort - abort current operation */
-static int cmd_opp_abort(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_opp_abort(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err = bt_opp_client_abort(&opp_client, NULL);
 
 	if (err != 0) {
-		shell_error(sh, "abort failed (err %d)", err);
+		bt_shell_session_error(sh, "abort failed (err %d)", err);
 		return err;
 	}
 
-	shell_print(sh, "OPP abort sent");
+	bt_shell_session_print(sh, "OPP abort sent");
 	return 0;
 }
 
@@ -868,12 +869,12 @@ static int opp_shell_transport_accept(struct bt_conn *conn,
 static bool g_server_registered;
 
 /* opp server_register - register OPP RFCOMM server (OPP 1.1) */
-static int cmd_opp_server_register(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_opp_server_register(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 
 	if (g_server_registered) {
-		shell_warn(sh, "OPP server already registered");
+		bt_shell_session_warn(sh, "OPP server already registered");
 		return 0;
 	}
 
@@ -883,52 +884,52 @@ static int cmd_opp_server_register(const struct shell *sh, size_t argc, char *ar
 		err = bt_opp_server_transport_register(&g_shell_transport_server);
 		if (err != 0) {
 			g_shell_transport_server.server.rfcomm.channel = 0U;
-			shell_error(sh, "transport register failed (err %d)", err);
+			bt_shell_session_error(sh, "transport register failed (err %d)", err);
 			return err;
 		}
 	}
 
 	err = bt_sdp_register_service(&opp_shell_sdp_rec);
 	if (err != 0 && err != -EEXIST) {
-		shell_error(sh, "SDP register failed (err %d)", err);
+		bt_shell_session_error(sh, "SDP register failed (err %d)", err);
 		return err;
 	}
 
 	g_server_registered = true;
-	shell_print(sh, "OPP server registered: RFCOMM channel=%u",
+	bt_shell_session_print(sh, "OPP server registered: RFCOMM channel=%u",
 		    g_shell_transport_server.server.rfcomm.channel);
 	return 0;
 }
 
 /* opp server_disconnect_rsp - respond to OBEX DISCONNECT request */
-static int cmd_opp_server_disconnect_rsp(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_opp_server_disconnect_rsp(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 
 	if (!g_shell_server_inst.in_use) {
-		shell_error(sh, "No active server connection");
+		bt_shell_session_error(sh, "No active server connection");
 		return -ENODEV;
 	}
 
 	err = bt_opp_server_disconnect(&g_shell_server_inst.server, NULL);
 	if (err != 0) {
-		shell_error(sh, "disconnect rsp failed (err %d)", err);
+		bt_shell_session_error(sh, "disconnect rsp failed (err %d)", err);
 		return err;
 	}
 
-	shell_print(sh, "OPP server disconnect rsp sent");
+	bt_shell_session_print(sh, "OPP server disconnect rsp sent");
 	return 0;
 }
 
 /* opp server_connect_rsp [success|reject] [mopl] - respond to incoming connect */
-static int cmd_opp_server_connect_rsp(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_opp_server_connect_rsp(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint8_t rsp = BT_OPP_RSP_CODE_SUCCESS;
 	uint16_t mopl = 0xffffU;
 	int err;
 
 	if (!g_shell_server_inst.in_use) {
-		shell_error(sh, "No active server connection");
+		bt_shell_session_error(sh, "No active server connection");
 		return -ENODEV;
 	}
 
@@ -938,7 +939,7 @@ static int cmd_opp_server_connect_rsp(const struct shell *sh, size_t argc, char 
 		} else if (strcmp(argv[1], "reject") == 0) {
 			rsp = BT_OPP_RSP_CODE_FORBIDDEN;
 		} else {
-			shell_error(sh, "Unknown response '%s'. Use: success | reject", argv[1]);
+			bt_shell_session_error(sh, "Unknown response '%s'. Use: success | reject", argv[1]);
 			return -EINVAL;
 		}
 	}
@@ -949,24 +950,24 @@ static int cmd_opp_server_connect_rsp(const struct shell *sh, size_t argc, char 
 
 	err = bt_opp_server_connect(&g_shell_server_inst.server, mopl, rsp, NULL);
 	if (err != 0) {
-		shell_error(sh, "connect rsp failed (err %d)", err);
+		bt_shell_session_error(sh, "connect rsp failed (err %d)", err);
 		return err;
 	}
 
-	shell_print(sh, "OPP server connect rsp sent (0x%02x)", rsp);
+	bt_shell_session_print(sh, "OPP server connect rsp sent (0x%02x)", rsp);
 	return 0;
 }
 
 /* opp server_push_rsp [continue|success|reject|toobig|unsupported] - respond to push.
  * Default: success for a final PUT, continue otherwise.
  */
-static int cmd_opp_server_push_rsp(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_opp_server_push_rsp(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint8_t rsp;
 	int err;
 
 	if (!g_shell_server_inst.in_use) {
-		shell_error(sh, "No active server connection");
+		bt_shell_session_error(sh, "No active server connection");
 		return -ENODEV;
 	}
 
@@ -984,7 +985,7 @@ static int cmd_opp_server_push_rsp(const struct shell *sh, size_t argc, char *ar
 		} else if (strcmp(argv[1], "unsupported") == 0) {
 			rsp = BT_OPP_RSP_CODE_UNSUPP_MEDIA_TYPE;
 		} else {
-			shell_error(sh, "Unknown response '%s'. Use: "
+			bt_shell_session_error(sh, "Unknown response '%s'. Use: "
 				    "success | continue | reject | toobig | unsupported", argv[1]);
 			return -EINVAL;
 		}
@@ -992,16 +993,16 @@ static int cmd_opp_server_push_rsp(const struct shell *sh, size_t argc, char *ar
 
 	err = bt_opp_server_push(&g_shell_server_inst.server, rsp, NULL);
 	if (err != 0) {
-		shell_error(sh, "push rsp failed (err %d)", err);
+		bt_shell_session_error(sh, "push rsp failed (err %d)", err);
 		return err;
 	}
 
-	shell_print(sh, "OPP server push rsp sent (0x%02x)", rsp);
+	bt_shell_session_print(sh, "OPP server push rsp sent (0x%02x)", rsp);
 	return 0;
 }
 
 /* opp server_pull_rsp [continue|success|reject|notfound] - respond to business card pull */
-static int cmd_opp_server_pull_rsp(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_opp_server_pull_rsp(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	static const char shell_vcard[] =
 		"BEGIN:VCARD\r\nVERSION:2.1\r\nFN:Zephyr Shell Server\r\nEND:VCARD\r\n";
@@ -1010,7 +1011,7 @@ static int cmd_opp_server_pull_rsp(const struct shell *sh, size_t argc, char *ar
 	int err;
 
 	if (!g_shell_server_inst.in_use) {
-		shell_error(sh, "No active server connection");
+		bt_shell_session_error(sh, "No active server connection");
 		return -ENODEV;
 	}
 
@@ -1024,7 +1025,7 @@ static int cmd_opp_server_pull_rsp(const struct shell *sh, size_t argc, char *ar
 		} else if (strcmp(argv[1], "notfound") == 0) {
 			rsp_code = BT_OPP_RSP_CODE_NOT_FOUND;
 		} else {
-			shell_error(sh, "Unknown response '%s'. Use: "
+			bt_shell_session_error(sh, "Unknown response '%s'. Use: "
 				    "continue | success | reject | notfound",
 				    argv[1]);
 			return -EINVAL;
@@ -1032,7 +1033,7 @@ static int cmd_opp_server_pull_rsp(const struct shell *sh, size_t argc, char *ar
 	}
 
 	if (!g_shell_server_inst.pull_final && rsp_code == BT_OPP_RSP_CODE_SUCCESS) {
-		shell_error(sh, "Incomplete GET request cannot be answered with success");
+		bt_shell_session_error(sh, "Incomplete GET request cannot be answered with success");
 		return -EINVAL;
 	}
 
@@ -1042,20 +1043,20 @@ static int cmd_opp_server_pull_rsp(const struct shell *sh, size_t argc, char *ar
 		struct net_buf *buf = bt_opp_server_create_pdu(&g_shell_server_inst.server, NULL);
 
 		if (buf == NULL) {
-			shell_error(sh, "create PDU failed");
+			bt_shell_session_error(sh, "create PDU failed");
 			return -ENOMEM;
 		}
 
 		err = bt_obex_add_header_len(buf, (uint32_t)len);
 		if (err != 0) {
-			shell_error(sh, "Fail to add length header %d", err);
+			bt_shell_session_error(sh, "Fail to add length header %d", err);
 			net_buf_unref(buf);
 			return err;
 		}
 
 		err = bt_obex_add_header_end_body(buf, (uint16_t)len, (const uint8_t *)shell_vcard);
 		if (err != 0) {
-			shell_error(sh, "Fail to add end-of-body header %d", err);
+			bt_shell_session_error(sh, "Fail to add end-of-body header %d", err);
 			net_buf_unref(buf);
 			return err;
 		}
@@ -1070,73 +1071,81 @@ static int cmd_opp_server_pull_rsp(const struct shell *sh, size_t argc, char *ar
 	}
 
 	if (err != 0) {
-		shell_error(sh, "pull rsp failed (err %d)", err);
+		bt_shell_session_error(sh, "pull rsp failed (err %d)", err);
 		return err;
 	}
 
-	shell_print(sh, "OPP server pull rsp sent (0x%02x)", rsp_code);
+	bt_shell_session_print(sh, "OPP server pull rsp sent (0x%02x)", rsp_code);
 	return 0;
 }
 
 /* opp server_abort_rsp - respond to abort */
-static int cmd_opp_server_abort_rsp(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_opp_server_abort_rsp(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 
 	if (!g_shell_server_inst.in_use) {
-		shell_error(sh, "No active server connection");
+		bt_shell_session_error(sh, "No active server connection");
 		return -ENODEV;
 	}
 
 	err = bt_opp_server_abort(&g_shell_server_inst.server, NULL);
 	if (err != 0) {
-		shell_error(sh, "abort rsp failed (err %d)", err);
+		bt_shell_session_error(sh, "abort rsp failed (err %d)", err);
 		return err;
 	}
 
-	shell_print(sh, "OPP server abort rsp sent");
+	bt_shell_session_print(sh, "OPP server abort rsp sent");
 	return 0;
 }
 
 #endif /* CONFIG_BT_OPP_SERVER */
 
-SHELL_STATIC_SUBCMD_SET_CREATE(
+BT_SHELL_STATIC_SUBCMD_SET_CREATE(
 	opp_cmds,
 #if defined(CONFIG_BT_OPP_CLIENT)
-	SHELL_CMD_ARG(discover, NULL, "Discover OPP service RFCOMM channel via SDP",
+	BT_SHELL_CMD_ARG(discover, NULL, "Discover OPP service RFCOMM channel via SDP",
 		      cmd_opp_discover, 1, 0),
-	SHELL_CMD_ARG(transport_connect, NULL, "Connect RFCOMM using SDP-discovered channel",
+	BT_SHELL_CMD_ARG(transport_connect, NULL, "Connect RFCOMM using SDP-discovered channel",
 		      cmd_opp_transport_connect, 1, 0),
-	SHELL_CMD_ARG(transport_disconnect, NULL, "Disconnect RFCOMM", cmd_opp_transport_disconnect,
+	BT_SHELL_CMD_ARG(transport_disconnect, NULL, "Disconnect RFCOMM", cmd_opp_transport_disconnect,
 		      1, 0),
-	SHELL_CMD_ARG(connect, NULL, "[mopl]  Establish OBEX connection", cmd_opp_connect, 1, 1),
-	SHELL_CMD_ARG(disconnect, NULL, "Terminate OBEX connection", cmd_opp_disconnect, 1, 0),
-	SHELL_CMD_ARG(push, NULL, "<vcard|vcal|vnote|vmsg>  Push a demo object to the server",
+	BT_SHELL_CMD_ARG(connect, NULL, "[mopl]  Establish OBEX connection", cmd_opp_connect, 1, 1),
+	BT_SHELL_CMD_ARG(disconnect, NULL, "Terminate OBEX connection", cmd_opp_disconnect, 1, 0),
+	BT_SHELL_CMD_ARG(push, NULL, "<vcard|vcal|vnote|vmsg>  Push a demo object to the server",
 		      cmd_opp_push, 2, 0),
-	SHELL_CMD_ARG(pull, NULL, "Pull the server's default business card", cmd_opp_pull, 1, 0),
-	SHELL_CMD_ARG(exchange, NULL, "Business Card Exchange: push own vCard then pull server's",
+	BT_SHELL_CMD_ARG(pull, NULL, "Pull the server's default business card", cmd_opp_pull, 1, 0),
+	BT_SHELL_CMD_ARG(exchange, NULL, "Business Card Exchange: push own vCard then pull server's",
 		      cmd_opp_exchange, 1, 0),
-	SHELL_CMD_ARG(abort, NULL, "Abort the current operation", cmd_opp_abort, 1, 0),
+	BT_SHELL_CMD_ARG(abort, NULL, "Abort the current operation", cmd_opp_abort, 1, 0),
 #endif /* CONFIG_BT_OPP_CLIENT */
 #if defined(CONFIG_BT_OPP_SERVER)
-	SHELL_CMD_ARG(server_register, NULL, "Register OPP Push Server (RFCOMM, OPP 1.1)",
+	BT_SHELL_CMD_ARG(server_register, NULL, "Register OPP Push Server (RFCOMM, OPP 1.1)",
 		      cmd_opp_server_register, 1, 0),
-	SHELL_CMD_ARG(server_connect_rsp, NULL,
+	BT_SHELL_CMD_ARG(server_connect_rsp, NULL,
 		      "[success|reject] [mopl]  Send OBEX CONNECT response",
 		      cmd_opp_server_connect_rsp, 1, 2),
-	SHELL_CMD_ARG(server_disconnect_rsp, NULL, "Send OBEX DISCONNECT response",
+	BT_SHELL_CMD_ARG(server_disconnect_rsp, NULL, "Send OBEX DISCONNECT response",
 		      cmd_opp_server_disconnect_rsp, 1, 0),
-	SHELL_CMD_ARG(server_push_rsp, NULL,
+	BT_SHELL_CMD_ARG(server_push_rsp, NULL,
 		      "[continue|success|reject|toobig|unsupported]  Send PUT response "
 		      "(default: success if final, else continue)",
 		      cmd_opp_server_push_rsp, 1, 1),
-	SHELL_CMD_ARG(server_pull_rsp, NULL,
+	BT_SHELL_CMD_ARG(server_pull_rsp, NULL,
 		      "[continue|success|reject|notfound]  Send GET response for "
 		      "business card pull",
 		      cmd_opp_server_pull_rsp, 1, 1),
-	SHELL_CMD_ARG(server_abort_rsp, NULL, "Send ABORT response", cmd_opp_server_abort_rsp, 1,
+	BT_SHELL_CMD_ARG(server_abort_rsp, NULL, "Send ABORT response", cmd_opp_server_abort_rsp, 1,
 		      0),
 #endif /* CONFIG_BT_OPP_SERVER */
-	SHELL_SUBCMD_SET_END);
+	BT_SHELL_SUBCMD_SET_END);
 
-SHELL_CMD_REGISTER(opp, &opp_cmds, "Bluetooth OPP shell commands", NULL);
+BT_SHELL_CMD_REGISTER(opp, &opp_cmds, "Bluetooth OPP shell commands", NULL);
+
+/** @brief Initialize module-owned storage before protocol operations. */
+void bt_host_classic_shell_opp_storage_init(void)
+{
+#if (defined(CONFIG_BT_OPP_CLIENT))
+	net_buf_pool_init(&sdp_client_pool);
+#endif
+}

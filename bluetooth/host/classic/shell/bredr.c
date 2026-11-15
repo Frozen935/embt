@@ -10,26 +10,28 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <embt/base/fifo.h>
+#include <embt/base/time.h>
+#include <embt/base/assert.h>
+#include <shell/bt_shell.h>
+#include <getopt.h>
 #include <errno.h>
-#include <zephyr/types.h>
+#include <stdint.h>
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
-#include <zephyr/sys/byteorder.h>
+#include <embt/base/byteorder.h>
 
-#include <zephyr/settings/settings.h>
+#include <embt/settings/settings.h>
 
-#include <zephyr/bluetooth/hci.h>
-#include <zephyr/bluetooth/addr.h>
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/l2cap.h>
-#include <zephyr/bluetooth/classic/rfcomm.h>
-#include <zephyr/bluetooth/classic/sdp.h>
-#include <zephyr/bluetooth/classic/classic.h>
-#include <zephyr/bluetooth/classic/l2cap_br.h>
-
-#include <zephyr/shell/shell.h>
+#include <embt/bluetooth/hci.h>
+#include <embt/bluetooth/addr.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/l2cap.h>
+#include <embt/bluetooth/classic/sdp.h>
+#include <embt/bluetooth/classic/classic.h>
+#include <embt/bluetooth/classic/l2cap_br.h>
 
 #include <host/shell/bt.h>
 #include <common/bt_shell_private.h>
@@ -48,7 +50,7 @@ NET_BUF_POOL_FIXED_DEFINE(data_rx_pool, 1, DATA_BREDR_MTU, 8, NULL);
 #define SDP_CLIENT_USER_BUF_LEN 512
 NET_BUF_POOL_FIXED_DEFINE(sdp_client_pool, CONFIG_BT_MAX_CONN, SDP_CLIENT_USER_BUF_LEN, 8, NULL);
 
-static int cmd_auth_pincode(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_auth_pincode(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	struct bt_conn *conn;
 	uint8_t max = 16U;
@@ -62,23 +64,23 @@ static int cmd_auth_pincode(const struct shell *sh, size_t argc, char *argv[])
 	}
 
 	if (!conn) {
-		shell_print(sh, "Not connected");
+		bt_shell_session_print(sh, "Not connected");
 		return -ENOEXEC;
 	}
 
 	if (strlen(argv[1]) > max) {
-		shell_print(sh, "PIN code value invalid - enter max %u digits", max);
+		bt_shell_session_print(sh, "PIN code value invalid - enter max %u digits", max);
 		return -ENOEXEC;
 	}
 
-	shell_print(sh, "PIN code \"%s\" applied", argv[1]);
+	bt_shell_session_print(sh, "PIN code \"%s\" applied", argv[1]);
 
 	bt_conn_auth_pincode_entry(conn, argv[1]);
 
 	return 0;
 }
 
-static int cmd_connect(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_connect(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	struct bt_conn *conn;
 	bt_addr_t addr;
@@ -86,17 +88,17 @@ static int cmd_connect(const struct shell *sh, size_t argc, char *argv[])
 
 	err = bt_addr_from_str(argv[1], &addr);
 	if (err) {
-		shell_print(sh, "Invalid peer address (err %d)", err);
+		bt_shell_session_print(sh, "Invalid peer address (err %d)", err);
 		return -ENOEXEC;
 	}
 
 	conn = bt_conn_create_br(&addr, BT_BR_CONN_PARAM_DEFAULT);
 	if (!conn) {
-		shell_print(sh, "Connection failed");
+		bt_shell_session_print(sh, "Connection failed");
 		return -ENOEXEC;
 	}
 
-	shell_print(sh, "Connection pending");
+	bt_shell_session_print(sh, "Connection pending");
 
 	/* unref connection obj in advance as app user */
 	bt_conn_unref(conn);
@@ -166,7 +168,7 @@ static struct bt_br_discovery_cb discovery_cb = {
 	.timeout = br_discovery_complete,
 };
 
-static int cmd_discovery(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_discovery(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	const char *action;
 
@@ -193,21 +195,21 @@ static int cmd_discovery(const struct shell *sh, size_t argc, char *argv[])
 
 		if (bt_br_discovery_start(&param, br_discovery_results,
 					  ARRAY_SIZE(br_discovery_results)) < 0) {
-			shell_print(sh, "Failed to start discovery");
+			bt_shell_session_print(sh, "Failed to start discovery");
 			return -ENOEXEC;
 		}
 
-		shell_print(sh, "Discovery started");
+		bt_shell_session_print(sh, "Discovery started");
 	} else if (!strcmp(action, "off")) {
 		if (bt_br_discovery_stop()) {
-			shell_print(sh, "Failed to stop discovery");
+			bt_shell_session_print(sh, "Failed to stop discovery");
 			return -ENOEXEC;
 		}
 
-		shell_print(sh, "Discovery stopped");
+		bt_shell_session_print(sh, "Discovery stopped");
 	} else {
-		shell_help(sh);
-		return SHELL_CMD_HELP_PRINTED;
+		bt_shell_help(sh);
+		return BT_SHELL_CMD_HELP_PRINTED;
 	}
 
 	return 0;
@@ -223,7 +225,7 @@ struct bt_l2cap_br_server {
 struct l2cap_br_chan {
 	struct bt_l2cap_br_chan chan;
 #if defined(CONFIG_BT_L2CAP_RET_FC)
-	struct k_fifo l2cap_recv_fifo;
+	struct bt_fifo l2cap_recv_fifo;
 	bool hold_credit;
 #endif /* CONFIG_BT_L2CAP_RET_FC */
 };
@@ -240,7 +242,7 @@ static int l2cap_recv(struct bt_l2cap_chan *chan, struct net_buf *buf)
 
 #if defined(CONFIG_BT_L2CAP_RET_FC)
 	if (br_chan->hold_credit) {
-		k_fifo_put(&br_chan->l2cap_recv_fifo, buf);
+		bt_fifo_put(&br_chan->l2cap_recv_fifo, buf);
 		return -EINPROGRESS;
 	}
 #endif /* CONFIG_BT_L2CAP_RET_FC */
@@ -301,7 +303,7 @@ static struct net_buf *l2cap_alloc_buf(struct bt_l2cap_chan *chan)
 {
 	bt_shell_print("Channel %p requires buffer", chan);
 
-	return net_buf_alloc(&data_rx_pool, K_NO_WAIT);
+	return net_buf_alloc(&data_rx_pool, BT_NO_WAIT);
 }
 
 #if defined(CONFIG_BT_L2CAP_SEG_RECV)
@@ -342,7 +344,7 @@ static struct l2cap_br_chan l2cap_chan = {
 		.rx.mtu = DATA_BREDR_MTU,
 	},
 #if defined(CONFIG_BT_L2CAP_RET_FC)
-	.l2cap_recv_fifo = Z_FIFO_INITIALIZER(l2cap_chan.l2cap_recv_fifo),
+	.l2cap_recv_fifo = {0},
 #endif /* CONFIG_BT_L2CAP_RET_FC */
 };
 
@@ -411,10 +413,10 @@ static struct bt_l2cap_br_server l2cap_server = {
 	},
 };
 
-static int cmd_l2cap_register(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_l2cap_register(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	if (l2cap_server.server.psm) {
-		shell_print(sh, "Already registered");
+		bt_shell_session_print(sh, "Already registered");
 		return -ENOEXEC;
 	}
 
@@ -435,8 +437,8 @@ static int cmd_l2cap_register(const struct shell *sh, size_t argc, char *argv[])
 		l2cap_server.options |= BT_L2CAP_BR_SERVER_OPT_STREAM;
 	} else {
 		l2cap_server.server.psm = 0;
-		shell_help(sh);
-		return SHELL_CMD_HELP_PRINTED;
+		bt_shell_help(sh);
+		return BT_SHELL_CMD_HELP_PRINTED;
 	}
 
 	for (size_t index = 3; index < argc; index++) {
@@ -448,39 +450,39 @@ static int cmd_l2cap_register(const struct shell *sh, size_t argc, char *argv[])
 			l2cap_server.options |= BT_L2CAP_BR_SERVER_OPT_EXT_WIN_SIZE;
 		} else {
 			l2cap_server.server.psm = 0;
-			shell_help(sh);
-			return SHELL_CMD_HELP_PRINTED;
+			bt_shell_help(sh);
+			return BT_SHELL_CMD_HELP_PRINTED;
 		}
 	}
 
 	if ((l2cap_server.options & BT_L2CAP_BR_SERVER_OPT_EXT_WIN_SIZE) &&
 	    (!(l2cap_server.options &
 	       (BT_L2CAP_BR_SERVER_OPT_ERET | BT_L2CAP_BR_SERVER_OPT_STREAM)))) {
-		shell_error(sh, "[extended_control] only supports mode eret and stream");
+		bt_shell_session_error(sh, "[extended_control] only supports mode eret and stream");
 		l2cap_server.server.psm = 0U;
 		return -ENOEXEC;
 	}
 #endif /* CONFIG_BT_L2CAP_RET_FC */
 
 	if (bt_l2cap_br_server_register(&l2cap_server.server) < 0) {
-		shell_error(sh, "Unable to register psm");
+		bt_shell_session_error(sh, "Unable to register psm");
 		l2cap_server.server.psm = 0U;
 		return -ENOEXEC;
 	}
 
-	shell_print(sh, "L2CAP psm %04x registered", l2cap_server.server.psm);
+	bt_shell_session_print(sh, "L2CAP psm %04x registered", l2cap_server.server.psm);
 
 	return 0;
 }
 
-static int cmd_l2cap_connect(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_l2cap_connect(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint16_t psm;
 	struct bt_conn_info info;
 	int err;
 
 	if (!default_conn) {
-		shell_error(sh, "Not connected");
+		bt_shell_session_error(sh, "Not connected");
 		return -ENOEXEC;
 	}
 
@@ -491,7 +493,7 @@ static int cmd_l2cap_connect(const struct shell *sh, size_t argc, char *argv[])
 
 	err = bt_conn_get_info(default_conn, &info);
 	if ((err < 0) || (info.type != BT_CONN_TYPE_BR)) {
-		shell_error(sh, "Invalid conn type");
+		bt_shell_session_error(sh, "Invalid conn type");
 		return -ENOEXEC;
 	}
 
@@ -513,8 +515,8 @@ static int cmd_l2cap_connect(const struct shell *sh, size_t argc, char *argv[])
 		l2cap_chan.chan.rx.mode = BT_L2CAP_BR_LINK_MODE_STREAM;
 		l2cap_chan.chan.rx.max_transmit = 0;
 	} else {
-		shell_help(sh);
-		return SHELL_CMD_HELP_PRINTED;
+		bt_shell_help(sh);
+		return BT_SHELL_CMD_HELP_PRINTED;
 	}
 
 	l2cap_chan.hold_credit = false;
@@ -529,20 +531,20 @@ static int cmd_l2cap_connect(const struct shell *sh, size_t argc, char *argv[])
 		} else if (!strcmp(argv[index], "extended_control")) {
 			l2cap_chan.chan.rx.extended_control = true;
 		} else {
-			shell_help(sh);
-			return SHELL_CMD_HELP_PRINTED;
+			bt_shell_help(sh);
+			return BT_SHELL_CMD_HELP_PRINTED;
 		}
 	}
 
 	if ((l2cap_chan.chan.rx.extended_control) &&
 	    ((l2cap_chan.chan.rx.mode != BT_L2CAP_BR_LINK_MODE_ERET) &&
 	     (l2cap_chan.chan.rx.mode != BT_L2CAP_BR_LINK_MODE_STREAM))) {
-		shell_error(sh, "[extended_control] only supports mode eret and stream");
+		bt_shell_session_error(sh, "[extended_control] only supports mode eret and stream");
 		return -ENOEXEC;
 	}
 
 	if (l2cap_chan.hold_credit && (l2cap_chan.chan.rx.mode == BT_L2CAP_BR_LINK_MODE_BASIC)) {
-		shell_error(sh, "[hold_credit] cannot support basic mode");
+		bt_shell_session_error(sh, "[hold_credit] cannot support basic mode");
 		return -ENOEXEC;
 	}
 
@@ -551,27 +553,27 @@ static int cmd_l2cap_connect(const struct shell *sh, size_t argc, char *argv[])
 
 	err = bt_l2cap_chan_connect(default_conn, &l2cap_chan.chan.chan, psm);
 	if (err < 0) {
-		shell_error(sh, "Unable to connect to psm %u (err %d)", psm, err);
+		bt_shell_session_error(sh, "Unable to connect to psm %u (err %d)", psm, err);
 	} else {
-		shell_print(sh, "L2CAP connection pending");
+		bt_shell_session_print(sh, "L2CAP connection pending");
 	}
 
 	return err;
 }
 
-static int cmd_l2cap_disconnect(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_l2cap_disconnect(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 
 	err = bt_l2cap_chan_disconnect(&l2cap_chan.chan.chan);
 	if (err) {
-		shell_error(sh, "Unable to disconnect: %d", err);
+		bt_shell_session_error(sh, "Unable to disconnect: %d", err);
 	}
 
 	return err;
 }
 
-static int cmd_l2cap_send(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_l2cap_send(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	static uint8_t buf_data[DATA_BREDR_MTU];
 	int err, len = DATA_BREDR_MTU, count = 1;
@@ -584,7 +586,7 @@ static int cmd_l2cap_send(const struct shell *sh, size_t argc, char *argv[])
 	if (argc > 2) {
 		len = strtoul(argv[2], NULL, 10);
 		if (len > DATA_BREDR_MTU) {
-			shell_error(sh, "Length exceeds TX MTU for the channel");
+			bt_shell_session_error(sh, "Length exceeds TX MTU for the channel");
 			return -ENOEXEC;
 		}
 	}
@@ -592,15 +594,15 @@ static int cmd_l2cap_send(const struct shell *sh, size_t argc, char *argv[])
 	len = MIN(l2cap_chan.chan.tx.mtu, len);
 
 	while (count--) {
-		shell_print(sh, "Rem %d", count);
-		buf = net_buf_alloc(&data_tx_pool, K_SECONDS(2));
+		bt_shell_session_print(sh, "Rem %d", count);
+		buf = net_buf_alloc(&data_tx_pool, BT_SECONDS(2));
 		if (!buf) {
 			if (l2cap_chan.chan.state != BT_L2CAP_CONNECTED) {
-				shell_error(sh, "Channel disconnected, stopping TX");
+				bt_shell_session_error(sh, "Channel disconnected, stopping TX");
 
 				return -EAGAIN;
 			}
-			shell_error(sh, "Allocation timeout, stopping TX");
+			bt_shell_session_error(sh, "Allocation timeout, stopping TX");
 
 			return -EAGAIN;
 		}
@@ -610,7 +612,7 @@ static int cmd_l2cap_send(const struct shell *sh, size_t argc, char *argv[])
 		net_buf_add_mem(buf, buf_data, len);
 		err = bt_l2cap_chan_send(&l2cap_chan.chan.chan, buf);
 		if (err < 0) {
-			shell_error(sh, "Unable to send: %d", err);
+			bt_shell_session_error(sh, "Unable to send: %d", err);
 			net_buf_unref(buf);
 			return -ENOEXEC;
 		}
@@ -620,19 +622,19 @@ static int cmd_l2cap_send(const struct shell *sh, size_t argc, char *argv[])
 }
 
 #if defined(CONFIG_BT_L2CAP_RET_FC)
-static int cmd_l2cap_credits(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_l2cap_credits(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 	struct net_buf *buf;
 
-	buf = k_fifo_get(&l2cap_chan.l2cap_recv_fifo, K_NO_WAIT);
+	buf = bt_fifo_get(&l2cap_chan.l2cap_recv_fifo, BT_NO_WAIT);
 	if (buf != NULL) {
 		err = bt_l2cap_chan_recv_complete(&l2cap_chan.chan.chan, buf);
 		if (err < 0) {
-			shell_error(sh, "Unable to set recv_complete: %d", err);
+			bt_shell_session_error(sh, "Unable to set recv_complete: %d", err);
 		}
 	} else {
-		shell_warn(sh, "No pending recv buffer");
+		bt_shell_session_warn(sh, "No pending recv buffer");
 	}
 
 	return 0;
@@ -663,33 +665,33 @@ static struct bt_l2cap_br_echo_cb echo_cb = {
 	.rsp = l2cap_br_echo_rsp,
 };
 
-static int cmd_l2cap_echo_reg(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_l2cap_echo_reg(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 
 	err = bt_l2cap_br_echo_cb_register(&echo_cb);
 	if (err) {
-		shell_error(sh, "Failed to register echo callback: %d", err);
+		bt_shell_session_error(sh, "Failed to register echo callback: %d", err);
 		return err;
 	}
 
 	return 0;
 }
 
-static int cmd_l2cap_echo_unreg(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_l2cap_echo_unreg(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 
 	err = bt_l2cap_br_echo_cb_unregister(&echo_cb);
 	if (err) {
-		shell_error(sh, "Failed to unregister echo callback: %d", err);
+		bt_shell_session_error(sh, "Failed to unregister echo callback: %d", err);
 		return err;
 	}
 
 	return 0;
 }
 
-static int cmd_l2cap_echo_req(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_l2cap_echo_req(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	static uint8_t buf_data[DATA_BREDR_MTU];
 	int err, len = DATA_BREDR_MTU;
@@ -697,13 +699,13 @@ static int cmd_l2cap_echo_req(const struct shell *sh, size_t argc, char *argv[])
 
 	len = strtoul(argv[1], NULL, 10);
 	if (len > DATA_BREDR_MTU) {
-		shell_error(sh, "Length exceeds TX MTU for the channel");
+		bt_shell_session_error(sh, "Length exceeds TX MTU for the channel");
 		return -ENOEXEC;
 	}
 
-	buf = net_buf_alloc(&data_tx_pool, K_SECONDS(2));
+	buf = net_buf_alloc(&data_tx_pool, BT_SECONDS(2));
 	if (!buf) {
-		shell_error(sh, "Allocation timeout, stopping TX");
+		bt_shell_session_error(sh, "Allocation timeout, stopping TX");
 		return -EAGAIN;
 	}
 	net_buf_reserve(buf, BT_L2CAP_BR_ECHO_REQ_RESERVE);
@@ -714,7 +716,7 @@ static int cmd_l2cap_echo_req(const struct shell *sh, size_t argc, char *argv[])
 	net_buf_add_mem(buf, buf_data, len);
 	err = bt_l2cap_br_echo_req(default_conn, buf);
 	if (err < 0) {
-		shell_error(sh, "Unable to send ECHO REQ: %d", err);
+		bt_shell_session_error(sh, "Unable to send ECHO REQ: %d", err);
 		net_buf_unref(buf);
 		return -ENOEXEC;
 	}
@@ -722,7 +724,7 @@ static int cmd_l2cap_echo_req(const struct shell *sh, size_t argc, char *argv[])
 	return 0;
 }
 
-static int cmd_l2cap_echo_rsp(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_l2cap_echo_rsp(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	static uint8_t buf_data[DATA_BREDR_MTU];
 	int err, len = DATA_BREDR_MTU;
@@ -733,13 +735,13 @@ static int cmd_l2cap_echo_rsp(const struct shell *sh, size_t argc, char *argv[])
 
 	len = strtoul(argv[2], NULL, 10);
 	if (len > DATA_BREDR_MTU) {
-		shell_error(sh, "Length exceeds TX MTU for the channel");
+		bt_shell_session_error(sh, "Length exceeds TX MTU for the channel");
 		return -ENOEXEC;
 	}
 
-	buf = net_buf_alloc(&data_tx_pool, K_SECONDS(2));
+	buf = net_buf_alloc(&data_tx_pool, BT_SECONDS(2));
 	if (!buf) {
-		shell_error(sh, "Allocation timeout, stopping TX");
+		bt_shell_session_error(sh, "Allocation timeout, stopping TX");
 		return -EAGAIN;
 	}
 	net_buf_reserve(buf, BT_L2CAP_BR_ECHO_RSP_RESERVE);
@@ -750,7 +752,7 @@ static int cmd_l2cap_echo_rsp(const struct shell *sh, size_t argc, char *argv[])
 	net_buf_add_mem(buf, buf_data, len);
 	err = bt_l2cap_br_echo_rsp(default_conn, identifier, buf);
 	if (err < 0) {
-		shell_error(sh, "Unable to send ECHO RSP: %d", err);
+		bt_shell_session_error(sh, "Unable to send ECHO RSP: %d", err);
 		net_buf_unref(buf);
 		return -ENOEXEC;
 	}
@@ -759,16 +761,16 @@ static int cmd_l2cap_echo_rsp(const struct shell *sh, size_t argc, char *argv[])
 }
 #endif /* CONFIG_BT_TESTING */
 
-static int cmd_discoverable(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_discoverable(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err = 0;
 	bool enable;
 	bool limited = false;
 
-	enable = shell_strtobool(argv[1], 10, &err);
+	enable = bt_shell_strtobool(argv[1], 10, &err);
 	if (err) {
-		shell_help(sh);
-		return SHELL_CMD_HELP_PRINTED;
+		bt_shell_help(sh);
+		return BT_SHELL_CMD_HELP_PRINTED;
 	}
 
 	if (argc > 2 && !strcmp(argv[2], "limited")) {
@@ -777,11 +779,11 @@ static int cmd_discoverable(const struct shell *sh, size_t argc, char *argv[])
 
 	err = bt_br_set_discoverable(enable, limited);
 	if (err) {
-		shell_print(sh, "BR/EDR set/reset discoverable failed (err %d)", err);
+		bt_shell_session_print(sh, "BR/EDR set/reset discoverable failed (err %d)", err);
 		return -ENOEXEC;
 	}
 
-	shell_print(sh, "BR/EDR set/reset discoverable done");
+	bt_shell_session_print(sh, "BR/EDR set/reset discoverable done");
 
 	return 0;
 }
@@ -802,19 +804,19 @@ static enum bt_br_conn_req_rsp br_conn_req_cb(const bt_addr_t *addr, uint32_t co
 	return BT_BR_CONN_REQ_ACCEPT_PERIPHERAL;
 }
 
-static int cmd_iscan_param(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_iscan_param(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err = 0;
 
 	if (argc == 1) {
 		err = bt_br_inquiry_scan_update_param(BT_BR_INQUIRY_SCAN_PARAM_DEFAULT);
 		if (err != 0) {
-			shell_error(sh, "BR/EDR set inquiry scan param (default) failed (err %d)",
+			bt_shell_session_error(sh, "BR/EDR set inquiry scan param (default) failed (err %d)",
 				    err);
 			return -ENOEXEC;
 		}
 
-		shell_print(sh,
+		bt_shell_session_print(sh,
 			    "BR/EDR update inquiry scan param(interval:0x%04x, window:0x%04x, "
 			    "type:%u) success",
 			    BT_BR_INQUIRY_SCAN_PARAM_DEFAULT->interval,
@@ -832,25 +834,25 @@ static int cmd_iscan_param(const struct shell *sh, size_t argc, char *argv[])
 
 		err = bt_br_inquiry_scan_update_param(&param);
 		if (err != 0) {
-			shell_error(sh,
+			bt_shell_session_error(sh,
 				    "BR/EDR set inquiry scan param failed "
 				    "(interval 0x%04x, window 0x%04x, type %u, err %d)",
 				    param.interval, param.window, param.type, err);
 			return -ENOEXEC;
 		}
 
-		shell_print(sh,
+		bt_shell_session_print(sh,
 			    "BR/EDR update inquiry scan param(interval:0x%04x, window:0x%04x, "
 			    "type:%u) success",
 			    param.interval, param.window, param.type);
 		return 0;
 	}
 
-	shell_help(sh);
-	return SHELL_CMD_HELP_PRINTED;
+	bt_shell_help(sh);
+	return BT_SHELL_CMD_HELP_PRINTED;
 }
 
-static int cmd_connectable(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_connectable(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 	const char *action;
@@ -868,8 +870,8 @@ static int cmd_connectable(const struct shell *sh, size_t argc, char *argv[])
 		} else if (strcmp(role, "peripheral") == 0) {
 			central_role_required = false;
 		} else {
-			shell_help(sh);
-			return SHELL_CMD_HELP_PRINTED;
+			bt_shell_help(sh);
+			return BT_SHELL_CMD_HELP_PRINTED;
 		}
 	}
 
@@ -878,40 +880,40 @@ static int cmd_connectable(const struct shell *sh, size_t argc, char *argv[])
 	} else if (!strcmp(action, "off")) {
 		err = bt_br_set_connectable(false, NULL);
 	} else {
-		shell_help(sh);
-		return SHELL_CMD_HELP_PRINTED;
+		bt_shell_help(sh);
+		return BT_SHELL_CMD_HELP_PRINTED;
 	}
 
 	if (err) {
-		shell_print(sh, "BR/EDR set/rest connectable failed (err %d)", err);
+		bt_shell_session_print(sh, "BR/EDR set/rest connectable failed (err %d)", err);
 		return -ENOEXEC;
 	}
 
-	shell_print(sh, "BR/EDR set/reset connectable done");
+	bt_shell_session_print(sh, "BR/EDR set/reset connectable done");
 
 	return 0;
 }
 
-static int cmd_auto_reject_conn(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_auto_reject_conn(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err = 0;
 	bool enable;
 
-	enable = shell_strtobool(argv[1], 0, &err);
+	enable = bt_shell_strtobool(argv[1], 0, &err);
 	if (err != 0) {
-		shell_help(sh);
-		return SHELL_CMD_HELP_PRINTED;
+		bt_shell_help(sh);
+		return BT_SHELL_CMD_HELP_PRINTED;
 	}
 
 	auto_reject_conn_req = enable;
-	shell_print(sh, "Auto reject connection request %s", auto_reject_conn_req ? "yes" : "no");
-	shell_print(sh, "This setting only takes effect if the 'connectable' command has the "
+	bt_shell_session_print(sh, "Auto reject connection request %s", auto_reject_conn_req ? "yes" : "no");
+	bt_shell_session_print(sh, "This setting only takes effect if the 'connectable' command has the "
 		    "optional parameter 'central/peripheral' set.");
 
 	return 0;
 }
 
-static int cmd_pscan_mode(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_pscan_mode(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 	const struct bt_br_page_scan_param *param;
@@ -929,21 +931,21 @@ static int cmd_pscan_mode(const struct shell *sh, size_t argc, char *argv[])
 	} else if (!strcmp(argv[1], "sr2")) {
 		param = BT_BR_PAGE_SCAN_PARAM_SLOW_R2;
 	} else {
-		shell_help(sh);
-		return SHELL_CMD_HELP_PRINTED;
+		bt_shell_help(sh);
+		return BT_SHELL_CMD_HELP_PRINTED;
 	}
 
 	err = bt_br_page_scan_update_param(param);
 	if (err != 0) {
-		shell_error(sh, "BR/EDR update page scan mode failed (err %d)", err);
+		bt_shell_session_error(sh, "BR/EDR update page scan mode failed (err %d)", err);
 		return -ENOEXEC;
 	}
 
-	shell_print(sh, "BR/EDR update page scan mode success");
+	bt_shell_session_print(sh, "BR/EDR update page scan mode success");
 	return 0;
 }
 
-static int cmd_pscan_param(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_pscan_param(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 	struct bt_br_page_scan_param param;
@@ -954,11 +956,11 @@ static int cmd_pscan_param(const struct shell *sh, size_t argc, char *argv[])
 
 	err = bt_br_page_scan_update_param(&param);
 	if (err != 0) {
-		shell_error(sh, "BR/EDR update page scan param failed (err %d)", err);
+		bt_shell_session_error(sh, "BR/EDR update page scan param failed (err %d)", err);
 		return -ENOEXEC;
 	}
 
-	shell_print(
+	bt_shell_session_print(
 		sh,
 		"BR/EDR update page scan param(interval 0x%04x, window 0x%04x, type: %u) success",
 		param.interval, param.window, param.type);
@@ -966,19 +968,19 @@ static int cmd_pscan_param(const struct shell *sh, size_t argc, char *argv[])
 	return 0;
 }
 
-static int cmd_oob(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_oob(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	struct bt_br_oob oob;
 	int err;
 
 	err = bt_br_oob_get_local(&oob);
 	if (err) {
-		shell_print(sh, "BR/EDR OOB data failed");
+		bt_shell_session_print(sh, "BR/EDR OOB data failed");
 		return -ENOEXEC;
 	}
 
-	shell_print(sh, "BR/EDR OOB data:");
-	shell_print(sh, "  bt_addr_str(&oob.addr) %s", bt_addr_str(&oob.addr));
+	bt_shell_session_print(sh, "BR/EDR OOB data:");
+	bt_shell_session_print(sh, "  bt_addr_str(&oob.addr) %s", bt_addr_str(&oob.addr));
 	return 0;
 }
 
@@ -1532,14 +1534,14 @@ static struct bt_sdp_discover_params discov_avrcp_tg = {
 	.pool = &sdp_client_pool,
 };
 
-static int cmd_sdp_find_record(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_sdp_find_record(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 	const char *action;
 	struct bt_sdp_discover_params *discov;
 
 	if (!default_conn) {
-		shell_print(sh, "Not connected");
+		bt_shell_session_print(sh, "Not connected");
 		return -ENOEXEC;
 	}
 
@@ -1566,20 +1568,20 @@ static int cmd_sdp_find_record(const struct shell *sh, size_t argc, char *argv[]
 	} else if (!strcmp(action, "PNP")) {
 		discov = &discov_pnp;
 	} else {
-		shell_help(sh);
-		return SHELL_CMD_HELP_PRINTED;
+		bt_shell_help(sh);
+		return BT_SHELL_CMD_HELP_PRINTED;
 	}
 
 discover:
-	shell_print(sh, "SDP UUID \'%s\' gets applied", action);
+	bt_shell_session_print(sh, "SDP UUID \'%s\' gets applied", action);
 
 	err = bt_sdp_discover(default_conn, discov);
 	if (err) {
-		shell_error(sh, "SDP discovery failed: err %d", err);
+		bt_shell_session_error(sh, "SDP discovery failed: err %d", err);
 		return -ENOEXEC;
 	}
 
-	shell_print(sh, "SDP discovery started");
+	bt_shell_session_print(sh, "SDP discovery started");
 
 	return 0;
 }
@@ -1592,18 +1594,18 @@ static void bond_info(const struct bt_br_bond_info *info, void *user_data)
 	(*bond_count)++;
 }
 
-static int cmd_bonds(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_bonds(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int bond_count = 0;
 
-	shell_print(sh, "Bonded devices:");
+	bt_shell_session_print(sh, "Bonded devices:");
 	bt_br_foreach_bond(bond_info, &bond_count);
-	shell_print(sh, "Total %d", bond_count);
+	bt_shell_session_print(sh, "Total %d", bond_count);
 
 	return 0;
 }
 
-static int cmd_clear(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_clear(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	bt_addr_t addr;
 	int err;
@@ -1611,31 +1613,31 @@ static int cmd_clear(const struct shell *sh, size_t argc, char *argv[])
 	if (strcmp(argv[1], "all") == 0) {
 		err = bt_br_unpair(NULL);
 		if (err) {
-			shell_error(sh, "Failed to clear pairings (err %d)", err);
+			bt_shell_session_error(sh, "Failed to clear pairings (err %d)", err);
 			return err;
 		}
 
-		shell_print(sh, "Pairings successfully cleared");
+		bt_shell_session_print(sh, "Pairings successfully cleared");
 		return 0;
 	}
 
 	err = bt_addr_from_str(argv[1], &addr);
 	if (err) {
-		shell_print(sh, "Invalid address");
+		bt_shell_session_print(sh, "Invalid address");
 		return err;
 	}
 
 	err = bt_br_unpair(&addr);
 	if (err) {
-		shell_error(sh, "Failed to clear pairing (err %d)", err);
+		bt_shell_session_error(sh, "Failed to clear pairing (err %d)", err);
 	} else {
-		shell_print(sh, "Pairing successfully cleared");
+		bt_shell_session_print(sh, "Pairing successfully cleared");
 	}
 
 	return err;
 }
 
-static int cmd_select(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_select(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	struct bt_conn *conn;
 	bt_addr_t addr;
@@ -1643,13 +1645,13 @@ static int cmd_select(const struct shell *sh, size_t argc, char *argv[])
 
 	err = bt_addr_from_str(argv[1], &addr);
 	if (err) {
-		shell_error(sh, "Invalid peer address (err %d)", err);
+		bt_shell_session_error(sh, "Invalid peer address (err %d)", err);
 		return err;
 	}
 
 	conn = bt_conn_lookup_addr_br(&addr);
 	if (!conn) {
-		shell_error(sh, "No matching connection found");
+		bt_shell_session_error(sh, "No matching connection found");
 		return -ENOEXEC;
 	}
 
@@ -1659,7 +1661,7 @@ static int cmd_select(const struct shell *sh, size_t argc, char *argv[])
 
 	default_conn = conn;
 
-	shell_print(sh, "Selected conn is now: %s", bt_conn_dst_str(conn));
+	bt_shell_session_print(sh, "Selected conn is now: %s", bt_conn_dst_str(conn));
 
 	return 0;
 }
@@ -1683,7 +1685,7 @@ static const char *get_conn_role_str(uint8_t role)
 	}
 }
 
-static int cmd_info(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_info(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	struct bt_conn *conn = NULL;
 	struct bt_conn_info info;
@@ -1693,7 +1695,7 @@ static int cmd_info(const struct shell *sh, size_t argc, char *argv[])
 	if (argc > 1) {
 		err = bt_addr_from_str(argv[1], &addr);
 		if (err) {
-			shell_error(sh, "Invalid peer address (err %d)", err);
+			bt_shell_session_error(sh, "Invalid peer address (err %d)", err);
 			return err;
 		}
 		conn = bt_conn_lookup_addr_br(&addr);
@@ -1704,23 +1706,23 @@ static int cmd_info(const struct shell *sh, size_t argc, char *argv[])
 	}
 
 	if (!conn) {
-		shell_error(sh, "Not connected");
+		bt_shell_session_error(sh, "Not connected");
 		return -ENOEXEC;
 	}
 
 	err = bt_conn_get_info(conn, &info);
 	if (err) {
-		shell_print(sh, "Failed to get info");
+		bt_shell_session_print(sh, "Failed to get info");
 		goto done;
 	}
 
-	shell_print(sh, "Type: %s, Role: %s, Id: %u",
+	bt_shell_session_print(sh, "Type: %s, Role: %s, Id: %u",
 		    get_conn_type_str(info.type),
 		    get_conn_role_str(info.role),
 		    info.id);
 
 	if (info.type == BT_CONN_TYPE_BR) {
-		shell_print(sh, "Peer address %s", bt_addr_str(info.br.dst));
+		bt_shell_session_print(sh, "Peer address %s", bt_addr_str(info.br.dst));
 	}
 
 done:
@@ -1752,13 +1754,13 @@ void br_packet_type_changed(struct bt_conn *conn, uint8_t status,
 		       status, packet_type);
 }
 
-static int cmd_change_packet_type(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_change_packet_type(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint16_t packet_type;
 	int err;
 
 	if (default_conn == NULL) {
-		shell_print(sh, "Not connected");
+		bt_shell_session_print(sh, "Not connected");
 		return -ENOEXEC;
 	}
 
@@ -1793,31 +1795,31 @@ static int cmd_change_packet_type(const struct shell *sh, size_t argc, char *arg
 		} else if (!strcmp(argv[i], "3-DH5")) {
 			packet_type &= ~BT_HCI_ACL_PKT_TYPE_NO_3DH5;
 		} else {
-			shell_error(sh, "Unknown packet type: %s", argv[i]);
-			shell_help(sh);
-			return SHELL_CMD_HELP_PRINTED;
+			bt_shell_session_error(sh, "Unknown packet type: %s", argv[i]);
+			bt_shell_help(sh);
+			return BT_SHELL_CMD_HELP_PRINTED;
 		}
 	}
 
-	shell_print(sh, "Changing packet type to 0x%04x", packet_type);
+	bt_shell_session_print(sh, "Changing packet type to 0x%04x", packet_type);
 
 	err = bt_conn_br_change_packet_type(default_conn, packet_type);
 	if (err != 0) {
-		shell_error(sh, "Failed to change packet type (err %d)", err);
+		bt_shell_session_error(sh, "Failed to change packet type (err %d)", err);
 		return -ENOEXEC;
 	}
 
 	return 0;
 }
 
-static int cmd_switch_role(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_switch_role(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 	const char *action;
 	uint8_t role;
 
 	if (!default_conn) {
-		shell_print(sh, "Not connected");
+		bt_shell_session_print(sh, "Not connected");
 		return -ENOEXEC;
 	}
 
@@ -1828,55 +1830,55 @@ static int cmd_switch_role(const struct shell *sh, size_t argc, char *argv[])
 	} else if (!strcmp(action, "peripheral")) {
 		role = BT_HCI_ROLE_PERIPHERAL;
 	} else {
-		shell_help(sh);
-		return SHELL_CMD_HELP_PRINTED;
+		bt_shell_help(sh);
+		return BT_SHELL_CMD_HELP_PRINTED;
 	}
 
 	err = bt_conn_br_switch_role(default_conn, role);
 
 	if (err) {
-		shell_error(sh, "fail to change role (err %d)", err);
+		bt_shell_session_error(sh, "fail to change role (err %d)", err);
 	}
 
 	return 0;
 }
 
-static int cmd_set_role_switchable(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_set_role_switchable(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err = 0;
 	bool enable;
 
 	if (!default_conn) {
-		shell_print(sh, "Not connected");
+		bt_shell_session_print(sh, "Not connected");
 		return -ENOEXEC;
 	}
 
-	enable = shell_strtobool(argv[1], 10, &err);
+	enable = bt_shell_strtobool(argv[1], 10, &err);
 	if (err) {
-		shell_help(sh);
-		return SHELL_CMD_HELP_PRINTED;
+		bt_shell_help(sh);
+		return BT_SHELL_CMD_HELP_PRINTED;
 	}
 
 	err = bt_conn_br_set_role_switch_enable(default_conn, enable);
 
 	if (err) {
-		shell_error(sh, "fail to set role switchable (err %d)", err);
+		bt_shell_session_error(sh, "fail to set role switchable (err %d)", err);
 	} else {
-		shell_print(sh, "success");
+		bt_shell_session_print(sh, "success");
 	}
 
 	return 0;
 }
 
 #if defined(CONFIG_BT_POWER_MODE_CONTROL)
-static int cmd_set_sniff_mode(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_set_sniff_mode(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	const char *action;
 	int err = 0;
 
 	action = argv[1];
 	if (!default_conn) {
-		shell_print(sh, "Not connected");
+		bt_shell_session_print(sh, "Not connected");
 		return -ENOEXEC;
 	}
 
@@ -1893,9 +1895,9 @@ static int cmd_set_sniff_mode(const struct shell *sh, size_t argc, char *argv[])
 		err = bt_conn_br_enter_sniff_mode(default_conn, min_interval, max_interval, attempt,
 						  timeout);
 		if (err) {
-			shell_print(sh, "request enter sniff mode, err:%d", err);
+			bt_shell_session_print(sh, "request enter sniff mode, err:%d", err);
 		} else {
-			shell_print(sh,
+			bt_shell_session_print(sh,
 				    "request enter sniff mode, min_interval:%d, max_interval:%d, "
 				    "attempt:%d, timeout:%d",
 				    min_interval, max_interval, attempt, timeout);
@@ -1903,35 +1905,35 @@ static int cmd_set_sniff_mode(const struct shell *sh, size_t argc, char *argv[])
 	} else if (!strcmp(action, "off")) {
 		err = bt_conn_br_exit_sniff_mode(default_conn);
 		if (err) {
-			shell_print(sh, "request enter active mode, err:%d", err);
+			bt_shell_session_print(sh, "request enter active mode, err:%d", err);
 		} else {
-			shell_print(sh, "request enter active mode success");
+			bt_shell_session_print(sh, "request enter active mode success");
 		}
 	} else {
-		shell_help(sh);
-		return SHELL_CMD_HELP_PRINTED;
+		bt_shell_help(sh);
+		return BT_SHELL_CMD_HELP_PRINTED;
 	}
 
 	return 0;
 }
 #endif
 
-static int cmd_get_class_of_device(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_get_class_of_device(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 	uint32_t cod;
 
 	err = bt_br_get_class_of_device(&cod);
 	if (err != 0) {
-		shell_error(sh, "fail to get cod (err %d)", err);
+		bt_shell_session_error(sh, "fail to get cod (err %d)", err);
 		return err;
 	}
 
-	shell_print(sh, "get cod:0x%06x success", cod);
+	bt_shell_session_print(sh, "get cod:0x%06x success", cod);
 	return 0;
 }
 
-static int cmd_set_class_of_device(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_set_class_of_device(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 	uint32_t cod;
@@ -1940,11 +1942,11 @@ static int cmd_set_class_of_device(const struct shell *sh, size_t argc, char *ar
 
 	err = bt_br_set_class_of_device(cod);
 	if (err != 0) {
-		shell_error(sh, "fail to set cod (err %d)", err);
+		bt_shell_session_error(sh, "fail to set cod (err %d)", err);
 		return err;
 	}
 
-	shell_print(sh, "set cod:0x%06x success", cod);
+	bt_shell_session_print(sh, "set cod:0x%06x success", cod);
 	return 0;
 }
 
@@ -1962,13 +1964,13 @@ static struct bt_l2cap_br_connless_cb connless_cb = {
 	.recv = connless_recv,
 };
 
-static int cmd_l2cap_connless_reg(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_l2cap_connless_reg(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 	uint16_t psm;
 
 	psm = (uint16_t)strtoul(argv[1], NULL, 16);
-	shell_print(sh, "Register connectionless callbacks with PSM 0x%04x", psm);
+	bt_shell_session_print(sh, "Register connectionless callbacks with PSM 0x%04x", psm);
 
 	connless_cb.psm = psm;
 
@@ -1980,27 +1982,27 @@ static int cmd_l2cap_connless_reg(const struct shell *sh, size_t argc, char *arg
 
 	err = bt_l2cap_br_connless_register(&connless_cb);
 	if (err) {
-		shell_error(sh, "Failed to register connectionless callback: %d", err);
+		bt_shell_session_error(sh, "Failed to register connectionless callback: %d", err);
 		return err;
 	}
 
 	return 0;
 }
 
-static int cmd_l2cap_connless_unreg(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_l2cap_connless_unreg(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 
 	err = bt_l2cap_br_connless_unregister(&connless_cb);
 	if (err) {
-		shell_error(sh, "Failed to unregister connectionless callback: %d", err);
+		bt_shell_session_error(sh, "Failed to unregister connectionless callback: %d", err);
 		return err;
 	}
 
 	return 0;
 }
 
-static int cmd_l2cap_connless_send(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_l2cap_connless_send(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	static uint8_t buf_data[DATA_BREDR_MTU];
 	int err, len = DATA_BREDR_MTU;
@@ -2011,13 +2013,13 @@ static int cmd_l2cap_connless_send(const struct shell *sh, size_t argc, char *ar
 
 	len = (int)strtoul(argv[2], NULL, 10);
 	if (len > DATA_BREDR_MTU) {
-		shell_error(sh, "Length exceeds TX MAX length for the channel");
+		bt_shell_session_error(sh, "Length exceeds TX MAX length for the channel");
 		return -ENOEXEC;
 	}
 
-	buf = net_buf_alloc(&data_tx_pool, K_SECONDS(2));
+	buf = net_buf_alloc(&data_tx_pool, BT_SECONDS(2));
 	if (!buf) {
-		shell_error(sh, "Allocation timeout, stopping TX");
+		bt_shell_session_error(sh, "Allocation timeout, stopping TX");
 		return -EAGAIN;
 	}
 	net_buf_reserve(buf, BT_L2CAP_CONNLESS_RESERVE);
@@ -2027,10 +2029,10 @@ static int cmd_l2cap_connless_send(const struct shell *sh, size_t argc, char *ar
 
 	net_buf_add_mem(buf, buf_data, len);
 
-	shell_print(sh, "Sending connectionless data with PSM 0x%04x", psm);
+	bt_shell_session_print(sh, "Sending connectionless data with PSM 0x%04x", psm);
 	err = bt_l2cap_br_connless_send(default_conn, psm, buf);
 	if (err < 0) {
-		shell_error(sh, "Unable to send connectionless data: %d", err);
+		bt_shell_session_error(sh, "Unable to send connectionless data: %d", err);
 		net_buf_unref(buf);
 		return -ENOEXEC;
 	}
@@ -2039,7 +2041,7 @@ static int cmd_l2cap_connless_send(const struct shell *sh, size_t argc, char *ar
 }
 #endif /* CONFIG_BT_L2CAP_CONNLESS */
 
-static int cmd_write_eir_name(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_write_eir_name(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	const char *name = bt_get_name();
 	size_t len = strlen(name);
@@ -2050,22 +2052,22 @@ static int cmd_write_eir_name(const struct shell *sh, size_t argc, char *argv[])
 
 	err = bt_br_write_eir(eir, ARRAY_SIZE(eir), true);
 	if (err != 0) {
-		shell_error(sh, "Failed to write EIR (err %d)", err);
+		bt_shell_session_error(sh, "Failed to write EIR (err %d)", err);
 		return err;
 	}
 
-	shell_print(sh, "EIR written with device name: %s", name);
+	bt_shell_session_print(sh, "EIR written with device name: %s", name);
 	return 0;
 }
 
-static int cmd_default_handler(const struct shell *sh, size_t argc, char **argv)
+static int cmd_default_handler(const struct bt_shell *sh, size_t argc, char **argv)
 {
 	if (argc == 1) {
-		shell_help(sh);
-		return SHELL_CMD_HELP_PRINTED;
+		bt_shell_help(sh);
+		return BT_SHELL_CMD_HELP_PRINTED;
 	}
 
-	shell_error(sh, "%s unknown parameter: %s", argv[0], argv[1]);
+	bt_shell_session_error(sh, "%s unknown parameter: %s", argv[0], argv[1]);
 
 	return -EINVAL;
 }
@@ -2091,84 +2093,97 @@ static int cmd_default_handler(const struct shell *sh, size_t argc, char **argv)
 	"<type: 0 for standard, 1 for interlaced>]"
 
 #if defined(CONFIG_BT_TESTING)
-SHELL_STATIC_SUBCMD_SET_CREATE(echo_cmds,
-	SHELL_CMD_ARG(register, NULL, HELP_NONE, cmd_l2cap_echo_reg, 1, 0),
-	SHELL_CMD_ARG(unregister, NULL, HELP_NONE, cmd_l2cap_echo_unreg, 1, 0),
-	SHELL_CMD_ARG(req, NULL, "<length of data>", cmd_l2cap_echo_req, 2, 0),
-	SHELL_CMD_ARG(rsp, NULL, "<identifier> <length of data>", cmd_l2cap_echo_rsp, 3, 0),
-	SHELL_SUBCMD_SET_END
+BT_SHELL_STATIC_SUBCMD_SET_CREATE(echo_cmds,
+	BT_SHELL_CMD_ARG(register, NULL, HELP_NONE, cmd_l2cap_echo_reg, 1, 0),
+	BT_SHELL_CMD_ARG(unregister, NULL, HELP_NONE, cmd_l2cap_echo_unreg, 1, 0),
+	BT_SHELL_CMD_ARG(req, NULL, "<length of data>", cmd_l2cap_echo_req, 2, 0),
+	BT_SHELL_CMD_ARG(rsp, NULL, "<identifier> <length of data>", cmd_l2cap_echo_rsp, 3, 0),
+	BT_SHELL_SUBCMD_SET_END
 );
 #endif /* CONFIG_BT_TESTING */
 
 #if defined(CONFIG_BT_L2CAP_CONNLESS)
-SHELL_STATIC_SUBCMD_SET_CREATE(connless_cmds,
-	SHELL_CMD_ARG(register, NULL, "<psm> [sec level]", cmd_l2cap_connless_reg, 2, 1),
-	SHELL_CMD_ARG(unregister, NULL, HELP_NONE, cmd_l2cap_connless_unreg, 1, 0),
-	SHELL_CMD_ARG(send, NULL, "<psm> <length of data>", cmd_l2cap_connless_send, 3, 0),
-	SHELL_SUBCMD_SET_END
+BT_SHELL_STATIC_SUBCMD_SET_CREATE(connless_cmds,
+	BT_SHELL_CMD_ARG(register, NULL, "<psm> [sec level]", cmd_l2cap_connless_reg, 2, 1),
+	BT_SHELL_CMD_ARG(unregister, NULL, HELP_NONE, cmd_l2cap_connless_unreg, 1, 0),
+	BT_SHELL_CMD_ARG(send, NULL, "<psm> <length of data>", cmd_l2cap_connless_send, 3, 0),
+	BT_SHELL_SUBCMD_SET_END
 );
 #endif /* CONFIG_BT_L2CAP_CONNLESS */
 
-SHELL_STATIC_SUBCMD_SET_CREATE(l2cap_cmds,
+BT_SHELL_STATIC_SUBCMD_SET_CREATE(l2cap_cmds,
 #if defined(CONFIG_BT_L2CAP_RET_FC)
-	SHELL_CMD_ARG(register, NULL, HELP_REG, cmd_l2cap_register, 3, 3),
-	SHELL_CMD_ARG(connect, NULL, HELP_CONN, cmd_l2cap_connect, 3, 3),
+	BT_SHELL_CMD_ARG(register, NULL, HELP_REG, cmd_l2cap_register, 3, 3),
+	BT_SHELL_CMD_ARG(connect, NULL, HELP_CONN, cmd_l2cap_connect, 3, 3),
 #else
-	SHELL_CMD_ARG(register, NULL, "<psm>", cmd_l2cap_register, 2, 0),
-	SHELL_CMD_ARG(connect, NULL, "<psm>", cmd_l2cap_connect, 2, 0),
+	BT_SHELL_CMD_ARG(register, NULL, "<psm>", cmd_l2cap_register, 2, 0),
+	BT_SHELL_CMD_ARG(connect, NULL, "<psm>", cmd_l2cap_connect, 2, 0),
 #endif /* CONFIG_BT_L2CAP_RET_FC */
-	SHELL_CMD_ARG(disconnect, NULL, HELP_NONE, cmd_l2cap_disconnect, 1, 0),
-	SHELL_CMD_ARG(send, NULL, "[number of packets] [length of packet(s)]",
+	BT_SHELL_CMD_ARG(disconnect, NULL, HELP_NONE, cmd_l2cap_disconnect, 1, 0),
+	BT_SHELL_CMD_ARG(send, NULL, "[number of packets] [length of packet(s)]",
 		      cmd_l2cap_send, 1, 2),
 #if defined(CONFIG_BT_L2CAP_RET_FC)
-	SHELL_CMD_ARG(credits, NULL, HELP_NONE, cmd_l2cap_credits, 1, 0),
+	BT_SHELL_CMD_ARG(credits, NULL, HELP_NONE, cmd_l2cap_credits, 1, 0),
 #endif /* CONFIG_BT_L2CAP_RET_FC */
 #if defined(CONFIG_BT_TESTING)
-	SHELL_CMD(echo, &echo_cmds, "L2CAP BR ECHO commands", cmd_default_handler),
+	BT_SHELL_CMD(echo, &echo_cmds, "L2CAP BR ECHO commands", cmd_default_handler),
 #endif /* CONFIG_BT_TESTING */
 #if defined(CONFIG_BT_L2CAP_CONNLESS)
-	SHELL_CMD(connless, &connless_cmds, "L2CAP connectionless commands", cmd_default_handler),
+	BT_SHELL_CMD(connless, &connless_cmds, "L2CAP connectionless commands", cmd_default_handler),
 #endif /* CONFIG_BT_L2CAP_CONNLESS */
-	SHELL_SUBCMD_SET_END
+	BT_SHELL_SUBCMD_SET_END
 );
 
-SHELL_STATIC_SUBCMD_SET_CREATE(br_cmds,
-	SHELL_CMD_ARG(auth-pincode, NULL, "<pincode>", cmd_auth_pincode, 2, 0),
-	SHELL_CMD_ARG(connect, NULL, "<address>", cmd_connect, 2, 0),
-	SHELL_CMD_ARG(bonds, NULL, HELP_NONE, cmd_bonds, 1, 0),
-	SHELL_CMD_ARG(change-packet-type, NULL,
+BT_SHELL_STATIC_SUBCMD_SET_CREATE(br_cmds,
+	BT_SHELL_CMD_ARG(auth-pincode, NULL, "<pincode>", cmd_auth_pincode, 2, 0),
+	BT_SHELL_CMD_ARG(connect, NULL, "<address>", cmd_connect, 2, 0),
+	BT_SHELL_CMD_ARG(bonds, NULL, HELP_NONE, cmd_bonds, 1, 0),
+	BT_SHELL_CMD_ARG(change-packet-type, NULL,
 		      "<[DM1] [DH1] [DM3] [DH3] [DM5] [DH5] "
 		      "[2-DH1] [3-DH1] [2-DH3] [3-DH3] [2-DH5] [3-DH5]>",
 		      cmd_change_packet_type, 2, 11),
-	SHELL_CMD_ARG(clear, NULL, "[all] ["HELP_ADDR"]", cmd_clear, 2, 0),
-	SHELL_CMD_ARG(select, NULL, HELP_ADDR, cmd_select, 2, 0),
-	SHELL_CMD_ARG(info, NULL, HELP_ADDR, cmd_info, 1, 1),
-	SHELL_CMD_ARG(discovery, NULL, "<value: on, off> [length: 1-48] [mode: limited]",
+	BT_SHELL_CMD_ARG(clear, NULL, "[all] ["HELP_ADDR"]", cmd_clear, 2, 0),
+	BT_SHELL_CMD_ARG(select, NULL, HELP_ADDR, cmd_select, 2, 0),
+	BT_SHELL_CMD_ARG(info, NULL, HELP_ADDR, cmd_info, 1, 1),
+	BT_SHELL_CMD_ARG(discovery, NULL, "<value: on, off> [length: 1-48] [mode: limited]",
 		      cmd_discovery, 2, 2),
-	SHELL_CMD_ARG(iscan, NULL, "<value: on, off> [mode: limited]",
+	BT_SHELL_CMD_ARG(iscan, NULL, "<value: on, off> [mode: limited]",
 		      cmd_discoverable, 2, 1),
-	SHELL_CMD_ARG(iscan-param, NULL, HELP_ISCAN_PARAM, cmd_iscan_param, 1, 3),
-	SHELL_CMD(l2cap, &l2cap_cmds, HELP_NONE, cmd_default_handler),
-	SHELL_CMD_ARG(oob, NULL, NULL, cmd_oob, 1, 0),
-	SHELL_CMD_ARG(pscan, NULL, "<value: on, off> [central/peripheral]", cmd_connectable, 2, 1),
-	SHELL_CMD_ARG(auto_reject_conn, NULL, "<value: on, off>", cmd_auto_reject_conn, 2, 0),
-	SHELL_CMD_ARG(pscan-mode, NULL, "<mode: r0, fr1, mr1, sr1, fr2, sr2>",
+	BT_SHELL_CMD_ARG(iscan-param, NULL, HELP_ISCAN_PARAM, cmd_iscan_param, 1, 3),
+	BT_SHELL_CMD(l2cap, &l2cap_cmds, HELP_NONE, cmd_default_handler),
+	BT_SHELL_CMD_ARG(oob, NULL, NULL, cmd_oob, 1, 0),
+	BT_SHELL_CMD_ARG(pscan, NULL, "<value: on, off> [central/peripheral]", cmd_connectable, 2, 1),
+	BT_SHELL_CMD_ARG(auto_reject_conn, NULL, "<value: on, off>", cmd_auto_reject_conn, 2, 0),
+	BT_SHELL_CMD_ARG(pscan-mode, NULL, "<mode: r0, fr1, mr1, sr1, fr2, sr2>",
 		      cmd_pscan_mode, 2, 0),
-	SHELL_CMD_ARG(pscan-param, NULL, HELP_PSCAN_PARAM, cmd_pscan_param, 4, 0),
-	SHELL_CMD_ARG(sdp-find, NULL, "[HFPAG, HFPHF, A2SRC, A2SNK, PNP, AVRCP_CT, AVRCP_TG]",
+	BT_SHELL_CMD_ARG(pscan-param, NULL, HELP_PSCAN_PARAM, cmd_pscan_param, 4, 0),
+	BT_SHELL_CMD_ARG(sdp-find, NULL, "[HFPAG, HFPHF, A2SRC, A2SNK, PNP, AVRCP_CT, AVRCP_TG]",
 		      cmd_sdp_find_record, 1, 1),
-	SHELL_CMD_ARG(switch-role, NULL, "<value: central, peripheral>", cmd_switch_role, 2, 0),
-	SHELL_CMD_ARG(set-role-switchable, NULL, "<value: enable, disable>",
+	BT_SHELL_CMD_ARG(switch-role, NULL, "<value: central, peripheral>", cmd_switch_role, 2, 0),
+	BT_SHELL_CMD_ARG(set-role-switchable, NULL, "<value: enable, disable>",
 		      cmd_set_role_switchable, 2, 0),
 #if defined(CONFIG_BT_POWER_MODE_CONTROL)
-	SHELL_CMD_ARG(set_sniff_mode, NULL,
+	BT_SHELL_CMD_ARG(set_sniff_mode, NULL,
 		      "<value:on, off> [min_interval] [max_interval] [attempt] [timeout]",
 		      cmd_set_sniff_mode, 2, 4),
 #endif
-	SHELL_CMD_ARG(cod-get, NULL, HELP_NONE, cmd_get_class_of_device, 1, 0),
-	SHELL_CMD_ARG(cod-set, NULL, "<cod>", cmd_set_class_of_device, 2, 0),
-	SHELL_CMD_ARG(write-eir-name, NULL, HELP_NONE, cmd_write_eir_name, 1, 0),
-	SHELL_SUBCMD_SET_END
+	BT_SHELL_CMD_ARG(cod-get, NULL, HELP_NONE, cmd_get_class_of_device, 1, 0),
+	BT_SHELL_CMD_ARG(cod-set, NULL, "<cod>", cmd_set_class_of_device, 2, 0),
+	BT_SHELL_CMD_ARG(write-eir-name, NULL, HELP_NONE, cmd_write_eir_name, 1, 0),
+	BT_SHELL_SUBCMD_SET_END
 );
 
-SHELL_CMD_ARG_REGISTER(br, &br_cmds, "Bluetooth BR/EDR shell commands", cmd_default_handler, 1, 1);
+BT_SHELL_CMD_ARG_REGISTER(br, &br_cmds, "Bluetooth BR/EDR shell commands", cmd_default_handler, 1, 1);
+
+/** @brief Initialize Classic shell pools before commands can allocate buffers. */
+void bt_shell_br_pools_init(void)
+{
+	net_buf_pool_init(&data_tx_pool);
+	net_buf_pool_init(&data_rx_pool);
+	net_buf_pool_init(&sdp_client_pool);
+#if defined(CONFIG_BT_L2CAP_RET_FC)
+	if (!l2cap_chan.l2cap_recv_fifo._queue.initialized) {
+		bt_fifo_init(&l2cap_chan.l2cap_recv_fifo);
+	}
+#endif
+}

@@ -4,25 +4,29 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <embt/base/fifo.h>
+#include <embt/base/time.h>
+#include <embt/base/atomic.h>
+#include <embt/base/assert.h>
 #include <errno.h>
-#include <zephyr/types.h>
+#include <stdint.h>
 #include <stddef.h>
 #include <stdlib.h>
 #include <stdbool.h>
 #include <string.h>
-#include <zephyr/sys/byteorder.h>
-#include <zephyr/sys/util.h>
+#include <embt/base/byteorder.h>
+#include <embt/base/util.h>
 
-#include <zephyr/settings/settings.h>
+#include <embt/settings/settings.h>
 
-#include <zephyr/bluetooth/hci.h>
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/uuid.h>
-#include <zephyr/bluetooth/classic/rfcomm.h>
-#include <zephyr/bluetooth/classic/sdp.h>
+#include <embt/bluetooth/hci.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/uuid.h>
+#include <embt/bluetooth/classic/rfcomm.h>
+#include <embt/bluetooth/classic/sdp.h>
 
-#include <zephyr/shell/shell.h>
+#include <shell/bt_shell.h>
 
 #include <host/shell/bt.h>
 #include <common/bt_shell_private.h>
@@ -78,13 +82,13 @@ struct bt_spp_endpoint {
 	enum bt_spp_mode mode;
 
 	/** Connection state (atomic) */
-	atomic_t state;
+	bt_atomic_t state;
 
 	/** Hold the credit for incoming data */
 	bool hold_credit;
 
 	/** FIFO for storing received data if hold_credit is enabled */
-	struct k_fifo rx_fifo;
+	struct bt_fifo rx_fifo;
 };
 
 struct bt_spp_client {
@@ -232,7 +236,7 @@ static int spp_parse_rfcomm_channel(const char *str, uint8_t *channel)
 	int err = 0;
 	unsigned long val;
 
-	val = shell_strtoul(str, 10, &err);
+	val = bt_shell_strtoul(str, 10, &err);
 	if (err != 0) {
 		return err;
 	}
@@ -245,7 +249,7 @@ static void bt_spp_connected(struct bt_rfcomm_dlc *dlci)
 {
 	struct bt_spp_endpoint *ep = SPP_EP_FROM_DLC(dlci);
 
-	atomic_set(&ep->state, SPP_STATE_CONNECTED);
+	bt_atomic_set(&ep->state, SPP_STATE_CONNECTED);
 	bt_shell_print("SPP: connected (ep=%p, channel=%u)", ep, ep->channel);
 }
 
@@ -253,7 +257,7 @@ static void bt_spp_disconnected(struct bt_rfcomm_dlc *dlci)
 {
 	struct bt_spp_endpoint *ep = SPP_EP_FROM_DLC(dlci);
 
-	atomic_set(&ep->state, SPP_STATE_DISCONNECTED);
+	bt_atomic_set(&ep->state, SPP_STATE_DISCONNECTED);
 	bt_shell_print("SPP: disconnected (ep=%p)", ep);
 
 	net_buf_fifo_purge(&ep->rx_fifo);
@@ -270,7 +274,7 @@ static int bt_spp_recv(struct bt_rfcomm_dlc *dlci, struct net_buf *buf)
 		return 0;
 	}
 
-	k_fifo_put(&ep->rx_fifo, buf);
+	bt_fifo_put(&ep->rx_fifo, buf);
 
 	return -EINPROGRESS;
 }
@@ -325,14 +329,14 @@ static int bt_spp_accept(struct bt_conn *conn, struct bt_rfcomm_server *server,
 {
 	struct bt_spp_server *spp = CONTAINER_OF(server, struct bt_spp_server, rfcomm_server);
 
-	if (atomic_get(&spp->ep.state) != SPP_STATE_DISCONNECTED) {
+	if (bt_atomic_get(&spp->ep.state) != SPP_STATE_DISCONNECTED) {
 		bt_shell_error("SPP: reject incoming RFCOMM (state=%ld)",
-			       (long)atomic_get(&spp->ep.state));
+			       (long)bt_atomic_get(&spp->ep.state));
 		return -EALREADY;
 	}
 
-	atomic_set(&spp->ep.state, SPP_STATE_CONNECTING);
-	k_fifo_init(&spp->ep.rx_fifo);
+	bt_atomic_set(&spp->ep.state, SPP_STATE_CONNECTING);
+	bt_fifo_init(&spp->ep.rx_fifo);
 	spp->ep.rfcomm_dlc.ops = &spp_rfcomm_ops;
 	spp->ep.rfcomm_dlc.mtu = SPP_RFCOMM_MTU;
 	spp->ep.rfcomm_dlc.required_sec_level = BT_SECURITY_L2;
@@ -369,7 +373,7 @@ static int spp_credit_limit_parse(const char *argv)
 	int err = 0;
 	unsigned long value;
 
-	value = shell_strtoul(argv, 0, &err);
+	value = bt_shell_strtoul(argv, 0, &err);
 	if (err != 0 || value > UINT8_MAX) {
 		bt_shell_error("SPP: invalid credit limit:%s", argv);
 		return -EINVAL;
@@ -378,7 +382,7 @@ static int spp_credit_limit_parse(const char *argv)
 	return value;
 }
 
-static int cmd_spp_register_with_uuid(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_spp_register_with_uuid(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 	struct bt_uuid_any uuid_any;
@@ -386,17 +390,17 @@ static int cmd_spp_register_with_uuid(const struct shell *sh, size_t argc, char 
 	uint8_t credit_limit = 0;
 
 	if (default_spp_server.rfcomm_server.channel != 0) {
-		shell_error(sh, "SPP: server already registered");
+		bt_shell_session_error(sh, "SPP: server already registered");
 		return -EALREADY;
 	}
 
 	if (bt_uuid_from_str(uuid, &uuid_any) < 0) {
-		shell_error(sh, "SPP: invalid UUID string: '%s'", uuid);
+		bt_shell_session_error(sh, "SPP: invalid UUID string: '%s'", uuid);
 		return -ENOEXEC;
 	}
 
 	if (spp_sdp_set_uuid(&uuid_any.uuid) < 0) {
-		shell_error(sh, "SPP: failed to set SDP UUID: '%s'", uuid);
+		bt_shell_session_error(sh, "SPP: failed to set SDP UUID: '%s'", uuid);
 		return -ENOEXEC;
 	}
 
@@ -418,31 +422,31 @@ static int cmd_spp_register_with_uuid(const struct shell *sh, size_t argc, char 
 
 	err = bt_spp_server_register(&default_spp_server);
 	if (err < 0) {
-		shell_error(sh, "SPP: register server failed (uuid=%s, err=%d)", uuid, err);
+		bt_shell_session_error(sh, "SPP: register server failed (uuid=%s, err=%d)", uuid, err);
 		default_spp_server.sdp_record = NULL;
 		default_spp_server.rfcomm_server.channel = 0U;
 		return -ENOEXEC;
 	}
 
-	shell_print(sh, "SPP: server registered (uuid=%s, channel=%u)", uuid,
+	bt_shell_session_print(sh, "SPP: server registered (uuid=%s, channel=%u)", uuid,
 		    default_spp_server.rfcomm_server.channel);
 	return 0;
 }
 
-static int cmd_spp_register_with_channel(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_spp_register_with_channel(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 	uint8_t channel = 0;
 	uint8_t credit_limit = 0;
 
 	if (default_spp_server.rfcomm_server.channel != 0) {
-		shell_error(sh, "SPP: server already registered");
+		bt_shell_session_error(sh, "SPP: server already registered");
 		return -EALREADY;
 	}
 
 	err = spp_parse_rfcomm_channel(argv[1], &channel);
 	if (err < 0) {
-		shell_error(sh, "SPP: invalid RFCOMM channel:%s", argv[1]);
+		bt_shell_session_error(sh, "SPP: invalid RFCOMM channel:%s", argv[1]);
 		return -EINVAL;
 	}
 
@@ -468,14 +472,14 @@ static int cmd_spp_register_with_channel(const struct shell *sh, size_t argc, ch
 
 	err = bt_spp_server_register(&default_spp_server);
 	if (err < 0) {
-		shell_error(sh, "SPP: register server failed (channel=%u, err=%d)", channel,
+		bt_shell_session_error(sh, "SPP: register server failed (channel=%u, err=%d)", channel,
 			    err);
 		default_spp_server.sdp_record = NULL;
 		default_spp_server.rfcomm_server.channel = 0U;
 		return -ENOEXEC;
 	}
 
-	shell_print(sh, "SPP: server registered (channel=%u)",
+	bt_shell_session_print(sh, "SPP: server registered (channel=%u)",
 		    default_spp_server.rfcomm_server.channel);
 	return 0;
 }
@@ -484,7 +488,7 @@ static int bt_spp_connect_rfcomm(struct bt_conn *conn, struct bt_spp_endpoint *e
 {
 	int err;
 
-	k_fifo_init(&ep->rx_fifo);
+	bt_fifo_init(&ep->rx_fifo);
 	ep->rfcomm_dlc.ops = &spp_rfcomm_ops;
 	ep->rfcomm_dlc.mtu = SPP_RFCOMM_MTU;
 	ep->rfcomm_dlc.required_sec_level = BT_SECURITY_L2;
@@ -534,7 +538,7 @@ static uint8_t sdp_discover_cb(struct bt_conn *conn, struct bt_sdp_client_result
 	return BT_SDP_DISCOVER_UUID_STOP;
 
 exit:
-	atomic_set(&spp->ep.state, SPP_STATE_DISCONNECTED);
+	bt_atomic_set(&spp->ep.state, SPP_STATE_DISCONNECTED);
 	return BT_SDP_DISCOVER_UUID_STOP;
 }
 
@@ -542,9 +546,9 @@ static int bt_spp_connect(struct bt_conn *conn, struct bt_spp_client *spp)
 {
 	int err;
 
-	if (atomic_get(&spp->ep.state) != SPP_STATE_DISCONNECTED) {
+	if (bt_atomic_get(&spp->ep.state) != SPP_STATE_DISCONNECTED) {
 		bt_shell_error("SPP: connect rejected (state=%ld)",
-			       (long)atomic_get(&spp->ep.state));
+			       (long)bt_atomic_get(&spp->ep.state));
 		return -EALREADY;
 	}
 
@@ -573,28 +577,28 @@ static int bt_spp_connect(struct bt_conn *conn, struct bt_spp_client *spp)
 		return -EINVAL;
 	}
 
-	atomic_set(&spp->ep.state, SPP_STATE_CONNECTING);
+	bt_atomic_set(&spp->ep.state, SPP_STATE_CONNECTING);
 	return 0;
 }
 
-static int cmd_spp_connect_by_uuid(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_spp_connect_by_uuid(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 	uint8_t credit_limit = 0;
 
 	if (default_conn == NULL) {
-		shell_error(sh, "SPP: no default connection");
+		bt_shell_session_error(sh, "SPP: no default connection");
 		return -ENOEXEC;
 	}
 
 	if (bt_uuid_from_str(argv[1], &spp_uuid) < 0) {
-		shell_error(sh, "SPP: invalid UUID string: '%s'", argv[1]);
+		bt_shell_session_error(sh, "SPP: invalid UUID string: '%s'", argv[1]);
 		return -ENOEXEC;
 	}
 
-	if (atomic_get(&default_spp_client.ep.state) != SPP_STATE_DISCONNECTED) {
-		shell_error(sh, "SPP: connect rejected (state=%ld)",
-			    (long)atomic_get(&default_spp_client.ep.state));
+	if (bt_atomic_get(&default_spp_client.ep.state) != SPP_STATE_DISCONNECTED) {
+		bt_shell_session_error(sh, "SPP: connect rejected (state=%ld)",
+			    (long)bt_atomic_get(&default_spp_client.ep.state));
 		return -EALREADY;
 	}
 
@@ -617,37 +621,37 @@ static int cmd_spp_connect_by_uuid(const struct shell *sh, size_t argc, char *ar
 
 	err = bt_spp_connect(default_conn, &default_spp_client);
 	if (err < 0) {
-		shell_error(sh, "SPP: connect by UUID failed (uuid=%s, err=%d)",
+		bt_shell_session_error(sh, "SPP: connect by UUID failed (uuid=%s, err=%d)",
 			    bt_uuid_str(&spp_uuid.uuid), err);
 		default_spp_client.ep.mode = BT_SPP_MODE_UNKNOWN;
 		default_spp_client.ep.uuid = NULL;
 		return -ENOEXEC;
 	}
 
-	shell_print(sh, "SPP: connect started (uuid=%s)", bt_uuid_str(&spp_uuid.uuid));
+	bt_shell_session_print(sh, "SPP: connect started (uuid=%s)", bt_uuid_str(&spp_uuid.uuid));
 	return 0;
 }
 
-static int cmd_spp_connect_by_channel(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_spp_connect_by_channel(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 	uint8_t channel = 0;
 	uint8_t credit_limit = 0;
 
 	if (default_conn == NULL) {
-		shell_error(sh, "SPP: no default connection");
+		bt_shell_session_error(sh, "SPP: no default connection");
 		return -ENOEXEC;
 	}
 
 	err = spp_parse_rfcomm_channel(argv[1], &channel);
 	if (err < 0) {
-		shell_error(sh, "SPP: invalid RFCOMM channel:%s", argv[1]);
+		bt_shell_session_error(sh, "SPP: invalid RFCOMM channel:%s", argv[1]);
 		return -EINVAL;
 	}
 
-	if (atomic_get(&default_spp_client.ep.state) != SPP_STATE_DISCONNECTED) {
-		shell_error(sh, "SPP: connect rejected (state=%ld)",
-			    (long)atomic_get(&default_spp_client.ep.state));
+	if (bt_atomic_get(&default_spp_client.ep.state) != SPP_STATE_DISCONNECTED) {
+		bt_shell_session_error(sh, "SPP: connect rejected (state=%ld)",
+			    (long)bt_atomic_get(&default_spp_client.ep.state));
 		return -EALREADY;
 	}
 
@@ -670,31 +674,31 @@ static int cmd_spp_connect_by_channel(const struct shell *sh, size_t argc, char 
 
 	err = bt_spp_connect(default_conn, &default_spp_client);
 	if (err < 0) {
-		shell_error(sh, "SPP: connect by channel failed (channel=%u, err=%d)", channel,
+		bt_shell_session_error(sh, "SPP: connect by channel failed (channel=%u, err=%d)", channel,
 			    err);
 		default_spp_client.ep.mode = BT_SPP_MODE_UNKNOWN;
 		default_spp_client.ep.channel = 0;
 		return -ENOEXEC;
 	}
 
-	shell_print(sh, "SPP: connect started (channel=%u)", channel);
+	bt_shell_session_print(sh, "SPP: connect started (channel=%u)", channel);
 	return 0;
 }
 
 static struct bt_spp_endpoint *bt_spp_get_active_ep(void)
 {
-	if (atomic_get(&default_spp_client.ep.state) != SPP_STATE_DISCONNECTED) {
+	if (bt_atomic_get(&default_spp_client.ep.state) != SPP_STATE_DISCONNECTED) {
 		return &default_spp_client.ep;
 	}
 
-	if (atomic_get(&default_spp_server.ep.state) != SPP_STATE_DISCONNECTED) {
+	if (bt_atomic_get(&default_spp_server.ep.state) != SPP_STATE_DISCONNECTED) {
 		return &default_spp_server.ep;
 	}
 
 	return NULL;
 }
 
-static int cmd_spp_send(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_spp_send(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 	struct net_buf *buf;
@@ -705,15 +709,15 @@ static int cmd_spp_send(const struct shell *sh, size_t argc, char *argv[])
 
 	ep = bt_spp_get_active_ep();
 	if (ep == NULL) {
-		shell_error(sh, "SPP: no active connection");
+		bt_shell_session_error(sh, "SPP: no active connection");
 		return -ENOEXEC;
 	}
 
 	if (argc > 1) {
 		err = 0;
-		len = shell_strtoul(argv[1], 10, &err);
+		len = bt_shell_strtoul(argv[1], 10, &err);
 		if (err != 0) {
-			shell_error(sh, "SPP: invalid length: '%s'", argv[1]);
+			bt_shell_session_error(sh, "SPP: invalid length: '%s'", argv[1]);
 			return -EINVAL;
 		}
 	}
@@ -722,15 +726,15 @@ static int cmd_spp_send(const struct shell *sh, size_t argc, char *argv[])
 
 	buf = bt_rfcomm_create_pdu(&tx_pool);
 	if (buf == NULL) {
-		shell_error(sh, "SPP: TX buffer allocation failed");
+		bt_shell_session_error(sh, "SPP: TX buffer allocation failed");
 		return -ENOEXEC;
 	}
 
-	shell_print(sh, "SPP: tx data (len=%lu)", len);
+	bt_shell_session_print(sh, "SPP: tx data (len=%lu)", len);
 
 	tailroom = net_buf_tailroom(buf);
 	if (len > tailroom) {
-		shell_error(sh, "SPP: tx len %lu exceeds buffer tailroom %zu", len, tailroom);
+		bt_shell_session_error(sh, "SPP: tx len %lu exceeds buffer tailroom %zu", len, tailroom);
 		net_buf_unref(buf);
 		return -ENOEXEC;
 	}
@@ -740,7 +744,7 @@ static int cmd_spp_send(const struct shell *sh, size_t argc, char *argv[])
 
 	err = bt_rfcomm_dlc_send(&ep->rfcomm_dlc, buf);
 	if (err < 0) {
-		shell_error(sh, "SPP: RFCOMM send failed (len=%u, err=%d)", (unsigned int)buf->len,
+		bt_shell_session_error(sh, "SPP: RFCOMM send failed (len=%u, err=%d)", (unsigned int)buf->len,
 			    err);
 		net_buf_unref(buf);
 		return -ENOEXEC;
@@ -749,30 +753,30 @@ static int cmd_spp_send(const struct shell *sh, size_t argc, char *argv[])
 	return 0;
 }
 
-static int cmd_spp_disconnect(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_spp_disconnect(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 	struct bt_spp_endpoint *ep;
 
 	ep = bt_spp_get_active_ep();
 	if (ep == NULL) {
-		shell_error(sh, "SPP: no active connection");
+		bt_shell_session_error(sh, "SPP: no active connection");
 		return -ENOEXEC;
 	}
 
 	err = bt_rfcomm_dlc_disconnect(&ep->rfcomm_dlc);
 	if (err < 0) {
-		shell_error(sh, "SPP: RFCOMM disconnect failed (err=%d)", err);
+		bt_shell_session_error(sh, "SPP: RFCOMM disconnect failed (err=%d)", err);
 		return -ENOEXEC;
 	}
 
-	atomic_set(&ep->state, SPP_STATE_DISCONNECTING);
+	bt_atomic_set(&ep->state, SPP_STATE_DISCONNECTING);
 
-	shell_print(sh, "SPP: disconnecting...");
+	bt_shell_session_print(sh, "SPP: disconnecting...");
 	return 0;
 }
 
-static int cmd_spp_rls(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_spp_rls(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 	struct bt_spp_endpoint *ep;
@@ -780,7 +784,7 @@ static int cmd_spp_rls(const struct shell *sh, size_t argc, char *argv[])
 
 	ep = bt_spp_get_active_ep();
 	if (ep == NULL) {
-		shell_error(sh, "SPP: no active connection");
+		bt_shell_session_error(sh, "SPP: no active connection");
 		return -ENOEXEC;
 	}
 
@@ -792,21 +796,21 @@ static int cmd_spp_rls(const struct shell *sh, size_t argc, char *argv[])
 		} else if (strcmp(argv[1], "framing") == 0) {
 			line_status = BT_RFCOMM_RLS_ERR(BT_RFCOMM_RLS_ERR_FRAMING_ERROR);
 		} else {
-			shell_help(sh);
-			return SHELL_CMD_HELP_PRINTED;
+			bt_shell_help(sh);
+			return BT_SHELL_CMD_HELP_PRINTED;
 		}
 	}
 
 	err = bt_rfcomm_send_rls_cmd(&ep->rfcomm_dlc, line_status);
 	if (err != 0) {
-		shell_error(sh, "SPP: send RLS failed (err=%d)", err);
+		bt_shell_session_error(sh, "SPP: send RLS failed (err=%d)", err);
 		return -ENOEXEC;
 	}
 
 	return 0;
 }
 
-static int cmd_spp_recv_complete(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_spp_recv_complete(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 	struct bt_spp_endpoint *ep;
@@ -814,56 +818,63 @@ static int cmd_spp_recv_complete(const struct shell *sh, size_t argc, char *argv
 
 	ep = bt_spp_get_active_ep();
 	if (ep == NULL) {
-		shell_error(sh, "SPP: no active connection");
+		bt_shell_session_error(sh, "SPP: no active connection");
 		return -ENOEXEC;
 	}
 
-	buf = k_fifo_get(&ep->rx_fifo, K_NO_WAIT);
+	buf = bt_fifo_get(&ep->rx_fifo, BT_NO_WAIT);
 	if (buf == NULL) {
-		shell_error(sh, "SPP: no inprogress buffer");
+		bt_shell_session_error(sh, "SPP: no inprogress buffer");
 		return -ENOEXEC;
 	}
 
 	err = bt_rfcomm_dlc_recv_complete(&ep->rfcomm_dlc, buf);
 	if (err != 0) {
-		shell_error(sh, "SPP: fail to call recv_complete (%d)", err);
+		bt_shell_session_error(sh, "SPP: fail to call recv_complete (%d)", err);
 		return -ENOEXEC;
 	}
 
 	return 0;
 }
 
-SHELL_STATIC_SUBCMD_SET_CREATE(
+BT_SHELL_STATIC_SUBCMD_SET_CREATE(
 	spp_cmds,
-	SHELL_CMD_ARG(register_with_channel, NULL, "<channel> [limited credit value] [hold_credit]",
+	BT_SHELL_CMD_ARG(register_with_channel, NULL, "<channel> [limited credit value] [hold_credit]",
 		      cmd_spp_register_with_channel, 2, 2),
-	SHELL_CMD_ARG(register_with_uuid, NULL,
+	BT_SHELL_CMD_ARG(register_with_uuid, NULL,
 		      "<bt-uuid16(e.g. 1101)|bt-uuid32|bt-uuid128(e.g. "
 		      "00001101-0000-1000-8000-00805F9B34FB)> [limited credit value] [hold_credit]",
 		      cmd_spp_register_with_uuid, 2, 2),
-	SHELL_CMD_ARG(connect_by_channel, NULL, "<channel> [limited credit value] [hold_credit]",
+	BT_SHELL_CMD_ARG(connect_by_channel, NULL, "<channel> [limited credit value] [hold_credit]",
 		      cmd_spp_connect_by_channel, 2, 2),
-	SHELL_CMD_ARG(connect_by_uuid, NULL,
+	BT_SHELL_CMD_ARG(connect_by_uuid, NULL,
 		      "<bt-uuid16(e.g. 1101)|bt-uuid32|bt-uuid128(e.g. "
 		      "00001101-0000-1000-8000-00805F9B34FB)> [limited credit value] [hold_credit]",
 		      cmd_spp_connect_by_uuid, 2, 2),
-	SHELL_CMD_ARG(send, NULL, "send [length of packet(s)]", cmd_spp_send, 1, 1),
-	SHELL_CMD_ARG(rls, NULL, "[overrun|parity|framing]", cmd_spp_rls, 1, 1),
-	SHELL_CMD_ARG(disconnect, NULL, HELP_NONE, cmd_spp_disconnect, 1, 0),
-	SHELL_CMD_ARG(recv_complete, NULL, HELP_NONE, cmd_spp_recv_complete, 1, 0),
-	SHELL_SUBCMD_SET_END
+	BT_SHELL_CMD_ARG(send, NULL, "send [length of packet(s)]", cmd_spp_send, 1, 1),
+	BT_SHELL_CMD_ARG(rls, NULL, "[overrun|parity|framing]", cmd_spp_rls, 1, 1),
+	BT_SHELL_CMD_ARG(disconnect, NULL, HELP_NONE, cmd_spp_disconnect, 1, 0),
+	BT_SHELL_CMD_ARG(recv_complete, NULL, HELP_NONE, cmd_spp_recv_complete, 1, 0),
+	BT_SHELL_SUBCMD_SET_END
 );
 
-static int cmd_spp(const struct shell *sh, size_t argc, char **argv)
+static int cmd_spp(const struct bt_shell *sh, size_t argc, char **argv)
 {
 	if (argc == 1) {
-		shell_help(sh);
+		bt_shell_help(sh);
 		/* sh returns 1 when help is printed */
-		return SHELL_CMD_HELP_PRINTED;
+		return BT_SHELL_CMD_HELP_PRINTED;
 	}
 
-	shell_error(sh, "SPP: unknown argument '%s'", argv[1]);
+	bt_shell_session_error(sh, "SPP: unknown argument '%s'", argv[1]);
 	return -ENOEXEC;
 }
 
-SHELL_CMD_ARG_REGISTER(spp, &spp_cmds, "Bluetooth SPP sh commands", cmd_spp, 1, 1);
+BT_SHELL_CMD_ARG_REGISTER(spp, &spp_cmds, "Bluetooth SPP sh commands", cmd_spp, 1, 1);
+
+/** @brief Initialize module-owned storage before protocol operations. */
+void bt_host_classic_shell_spp_storage_init(void)
+{
+	net_buf_pool_init(&sdp_pool);
+	net_buf_pool_init(&tx_pool);
+}

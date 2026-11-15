@@ -52,6 +52,12 @@ config EMBT_A2DP_PLAYER
 	depends on LIBSBC
 	default n
 
+config EMBT_AUDIO_SHELL
+	bool "Bluetooth shell PCM playback"
+	depends on BT_SHELL && EMBT_AUDIO_PULSE
+	depends on (BT_A2DP_SINK && EMBT_A2DP_PLAYER) || (BT_AUDIO_RX && EMBT_BAP_PLAYER)
+	default n
+
 config EMBT_BAP_PLAYER
 	bool "Shared LC3 playback component"
 	depends on LIBLC3

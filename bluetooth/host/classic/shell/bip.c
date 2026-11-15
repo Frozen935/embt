@@ -9,19 +9,21 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <embt/base/assert.h>
 #include <errno.h>
-#include <zephyr/types.h>
-#include <zephyr/sys/byteorder.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <embt/base/byteorder.h>
 #include <stdlib.h>
 
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/l2cap.h>
-#include <zephyr/bluetooth/classic/rfcomm.h>
-#include <zephyr/bluetooth/classic/sdp.h>
-#include <zephyr/bluetooth/classic/bip.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/l2cap.h>
+#include <embt/bluetooth/classic/rfcomm.h>
+#include <embt/bluetooth/classic/sdp.h>
+#include <embt/bluetooth/classic/bip.h>
 
-#include <zephyr/shell/shell.h>
+#include <shell/bt_shell.h>
 
 #include <host/shell/bt.h>
 #include <common/bt_shell_private.h>
@@ -715,13 +717,13 @@ static int rfcomm_accept(struct bt_conn *conn, struct bt_bip_rfcomm_server *serv
 	return 0;
 }
 
-static int cmd_register_rfcomm(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_register_rfcomm(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 	uint8_t channel;
 
 	if (rfcomm_server.server.rfcomm.channel != 0) {
-		shell_error(sh, "RFCOMM has been registered");
+		bt_shell_session_error(sh, "RFCOMM has been registered");
 		return -EBUSY;
 	}
 
@@ -731,35 +733,35 @@ static int cmd_register_rfcomm(const struct shell *sh, size_t argc, char *argv[]
 	rfcomm_server.accept = rfcomm_accept;
 	err = bt_bip_rfcomm_register(&rfcomm_server);
 	if (err != 0) {
-		shell_error(sh, "Fail to register RFCOMM server (error %d)", err);
+		bt_shell_session_error(sh, "Fail to register RFCOMM server (error %d)", err);
 		rfcomm_server.server.rfcomm.channel = 0;
 		return -ENOEXEC;
 	}
-	shell_print(sh, "RFCOMM server (channel %02x) is registered",
+	bt_shell_session_print(sh, "RFCOMM server (channel %02x) is registered",
 		    rfcomm_server.server.rfcomm.channel);
 	return 0;
 }
 
-static int cmd_connect_rfcomm(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_connect_rfcomm(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 	struct bt_bip_app *g_app;
 	uint8_t channel;
 
 	if (default_conn == NULL) {
-		shell_error(sh, "Not connected");
+		bt_shell_session_error(sh, "Not connected");
 		return -ENOEXEC;
 	}
 
 	channel = (uint8_t)strtoul(argv[1], NULL, 16);
 	if (channel == 0) {
-		shell_error(sh, "Invalid channel");
+		bt_shell_session_error(sh, "Invalid channel");
 		return -ENOEXEC;
 	}
 
 	g_app = bip_alloc(default_conn);
 	if (g_app == NULL) {
-		shell_error(sh, "Cannot allocate bip instance");
+		bt_shell_session_error(sh, "Cannot allocate bip instance");
 		return -ENOMEM;
 	}
 
@@ -768,33 +770,33 @@ static int cmd_connect_rfcomm(const struct shell *sh, size_t argc, char *argv[])
 	err = bt_bip_rfcomm_connect(default_conn, &g_app->bip, channel);
 	if (err != 0) {
 		bip_free(g_app);
-		shell_error(sh, "Fail to connect to channel %d (err %d)", channel, err);
+		bt_shell_session_error(sh, "Fail to connect to channel %d (err %d)", channel, err);
 	} else {
-		shell_print(sh, "BIP RFCOMM connection pending");
+		bt_shell_session_print(sh, "BIP RFCOMM connection pending");
 	}
 
 	return err;
 }
 
-static int cmd_disconnect_rfcomm(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_disconnect_rfcomm(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 
 	if (default_conn == NULL) {
-		shell_error(sh, "Not connected");
+		bt_shell_session_error(sh, "Not connected");
 		return -ENOEXEC;
 	}
 
 	if (bip_app.conn == NULL) {
-		shell_error(sh, "No bip transport connection");
+		bt_shell_session_error(sh, "No bip transport connection");
 		return -ENOEXEC;
 	}
 
 	err = bt_bip_rfcomm_disconnect(&bip_app.bip);
 	if (err != 0) {
-		shell_error(sh, "Fail to disconnect to channel (err %d)", err);
+		bt_shell_session_error(sh, "Fail to disconnect to channel (err %d)", err);
 	} else {
-		shell_print(sh, "BIP RFCOMM disconnection pending");
+		bt_shell_session_print(sh, "BIP RFCOMM disconnection pending");
 	}
 	return err;
 }
@@ -815,13 +817,13 @@ static int l2cap_accept(struct bt_conn *conn, struct bt_bip_l2cap_server *server
 	return 0;
 }
 
-static int cmd_register_l2cap(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_register_l2cap(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 	uint16_t psm;
 
 	if (l2cap_server.server.l2cap.psm != 0) {
-		shell_error(sh, "L2CAP server has been registered");
+		bt_shell_session_error(sh, "L2CAP server has been registered");
 		return -EBUSY;
 	}
 
@@ -831,34 +833,34 @@ static int cmd_register_l2cap(const struct shell *sh, size_t argc, char *argv[])
 	l2cap_server.accept = l2cap_accept;
 	err = bt_bip_l2cap_register(&l2cap_server);
 	if (err != 0) {
-		shell_error(sh, "Fail to register L2CAP server (error %d)", err);
+		bt_shell_session_error(sh, "Fail to register L2CAP server (error %d)", err);
 		l2cap_server.server.l2cap.psm = 0;
 		return -ENOEXEC;
 	}
-	shell_print(sh, "L2CAP server (psm %04x) is registered", l2cap_server.server.l2cap.psm);
+	bt_shell_session_print(sh, "L2CAP server (psm %04x) is registered", l2cap_server.server.l2cap.psm);
 	return 0;
 }
 
-static int cmd_connect_l2cap(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_connect_l2cap(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 	struct bt_bip_app *g_app;
 	uint16_t psm;
 
 	if (default_conn == NULL) {
-		shell_error(sh, "Not connected");
+		bt_shell_session_error(sh, "Not connected");
 		return -ENOEXEC;
 	}
 
 	psm = (uint16_t)strtoul(argv[1], NULL, 16);
 	if (psm == 0) {
-		shell_error(sh, "Invalid psm");
+		bt_shell_session_error(sh, "Invalid psm");
 		return -ENOEXEC;
 	}
 
 	g_app = bip_alloc(default_conn);
 	if (g_app == NULL) {
-		shell_error(sh, "Cannot allocate bip instance");
+		bt_shell_session_error(sh, "Cannot allocate bip instance");
 		return -ENOMEM;
 	}
 
@@ -867,38 +869,38 @@ static int cmd_connect_l2cap(const struct shell *sh, size_t argc, char *argv[])
 	err = bt_bip_l2cap_connect(default_conn, &g_app->bip, psm);
 	if (err != 0) {
 		bip_free(g_app);
-		shell_error(sh, "Fail to connect to PSM %d (err %d)", psm, err);
+		bt_shell_session_error(sh, "Fail to connect to PSM %d (err %d)", psm, err);
 	} else {
-		shell_print(sh, "BIP L2CAP connection pending");
+		bt_shell_session_print(sh, "BIP L2CAP connection pending");
 	}
 
 	return err;
 }
 
-static int cmd_disconnect_l2cap(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_disconnect_l2cap(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 
 	if (default_conn == NULL) {
-		shell_error(sh, "Not connected");
+		bt_shell_session_error(sh, "Not connected");
 		return -ENOEXEC;
 	}
 
 	if (bip_app.conn == NULL) {
-		shell_error(sh, "No bip transport connection");
+		bt_shell_session_error(sh, "No bip transport connection");
 		return -ENOEXEC;
 	}
 
 	err = bt_bip_l2cap_disconnect(&bip_app.bip);
 	if (err != 0) {
-		shell_error(sh, "Fail to disconnect L2CAP conn (err %d)", err);
+		bt_shell_session_error(sh, "Fail to disconnect L2CAP conn (err %d)", err);
 	} else {
-		shell_print(sh, "BIP L2CAP disconnection pending");
+		bt_shell_session_print(sh, "BIP L2CAP disconnection pending");
 	}
 	return err;
 }
 
-static int cmd_add_header_count(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_add_header_count(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint32_t count;
 	int err;
@@ -907,12 +909,12 @@ static int cmd_add_header_count(const struct shell *sh, size_t argc, char *argv[
 
 	err = bt_obex_add_header_count(bip_app.tx_buf, count);
 	if (err != 0) {
-		shell_error(sh, "Fail to add header count");
+		bt_shell_session_error(sh, "Fail to add header count");
 	}
 	return err;
 }
 
-static int cmd_add_header_name(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_add_header_name(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	size_t len;
 	int err;
@@ -926,7 +928,7 @@ static int cmd_add_header_name(const struct shell *sh, size_t argc, char *argv[]
 		len = hex2bin(hex_payload, hex_payload_size, add_head_buffer,
 			      sizeof(add_head_buffer));
 		if (len > UINT16_MAX) {
-			shell_error(sh, "Length exceeds max length (%x > %x)", len, UINT16_MAX);
+			bt_shell_session_error(sh, "Length exceeds max length (%x > %x)", len, UINT16_MAX);
 			return -ENOEXEC;
 		}
 	} else {
@@ -935,12 +937,12 @@ static int cmd_add_header_name(const struct shell *sh, size_t argc, char *argv[]
 
 	err = bt_obex_add_header_name(bip_app.tx_buf, (uint16_t)len, add_head_buffer);
 	if (err != 0) {
-		shell_error(sh, "Fail to add header name");
+		bt_shell_session_error(sh, "Fail to add header name");
 	}
 	return err;
 }
 
-static int cmd_add_header_type(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_add_header_type(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	size_t len;
 	int err;
@@ -949,18 +951,18 @@ static int cmd_add_header_type(const struct shell *sh, size_t argc, char *argv[]
 
 	len = hex2bin(hex_payload, hex_payload_size, add_head_buffer, sizeof(add_head_buffer));
 	if (len > UINT16_MAX) {
-		shell_error(sh, "Length exceeds max length (%x > %x)", len, UINT16_MAX);
+		bt_shell_session_error(sh, "Length exceeds max length (%x > %x)", len, UINT16_MAX);
 		return -ENOEXEC;
 	}
 
 	err = bt_obex_add_header_type(bip_app.tx_buf, (uint16_t)len, add_head_buffer);
 	if (err != 0) {
-		shell_error(sh, "Fail to add header type");
+		bt_shell_session_error(sh, "Fail to add header type");
 	}
 	return err;
 }
 
-static int cmd_add_header_len(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_add_header_len(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint32_t len;
 	int err;
@@ -969,12 +971,12 @@ static int cmd_add_header_len(const struct shell *sh, size_t argc, char *argv[])
 
 	err = bt_obex_add_header_len(bip_app.tx_buf, len);
 	if (err != 0) {
-		shell_error(sh, "Fail to add header len");
+		bt_shell_session_error(sh, "Fail to add header len");
 	}
 	return err;
 }
 
-static int cmd_add_header_time_iso_8601(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_add_header_time_iso_8601(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	size_t len;
 	int err;
@@ -983,18 +985,18 @@ static int cmd_add_header_time_iso_8601(const struct shell *sh, size_t argc, cha
 
 	len = hex2bin(hex_payload, hex_payload_size, add_head_buffer, sizeof(add_head_buffer));
 	if (len > UINT16_MAX) {
-		shell_error(sh, "Length exceeds max length (%x > %x)", len, UINT16_MAX);
+		bt_shell_session_error(sh, "Length exceeds max length (%x > %x)", len, UINT16_MAX);
 		return -ENOEXEC;
 	}
 
 	err = bt_obex_add_header_time_iso_8601(bip_app.tx_buf, (uint16_t)len, add_head_buffer);
 	if (err != 0) {
-		shell_error(sh, "Fail to add header time_iso_8601");
+		bt_shell_session_error(sh, "Fail to add header time_iso_8601");
 	}
 	return err;
 }
 
-static int cmd_add_header_time(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_add_header_time(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint32_t t;
 	int err;
@@ -1003,12 +1005,12 @@ static int cmd_add_header_time(const struct shell *sh, size_t argc, char *argv[]
 
 	err = bt_obex_add_header_time(bip_app.tx_buf, t);
 	if (err != 0) {
-		shell_error(sh, "Fail to add header time");
+		bt_shell_session_error(sh, "Fail to add header time");
 	}
 	return err;
 }
 
-static int cmd_add_header_description(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_add_header_description(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	size_t len;
 	int err;
@@ -1017,18 +1019,18 @@ static int cmd_add_header_description(const struct shell *sh, size_t argc, char 
 
 	len = hex2bin(hex_payload, hex_payload_size, add_head_buffer, sizeof(add_head_buffer));
 	if (len > UINT16_MAX) {
-		shell_error(sh, "Length exceeds max length (%x > %x)", len, UINT16_MAX);
+		bt_shell_session_error(sh, "Length exceeds max length (%x > %x)", len, UINT16_MAX);
 		return -ENOEXEC;
 	}
 
 	err = bt_obex_add_header_description(bip_app.tx_buf, (uint16_t)len, add_head_buffer);
 	if (err != 0) {
-		shell_error(sh, "Fail to add header description");
+		bt_shell_session_error(sh, "Fail to add header description");
 	}
 	return err;
 }
 
-static int cmd_add_header_target(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_add_header_target(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	size_t len;
 	int err;
@@ -1037,18 +1039,18 @@ static int cmd_add_header_target(const struct shell *sh, size_t argc, char *argv
 
 	len = hex2bin(hex_payload, hex_payload_size, add_head_buffer, sizeof(add_head_buffer));
 	if (len > UINT16_MAX) {
-		shell_error(sh, "Length exceeds max length (%x > %x)", len, UINT16_MAX);
+		bt_shell_session_error(sh, "Length exceeds max length (%x > %x)", len, UINT16_MAX);
 		return -ENOEXEC;
 	}
 
 	err = bt_obex_add_header_target(bip_app.tx_buf, (uint16_t)len, add_head_buffer);
 	if (err != 0) {
-		shell_error(sh, "Fail to add header target");
+		bt_shell_session_error(sh, "Fail to add header target");
 	}
 	return err;
 }
 
-static int cmd_add_header_http(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_add_header_http(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	size_t len;
 	int err;
@@ -1057,18 +1059,18 @@ static int cmd_add_header_http(const struct shell *sh, size_t argc, char *argv[]
 
 	len = hex2bin(hex_payload, hex_payload_size, add_head_buffer, sizeof(add_head_buffer));
 	if (len > UINT16_MAX) {
-		shell_error(sh, "Length exceeds max length (%x > %x)", len, UINT16_MAX);
+		bt_shell_session_error(sh, "Length exceeds max length (%x > %x)", len, UINT16_MAX);
 		return -ENOEXEC;
 	}
 
 	err = bt_obex_add_header_http(bip_app.tx_buf, (uint16_t)len, add_head_buffer);
 	if (err != 0) {
-		shell_error(sh, "Fail to add header http");
+		bt_shell_session_error(sh, "Fail to add header http");
 	}
 	return err;
 }
 
-static int cmd_add_header_body(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_add_header_body(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	size_t len;
 	int err;
@@ -1077,18 +1079,18 @@ static int cmd_add_header_body(const struct shell *sh, size_t argc, char *argv[]
 
 	len = hex2bin(hex_payload, hex_payload_size, add_head_buffer, sizeof(add_head_buffer));
 	if (len > UINT16_MAX) {
-		shell_error(sh, "Length exceeds max length (%x > %x)", len, UINT16_MAX);
+		bt_shell_session_error(sh, "Length exceeds max length (%x > %x)", len, UINT16_MAX);
 		return -ENOEXEC;
 	}
 
 	err = bt_obex_add_header_body(bip_app.tx_buf, (uint16_t)len, add_head_buffer);
 	if (err != 0) {
-		shell_error(sh, "Fail to add header body");
+		bt_shell_session_error(sh, "Fail to add header body");
 	}
 	return err;
 }
 
-static int cmd_add_header_end_body(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_add_header_end_body(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	size_t len;
 	int err;
@@ -1097,18 +1099,18 @@ static int cmd_add_header_end_body(const struct shell *sh, size_t argc, char *ar
 
 	len = hex2bin(hex_payload, hex_payload_size, add_head_buffer, sizeof(add_head_buffer));
 	if (len > UINT16_MAX) {
-		shell_error(sh, "Length exceeds max length (%x > %x)", len, UINT16_MAX);
+		bt_shell_session_error(sh, "Length exceeds max length (%x > %x)", len, UINT16_MAX);
 		return -ENOEXEC;
 	}
 
 	err = bt_obex_add_header_end_body(bip_app.tx_buf, (uint16_t)len, add_head_buffer);
 	if (err != 0) {
-		shell_error(sh, "Fail to add header end_body");
+		bt_shell_session_error(sh, "Fail to add header end_body");
 	}
 	return err;
 }
 
-static int cmd_add_header_who(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_add_header_who(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	size_t len;
 	int err;
@@ -1117,18 +1119,18 @@ static int cmd_add_header_who(const struct shell *sh, size_t argc, char *argv[])
 
 	len = hex2bin(hex_payload, hex_payload_size, add_head_buffer, sizeof(add_head_buffer));
 	if (len > UINT16_MAX) {
-		shell_error(sh, "Length exceeds max length (%x > %x)", len, UINT16_MAX);
+		bt_shell_session_error(sh, "Length exceeds max length (%x > %x)", len, UINT16_MAX);
 		return -ENOEXEC;
 	}
 
 	err = bt_obex_add_header_who(bip_app.tx_buf, (uint16_t)len, add_head_buffer);
 	if (err != 0) {
-		shell_error(sh, "Fail to add header who");
+		bt_shell_session_error(sh, "Fail to add header who");
 	}
 	return err;
 }
 
-static int cmd_add_header_conn_id(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_add_header_conn_id(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint32_t conn_id;
 	int err;
@@ -1137,12 +1139,12 @@ static int cmd_add_header_conn_id(const struct shell *sh, size_t argc, char *arg
 
 	err = bt_obex_add_header_conn_id(bip_app.tx_buf, conn_id);
 	if (err != 0) {
-		shell_error(sh, "Fail to add header conn_id");
+		bt_shell_session_error(sh, "Fail to add header conn_id");
 	}
 	return err;
 }
 
-static int cmd_add_header_app_param(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_add_header_app_param(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	size_t len;
 	int err;
@@ -1150,19 +1152,19 @@ static int cmd_add_header_app_param(const struct shell *sh, size_t argc, char *a
 	bool last = false;
 
 	if (tlv_count >= (uint8_t)ARRAY_SIZE(tlvs)) {
-		shell_warn(sh, "No space of TLV array, add app_param and clear tlvs");
+		bt_shell_session_warn(sh, "No space of TLV array, add app_param and clear tlvs");
 		goto add_header;
 	}
 
 	len = hex2bin(argv[1], strlen(argv[1]), &tag, sizeof(tag));
 	if (len < 1) {
-		shell_error(sh, "Length should not be zero");
+		bt_shell_session_error(sh, "Length should not be zero");
 		return -ENOEXEC;
 	}
 
 	len = hex2bin(argv[2], strlen(argv[2]), &tlv_buffers[tlv_count][0], TLV_BUFFER_SIZE);
 	if (len > UINT16_MAX) {
-		shell_error(sh, "Length exceeds max length (%x > %x)", len, UINT16_MAX);
+		bt_shell_session_error(sh, "Length exceeds max length (%x > %x)", len, UINT16_MAX);
 		return -ENOEXEC;
 	}
 
@@ -1183,13 +1185,13 @@ static int cmd_add_header_app_param(const struct shell *sh, size_t argc, char *a
 add_header:
 	err = bt_obex_add_header_app_param(bip_app.tx_buf, (size_t)tlv_count, tlvs);
 	if (err != 0) {
-		shell_error(sh, "Fail to add header app_param");
+		bt_shell_session_error(sh, "Fail to add header app_param");
 	}
 	tlv_count = 0;
 	return err;
 }
 
-static int cmd_add_header_auth_challenge(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_add_header_auth_challenge(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	size_t len;
 	int err;
@@ -1197,19 +1199,19 @@ static int cmd_add_header_auth_challenge(const struct shell *sh, size_t argc, ch
 	bool last = false;
 
 	if (tlv_count >= (uint8_t)ARRAY_SIZE(tlvs)) {
-		shell_warn(sh, "No space of TLV array, add auth_challenge and clear tlvs");
+		bt_shell_session_warn(sh, "No space of TLV array, add auth_challenge and clear tlvs");
 		goto add_header;
 	}
 
 	len = hex2bin(argv[1], strlen(argv[1]), &tag, sizeof(tag));
 	if (len < 1) {
-		shell_error(sh, "Length should not be zero");
+		bt_shell_session_error(sh, "Length should not be zero");
 		return -ENOEXEC;
 	}
 
 	len = hex2bin(argv[2], strlen(argv[2]), &tlv_buffers[tlv_count][0], TLV_BUFFER_SIZE);
 	if (len > UINT16_MAX) {
-		shell_error(sh, "Length exceeds max length (%x > %x)", len, UINT16_MAX);
+		bt_shell_session_error(sh, "Length exceeds max length (%x > %x)", len, UINT16_MAX);
 		return -ENOEXEC;
 	}
 
@@ -1230,13 +1232,13 @@ static int cmd_add_header_auth_challenge(const struct shell *sh, size_t argc, ch
 add_header:
 	err = bt_obex_add_header_auth_challenge(bip_app.tx_buf, (size_t)tlv_count, tlvs);
 	if (err != 0) {
-		shell_error(sh, "Fail to add header auth_challenge");
+		bt_shell_session_error(sh, "Fail to add header auth_challenge");
 	}
 	tlv_count = 0;
 	return err;
 }
 
-static int cmd_add_header_auth_rsp(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_add_header_auth_rsp(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	size_t len;
 	int err;
@@ -1244,19 +1246,19 @@ static int cmd_add_header_auth_rsp(const struct shell *sh, size_t argc, char *ar
 	bool last = false;
 
 	if (tlv_count >= (uint8_t)ARRAY_SIZE(tlvs)) {
-		shell_warn(sh, "No space of TLV array, add auth_rsp and clear tlvs");
+		bt_shell_session_warn(sh, "No space of TLV array, add auth_rsp and clear tlvs");
 		goto add_header;
 	}
 
 	len = hex2bin(argv[1], strlen(argv[1]), &tag, sizeof(tag));
 	if (len < 1) {
-		shell_error(sh, "Length should not be zero");
+		bt_shell_session_error(sh, "Length should not be zero");
 		return -ENOEXEC;
 	}
 
 	len = hex2bin(argv[2], strlen(argv[2]), &tlv_buffers[tlv_count][0], TLV_BUFFER_SIZE);
 	if (len > UINT16_MAX) {
-		shell_error(sh, "Length exceeds max length (%x > %x)", len, UINT16_MAX);
+		bt_shell_session_error(sh, "Length exceeds max length (%x > %x)", len, UINT16_MAX);
 		return -ENOEXEC;
 	}
 
@@ -1277,13 +1279,13 @@ static int cmd_add_header_auth_rsp(const struct shell *sh, size_t argc, char *ar
 add_header:
 	err = bt_obex_add_header_auth_rsp(bip_app.tx_buf, (size_t)tlv_count, tlvs);
 	if (err != 0) {
-		shell_error(sh, "Fail to add header auth_rsp");
+		bt_shell_session_error(sh, "Fail to add header auth_rsp");
 	}
 	tlv_count = 0;
 	return err;
 }
 
-static int cmd_add_header_creator_id(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_add_header_creator_id(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint32_t creator_id;
 	int err;
@@ -1292,12 +1294,12 @@ static int cmd_add_header_creator_id(const struct shell *sh, size_t argc, char *
 
 	err = bt_obex_add_header_creator_id(bip_app.tx_buf, creator_id);
 	if (err != 0) {
-		shell_error(sh, "Fail to add header creator_id");
+		bt_shell_session_error(sh, "Fail to add header creator_id");
 	}
 	return err;
 }
 
-static int cmd_add_header_wan_uuid(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_add_header_wan_uuid(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	size_t len;
 	int err;
@@ -1306,18 +1308,18 @@ static int cmd_add_header_wan_uuid(const struct shell *sh, size_t argc, char *ar
 
 	len = hex2bin(hex_payload, hex_payload_size, add_head_buffer, sizeof(add_head_buffer));
 	if (len > UINT16_MAX) {
-		shell_error(sh, "Length exceeds max length (%x > %x)", len, UINT16_MAX);
+		bt_shell_session_error(sh, "Length exceeds max length (%x > %x)", len, UINT16_MAX);
 		return -ENOEXEC;
 	}
 
 	err = bt_obex_add_header_wan_uuid(bip_app.tx_buf, (uint16_t)len, add_head_buffer);
 	if (err != 0) {
-		shell_error(sh, "Fail to add header wan_uuid");
+		bt_shell_session_error(sh, "Fail to add header wan_uuid");
 	}
 	return err;
 }
 
-static int cmd_add_header_obj_class(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_add_header_obj_class(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	size_t len;
 	int err;
@@ -1326,18 +1328,18 @@ static int cmd_add_header_obj_class(const struct shell *sh, size_t argc, char *a
 
 	len = hex2bin(hex_payload, hex_payload_size, add_head_buffer, sizeof(add_head_buffer));
 	if (len > UINT16_MAX) {
-		shell_error(sh, "Length exceeds max length (%x > %x)", len, UINT16_MAX);
+		bt_shell_session_error(sh, "Length exceeds max length (%x > %x)", len, UINT16_MAX);
 		return -ENOEXEC;
 	}
 
 	err = bt_obex_add_header_obj_class(bip_app.tx_buf, (uint16_t)len, add_head_buffer);
 	if (err != 0) {
-		shell_error(sh, "Fail to add header obj_class");
+		bt_shell_session_error(sh, "Fail to add header obj_class");
 	}
 	return err;
 }
 
-static int cmd_add_header_session_param(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_add_header_session_param(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	size_t len;
 	int err;
@@ -1346,18 +1348,18 @@ static int cmd_add_header_session_param(const struct shell *sh, size_t argc, cha
 
 	len = hex2bin(hex_payload, hex_payload_size, add_head_buffer, sizeof(add_head_buffer));
 	if (len > UINT16_MAX) {
-		shell_error(sh, "Length exceeds max length (%x > %x)", len, UINT16_MAX);
+		bt_shell_session_error(sh, "Length exceeds max length (%x > %x)", len, UINT16_MAX);
 		return -ENOEXEC;
 	}
 
 	err = bt_obex_add_header_session_param(bip_app.tx_buf, (uint16_t)len, add_head_buffer);
 	if (err != 0) {
-		shell_error(sh, "Fail to add header session_param");
+		bt_shell_session_error(sh, "Fail to add header session_param");
 	}
 	return err;
 }
 
-static int cmd_add_header_session_seq_number(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_add_header_session_seq_number(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint32_t session_seq_number;
 	int err;
@@ -1366,12 +1368,12 @@ static int cmd_add_header_session_seq_number(const struct shell *sh, size_t argc
 
 	err = bt_obex_add_header_session_seq_number(bip_app.tx_buf, session_seq_number);
 	if (err != 0) {
-		shell_error(sh, "Fail to add header session_seq_number");
+		bt_shell_session_error(sh, "Fail to add header session_seq_number");
 	}
 	return err;
 }
 
-static int cmd_add_header_action_id(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_add_header_action_id(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint32_t action_id;
 	int err;
@@ -1380,12 +1382,12 @@ static int cmd_add_header_action_id(const struct shell *sh, size_t argc, char *a
 
 	err = bt_obex_add_header_action_id(bip_app.tx_buf, (uint8_t)action_id);
 	if (err != 0) {
-		shell_error(sh, "Fail to add header action_id");
+		bt_shell_session_error(sh, "Fail to add header action_id");
 	}
 	return err;
 }
 
-static int cmd_add_header_dest_name(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_add_header_dest_name(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	size_t len;
 	int err;
@@ -1394,18 +1396,18 @@ static int cmd_add_header_dest_name(const struct shell *sh, size_t argc, char *a
 
 	len = hex2bin(hex_payload, hex_payload_size, add_head_buffer, sizeof(add_head_buffer));
 	if (len > UINT16_MAX) {
-		shell_error(sh, "Length exceeds max length (%x > %x)", len, UINT16_MAX);
+		bt_shell_session_error(sh, "Length exceeds max length (%x > %x)", len, UINT16_MAX);
 		return -ENOEXEC;
 	}
 
 	err = bt_obex_add_header_dest_name(bip_app.tx_buf, (uint16_t)len, add_head_buffer);
 	if (err != 0) {
-		shell_error(sh, "Fail to add header dest_name");
+		bt_shell_session_error(sh, "Fail to add header dest_name");
 	}
 	return err;
 }
 
-static int cmd_add_header_perm(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_add_header_perm(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint32_t perm;
 	int err;
@@ -1414,12 +1416,12 @@ static int cmd_add_header_perm(const struct shell *sh, size_t argc, char *argv[]
 
 	err = bt_obex_add_header_perm(bip_app.tx_buf, perm);
 	if (err != 0) {
-		shell_error(sh, "Fail to add header perm");
+		bt_shell_session_error(sh, "Fail to add header perm");
 	}
 	return err;
 }
 
-static int cmd_add_header_srm(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_add_header_srm(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint32_t srm;
 	int err;
@@ -1427,18 +1429,18 @@ static int cmd_add_header_srm(const struct shell *sh, size_t argc, char *argv[])
 	srm = strtoul(argv[1], NULL, 16);
 
 	if (srm > UINT8_MAX) {
-		shell_error(sh, "Value exceeds max value (%x > %x)", srm, UINT8_MAX);
+		bt_shell_session_error(sh, "Value exceeds max value (%x > %x)", srm, UINT8_MAX);
 		return -ENOEXEC;
 	}
 
 	err = bt_obex_add_header_srm(bip_app.tx_buf, (uint8_t)srm);
 	if (err != 0) {
-		shell_error(sh, "Fail to add header srm");
+		bt_shell_session_error(sh, "Fail to add header srm");
 	}
 	return err;
 }
 
-static int cmd_add_header_srm_param(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_add_header_srm_param(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint32_t srm_param;
 	int err;
@@ -1446,35 +1448,35 @@ static int cmd_add_header_srm_param(const struct shell *sh, size_t argc, char *a
 	srm_param = strtoul(argv[1], NULL, 16);
 
 	if (srm_param > UINT8_MAX) {
-		shell_error(sh, "Value exceeds max value (%x > %x)", srm_param, UINT8_MAX);
+		bt_shell_session_error(sh, "Value exceeds max value (%x > %x)", srm_param, UINT8_MAX);
 		return -ENOEXEC;
 	}
 
 	err = bt_obex_add_header_srm_param(bip_app.tx_buf, (uint8_t)srm_param);
 	if (err != 0) {
-		shell_error(sh, "Fail to add header srm_param");
+		bt_shell_session_error(sh, "Fail to add header srm_param");
 	}
 	return err;
 }
 
-static int cmd_bip_client_set_feats_funcs(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_bip_client_set_feats_funcs(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 
 	err = bt_bip_set_supported_features(&bip_app.bip, bip_supported_features);
 	if (err != 0) {
-		shell_error(sh, "Failed to set BIP supported features");
+		bt_shell_session_error(sh, "Failed to set BIP supported features");
 	}
 
 	err = bt_bip_set_supported_functions(&bip_app.bip, bip_supported_functions);
 	if (err != 0) {
-		shell_error(sh, "Failed to set BIP supported functions");
+		bt_shell_session_error(sh, "Failed to set BIP supported functions");
 	}
 
 	return 0;
 }
 
-static int cmd_bip_client_conn(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_bip_client_conn(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 	uint8_t uuid128[BT_UUID_SIZE_128];
@@ -1484,19 +1486,19 @@ static int cmd_bip_client_conn(const struct shell *sh, size_t argc, char *argv[]
 	static struct bt_uuid_128 uuid;
 
 	if (default_conn == NULL) {
-		shell_error(sh, "Not connected");
+		bt_shell_session_error(sh, "Not connected");
 		return -ENOEXEC;
 	}
 
 	if (bip_app.conn == NULL) {
-		shell_error(sh, "No bip transport connection");
+		bt_shell_session_error(sh, "No bip transport connection");
 		return -ENOEXEC;
 	}
 
 	err = 0;
-	type = shell_strtoul(argv[1], 0, &err);
+	type = bt_shell_strtoul(argv[1], 0, &err);
 	if (err != 0) {
-		shell_error(sh, "Invalid type %s", argv[1]);
+		bt_shell_session_error(sh, "Invalid type %s", argv[1]);
 		return -ENOEXEC;
 	}
 
@@ -1510,70 +1512,70 @@ static int cmd_bip_client_conn(const struct shell *sh, size_t argc, char *argv[]
 	err = bt_bip_primary_client_connect(&bip_app.bip, &bip_app.client, type, &bip_client_cb,
 					    bip_app.tx_buf);
 	if (err != 0) {
-		shell_error(sh, "Fail to send conn req %d", err);
+		bt_shell_session_error(sh, "Fail to send conn req %d", err);
 	} else {
 		bip_app.tx_buf = NULL;
 	}
 	return err;
 }
 
-static int cmd_bip_client_disconn(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_bip_client_disconn(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 
 	if (default_conn == NULL) {
-		shell_error(sh, "Not connected");
+		bt_shell_session_error(sh, "Not connected");
 		return -ENOEXEC;
 	}
 
 	if (bip_app.conn == NULL) {
-		shell_error(sh, "No bip transport connection");
+		bt_shell_session_error(sh, "No bip transport connection");
 		return -ENOEXEC;
 	}
 
 	err = bt_bip_disconnect(&bip_app.client, bip_app.tx_buf);
 	if (err != 0) {
-		shell_error(sh, "Fail to send disconn req %d", err);
+		bt_shell_session_error(sh, "Fail to send disconn req %d", err);
 	} else {
 		bip_app.tx_buf = NULL;
 	}
 	return err;
 }
 
-static int cmd_bip_client_abort(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_bip_client_abort(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 
 	if (default_conn == NULL) {
-		shell_error(sh, "Not connected");
+		bt_shell_session_error(sh, "Not connected");
 		return -ENOEXEC;
 	}
 
 	if (bip_app.conn == NULL) {
-		shell_error(sh, "No bip transport connection");
+		bt_shell_session_error(sh, "No bip transport connection");
 		return -ENOEXEC;
 	}
 
 	err = bt_bip_abort(&bip_app.client, bip_app.tx_buf);
 	if (err != 0) {
-		shell_error(sh, "Fail to send abort req %d", err);
+		bt_shell_session_error(sh, "Fail to send abort req %d", err);
 	} else {
 		bip_app.tx_buf = NULL;
 	}
 	return err;
 }
 
-static int cmd_bip_client_get_caps(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_bip_client_get_caps(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err = 0;
 
 	if (default_conn == NULL) {
-		shell_error(sh, "Not connected");
+		bt_shell_session_error(sh, "Not connected");
 		return -ENOEXEC;
 	}
 
 	if (bip_app.conn == NULL) {
-		shell_error(sh, "No bip transport connection");
+		bt_shell_session_error(sh, "No bip transport connection");
 		return -ENOEXEC;
 	}
 
@@ -1584,7 +1586,7 @@ static int cmd_bip_client_get_caps(const struct shell *sh, size_t argc, char *ar
 	}
 
 	if (bip_app.tx_buf == NULL) {
-		shell_error(sh, "Fail to allocate tx buffer");
+		bt_shell_session_error(sh, "Fail to allocate tx buffer");
 		return -ENOBUFS;
 	}
 
@@ -1594,21 +1596,21 @@ static int cmd_bip_client_get_caps(const struct shell *sh, size_t argc, char *ar
 
 	err = bt_obex_add_header_conn_id(bip_app.tx_buf, bip_app.conn_id);
 	if (err != 0) {
-		shell_error(sh, "Fail to add conn id header %d", err);
+		bt_shell_session_error(sh, "Fail to add conn id header %d", err);
 		return err;
 	}
 
 	err = bt_obex_add_header_type(bip_app.tx_buf, sizeof(BT_BIP_HDR_TYPE_GET_CAPS),
 				      BT_BIP_HDR_TYPE_GET_CAPS);
 	if (err != 0) {
-		shell_error(sh, "Fail to add type header %d", err);
+		bt_shell_session_error(sh, "Fail to add type header %d", err);
 		return err;
 	}
 
 continue_req:
 	err = bt_bip_get_capabilities(&bip_app.client, true, bip_app.tx_buf);
 	if (err != 0) {
-		shell_error(sh, "Fail to send get caps req %d", err);
+		bt_shell_session_error(sh, "Fail to send get caps req %d", err);
 	} else {
 		bip_app.tx_buf = NULL;
 	}
@@ -1620,7 +1622,7 @@ continue_req:
 	"<filtering-parameters created=\"20000101T000000Z-20000101T235959Z\" />"                   \
 	"</image-handles-descriptor>"
 
-static int cmd_bip_client_get_image_list(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_bip_client_get_image_list(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err = 0;
 	uint16_t returned_handles = sys_cpu_to_be16(1);
@@ -1636,12 +1638,12 @@ static int cmd_bip_client_get_image_list(const struct shell *sh, size_t argc, ch
 	};
 
 	if (default_conn == NULL) {
-		shell_error(sh, "Not connected");
+		bt_shell_session_error(sh, "Not connected");
 		return -ENOEXEC;
 	}
 
 	if (bip_app.conn == NULL) {
-		shell_error(sh, "No bip transport connection");
+		bt_shell_session_error(sh, "No bip transport connection");
 		return -ENOEXEC;
 	}
 
@@ -1652,7 +1654,7 @@ static int cmd_bip_client_get_image_list(const struct shell *sh, size_t argc, ch
 	}
 
 	if (bip_app.tx_buf == NULL) {
-		shell_error(sh, "Fail to allocate tx buffer");
+		bt_shell_session_error(sh, "Fail to allocate tx buffer");
 		return -ENOBUFS;
 	}
 
@@ -1662,34 +1664,34 @@ static int cmd_bip_client_get_image_list(const struct shell *sh, size_t argc, ch
 
 	err = bt_obex_add_header_conn_id(bip_app.tx_buf, bip_app.conn_id);
 	if (err != 0) {
-		shell_error(sh, "Fail to add conn id header %d", err);
+		bt_shell_session_error(sh, "Fail to add conn id header %d", err);
 		return err;
 	}
 
 	err = bt_obex_add_header_type(bip_app.tx_buf, sizeof(BT_BIP_HDR_TYPE_GET_IMAGE_LIST),
 				      BT_BIP_HDR_TYPE_GET_IMAGE_LIST);
 	if (err != 0) {
-		shell_error(sh, "Fail to add type header %d", err);
+		bt_shell_session_error(sh, "Fail to add type header %d", err);
 		return err;
 	}
 
 	err = bt_obex_add_header_app_param(bip_app.tx_buf, ARRAY_SIZE(appl_params), appl_params);
 	if (err != 0) {
-		shell_error(sh, "Fail to add appl param header %d", err);
+		bt_shell_session_error(sh, "Fail to add appl param header %d", err);
 		return err;
 	}
 
 	err = bt_bip_add_header_image_desc(bip_app.tx_buf, sizeof(IMAGE_HANDLES_DESC),
 					   IMAGE_HANDLES_DESC);
 	if (err != 0) {
-		shell_error(sh, "Fail to add image desc header %d", err);
+		bt_shell_session_error(sh, "Fail to add image desc header %d", err);
 		return err;
 	}
 
 continue_req:
 	err = bt_bip_get_image_list(&bip_app.client, true, bip_app.tx_buf);
 	if (err != 0) {
-		shell_error(sh, "Fail to send get image list req %d", err);
+		bt_shell_session_error(sh, "Fail to send get image list req %d", err);
 	} else {
 		bip_app.tx_buf = NULL;
 	}
@@ -1698,17 +1700,17 @@ continue_req:
 
 #define IMAGE_HANDLE "\x00\x31\x00\x30\x00\x30\x00\x30\x00\x30\x00\x30\x00\x31\x00\x00"
 
-static int cmd_bip_client_get_image_properties(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_bip_client_get_image_properties(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err = 0;
 
 	if (default_conn == NULL) {
-		shell_error(sh, "Not connected");
+		bt_shell_session_error(sh, "Not connected");
 		return -ENOEXEC;
 	}
 
 	if (bip_app.conn == NULL) {
-		shell_error(sh, "No bip transport connection");
+		bt_shell_session_error(sh, "No bip transport connection");
 		return -ENOEXEC;
 	}
 
@@ -1719,7 +1721,7 @@ static int cmd_bip_client_get_image_properties(const struct shell *sh, size_t ar
 	}
 
 	if (bip_app.tx_buf == NULL) {
-		shell_error(sh, "Fail to allocate tx buffer");
+		bt_shell_session_error(sh, "Fail to allocate tx buffer");
 		return -ENOBUFS;
 	}
 
@@ -1729,28 +1731,28 @@ static int cmd_bip_client_get_image_properties(const struct shell *sh, size_t ar
 
 	err = bt_obex_add_header_conn_id(bip_app.tx_buf, bip_app.conn_id);
 	if (err != 0) {
-		shell_error(sh, "Fail to add conn id header %d", err);
+		bt_shell_session_error(sh, "Fail to add conn id header %d", err);
 		return err;
 	}
 
 	err = bt_obex_add_header_type(bip_app.tx_buf, sizeof(BT_BIP_HDR_TYPE_GET_IMAGE_PROPERTIES),
 				      BT_BIP_HDR_TYPE_GET_IMAGE_PROPERTIES);
 	if (err != 0) {
-		shell_error(sh, "Fail to add type header %d", err);
+		bt_shell_session_error(sh, "Fail to add type header %d", err);
 		return err;
 	}
 
 	err = bt_bip_add_header_image_handle(bip_app.tx_buf, sizeof(IMAGE_HANDLE) - 1,
 					     IMAGE_HANDLE);
 	if (err != 0) {
-		shell_error(sh, "Fail to add image handle header %d", err);
+		bt_shell_session_error(sh, "Fail to add image handle header %d", err);
 		return err;
 	}
 
 continue_req:
 	err = bt_bip_get_image_properties(&bip_app.client, true, bip_app.tx_buf);
 	if (err != 0) {
-		shell_error(sh, "Fail to send get_image_properties req %d", err);
+		bt_shell_session_error(sh, "Fail to send get_image_properties req %d", err);
 	} else {
 		bip_app.tx_buf = NULL;
 	}
@@ -1762,17 +1764,17 @@ continue_req:
 	"<image encoding=\"JPEG\" pixel=\"640*480\" size=\"100000\"/>"                             \
 	"</image-descriptor>"
 
-static int cmd_bip_client_get_image(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_bip_client_get_image(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err = 0;
 
 	if (default_conn == NULL) {
-		shell_error(sh, "Not connected");
+		bt_shell_session_error(sh, "Not connected");
 		return -ENOEXEC;
 	}
 
 	if (bip_app.conn == NULL) {
-		shell_error(sh, "No bip transport connection");
+		bt_shell_session_error(sh, "No bip transport connection");
 		return -ENOEXEC;
 	}
 
@@ -1783,7 +1785,7 @@ static int cmd_bip_client_get_image(const struct shell *sh, size_t argc, char *a
 	}
 
 	if (bip_app.tx_buf == NULL) {
-		shell_error(sh, "Fail to allocate tx buffer");
+		bt_shell_session_error(sh, "Fail to allocate tx buffer");
 		return -ENOBUFS;
 	}
 
@@ -1793,51 +1795,51 @@ static int cmd_bip_client_get_image(const struct shell *sh, size_t argc, char *a
 
 	err = bt_obex_add_header_conn_id(bip_app.tx_buf, bip_app.conn_id);
 	if (err != 0) {
-		shell_error(sh, "Fail to add conn id header %d", err);
+		bt_shell_session_error(sh, "Fail to add conn id header %d", err);
 		return err;
 	}
 
 	err = bt_obex_add_header_type(bip_app.tx_buf, sizeof(BT_BIP_HDR_TYPE_GET_IMAGE),
 				      BT_BIP_HDR_TYPE_GET_IMAGE);
 	if (err != 0) {
-		shell_error(sh, "Fail to add type header %d", err);
+		bt_shell_session_error(sh, "Fail to add type header %d", err);
 		return err;
 	}
 
 	err = bt_bip_add_header_image_handle(bip_app.tx_buf, sizeof(IMAGE_HANDLE) - 1,
 					     IMAGE_HANDLE);
 	if (err != 0) {
-		shell_error(sh, "Fail to add image handle header %d", err);
+		bt_shell_session_error(sh, "Fail to add image handle header %d", err);
 		return err;
 	}
 
 	err = bt_bip_add_header_image_desc(bip_app.tx_buf, sizeof(IMAGE_DESC), IMAGE_DESC);
 	if (err != 0) {
-		shell_error(sh, "Fail to add image descriptor header %d", err);
+		bt_shell_session_error(sh, "Fail to add image descriptor header %d", err);
 		return err;
 	}
 
 continue_req:
 	err = bt_bip_get_image(&bip_app.client, true, bip_app.tx_buf);
 	if (err != 0) {
-		shell_error(sh, "Fail to send get_image req %d", err);
+		bt_shell_session_error(sh, "Fail to send get_image req %d", err);
 	} else {
 		bip_app.tx_buf = NULL;
 	}
 	return err;
 }
 
-static int cmd_bip_client_get_linked_thumbnail(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_bip_client_get_linked_thumbnail(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err = 0;
 
 	if (default_conn == NULL) {
-		shell_error(sh, "Not connected");
+		bt_shell_session_error(sh, "Not connected");
 		return -ENOEXEC;
 	}
 
 	if (bip_app.conn == NULL) {
-		shell_error(sh, "No bip transport connection");
+		bt_shell_session_error(sh, "No bip transport connection");
 		return -ENOEXEC;
 	}
 
@@ -1848,7 +1850,7 @@ static int cmd_bip_client_get_linked_thumbnail(const struct shell *sh, size_t ar
 	}
 
 	if (bip_app.tx_buf == NULL) {
-		shell_error(sh, "Fail to allocate tx buffer");
+		bt_shell_session_error(sh, "Fail to allocate tx buffer");
 		return -ENOBUFS;
 	}
 
@@ -1858,28 +1860,28 @@ static int cmd_bip_client_get_linked_thumbnail(const struct shell *sh, size_t ar
 
 	err = bt_obex_add_header_conn_id(bip_app.tx_buf, bip_app.conn_id);
 	if (err != 0) {
-		shell_error(sh, "Fail to add conn id header %d", err);
+		bt_shell_session_error(sh, "Fail to add conn id header %d", err);
 		return err;
 	}
 
 	err = bt_obex_add_header_type(bip_app.tx_buf, sizeof(BT_BIP_HDR_TYPE_GET_LINKED_THUMBNAIL),
 				      BT_BIP_HDR_TYPE_GET_LINKED_THUMBNAIL);
 	if (err != 0) {
-		shell_error(sh, "Fail to add type header %d", err);
+		bt_shell_session_error(sh, "Fail to add type header %d", err);
 		return err;
 	}
 
 	err = bt_bip_add_header_image_handle(bip_app.tx_buf, sizeof(IMAGE_HANDLE) - 1,
 					     IMAGE_HANDLE);
 	if (err != 0) {
-		shell_error(sh, "Fail to add image handle header %d", err);
+		bt_shell_session_error(sh, "Fail to add image handle header %d", err);
 		return err;
 	}
 
 continue_req:
 	err = bt_bip_get_linked_thumbnail(&bip_app.client, true, bip_app.tx_buf);
 	if (err != 0) {
-		shell_error(sh, "Fail to send get_linked_thumbnail req %d", err);
+		bt_shell_session_error(sh, "Fail to send get_linked_thumbnail req %d", err);
 	} else {
 		bip_app.tx_buf = NULL;
 	}
@@ -1888,17 +1890,17 @@ continue_req:
 
 #define IMAGE_ATTCHMENT_FILE_NAME "\x00\x31\x00\x30\x00\x30\x00\x30\x00\x30\x00\x30\x00\x31\x00\x00"
 
-static int cmd_bip_client_get_linked_attachment(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_bip_client_get_linked_attachment(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err = 0;
 
 	if (default_conn == NULL) {
-		shell_error(sh, "Not connected");
+		bt_shell_session_error(sh, "Not connected");
 		return -ENOEXEC;
 	}
 
 	if (bip_app.conn == NULL) {
-		shell_error(sh, "No bip transport connection");
+		bt_shell_session_error(sh, "No bip transport connection");
 		return -ENOEXEC;
 	}
 
@@ -1909,7 +1911,7 @@ static int cmd_bip_client_get_linked_attachment(const struct shell *sh, size_t a
 	}
 
 	if (bip_app.tx_buf == NULL) {
-		shell_error(sh, "Fail to allocate tx buffer");
+		bt_shell_session_error(sh, "Fail to allocate tx buffer");
 		return -ENOBUFS;
 	}
 
@@ -1919,35 +1921,35 @@ static int cmd_bip_client_get_linked_attachment(const struct shell *sh, size_t a
 
 	err = bt_obex_add_header_conn_id(bip_app.tx_buf, bip_app.conn_id);
 	if (err != 0) {
-		shell_error(sh, "Fail to add conn id header %d", err);
+		bt_shell_session_error(sh, "Fail to add conn id header %d", err);
 		return err;
 	}
 
 	err = bt_obex_add_header_type(bip_app.tx_buf, sizeof(BT_BIP_HDR_TYPE_GET_LINKED_ATTACHMENT),
 				      BT_BIP_HDR_TYPE_GET_LINKED_ATTACHMENT);
 	if (err != 0) {
-		shell_error(sh, "Fail to add type header %d", err);
+		bt_shell_session_error(sh, "Fail to add type header %d", err);
 		return err;
 	}
 
 	err = bt_bip_add_header_image_handle(bip_app.tx_buf, sizeof(IMAGE_HANDLE) - 1,
 					     IMAGE_HANDLE);
 	if (err != 0) {
-		shell_error(sh, "Fail to add image handle header %d", err);
+		bt_shell_session_error(sh, "Fail to add image handle header %d", err);
 		return err;
 	}
 
 	err = bt_obex_add_header_name(bip_app.tx_buf, sizeof(IMAGE_ATTCHMENT_FILE_NAME) - 1,
 				      IMAGE_ATTCHMENT_FILE_NAME);
 	if (err != 0) {
-		shell_error(sh, "Fail to add image name header %d", err);
+		bt_shell_session_error(sh, "Fail to add image name header %d", err);
 		return err;
 	}
 
 continue_req:
 	err = bt_bip_get_linked_attachment(&bip_app.client, true, bip_app.tx_buf);
 	if (err != 0) {
-		shell_error(sh, "Fail to send get_linked_attachment req %d", err);
+		bt_shell_session_error(sh, "Fail to send get_linked_attachment req %d", err);
 	} else {
 		bip_app.tx_buf = NULL;
 	}
@@ -1956,7 +1958,7 @@ continue_req:
 
 #define IMAGE_PARTIAL_FILE_NAME "\x00\x31\x00\x30\x00\x30\x00\x30\x00\x30\x00\x30\x00\x31\x00\x00"
 
-static int cmd_bip_client_get_partial_image(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_bip_client_get_partial_image(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err = 0;
 	uint32_t partial_file_len = 0xffffffff;
@@ -1969,12 +1971,12 @@ static int cmd_bip_client_get_partial_image(const struct shell *sh, size_t argc,
 	};
 
 	if (default_conn == NULL) {
-		shell_error(sh, "Not connected");
+		bt_shell_session_error(sh, "Not connected");
 		return -ENOEXEC;
 	}
 
 	if (bip_app.conn == NULL) {
-		shell_error(sh, "No bip transport connection");
+		bt_shell_session_error(sh, "No bip transport connection");
 		return -ENOEXEC;
 	}
 
@@ -1985,33 +1987,33 @@ static int cmd_bip_client_get_partial_image(const struct shell *sh, size_t argc,
 	}
 
 	if (bip_app.tx_buf == NULL) {
-		shell_error(sh, "Fail to allocate tx buffer");
+		bt_shell_session_error(sh, "Fail to allocate tx buffer");
 		return -ENOBUFS;
 	}
 
 	err = bt_obex_add_header_conn_id(bip_app.tx_buf, bip_app.conn_id);
 	if (err != 0) {
-		shell_error(sh, "Fail to add conn id header %d", err);
+		bt_shell_session_error(sh, "Fail to add conn id header %d", err);
 		return err;
 	}
 
 	err = bt_obex_add_header_type(bip_app.tx_buf, sizeof(BT_BIP_HDR_TYPE_GET_PARTIAL_IMAGE),
 				      BT_BIP_HDR_TYPE_GET_PARTIAL_IMAGE);
 	if (err != 0) {
-		shell_error(sh, "Fail to add type header %d", err);
+		bt_shell_session_error(sh, "Fail to add type header %d", err);
 		return err;
 	}
 
 	err = bt_obex_add_header_name(bip_app.tx_buf, sizeof(IMAGE_PARTIAL_FILE_NAME) - 1,
 				      IMAGE_PARTIAL_FILE_NAME);
 	if (err != 0) {
-		shell_error(sh, "Fail to add image name header %d", err);
+		bt_shell_session_error(sh, "Fail to add image name header %d", err);
 		return err;
 	}
 
 	err = bt_obex_add_header_app_param(bip_app.tx_buf, ARRAY_SIZE(appl_params), appl_params);
 	if (err != 0) {
-		shell_error(sh, "Fail to add app param header %d", err);
+		bt_shell_session_error(sh, "Fail to add app param header %d", err);
 		return err;
 	}
 
@@ -2022,14 +2024,14 @@ static int cmd_bip_client_get_partial_image(const struct shell *sh, size_t argc,
 continue_req:
 	err = bt_bip_get_partial_image(&bip_app.client, true, bip_app.tx_buf);
 	if (err != 0) {
-		shell_error(sh, "Fail to send get_partial_image req %d", err);
+		bt_shell_session_error(sh, "Fail to send get_partial_image req %d", err);
 	} else {
 		bip_app.tx_buf = NULL;
 	}
 	return err;
 }
 
-static int cmd_bip_client_get_monitoring_image(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_bip_client_get_monitoring_image(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err = 0;
 	uint8_t store_flag = 0;
@@ -2039,12 +2041,12 @@ static int cmd_bip_client_get_monitoring_image(const struct shell *sh, size_t ar
 	};
 
 	if (default_conn == NULL) {
-		shell_error(sh, "Not connected");
+		bt_shell_session_error(sh, "Not connected");
 		return -ENOEXEC;
 	}
 
 	if (bip_app.conn == NULL) {
-		shell_error(sh, "No bip transport connection");
+		bt_shell_session_error(sh, "No bip transport connection");
 		return -ENOEXEC;
 	}
 
@@ -2055,7 +2057,7 @@ static int cmd_bip_client_get_monitoring_image(const struct shell *sh, size_t ar
 	}
 
 	if (bip_app.tx_buf == NULL) {
-		shell_error(sh, "Fail to allocate tx buffer");
+		bt_shell_session_error(sh, "Fail to allocate tx buffer");
 		return -ENOBUFS;
 	}
 
@@ -2065,44 +2067,44 @@ static int cmd_bip_client_get_monitoring_image(const struct shell *sh, size_t ar
 
 	err = bt_obex_add_header_conn_id(bip_app.tx_buf, bip_app.conn_id);
 	if (err != 0) {
-		shell_error(sh, "Fail to add conn id header %d", err);
+		bt_shell_session_error(sh, "Fail to add conn id header %d", err);
 		return err;
 	}
 
 	err = bt_obex_add_header_type(bip_app.tx_buf, sizeof(BT_BIP_HDR_TYPE_GET_MONITORING_IMAGE),
 				      BT_BIP_HDR_TYPE_GET_MONITORING_IMAGE);
 	if (err != 0) {
-		shell_error(sh, "Fail to add type header %d", err);
+		bt_shell_session_error(sh, "Fail to add type header %d", err);
 		return err;
 	}
 
 	err = bt_obex_add_header_app_param(bip_app.tx_buf, ARRAY_SIZE(appl_params), appl_params);
 	if (err != 0) {
-		shell_error(sh, "Fail to add app param header %d", err);
+		bt_shell_session_error(sh, "Fail to add app param header %d", err);
 		return err;
 	}
 
 continue_req:
 	err = bt_bip_get_monitoring_image(&bip_app.client, true, bip_app.tx_buf);
 	if (err != 0) {
-		shell_error(sh, "Fail to send get_monitoring_image req %d", err);
+		bt_shell_session_error(sh, "Fail to send get_monitoring_image req %d", err);
 	} else {
 		bip_app.tx_buf = NULL;
 	}
 	return err;
 }
 
-static int cmd_bip_client_get_status(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_bip_client_get_status(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err = 0;
 
 	if (default_conn == NULL) {
-		shell_error(sh, "Not connected");
+		bt_shell_session_error(sh, "Not connected");
 		return -ENOEXEC;
 	}
 
 	if (bip_app.conn == NULL) {
-		shell_error(sh, "No bip transport connection");
+		bt_shell_session_error(sh, "No bip transport connection");
 		return -ENOEXEC;
 	}
 
@@ -2113,20 +2115,20 @@ static int cmd_bip_client_get_status(const struct shell *sh, size_t argc, char *
 	}
 
 	if (bip_app.tx_buf == NULL) {
-		shell_error(sh, "Fail to allocate tx buffer");
+		bt_shell_session_error(sh, "Fail to allocate tx buffer");
 		return -ENOBUFS;
 	}
 
 	err = bt_obex_add_header_conn_id(bip_app.tx_buf, bip_app.conn_id);
 	if (err != 0) {
-		shell_error(sh, "Fail to add conn id header %d", err);
+		bt_shell_session_error(sh, "Fail to add conn id header %d", err);
 		return err;
 	}
 
 	err = bt_obex_add_header_type(bip_app.tx_buf, sizeof(BT_BIP_HDR_TYPE_GET_STATUS),
 				      BT_BIP_HDR_TYPE_GET_STATUS);
 	if (err != 0) {
-		shell_error(sh, "Fail to add type header %d", err);
+		bt_shell_session_error(sh, "Fail to add type header %d", err);
 		return err;
 	}
 
@@ -2137,7 +2139,7 @@ static int cmd_bip_client_get_status(const struct shell *sh, size_t argc, char *
 continue_req:
 	err = bt_bip_get_status(&bip_app.client, true, bip_app.tx_buf);
 	if (err != 0) {
-		shell_error(sh, "Fail to send get_status req %d", err);
+		bt_shell_session_error(sh, "Fail to send get_status req %d", err);
 	} else {
 		bip_app.tx_buf = NULL;
 	}
@@ -2228,7 +2230,7 @@ static const uint8_t jpeg_1000001[] = {
 	0xFF, 0xD9
 };
 
-static int cmd_bip_client_put_image(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_bip_client_put_image(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err = 0;
 	uint16_t len = 0;
@@ -2236,12 +2238,12 @@ static int cmd_bip_client_put_image(const struct shell *sh, size_t argc, char *a
 	static uint16_t offset;
 
 	if (default_conn == NULL) {
-		shell_error(sh, "Not connected");
+		bt_shell_session_error(sh, "Not connected");
 		return -ENOEXEC;
 	}
 
 	if (bip_app.conn == NULL) {
-		shell_error(sh, "No bip transport connection");
+		bt_shell_session_error(sh, "No bip transport connection");
 		return -ENOEXEC;
 	}
 
@@ -2252,7 +2254,7 @@ static int cmd_bip_client_put_image(const struct shell *sh, size_t argc, char *a
 	}
 
 	if (bip_app.tx_buf == NULL) {
-		shell_error(sh, "Fail to allocate tx buffer");
+		bt_shell_session_error(sh, "Fail to allocate tx buffer");
 		return -ENOBUFS;
 	}
 
@@ -2267,27 +2269,27 @@ static int cmd_bip_client_put_image(const struct shell *sh, size_t argc, char *a
 	if (offset == 0) {
 		err = bt_obex_add_header_conn_id(bip_app.tx_buf, bip_app.conn_id);
 		if (err != 0) {
-			shell_error(sh, "Fail to add conn id header %d", err);
+			bt_shell_session_error(sh, "Fail to add conn id header %d", err);
 			return err;
 		}
 
 		err = bt_obex_add_header_type(bip_app.tx_buf, sizeof(BT_BIP_HDR_TYPE_PUT_IMAGE),
 					      BT_BIP_HDR_TYPE_PUT_IMAGE);
 		if (err != 0) {
-			shell_error(sh, "Fail to add type header %d", err);
+			bt_shell_session_error(sh, "Fail to add type header %d", err);
 			return err;
 		}
 
 		err = bt_obex_add_header_name(bip_app.tx_buf, sizeof(IMAGE_PUT_FILE_NAME) - 1,
 					      IMAGE_PUT_FILE_NAME);
 		if (err != 0) {
-			shell_error(sh, "Fail to add name header %d", err);
+			bt_shell_session_error(sh, "Fail to add name header %d", err);
 			return err;
 		}
 
 		err = bt_bip_add_header_image_desc(bip_app.tx_buf, sizeof(IMAGE_DESC), IMAGE_DESC);
 		if (err != 0) {
-			shell_error(sh, "Fail to add image desc header %d", err);
+			bt_shell_session_error(sh, "Fail to add image desc header %d", err);
 			return err;
 		}
 	}
@@ -2296,7 +2298,7 @@ static int cmd_bip_client_put_image(const struct shell *sh, size_t argc, char *a
 						  sizeof(jpeg_1000001) - offset,
 						  jpeg_1000001 + offset, &len);
 	if (err != 0) {
-		shell_error(sh, "Fail to add body");
+		bt_shell_session_error(sh, "Fail to add body");
 		return -ENOEXEC;
 	}
 
@@ -2307,7 +2309,7 @@ static int cmd_bip_client_put_image(const struct shell *sh, size_t argc, char *a
 continue_req:
 	err = bt_bip_put_image(&bip_app.client, client_put_image_final, bip_app.tx_buf);
 	if (err != 0) {
-		shell_error(sh, "Fail to send put_image req %d", err);
+		bt_shell_session_error(sh, "Fail to send put_image req %d", err);
 	} else {
 		bip_app.tx_buf = NULL;
 		if (!client_put_image_final) {
@@ -2319,7 +2321,7 @@ continue_req:
 	return err;
 }
 
-static int cmd_bip_client_put_linked_thumbnail(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_bip_client_put_linked_thumbnail(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err = 0;
 	uint16_t len = 0;
@@ -2327,12 +2329,12 @@ static int cmd_bip_client_put_linked_thumbnail(const struct shell *sh, size_t ar
 	static uint16_t offset;
 
 	if (default_conn == NULL) {
-		shell_error(sh, "Not connected");
+		bt_shell_session_error(sh, "Not connected");
 		return -ENOEXEC;
 	}
 
 	if (bip_app.conn == NULL) {
-		shell_error(sh, "No bip transport connection");
+		bt_shell_session_error(sh, "No bip transport connection");
 		return -ENOEXEC;
 	}
 
@@ -2343,7 +2345,7 @@ static int cmd_bip_client_put_linked_thumbnail(const struct shell *sh, size_t ar
 	}
 
 	if (bip_app.tx_buf == NULL) {
-		shell_error(sh, "Fail to allocate tx buffer");
+		bt_shell_session_error(sh, "Fail to allocate tx buffer");
 		return -ENOBUFS;
 	}
 
@@ -2358,7 +2360,7 @@ static int cmd_bip_client_put_linked_thumbnail(const struct shell *sh, size_t ar
 	if (offset == 0) {
 		err = bt_obex_add_header_conn_id(bip_app.tx_buf, bip_app.conn_id);
 		if (err != 0) {
-			shell_error(sh, "Fail to add conn id header %d", err);
+			bt_shell_session_error(sh, "Fail to add conn id header %d", err);
 			return err;
 		}
 
@@ -2366,14 +2368,14 @@ static int cmd_bip_client_put_linked_thumbnail(const struct shell *sh, size_t ar
 					      sizeof(BT_BIP_HDR_TYPE_PUT_LINKED_THUMBNAIL),
 					      BT_BIP_HDR_TYPE_PUT_LINKED_THUMBNAIL);
 		if (err != 0) {
-			shell_error(sh, "Fail to add type header %d", err);
+			bt_shell_session_error(sh, "Fail to add type header %d", err);
 			return err;
 		}
 
 		err = bt_bip_add_header_image_handle(bip_app.tx_buf, sizeof(IMAGE_HANDLE) - 1,
 						     IMAGE_HANDLE);
 		if (err != 0) {
-			shell_error(sh, "Fail to add image handle header %d", err);
+			bt_shell_session_error(sh, "Fail to add image handle header %d", err);
 			return err;
 		}
 	}
@@ -2382,7 +2384,7 @@ static int cmd_bip_client_put_linked_thumbnail(const struct shell *sh, size_t ar
 						  sizeof(jpeg_1000001) - offset,
 						  jpeg_1000001 + offset, &len);
 	if (err != 0) {
-		shell_error(sh, "Fail to add body");
+		bt_shell_session_error(sh, "Fail to add body");
 		return -ENOEXEC;
 	}
 
@@ -2394,7 +2396,7 @@ continue_req:
 	err = bt_bip_put_linked_thumbnail(&bip_app.client, client_put_linked_thumbnail_final,
 					  bip_app.tx_buf);
 	if (err != 0) {
-		shell_error(sh, "Fail to send put_linked_thumbnail req %d", err);
+		bt_shell_session_error(sh, "Fail to send put_linked_thumbnail req %d", err);
 	} else {
 		bip_app.tx_buf = NULL;
 		if (!client_put_linked_thumbnail_final) {
@@ -2406,7 +2408,7 @@ continue_req:
 	return err;
 }
 
-static int cmd_bip_client_put_linked_attachment(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_bip_client_put_linked_attachment(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err = 0;
 	uint16_t len = 0;
@@ -2414,12 +2416,12 @@ static int cmd_bip_client_put_linked_attachment(const struct shell *sh, size_t a
 	static uint16_t offset;
 
 	if (default_conn == NULL) {
-		shell_error(sh, "Not connected");
+		bt_shell_session_error(sh, "Not connected");
 		return -ENOEXEC;
 	}
 
 	if (bip_app.conn == NULL) {
-		shell_error(sh, "No bip transport connection");
+		bt_shell_session_error(sh, "No bip transport connection");
 		return -ENOEXEC;
 	}
 
@@ -2430,7 +2432,7 @@ static int cmd_bip_client_put_linked_attachment(const struct shell *sh, size_t a
 	}
 
 	if (bip_app.tx_buf == NULL) {
-		shell_error(sh, "Fail to allocate tx buffer");
+		bt_shell_session_error(sh, "Fail to allocate tx buffer");
 		return -ENOBUFS;
 	}
 
@@ -2445,7 +2447,7 @@ static int cmd_bip_client_put_linked_attachment(const struct shell *sh, size_t a
 	if (offset == 0) {
 		err = bt_obex_add_header_conn_id(bip_app.tx_buf, bip_app.conn_id);
 		if (err != 0) {
-			shell_error(sh, "Fail to add conn id header %d", err);
+			bt_shell_session_error(sh, "Fail to add conn id header %d", err);
 			return err;
 		}
 
@@ -2453,20 +2455,20 @@ static int cmd_bip_client_put_linked_attachment(const struct shell *sh, size_t a
 					      sizeof(BT_BIP_HDR_TYPE_PUT_LINKED_ATTACHMENT),
 					      BT_BIP_HDR_TYPE_PUT_LINKED_ATTACHMENT);
 		if (err != 0) {
-			shell_error(sh, "Fail to add type header %d", err);
+			bt_shell_session_error(sh, "Fail to add type header %d", err);
 			return err;
 		}
 
 		err = bt_bip_add_header_image_handle(bip_app.tx_buf, sizeof(IMAGE_HANDLE) - 1,
 						     IMAGE_HANDLE);
 		if (err != 0) {
-			shell_error(sh, "Fail to add image handle header %d", err);
+			bt_shell_session_error(sh, "Fail to add image handle header %d", err);
 			return err;
 		}
 
 		err = bt_bip_add_header_image_desc(bip_app.tx_buf, sizeof(IMAGE_DESC), IMAGE_DESC);
 		if (err != 0) {
-			shell_error(sh, "Fail to add image descriptor header %d", err);
+			bt_shell_session_error(sh, "Fail to add image descriptor header %d", err);
 			return err;
 		}
 	}
@@ -2475,7 +2477,7 @@ static int cmd_bip_client_put_linked_attachment(const struct shell *sh, size_t a
 						  sizeof(jpeg_1000001) - offset,
 						  jpeg_1000001 + offset, &len);
 	if (err != 0) {
-		shell_error(sh, "Fail to add body");
+		bt_shell_session_error(sh, "Fail to add body");
 		return -ENOEXEC;
 	}
 
@@ -2487,7 +2489,7 @@ continue_req:
 	err = bt_bip_put_linked_attachment(&bip_app.client, client_put_linked_attachment_final,
 					   bip_app.tx_buf);
 	if (err != 0) {
-		shell_error(sh, "Fail to send put_linked_attachment req %d", err);
+		bt_shell_session_error(sh, "Fail to send put_linked_attachment req %d", err);
 	} else {
 		bip_app.tx_buf = NULL;
 		if (!client_put_linked_attachment_final) {
@@ -2499,7 +2501,7 @@ continue_req:
 	return err;
 }
 
-static int cmd_bip_client_remote_display(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_bip_client_remote_display(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err = 0;
 	uint8_t remote_display_id = 0x04;
@@ -2510,12 +2512,12 @@ static int cmd_bip_client_remote_display(const struct shell *sh, size_t argc, ch
 	};
 
 	if (default_conn == NULL) {
-		shell_error(sh, "Not connected");
+		bt_shell_session_error(sh, "Not connected");
 		return -ENOEXEC;
 	}
 
 	if (bip_app.conn == NULL) {
-		shell_error(sh, "No bip transport connection");
+		bt_shell_session_error(sh, "No bip transport connection");
 		return -ENOEXEC;
 	}
 
@@ -2526,7 +2528,7 @@ static int cmd_bip_client_remote_display(const struct shell *sh, size_t argc, ch
 	}
 
 	if (bip_app.tx_buf == NULL) {
-		shell_error(sh, "Fail to allocate tx buffer");
+		bt_shell_session_error(sh, "Fail to allocate tx buffer");
 		return -ENOBUFS;
 	}
 
@@ -2536,51 +2538,51 @@ static int cmd_bip_client_remote_display(const struct shell *sh, size_t argc, ch
 
 	err = bt_obex_add_header_conn_id(bip_app.tx_buf, bip_app.conn_id);
 	if (err != 0) {
-		shell_error(sh, "Fail to add conn id header %d", err);
+		bt_shell_session_error(sh, "Fail to add conn id header %d", err);
 		return err;
 	}
 
 	err = bt_obex_add_header_type(bip_app.tx_buf, sizeof(BT_BIP_HDR_TYPE_REMOTE_DISPLAY),
 				      BT_BIP_HDR_TYPE_REMOTE_DISPLAY);
 	if (err != 0) {
-		shell_error(sh, "Fail to add type header %d", err);
+		bt_shell_session_error(sh, "Fail to add type header %d", err);
 		return err;
 	}
 
 	err = bt_bip_add_header_image_handle(bip_app.tx_buf, sizeof(IMAGE_HANDLE) - 1,
 					     IMAGE_HANDLE);
 	if (err != 0) {
-		shell_error(sh, "Fail to add image handle header %d", err);
+		bt_shell_session_error(sh, "Fail to add image handle header %d", err);
 		return err;
 	}
 
 	err = bt_obex_add_header_app_param(bip_app.tx_buf, ARRAY_SIZE(appl_params), appl_params);
 	if (err != 0) {
-		shell_error(sh, "Fail to add app param header %d", err);
+		bt_shell_session_error(sh, "Fail to add app param header %d", err);
 		return err;
 	}
 
 continue_req:
 	err = bt_bip_remote_display(&bip_app.client, true, bip_app.tx_buf);
 	if (err != 0) {
-		shell_error(sh, "Fail to send remote_display req %d", err);
+		bt_shell_session_error(sh, "Fail to send remote_display req %d", err);
 	} else {
 		bip_app.tx_buf = NULL;
 	}
 	return err;
 }
 
-static int cmd_bip_client_delete_image(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_bip_client_delete_image(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err = 0;
 
 	if (default_conn == NULL) {
-		shell_error(sh, "Not connected");
+		bt_shell_session_error(sh, "Not connected");
 		return -ENOEXEC;
 	}
 
 	if (bip_app.conn == NULL) {
-		shell_error(sh, "No bip transport connection");
+		bt_shell_session_error(sh, "No bip transport connection");
 		return -ENOEXEC;
 	}
 
@@ -2591,7 +2593,7 @@ static int cmd_bip_client_delete_image(const struct shell *sh, size_t argc, char
 	}
 
 	if (bip_app.tx_buf == NULL) {
-		shell_error(sh, "Fail to allocate tx buffer");
+		bt_shell_session_error(sh, "Fail to allocate tx buffer");
 		return -ENOBUFS;
 	}
 
@@ -2601,28 +2603,28 @@ static int cmd_bip_client_delete_image(const struct shell *sh, size_t argc, char
 
 	err = bt_obex_add_header_conn_id(bip_app.tx_buf, bip_app.conn_id);
 	if (err != 0) {
-		shell_error(sh, "Fail to add conn id header %d", err);
+		bt_shell_session_error(sh, "Fail to add conn id header %d", err);
 		return err;
 	}
 
 	err = bt_obex_add_header_type(bip_app.tx_buf, sizeof(BT_BIP_HDR_TYPE_DELETE_IMAGE),
 				      BT_BIP_HDR_TYPE_DELETE_IMAGE);
 	if (err != 0) {
-		shell_error(sh, "Fail to add type header %d", err);
+		bt_shell_session_error(sh, "Fail to add type header %d", err);
 		return err;
 	}
 
 	err = bt_bip_add_header_image_handle(bip_app.tx_buf, sizeof(IMAGE_HANDLE) - 1,
 					     IMAGE_HANDLE);
 	if (err != 0) {
-		shell_error(sh, "Fail to add image handle header %d", err);
+		bt_shell_session_error(sh, "Fail to add image handle header %d", err);
 		return err;
 	}
 
 continue_req:
 	err = bt_bip_delete_image(&bip_app.client, true, bip_app.tx_buf);
 	if (err != 0) {
-		shell_error(sh, "Fail to send delete_image req %d", err);
+		bt_shell_session_error(sh, "Fail to send delete_image req %d", err);
 	} else {
 		bip_app.tx_buf = NULL;
 	}
@@ -2674,7 +2676,7 @@ continue_req:
 	"IMG SRC = \"../DCIM/100ABCDE/ABCD0003.JPG\""                                              \
 	"IMG SRC = \"../DCIM/102_BLUE/BLUE0001.JPG\""
 
-static int cmd_bip_client_start_print(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_bip_client_start_print(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err = 0;
 	uint8_t uuid_128[] = {
@@ -2688,12 +2690,12 @@ static int cmd_bip_client_start_print(const struct shell *sh, size_t argc, char 
 	static uint16_t offset;
 
 	if (default_conn == NULL) {
-		shell_error(sh, "Not connected");
+		bt_shell_session_error(sh, "Not connected");
 		return -ENOEXEC;
 	}
 
 	if (bip_app.conn == NULL) {
-		shell_error(sh, "No bip transport connection");
+		bt_shell_session_error(sh, "No bip transport connection");
 		return -ENOEXEC;
 	}
 
@@ -2704,7 +2706,7 @@ static int cmd_bip_client_start_print(const struct shell *sh, size_t argc, char 
 	}
 
 	if (bip_app.tx_buf == NULL) {
-		shell_error(sh, "Fail to allocate tx buffer");
+		bt_shell_session_error(sh, "Fail to allocate tx buffer");
 		return -ENOBUFS;
 	}
 
@@ -2719,21 +2721,21 @@ static int cmd_bip_client_start_print(const struct shell *sh, size_t argc, char 
 	if (offset == 0) {
 		err = bt_obex_add_header_conn_id(bip_app.tx_buf, bip_app.conn_id);
 		if (err != 0) {
-			shell_error(sh, "Fail to add conn id header %d", err);
+			bt_shell_session_error(sh, "Fail to add conn id header %d", err);
 			return err;
 		}
 
 		err = bt_obex_add_header_type(bip_app.tx_buf, sizeof(BT_BIP_HDR_TYPE_START_PRINT),
 					      BT_BIP_HDR_TYPE_START_PRINT);
 		if (err != 0) {
-			shell_error(sh, "Fail to add type header %d", err);
+			bt_shell_session_error(sh, "Fail to add type header %d", err);
 			return err;
 		}
 
 		err = bt_obex_add_header_app_param(bip_app.tx_buf, ARRAY_SIZE(appl_params),
 						   appl_params);
 		if (err != 0) {
-			shell_error(sh, "Fail to add app param header %d", err);
+			bt_shell_session_error(sh, "Fail to add app param header %d", err);
 			return err;
 		}
 	}
@@ -2742,7 +2744,7 @@ static int cmd_bip_client_start_print(const struct shell *sh, size_t argc, char 
 						  sizeof(PRINT_CONTROL_OBJECT) - offset,
 						  print_control_obj + offset, &len);
 	if (err != 0) {
-		shell_error(sh, "Fail to add body");
+		bt_shell_session_error(sh, "Fail to add body");
 		return -ENOEXEC;
 	}
 
@@ -2753,7 +2755,7 @@ static int cmd_bip_client_start_print(const struct shell *sh, size_t argc, char 
 continue_req:
 	err = bt_bip_start_print(&bip_app.client, client_start_print_final, bip_app.tx_buf);
 	if (err != 0) {
-		shell_error(sh, "Fail to send start_print req %d", err);
+		bt_shell_session_error(sh, "Fail to send start_print req %d", err);
 	} else {
 		bip_app.tx_buf = NULL;
 		if (!client_start_print_final) {
@@ -2765,7 +2767,7 @@ continue_req:
 	return err;
 }
 
-static int cmd_bip_client_start_archive(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_bip_client_start_archive(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err = 0;
 	uint8_t uuid_128[] = {
@@ -2775,12 +2777,12 @@ static int cmd_bip_client_start_archive(const struct shell *sh, size_t argc, cha
 	};
 
 	if (default_conn == NULL) {
-		shell_error(sh, "Not connected");
+		bt_shell_session_error(sh, "Not connected");
 		return -ENOEXEC;
 	}
 
 	if (bip_app.conn == NULL) {
-		shell_error(sh, "No bip transport connection");
+		bt_shell_session_error(sh, "No bip transport connection");
 		return -ENOEXEC;
 	}
 
@@ -2791,7 +2793,7 @@ static int cmd_bip_client_start_archive(const struct shell *sh, size_t argc, cha
 	}
 
 	if (bip_app.tx_buf == NULL) {
-		shell_error(sh, "Fail to allocate tx buffer");
+		bt_shell_session_error(sh, "Fail to allocate tx buffer");
 		return -ENOBUFS;
 	}
 
@@ -2801,34 +2803,34 @@ static int cmd_bip_client_start_archive(const struct shell *sh, size_t argc, cha
 
 	err = bt_obex_add_header_conn_id(bip_app.tx_buf, bip_app.conn_id);
 	if (err != 0) {
-		shell_error(sh, "Fail to add conn id header %d", err);
+		bt_shell_session_error(sh, "Fail to add conn id header %d", err);
 		return err;
 	}
 
 	err = bt_obex_add_header_type(bip_app.tx_buf, sizeof(BT_BIP_HDR_TYPE_START_ARCHIVE),
 				      BT_BIP_HDR_TYPE_START_ARCHIVE);
 	if (err != 0) {
-		shell_error(sh, "Fail to add type header %d", err);
+		bt_shell_session_error(sh, "Fail to add type header %d", err);
 		return err;
 	}
 
 	err = bt_obex_add_header_app_param(bip_app.tx_buf, ARRAY_SIZE(appl_params), appl_params);
 	if (err != 0) {
-		shell_error(sh, "Fail to add app param header %d", err);
+		bt_shell_session_error(sh, "Fail to add app param header %d", err);
 		return err;
 	}
 
 continue_req:
 	err = bt_bip_start_archive(&bip_app.client, true, bip_app.tx_buf);
 	if (err != 0) {
-		shell_error(sh, "Fail to send start_archive req %d", err);
+		bt_shell_session_error(sh, "Fail to send start_archive req %d", err);
 	} else {
 		bip_app.tx_buf = NULL;
 	}
 	return err;
 }
 
-static int cmd_bip_server_reg(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_bip_server_reg(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 	uint8_t uuid128[BT_UUID_SIZE_128];
@@ -2838,9 +2840,9 @@ static int cmd_bip_server_reg(const struct shell *sh, size_t argc, char *argv[])
 	static struct bt_uuid_128 uuid;
 
 	err = 0;
-	type = shell_strtoul(argv[1], 0, &err);
+	type = bt_shell_strtoul(argv[1], 0, &err);
 	if (err != 0) {
-		shell_error(sh, "Invalid type %s", argv[1]);
+		bt_shell_session_error(sh, "Invalid type %s", argv[1]);
 		return -ENOEXEC;
 	}
 
@@ -2854,37 +2856,37 @@ static int cmd_bip_server_reg(const struct shell *sh, size_t argc, char *argv[])
 	err = bt_bip_primary_server_register(&bip_app.bip, &bip_app.server, type, u,
 					     &bip_server_cb);
 	if (err != 0) {
-		shell_error(sh, "Fail to register server %d", err);
+		bt_shell_session_error(sh, "Fail to register server %d", err);
 	}
 
 	return err;
 }
 
-static int cmd_bip_server_unreg(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_bip_server_unreg(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 
 	err = bt_bip_server_unregister(&bip_app.server);
 	if (err != 0) {
-		shell_error(sh, "Fail to unregister obex server %d", err);
+		bt_shell_session_error(sh, "Fail to unregister obex server %d", err);
 	}
 
 	return err;
 }
 
-static int cmd_bip_server_conn(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_bip_server_conn(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint8_t rsp_code;
 	const char *rsp;
 	int err;
 
 	if (default_conn == NULL) {
-		shell_error(sh, "Not connected");
+		bt_shell_session_error(sh, "Not connected");
 		return -ENOEXEC;
 	}
 
 	if (bip_app.conn == NULL) {
-		shell_error(sh, "No bip transport connection");
+		bt_shell_session_error(sh, "No bip transport connection");
 		return -ENOEXEC;
 	}
 
@@ -2895,38 +2897,38 @@ static int cmd_bip_server_conn(const struct shell *sh, size_t argc, char *argv[]
 		rsp_code = BT_OBEX_RSP_CODE_SUCCESS;
 	} else if (!strcmp(rsp, "error")) {
 		if (argc < 3) {
-			shell_error(sh, "[rsp_code] is needed if the rsp is %s", rsp);
-			shell_help(sh);
-			return SHELL_CMD_HELP_PRINTED;
+			bt_shell_session_error(sh, "[rsp_code] is needed if the rsp is %s", rsp);
+			bt_shell_help(sh);
+			return BT_SHELL_CMD_HELP_PRINTED;
 		}
 		rsp_code = (uint8_t)strtoul(argv[2], NULL, 16);
 	} else {
-		shell_help(sh);
-		return SHELL_CMD_HELP_PRINTED;
+		bt_shell_help(sh);
+		return BT_SHELL_CMD_HELP_PRINTED;
 	}
 
 	err = bt_bip_connect_rsp(&bip_app.server, rsp_code, bip_app.tx_buf);
 	if (err != 0) {
-		shell_error(sh, "Fail to send conn rsp %d", err);
+		bt_shell_session_error(sh, "Fail to send conn rsp %d", err);
 	} else {
 		bip_app.tx_buf = NULL;
 	}
 	return err;
 }
 
-static int cmd_bip_server_disconn(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_bip_server_disconn(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint8_t rsp_code;
 	const char *rsp;
 	int err;
 
 	if (default_conn == NULL) {
-		shell_error(sh, "Not connected");
+		bt_shell_session_error(sh, "Not connected");
 		return -ENOEXEC;
 	}
 
 	if (bip_app.conn == NULL) {
-		shell_error(sh, "No bip transport connection");
+		bt_shell_session_error(sh, "No bip transport connection");
 		return -ENOEXEC;
 	}
 
@@ -2937,38 +2939,38 @@ static int cmd_bip_server_disconn(const struct shell *sh, size_t argc, char *arg
 		rsp_code = BT_OBEX_RSP_CODE_SUCCESS;
 	} else if (!strcmp(rsp, "error")) {
 		if (argc < 3) {
-			shell_error(sh, "[rsp_code] is needed if the rsp is %s", rsp);
-			shell_help(sh);
-			return SHELL_CMD_HELP_PRINTED;
+			bt_shell_session_error(sh, "[rsp_code] is needed if the rsp is %s", rsp);
+			bt_shell_help(sh);
+			return BT_SHELL_CMD_HELP_PRINTED;
 		}
 		rsp_code = (uint8_t)strtoul(argv[2], NULL, 16);
 	} else {
-		shell_help(sh);
-		return SHELL_CMD_HELP_PRINTED;
+		bt_shell_help(sh);
+		return BT_SHELL_CMD_HELP_PRINTED;
 	}
 
 	err = bt_bip_disconnect_rsp(&bip_app.server, rsp_code, bip_app.tx_buf);
 	if (err != 0) {
-		shell_error(sh, "Fail to send disconn rsp %d", err);
+		bt_shell_session_error(sh, "Fail to send disconn rsp %d", err);
 	} else {
 		bip_app.tx_buf = NULL;
 	}
 	return err;
 }
 
-static int cmd_bip_server_abort(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_bip_server_abort(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint8_t rsp_code;
 	const char *rsp;
 	int err;
 
 	if (default_conn == NULL) {
-		shell_error(sh, "Not connected");
+		bt_shell_session_error(sh, "Not connected");
 		return -ENOEXEC;
 	}
 
 	if (bip_app.conn == NULL) {
-		shell_error(sh, "No bip transport connection");
+		bt_shell_session_error(sh, "No bip transport connection");
 		return -ENOEXEC;
 	}
 
@@ -2979,19 +2981,19 @@ static int cmd_bip_server_abort(const struct shell *sh, size_t argc, char *argv[
 		rsp_code = BT_OBEX_RSP_CODE_SUCCESS;
 	} else if (!strcmp(rsp, "error")) {
 		if (argc < 3) {
-			shell_error(sh, "[rsp_code] is needed if the rsp is %s", rsp);
-			shell_help(sh);
-			return SHELL_CMD_HELP_PRINTED;
+			bt_shell_session_error(sh, "[rsp_code] is needed if the rsp is %s", rsp);
+			bt_shell_help(sh);
+			return BT_SHELL_CMD_HELP_PRINTED;
 		}
 		rsp_code = (uint8_t)strtoul(argv[2], NULL, 16);
 	} else {
-		shell_help(sh);
-		return SHELL_CMD_HELP_PRINTED;
+		bt_shell_help(sh);
+		return BT_SHELL_CMD_HELP_PRINTED;
 	}
 
 	err = bt_bip_abort_rsp(&bip_app.server, rsp_code, bip_app.tx_buf);
 	if (err != 0) {
-		shell_error(sh, "Fail to send abort rsp %d", err);
+		bt_shell_session_error(sh, "Fail to send abort rsp %d", err);
 	} else {
 		bip_app.tx_buf = NULL;
 	}
@@ -3016,7 +3018,7 @@ static int cmd_bip_server_abort(const struct shell *sh, size_t argc, char *argv[
 	"    <dpof-options printing=\"yes\" paper-types=\"yes\"/>"                                 \
 	"</imaging-capabilities>"
 
-static int cmd_bip_server_get_caps(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_bip_server_get_caps(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint8_t rsp_code;
 	const char *rsp;
@@ -3027,21 +3029,21 @@ static int cmd_bip_server_get_caps(const struct shell *sh, size_t argc, char *ar
 	static uint16_t offset;
 
 	if (default_conn == NULL) {
-		shell_error(sh, "Not connected");
+		bt_shell_session_error(sh, "Not connected");
 		return -ENOEXEC;
 	}
 
 	if (bip_app.conn == NULL) {
-		shell_error(sh, "No bip transport connection");
+		bt_shell_session_error(sh, "No bip transport connection");
 		return -ENOEXEC;
 	}
 
 	rsp = argv[1];
 	if (!strcmp(rsp, "error")) {
 		if (argc < 3) {
-			shell_error(sh, "[rsp_code] is needed if the rsp is %s", rsp);
-			shell_help(sh);
-			return SHELL_CMD_HELP_PRINTED;
+			bt_shell_session_error(sh, "[rsp_code] is needed if the rsp is %s", rsp);
+			bt_shell_help(sh);
+			return BT_SHELL_CMD_HELP_PRINTED;
 		}
 		rsp_code = (uint8_t)strtoul(argv[2], NULL, 16);
 
@@ -3055,7 +3057,7 @@ static int cmd_bip_server_get_caps(const struct shell *sh, size_t argc, char *ar
 	}
 
 	if (bip_app.tx_buf == NULL) {
-		shell_error(sh, "Fail to allocate tx buffer");
+		bt_shell_session_error(sh, "Fail to allocate tx buffer");
 		return -ENOBUFS;
 	}
 
@@ -3063,7 +3065,7 @@ static int cmd_bip_server_get_caps(const struct shell *sh, size_t argc, char *ar
 						  sizeof(IMAGING_CAPS_BODY) - offset,
 						  caps_body + offset, &len);
 	if (err != 0) {
-		shell_error(sh, "Fail to add body");
+		bt_shell_session_error(sh, "Fail to add body");
 		return -ENOEXEC;
 	}
 
@@ -3076,7 +3078,7 @@ static int cmd_bip_server_get_caps(const struct shell *sh, size_t argc, char *ar
 error_rsp:
 	err = bt_bip_get_capabilities_rsp(&bip_app.server, rsp_code, bip_app.tx_buf);
 	if (err != 0) {
-		shell_error(sh, "Fail to send get_capabilities rsp %d", err);
+		bt_shell_session_error(sh, "Fail to send get_capabilities rsp %d", err);
 	} else {
 		bip_app.tx_buf = NULL;
 		if (rsp_code == BT_OBEX_RSP_CODE_CONTINUE) {
@@ -3095,7 +3097,7 @@ error_rsp:
 	"<image handle=\"1000004\" created=\"20000801T060137Z\" />"                                \
 	"</images-listing>"
 
-static int cmd_bip_server_get_image_list(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_bip_server_get_image_list(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint8_t rsp_code;
 	const char *rsp;
@@ -3106,21 +3108,21 @@ static int cmd_bip_server_get_image_list(const struct shell *sh, size_t argc, ch
 	static uint16_t offset;
 
 	if (default_conn == NULL) {
-		shell_error(sh, "Not connected");
+		bt_shell_session_error(sh, "Not connected");
 		return -ENOEXEC;
 	}
 
 	if (bip_app.conn == NULL) {
-		shell_error(sh, "No bip transport connection");
+		bt_shell_session_error(sh, "No bip transport connection");
 		return -ENOEXEC;
 	}
 
 	rsp = argv[1];
 	if (!strcmp(rsp, "error")) {
 		if (argc < 3) {
-			shell_error(sh, "[rsp_code] is needed if the rsp is %s", rsp);
-			shell_help(sh);
-			return SHELL_CMD_HELP_PRINTED;
+			bt_shell_session_error(sh, "[rsp_code] is needed if the rsp is %s", rsp);
+			bt_shell_help(sh);
+			return BT_SHELL_CMD_HELP_PRINTED;
 		}
 		rsp_code = (uint8_t)strtoul(argv[2], NULL, 16);
 
@@ -3134,7 +3136,7 @@ static int cmd_bip_server_get_image_list(const struct shell *sh, size_t argc, ch
 	}
 
 	if (bip_app.tx_buf == NULL) {
-		shell_error(sh, "Fail to allocate tx buffer");
+		bt_shell_session_error(sh, "Fail to allocate tx buffer");
 		return -ENOBUFS;
 	}
 
@@ -3148,14 +3150,14 @@ static int cmd_bip_server_get_image_list(const struct shell *sh, size_t argc, ch
 		err = bt_obex_add_header_app_param(bip_app.tx_buf, ARRAY_SIZE(appl_params),
 						   appl_params);
 		if (err != 0) {
-			shell_error(sh, "Fail to add appl param header %d", err);
+			bt_shell_session_error(sh, "Fail to add appl param header %d", err);
 			return err;
 		}
 
 		err = bt_bip_add_header_image_desc(bip_app.tx_buf, sizeof(IMAGE_HANDLES_DESC),
 						   IMAGE_HANDLES_DESC);
 		if (err != 0) {
-			shell_error(sh, "Fail to add image desc header %d", err);
+			bt_shell_session_error(sh, "Fail to add image desc header %d", err);
 			return err;
 		}
 	}
@@ -3164,7 +3166,7 @@ static int cmd_bip_server_get_image_list(const struct shell *sh, size_t argc, ch
 						  sizeof(IMAGE_LIST_BODY) - offset,
 						  image_list_body + offset, &len);
 	if (err != 0) {
-		shell_error(sh, "Fail to add body");
+		bt_shell_session_error(sh, "Fail to add body");
 		return -ENOEXEC;
 	}
 
@@ -3177,7 +3179,7 @@ static int cmd_bip_server_get_image_list(const struct shell *sh, size_t argc, ch
 error_rsp:
 	err = bt_bip_get_image_list_rsp(&bip_app.server, rsp_code, bip_app.tx_buf);
 	if (err != 0) {
-		shell_error(sh, "Fail to send get_image_list rsp %d", err);
+		bt_shell_session_error(sh, "Fail to send get_image_list rsp %d", err);
 	} else {
 		bip_app.tx_buf = NULL;
 		if (rsp_code == BT_OBEX_RSP_CODE_CONTINUE) {
@@ -3199,7 +3201,7 @@ error_rsp:
 	"<attachment content-type=\"audio/basic\" name=\"ABCD0001.wav\" size=\"102400\"/>"         \
 	"</image-properties>"
 
-static int cmd_bip_server_get_image_properties(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_bip_server_get_image_properties(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint8_t rsp_code;
 	const char *rsp;
@@ -3210,21 +3212,21 @@ static int cmd_bip_server_get_image_properties(const struct shell *sh, size_t ar
 	static uint16_t offset;
 
 	if (default_conn == NULL) {
-		shell_error(sh, "Not connected");
+		bt_shell_session_error(sh, "Not connected");
 		return -ENOEXEC;
 	}
 
 	if (bip_app.conn == NULL) {
-		shell_error(sh, "No bip transport connection");
+		bt_shell_session_error(sh, "No bip transport connection");
 		return -ENOEXEC;
 	}
 
 	rsp = argv[1];
 	if (!strcmp(rsp, "error")) {
 		if (argc < 3) {
-			shell_error(sh, "[rsp_code] is needed if the rsp is %s", rsp);
-			shell_help(sh);
-			return SHELL_CMD_HELP_PRINTED;
+			bt_shell_session_error(sh, "[rsp_code] is needed if the rsp is %s", rsp);
+			bt_shell_help(sh);
+			return BT_SHELL_CMD_HELP_PRINTED;
 		}
 		rsp_code = (uint8_t)strtoul(argv[2], NULL, 16);
 
@@ -3238,7 +3240,7 @@ static int cmd_bip_server_get_image_properties(const struct shell *sh, size_t ar
 	}
 
 	if (bip_app.tx_buf == NULL) {
-		shell_error(sh, "Fail to allocate tx buffer");
+		bt_shell_session_error(sh, "Fail to allocate tx buffer");
 		return -ENOBUFS;
 	}
 
@@ -3246,7 +3248,7 @@ static int cmd_bip_server_get_image_properties(const struct shell *sh, size_t ar
 						  sizeof(IMAGE_PROPERTIES_BODY) - offset,
 						  image_properties_body + offset, &len);
 	if (err != 0) {
-		shell_error(sh, "Fail to add body");
+		bt_shell_session_error(sh, "Fail to add body");
 		return -ENOEXEC;
 	}
 
@@ -3259,7 +3261,7 @@ static int cmd_bip_server_get_image_properties(const struct shell *sh, size_t ar
 error_rsp:
 	err = bt_bip_get_image_properties_rsp(&bip_app.server, rsp_code, bip_app.tx_buf);
 	if (err != 0) {
-		shell_error(sh, "Fail to send get_image_properties rsp %d", err);
+		bt_shell_session_error(sh, "Fail to send get_image_properties rsp %d", err);
 	} else {
 		bip_app.tx_buf = NULL;
 		if (rsp_code == BT_OBEX_RSP_CODE_CONTINUE) {
@@ -3271,7 +3273,7 @@ error_rsp:
 	return err;
 }
 
-static int cmd_bip_server_get_image(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_bip_server_get_image(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint8_t rsp_code;
 	const char *rsp;
@@ -3281,21 +3283,21 @@ static int cmd_bip_server_get_image(const struct shell *sh, size_t argc, char *a
 	static uint16_t offset;
 
 	if (default_conn == NULL) {
-		shell_error(sh, "Not connected");
+		bt_shell_session_error(sh, "Not connected");
 		return -ENOEXEC;
 	}
 
 	if (bip_app.conn == NULL) {
-		shell_error(sh, "No bip transport connection");
+		bt_shell_session_error(sh, "No bip transport connection");
 		return -ENOEXEC;
 	}
 
 	rsp = argv[1];
 	if (!strcmp(rsp, "error")) {
 		if (argc < 3) {
-			shell_error(sh, "[rsp_code] is needed if the rsp is %s", rsp);
-			shell_help(sh);
-			return SHELL_CMD_HELP_PRINTED;
+			bt_shell_session_error(sh, "[rsp_code] is needed if the rsp is %s", rsp);
+			bt_shell_help(sh);
+			return BT_SHELL_CMD_HELP_PRINTED;
 		}
 		rsp_code = (uint8_t)strtoul(argv[2], NULL, 16);
 
@@ -3309,14 +3311,14 @@ static int cmd_bip_server_get_image(const struct shell *sh, size_t argc, char *a
 	}
 
 	if (bip_app.tx_buf == NULL) {
-		shell_error(sh, "Fail to allocate tx buffer");
+		bt_shell_session_error(sh, "Fail to allocate tx buffer");
 		return -ENOBUFS;
 	}
 
 	if (offset == 0) {
 		err = bt_obex_add_header_len(bip_app.tx_buf, sizeof(jpeg_1000001));
 		if (err != 0) {
-			shell_error(sh, "Fail to add len header %d", err);
+			bt_shell_session_error(sh, "Fail to add len header %d", err);
 			return err;
 		}
 	}
@@ -3325,7 +3327,7 @@ static int cmd_bip_server_get_image(const struct shell *sh, size_t argc, char *a
 						  sizeof(jpeg_1000001) - offset,
 						  jpeg_1000001 + offset, &len);
 	if (err != 0) {
-		shell_error(sh, "Fail to add body");
+		bt_shell_session_error(sh, "Fail to add body");
 		return -ENOEXEC;
 	}
 
@@ -3338,7 +3340,7 @@ static int cmd_bip_server_get_image(const struct shell *sh, size_t argc, char *a
 error_rsp:
 	err = bt_bip_get_image_rsp(&bip_app.server, rsp_code, bip_app.tx_buf);
 	if (err != 0) {
-		shell_error(sh, "Fail to send get_image rsp %d", err);
+		bt_shell_session_error(sh, "Fail to send get_image rsp %d", err);
 	} else {
 		bip_app.tx_buf = NULL;
 		if (rsp_code == BT_OBEX_RSP_CODE_CONTINUE) {
@@ -3350,7 +3352,7 @@ error_rsp:
 	return err;
 }
 
-static int cmd_bip_server_get_linked_thumbnail(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_bip_server_get_linked_thumbnail(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint8_t rsp_code;
 	const char *rsp;
@@ -3360,21 +3362,21 @@ static int cmd_bip_server_get_linked_thumbnail(const struct shell *sh, size_t ar
 	static uint16_t offset;
 
 	if (default_conn == NULL) {
-		shell_error(sh, "Not connected");
+		bt_shell_session_error(sh, "Not connected");
 		return -ENOEXEC;
 	}
 
 	if (bip_app.conn == NULL) {
-		shell_error(sh, "No bip transport connection");
+		bt_shell_session_error(sh, "No bip transport connection");
 		return -ENOEXEC;
 	}
 
 	rsp = argv[1];
 	if (!strcmp(rsp, "error")) {
 		if (argc < 3) {
-			shell_error(sh, "[rsp_code] is needed if the rsp is %s", rsp);
-			shell_help(sh);
-			return SHELL_CMD_HELP_PRINTED;
+			bt_shell_session_error(sh, "[rsp_code] is needed if the rsp is %s", rsp);
+			bt_shell_help(sh);
+			return BT_SHELL_CMD_HELP_PRINTED;
 		}
 		rsp_code = (uint8_t)strtoul(argv[2], NULL, 16);
 
@@ -3388,7 +3390,7 @@ static int cmd_bip_server_get_linked_thumbnail(const struct shell *sh, size_t ar
 	}
 
 	if (bip_app.tx_buf == NULL) {
-		shell_error(sh, "Fail to allocate tx buffer");
+		bt_shell_session_error(sh, "Fail to allocate tx buffer");
 		return -ENOBUFS;
 	}
 
@@ -3396,7 +3398,7 @@ static int cmd_bip_server_get_linked_thumbnail(const struct shell *sh, size_t ar
 						  sizeof(jpeg_1000001) - offset,
 						  jpeg_1000001 + offset, &len);
 	if (err != 0) {
-		shell_error(sh, "Fail to add body");
+		bt_shell_session_error(sh, "Fail to add body");
 		return -ENOEXEC;
 	}
 
@@ -3409,7 +3411,7 @@ static int cmd_bip_server_get_linked_thumbnail(const struct shell *sh, size_t ar
 error_rsp:
 	err = bt_bip_get_linked_thumbnail_rsp(&bip_app.server, rsp_code, bip_app.tx_buf);
 	if (err != 0) {
-		shell_error(sh, "Fail to send get_linked_thumbnail rsp %d", err);
+		bt_shell_session_error(sh, "Fail to send get_linked_thumbnail rsp %d", err);
 	} else {
 		bip_app.tx_buf = NULL;
 		if (rsp_code == BT_OBEX_RSP_CODE_CONTINUE) {
@@ -3421,7 +3423,7 @@ error_rsp:
 	return err;
 }
 
-static int cmd_bip_server_get_linked_attachment(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_bip_server_get_linked_attachment(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint8_t rsp_code;
 	const char *rsp;
@@ -3431,21 +3433,21 @@ static int cmd_bip_server_get_linked_attachment(const struct shell *sh, size_t a
 	static uint16_t offset;
 
 	if (default_conn == NULL) {
-		shell_error(sh, "Not connected");
+		bt_shell_session_error(sh, "Not connected");
 		return -ENOEXEC;
 	}
 
 	if (bip_app.conn == NULL) {
-		shell_error(sh, "No bip transport connection");
+		bt_shell_session_error(sh, "No bip transport connection");
 		return -ENOEXEC;
 	}
 
 	rsp = argv[1];
 	if (!strcmp(rsp, "error")) {
 		if (argc < 3) {
-			shell_error(sh, "[rsp_code] is needed if the rsp is %s", rsp);
-			shell_help(sh);
-			return SHELL_CMD_HELP_PRINTED;
+			bt_shell_session_error(sh, "[rsp_code] is needed if the rsp is %s", rsp);
+			bt_shell_help(sh);
+			return BT_SHELL_CMD_HELP_PRINTED;
 		}
 		rsp_code = (uint8_t)strtoul(argv[2], NULL, 16);
 
@@ -3459,7 +3461,7 @@ static int cmd_bip_server_get_linked_attachment(const struct shell *sh, size_t a
 	}
 
 	if (bip_app.tx_buf == NULL) {
-		shell_error(sh, "Fail to allocate tx buffer");
+		bt_shell_session_error(sh, "Fail to allocate tx buffer");
 		return -ENOBUFS;
 	}
 
@@ -3467,7 +3469,7 @@ static int cmd_bip_server_get_linked_attachment(const struct shell *sh, size_t a
 						  sizeof(jpeg_1000001) - offset,
 						  jpeg_1000001 + offset, &len);
 	if (err != 0) {
-		shell_error(sh, "Fail to add body");
+		bt_shell_session_error(sh, "Fail to add body");
 		return -ENOEXEC;
 	}
 
@@ -3480,7 +3482,7 @@ static int cmd_bip_server_get_linked_attachment(const struct shell *sh, size_t a
 error_rsp:
 	err = bt_bip_get_linked_attachment_rsp(&bip_app.server, rsp_code, bip_app.tx_buf);
 	if (err != 0) {
-		shell_error(sh, "Fail to send get_linked_attachment rsp %d", err);
+		bt_shell_session_error(sh, "Fail to send get_linked_attachment rsp %d", err);
 	} else {
 		bip_app.tx_buf = NULL;
 		if (rsp_code == BT_OBEX_RSP_CODE_CONTINUE) {
@@ -3492,7 +3494,7 @@ error_rsp:
 	return err;
 }
 
-static int cmd_bip_server_get_partial_image(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_bip_server_get_partial_image(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint8_t rsp_code;
 	const char *rsp;
@@ -3502,21 +3504,21 @@ static int cmd_bip_server_get_partial_image(const struct shell *sh, size_t argc,
 	static uint16_t offset;
 
 	if (default_conn == NULL) {
-		shell_error(sh, "Not connected");
+		bt_shell_session_error(sh, "Not connected");
 		return -ENOEXEC;
 	}
 
 	if (bip_app.conn == NULL) {
-		shell_error(sh, "No bip transport connection");
+		bt_shell_session_error(sh, "No bip transport connection");
 		return -ENOEXEC;
 	}
 
 	rsp = argv[1];
 	if (!strcmp(rsp, "error")) {
 		if (argc < 3) {
-			shell_error(sh, "[rsp_code] is needed if the rsp is %s", rsp);
-			shell_help(sh);
-			return SHELL_CMD_HELP_PRINTED;
+			bt_shell_session_error(sh, "[rsp_code] is needed if the rsp is %s", rsp);
+			bt_shell_help(sh);
+			return BT_SHELL_CMD_HELP_PRINTED;
 		}
 		rsp_code = (uint8_t)strtoul(argv[2], NULL, 16);
 
@@ -3530,7 +3532,7 @@ static int cmd_bip_server_get_partial_image(const struct shell *sh, size_t argc,
 	}
 
 	if (bip_app.tx_buf == NULL) {
-		shell_error(sh, "Fail to allocate tx buffer");
+		bt_shell_session_error(sh, "Fail to allocate tx buffer");
 		return -ENOBUFS;
 	}
 
@@ -3546,14 +3548,14 @@ static int cmd_bip_server_get_partial_image(const struct shell *sh, size_t argc,
 
 		err = bt_obex_add_header_len(bip_app.tx_buf, sizeof(jpeg_1000001));
 		if (err != 0) {
-			shell_error(sh, "Fail to add appl param header %d", err);
+			bt_shell_session_error(sh, "Fail to add appl param header %d", err);
 			return err;
 		}
 
 		err = bt_obex_add_header_app_param(bip_app.tx_buf, ARRAY_SIZE(appl_params),
 						   appl_params);
 		if (err != 0) {
-			shell_error(sh, "Fail to add appl param header %d", err);
+			bt_shell_session_error(sh, "Fail to add appl param header %d", err);
 			return err;
 		}
 	}
@@ -3562,7 +3564,7 @@ static int cmd_bip_server_get_partial_image(const struct shell *sh, size_t argc,
 						  sizeof(jpeg_1000001) - offset,
 						  jpeg_1000001 + offset, &len);
 	if (err != 0) {
-		shell_error(sh, "Fail to add body");
+		bt_shell_session_error(sh, "Fail to add body");
 		return -ENOEXEC;
 	}
 
@@ -3575,7 +3577,7 @@ static int cmd_bip_server_get_partial_image(const struct shell *sh, size_t argc,
 error_rsp:
 	err = bt_bip_get_partial_image_rsp(&bip_app.server, rsp_code, bip_app.tx_buf);
 	if (err != 0) {
-		shell_error(sh, "Fail to send get_partial_image rsp %d", err);
+		bt_shell_session_error(sh, "Fail to send get_partial_image rsp %d", err);
 	} else {
 		bip_app.tx_buf = NULL;
 		if (rsp_code == BT_OBEX_RSP_CODE_CONTINUE) {
@@ -3587,7 +3589,7 @@ error_rsp:
 	return err;
 }
 
-static int cmd_bip_server_get_monitoring_image(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_bip_server_get_monitoring_image(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint8_t rsp_code;
 	const char *rsp;
@@ -3597,21 +3599,21 @@ static int cmd_bip_server_get_monitoring_image(const struct shell *sh, size_t ar
 	static uint16_t offset;
 
 	if (default_conn == NULL) {
-		shell_error(sh, "Not connected");
+		bt_shell_session_error(sh, "Not connected");
 		return -ENOEXEC;
 	}
 
 	if (bip_app.conn == NULL) {
-		shell_error(sh, "No bip transport connection");
+		bt_shell_session_error(sh, "No bip transport connection");
 		return -ENOEXEC;
 	}
 
 	rsp = argv[1];
 	if (!strcmp(rsp, "error")) {
 		if (argc < 3) {
-			shell_error(sh, "[rsp_code] is needed if the rsp is %s", rsp);
-			shell_help(sh);
-			return SHELL_CMD_HELP_PRINTED;
+			bt_shell_session_error(sh, "[rsp_code] is needed if the rsp is %s", rsp);
+			bt_shell_help(sh);
+			return BT_SHELL_CMD_HELP_PRINTED;
 		}
 		rsp_code = (uint8_t)strtoul(argv[2], NULL, 16);
 
@@ -3625,7 +3627,7 @@ static int cmd_bip_server_get_monitoring_image(const struct shell *sh, size_t ar
 	}
 
 	if (bip_app.tx_buf == NULL) {
-		shell_error(sh, "Fail to allocate tx buffer");
+		bt_shell_session_error(sh, "Fail to allocate tx buffer");
 		return -ENOBUFS;
 	}
 
@@ -3633,7 +3635,7 @@ static int cmd_bip_server_get_monitoring_image(const struct shell *sh, size_t ar
 		err = bt_bip_add_header_image_handle(bip_app.tx_buf, sizeof(IMAGE_HANDLE) - 1,
 						     IMAGE_HANDLE);
 		if (err != 0) {
-			shell_error(sh, "Fail to add image handle header %d", err);
+			bt_shell_session_error(sh, "Fail to add image handle header %d", err);
 			return err;
 		}
 	}
@@ -3642,7 +3644,7 @@ static int cmd_bip_server_get_monitoring_image(const struct shell *sh, size_t ar
 						  sizeof(jpeg_1000001) - offset,
 						  jpeg_1000001 + offset, &len);
 	if (err != 0) {
-		shell_error(sh, "Fail to add body");
+		bt_shell_session_error(sh, "Fail to add body");
 		return -ENOEXEC;
 	}
 
@@ -3655,7 +3657,7 @@ static int cmd_bip_server_get_monitoring_image(const struct shell *sh, size_t ar
 error_rsp:
 	err = bt_bip_get_monitoring_image_rsp(&bip_app.server, rsp_code, bip_app.tx_buf);
 	if (err != 0) {
-		shell_error(sh, "Fail to send get_monitoring_image rsp %d", err);
+		bt_shell_session_error(sh, "Fail to send get_monitoring_image rsp %d", err);
 	} else {
 		bip_app.tx_buf = NULL;
 		if (rsp_code == BT_OBEX_RSP_CODE_CONTINUE) {
@@ -3667,19 +3669,19 @@ error_rsp:
 	return err;
 }
 
-static int cmd_bip_server_get_status(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_bip_server_get_status(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint8_t rsp_code;
 	const char *rsp;
 	int err;
 
 	if (default_conn == NULL) {
-		shell_error(sh, "Not connected");
+		bt_shell_session_error(sh, "Not connected");
 		return -ENOEXEC;
 	}
 
 	if (bip_app.conn == NULL) {
-		shell_error(sh, "No bip transport connection");
+		bt_shell_session_error(sh, "No bip transport connection");
 		return -ENOEXEC;
 	}
 
@@ -3690,14 +3692,14 @@ static int cmd_bip_server_get_status(const struct shell *sh, size_t argc, char *
 		rsp_code = BT_OBEX_RSP_CODE_SUCCESS;
 	} else if (!strcmp(rsp, "error")) {
 		if (argc < 3) {
-			shell_error(sh, "[rsp_code] is needed if the rsp is %s", rsp);
-			shell_help(sh);
-			return SHELL_CMD_HELP_PRINTED;
+			bt_shell_session_error(sh, "[rsp_code] is needed if the rsp is %s", rsp);
+			bt_shell_help(sh);
+			return BT_SHELL_CMD_HELP_PRINTED;
 		}
 		rsp_code = (uint8_t)strtoul(argv[2], NULL, 16);
 	} else {
-		shell_help(sh);
-		return SHELL_CMD_HELP_PRINTED;
+		bt_shell_help(sh);
+		return BT_SHELL_CMD_HELP_PRINTED;
 	}
 
 	net_buf_drop(&bip_app.tx_buf);
@@ -3707,41 +3709,41 @@ static int cmd_bip_server_get_status(const struct shell *sh, size_t argc, char *
 	}
 
 	if (bip_app.tx_buf == NULL) {
-		shell_error(sh, "Fail to allocate tx buffer");
+		bt_shell_session_error(sh, "Fail to allocate tx buffer");
 		return -ENOBUFS;
 	}
 
 	err = bt_bip_get_status_rsp(&bip_app.server, rsp_code, bip_app.tx_buf);
 	if (err != 0) {
-		shell_error(sh, "Fail to send get_status rsp %d", err);
+		bt_shell_session_error(sh, "Fail to send get_status rsp %d", err);
 	} else {
 		bip_app.tx_buf = NULL;
 	}
 	return err;
 }
 
-static int cmd_bip_server_put_image(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_bip_server_put_image(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint8_t rsp_code;
 	const char *rsp;
 	int err;
 
 	if (default_conn == NULL) {
-		shell_error(sh, "Not connected");
+		bt_shell_session_error(sh, "Not connected");
 		return -ENOEXEC;
 	}
 
 	if (bip_app.conn == NULL) {
-		shell_error(sh, "No bip transport connection");
+		bt_shell_session_error(sh, "No bip transport connection");
 		return -ENOEXEC;
 	}
 
 	rsp = argv[1];
 	if (!strcmp(rsp, "error")) {
 		if (argc < 3) {
-			shell_error(sh, "[rsp_code] is needed if the rsp is %s", rsp);
-			shell_help(sh);
-			return SHELL_CMD_HELP_PRINTED;
+			bt_shell_session_error(sh, "[rsp_code] is needed if the rsp is %s", rsp);
+			bt_shell_help(sh);
+			return BT_SHELL_CMD_HELP_PRINTED;
 		}
 		rsp_code = (uint8_t)strtoul(argv[2], NULL, 16);
 
@@ -3755,7 +3757,7 @@ static int cmd_bip_server_put_image(const struct shell *sh, size_t argc, char *a
 	}
 
 	if (bip_app.tx_buf == NULL) {
-		shell_error(sh, "Fail to allocate tx buffer");
+		bt_shell_session_error(sh, "Fail to allocate tx buffer");
 		return -ENOBUFS;
 	}
 
@@ -3763,7 +3765,7 @@ static int cmd_bip_server_put_image(const struct shell *sh, size_t argc, char *a
 		err = bt_bip_add_header_image_handle(bip_app.tx_buf, sizeof(IMAGE_HANDLE) - 1,
 						     IMAGE_HANDLE);
 		if (err != 0) {
-			shell_error(sh, "Fail to add image handle header %d", err);
+			bt_shell_session_error(sh, "Fail to add image handle header %d", err);
 			return err;
 		}
 		rsp_code = BT_OBEX_RSP_CODE_SUCCESS;
@@ -3774,7 +3776,7 @@ static int cmd_bip_server_put_image(const struct shell *sh, size_t argc, char *a
 error_rsp:
 	err = bt_bip_put_image_rsp(&bip_app.server, rsp_code, bip_app.tx_buf);
 	if (err != 0) {
-		shell_error(sh, "Fail to send put_image rsp %d", err);
+		bt_shell_session_error(sh, "Fail to send put_image rsp %d", err);
 	} else {
 		bip_app.tx_buf = NULL;
 		server_put_image_final = false;
@@ -3782,28 +3784,28 @@ error_rsp:
 	return err;
 }
 
-static int cmd_bip_server_put_linked_thumbnail(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_bip_server_put_linked_thumbnail(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint8_t rsp_code;
 	const char *rsp;
 	int err;
 
 	if (default_conn == NULL) {
-		shell_error(sh, "Not connected");
+		bt_shell_session_error(sh, "Not connected");
 		return -ENOEXEC;
 	}
 
 	if (bip_app.conn == NULL) {
-		shell_error(sh, "No bip transport connection");
+		bt_shell_session_error(sh, "No bip transport connection");
 		return -ENOEXEC;
 	}
 
 	rsp = argv[1];
 	if (!strcmp(rsp, "error")) {
 		if (argc < 3) {
-			shell_error(sh, "[rsp_code] is needed if the rsp is %s", rsp);
-			shell_help(sh);
-			return SHELL_CMD_HELP_PRINTED;
+			bt_shell_session_error(sh, "[rsp_code] is needed if the rsp is %s", rsp);
+			bt_shell_help(sh);
+			return BT_SHELL_CMD_HELP_PRINTED;
 		}
 		rsp_code = (uint8_t)strtoul(argv[2], NULL, 16);
 
@@ -3817,7 +3819,7 @@ static int cmd_bip_server_put_linked_thumbnail(const struct shell *sh, size_t ar
 	}
 
 	if (bip_app.tx_buf == NULL) {
-		shell_error(sh, "Fail to allocate tx buffer");
+		bt_shell_session_error(sh, "Fail to allocate tx buffer");
 		return -ENOBUFS;
 	}
 
@@ -3830,7 +3832,7 @@ static int cmd_bip_server_put_linked_thumbnail(const struct shell *sh, size_t ar
 error_rsp:
 	err = bt_bip_put_linked_thumbnail_rsp(&bip_app.server, rsp_code, bip_app.tx_buf);
 	if (err != 0) {
-		shell_error(sh, "Fail to send put_linked_thumbnail rsp %d", err);
+		bt_shell_session_error(sh, "Fail to send put_linked_thumbnail rsp %d", err);
 	} else {
 		bip_app.tx_buf = NULL;
 		server_put_linked_thumbnail_final = false;
@@ -3838,28 +3840,28 @@ error_rsp:
 	return err;
 }
 
-static int cmd_bip_server_put_linked_attachment(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_bip_server_put_linked_attachment(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint8_t rsp_code;
 	const char *rsp;
 	int err;
 
 	if (default_conn == NULL) {
-		shell_error(sh, "Not connected");
+		bt_shell_session_error(sh, "Not connected");
 		return -ENOEXEC;
 	}
 
 	if (bip_app.conn == NULL) {
-		shell_error(sh, "No bip transport connection");
+		bt_shell_session_error(sh, "No bip transport connection");
 		return -ENOEXEC;
 	}
 
 	rsp = argv[1];
 	if (!strcmp(rsp, "error")) {
 		if (argc < 3) {
-			shell_error(sh, "[rsp_code] is needed if the rsp is %s", rsp);
-			shell_help(sh);
-			return SHELL_CMD_HELP_PRINTED;
+			bt_shell_session_error(sh, "[rsp_code] is needed if the rsp is %s", rsp);
+			bt_shell_help(sh);
+			return BT_SHELL_CMD_HELP_PRINTED;
 		}
 		rsp_code = (uint8_t)strtoul(argv[2], NULL, 16);
 
@@ -3873,7 +3875,7 @@ static int cmd_bip_server_put_linked_attachment(const struct shell *sh, size_t a
 	}
 
 	if (bip_app.tx_buf == NULL) {
-		shell_error(sh, "Fail to allocate tx buffer");
+		bt_shell_session_error(sh, "Fail to allocate tx buffer");
 		return -ENOBUFS;
 	}
 
@@ -3886,7 +3888,7 @@ static int cmd_bip_server_put_linked_attachment(const struct shell *sh, size_t a
 error_rsp:
 	err = bt_bip_put_linked_attachment_rsp(&bip_app.server, rsp_code, bip_app.tx_buf);
 	if (err != 0) {
-		shell_error(sh, "Fail to send put_linked_attachment rsp %d", err);
+		bt_shell_session_error(sh, "Fail to send put_linked_attachment rsp %d", err);
 	} else {
 		bip_app.tx_buf = NULL;
 		server_put_linked_attachment_final = false;
@@ -3894,28 +3896,28 @@ error_rsp:
 	return err;
 }
 
-static int cmd_bip_server_remote_display(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_bip_server_remote_display(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint8_t rsp_code;
 	const char *rsp;
 	int err;
 
 	if (default_conn == NULL) {
-		shell_error(sh, "Not connected");
+		bt_shell_session_error(sh, "Not connected");
 		return -ENOEXEC;
 	}
 
 	if (bip_app.conn == NULL) {
-		shell_error(sh, "No bip transport connection");
+		bt_shell_session_error(sh, "No bip transport connection");
 		return -ENOEXEC;
 	}
 
 	rsp = argv[1];
 	if (!strcmp(rsp, "error")) {
 		if (argc < 3) {
-			shell_error(sh, "[rsp_code] is needed if the rsp is %s", rsp);
-			shell_help(sh);
-			return SHELL_CMD_HELP_PRINTED;
+			bt_shell_session_error(sh, "[rsp_code] is needed if the rsp is %s", rsp);
+			bt_shell_help(sh);
+			return BT_SHELL_CMD_HELP_PRINTED;
 		}
 		rsp_code = (uint8_t)strtoul(argv[2], NULL, 16);
 
@@ -3929,7 +3931,7 @@ static int cmd_bip_server_remote_display(const struct shell *sh, size_t argc, ch
 	}
 
 	if (bip_app.tx_buf == NULL) {
-		shell_error(sh, "Fail to allocate tx buffer");
+		bt_shell_session_error(sh, "Fail to allocate tx buffer");
 		return -ENOBUFS;
 	}
 
@@ -3938,42 +3940,42 @@ static int cmd_bip_server_remote_display(const struct shell *sh, size_t argc, ch
 	err = bt_bip_add_header_image_handle(bip_app.tx_buf, sizeof(IMAGE_HANDLE) - 1,
 					     IMAGE_HANDLE);
 	if (err != 0) {
-		shell_error(sh, "Fail to add image handle header %d", err);
+		bt_shell_session_error(sh, "Fail to add image handle header %d", err);
 		return err;
 	}
 
 error_rsp:
 	err = bt_bip_remote_display_rsp(&bip_app.server, rsp_code, bip_app.tx_buf);
 	if (err != 0) {
-		shell_error(sh, "Fail to send remote_display rsp %d", err);
+		bt_shell_session_error(sh, "Fail to send remote_display rsp %d", err);
 	} else {
 		bip_app.tx_buf = NULL;
 	}
 	return err;
 }
 
-static int cmd_bip_server_delete_image(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_bip_server_delete_image(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint8_t rsp_code;
 	const char *rsp;
 	int err;
 
 	if (default_conn == NULL) {
-		shell_error(sh, "Not connected");
+		bt_shell_session_error(sh, "Not connected");
 		return -ENOEXEC;
 	}
 
 	if (bip_app.conn == NULL) {
-		shell_error(sh, "No bip transport connection");
+		bt_shell_session_error(sh, "No bip transport connection");
 		return -ENOEXEC;
 	}
 
 	rsp = argv[1];
 	if (!strcmp(rsp, "error")) {
 		if (argc < 3) {
-			shell_error(sh, "[rsp_code] is needed if the rsp is %s", rsp);
-			shell_help(sh);
-			return SHELL_CMD_HELP_PRINTED;
+			bt_shell_session_error(sh, "[rsp_code] is needed if the rsp is %s", rsp);
+			bt_shell_help(sh);
+			return BT_SHELL_CMD_HELP_PRINTED;
 		}
 		rsp_code = (uint8_t)strtoul(argv[2], NULL, 16);
 
@@ -3987,7 +3989,7 @@ static int cmd_bip_server_delete_image(const struct shell *sh, size_t argc, char
 	}
 
 	if (bip_app.tx_buf == NULL) {
-		shell_error(sh, "Fail to allocate tx buffer");
+		bt_shell_session_error(sh, "Fail to allocate tx buffer");
 		return -ENOBUFS;
 	}
 
@@ -3996,35 +3998,35 @@ static int cmd_bip_server_delete_image(const struct shell *sh, size_t argc, char
 error_rsp:
 	err = bt_bip_delete_image_rsp(&bip_app.server, rsp_code, bip_app.tx_buf);
 	if (err != 0) {
-		shell_error(sh, "Fail to send delete_image rsp %d", err);
+		bt_shell_session_error(sh, "Fail to send delete_image rsp %d", err);
 	} else {
 		bip_app.tx_buf = NULL;
 	}
 	return err;
 }
 
-static int cmd_bip_server_start_print(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_bip_server_start_print(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint8_t rsp_code;
 	const char *rsp;
 	int err;
 
 	if (default_conn == NULL) {
-		shell_error(sh, "Not connected");
+		bt_shell_session_error(sh, "Not connected");
 		return -ENOEXEC;
 	}
 
 	if (bip_app.conn == NULL) {
-		shell_error(sh, "No bip transport connection");
+		bt_shell_session_error(sh, "No bip transport connection");
 		return -ENOEXEC;
 	}
 
 	rsp = argv[1];
 	if (!strcmp(rsp, "error")) {
 		if (argc < 3) {
-			shell_error(sh, "[rsp_code] is needed if the rsp is %s", rsp);
-			shell_help(sh);
-			return SHELL_CMD_HELP_PRINTED;
+			bt_shell_session_error(sh, "[rsp_code] is needed if the rsp is %s", rsp);
+			bt_shell_help(sh);
+			return BT_SHELL_CMD_HELP_PRINTED;
 		}
 		rsp_code = (uint8_t)strtoul(argv[2], NULL, 16);
 
@@ -4038,7 +4040,7 @@ static int cmd_bip_server_start_print(const struct shell *sh, size_t argc, char 
 	}
 
 	if (bip_app.tx_buf == NULL) {
-		shell_error(sh, "Fail to allocate tx buffer");
+		bt_shell_session_error(sh, "Fail to allocate tx buffer");
 		return -ENOBUFS;
 	}
 
@@ -4050,7 +4052,7 @@ static int cmd_bip_server_start_print(const struct shell *sh, size_t argc, char 
 error_rsp:
 	err = bt_bip_start_print_rsp(&bip_app.server, rsp_code, bip_app.tx_buf);
 	if (err != 0) {
-		shell_error(sh, "Fail to send start_print rsp %d", err);
+		bt_shell_session_error(sh, "Fail to send start_print rsp %d", err);
 	} else {
 		bip_app.tx_buf = NULL;
 		server_start_print_final = false;
@@ -4058,28 +4060,28 @@ error_rsp:
 	return err;
 }
 
-static int cmd_bip_server_start_archive(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_bip_server_start_archive(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint8_t rsp_code;
 	const char *rsp;
 	int err;
 
 	if (default_conn == NULL) {
-		shell_error(sh, "Not connected");
+		bt_shell_session_error(sh, "Not connected");
 		return -ENOEXEC;
 	}
 
 	if (bip_app.conn == NULL) {
-		shell_error(sh, "No bip transport connection");
+		bt_shell_session_error(sh, "No bip transport connection");
 		return -ENOEXEC;
 	}
 
 	rsp = argv[1];
 	if (!strcmp(rsp, "error")) {
 		if (argc < 3) {
-			shell_error(sh, "[rsp_code] is needed if the rsp is %s", rsp);
-			shell_help(sh);
-			return SHELL_CMD_HELP_PRINTED;
+			bt_shell_session_error(sh, "[rsp_code] is needed if the rsp is %s", rsp);
+			bt_shell_help(sh);
+			return BT_SHELL_CMD_HELP_PRINTED;
 		}
 		rsp_code = (uint8_t)strtoul(argv[2], NULL, 16);
 
@@ -4093,7 +4095,7 @@ static int cmd_bip_server_start_archive(const struct shell *sh, size_t argc, cha
 	}
 
 	if (bip_app.tx_buf == NULL) {
-		shell_error(sh, "Fail to allocate tx buffer");
+		bt_shell_session_error(sh, "Fail to allocate tx buffer");
 		return -ENOBUFS;
 	}
 
@@ -4102,27 +4104,27 @@ static int cmd_bip_server_start_archive(const struct shell *sh, size_t argc, cha
 error_rsp:
 	err = bt_bip_start_archive_rsp(&bip_app.server, rsp_code, bip_app.tx_buf);
 	if (err != 0) {
-		shell_error(sh, "Fail to send start_archive rsp %d", err);
+		bt_shell_session_error(sh, "Fail to send start_archive rsp %d", err);
 	} else {
 		bip_app.tx_buf = NULL;
 	}
 	return err;
 }
 
-static int cmd_bip_sdp_reg(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_bip_sdp_reg(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 
 	static bool registered;
 
 	if (registered) {
-		shell_error(sh, "SDP record has been registered");
+		bt_shell_session_error(sh, "SDP record has been registered");
 		return -EINVAL;
 	}
 
 	err = bt_sdp_register_service(&bip_responder_rec);
 	if (err != 0) {
-		shell_error(sh, "Failed to register SDP record");
+		bt_shell_session_error(sh, "Failed to register SDP record");
 		return err;
 	}
 
@@ -4131,39 +4133,39 @@ static int cmd_bip_sdp_reg(const struct shell *sh, size_t argc, char *argv[])
 	return err;
 }
 
-static int cmd_sdp_set_caps(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_sdp_set_caps(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err = 0;
 
-	bip_supported_caps = shell_strtol(argv[1], 0, &err);
+	bip_supported_caps = bt_shell_strtol(argv[1], 0, &err);
 	if (err != 0) {
-		shell_error(sh, "Invalid capabilities %d", err);
+		bt_shell_session_error(sh, "Invalid capabilities %d", err);
 		return err;
 	}
 
 	return 0;
 }
 
-static int cmd_sdp_set_features(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_sdp_set_features(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err = 0;
 
-	bip_supported_features = shell_strtol(argv[1], 0, &err);
+	bip_supported_features = bt_shell_strtol(argv[1], 0, &err);
 	if (err != 0) {
-		shell_error(sh, "Invalid features %d", err);
+		bt_shell_session_error(sh, "Invalid features %d", err);
 		return err;
 	}
 
 	return 0;
 }
 
-static int cmd_sdp_set_functions(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_sdp_set_functions(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err = 0;
 
-	bip_supported_functions = shell_strtol(argv[1], 0, &err);
+	bip_supported_functions = bt_shell_strtol(argv[1], 0, &err);
 	if (err != 0) {
-		shell_error(sh, "Invalid functions %d", err);
+		bt_shell_session_error(sh, "Invalid functions %d", err);
 		return err;
 	}
 
@@ -4269,7 +4271,7 @@ static uint8_t bip_discover_func(struct bt_conn *conn, struct bt_sdp_client_resu
 	return BT_SDP_DISCOVER_UUID_CONTINUE;
 }
 
-static int cmd_sdp_discover(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_sdp_discover(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err = 0;
 
@@ -4277,7 +4279,7 @@ static int cmd_sdp_discover(const struct shell *sh, size_t argc, char *argv[])
 	static struct bt_uuid_16 uuid;
 
 	if (default_conn == NULL) {
-		shell_error(sh, "Not connected");
+		bt_shell_session_error(sh, "Not connected");
 		return -ENOEXEC;
 	}
 
@@ -4290,7 +4292,7 @@ static int cmd_sdp_discover(const struct shell *sh, size_t argc, char *argv[])
 
 	err = bt_sdp_discover(default_conn, &sdp_bip_params);
 	if (err != 0) {
-		shell_error(sh, "Failed to start SDP discovery %d", err);
+		bt_shell_session_error(sh, "Failed to start SDP discovery %d", err);
 		return err;
 	}
 
@@ -4299,165 +4301,165 @@ static int cmd_sdp_discover(const struct shell *sh, size_t argc, char *argv[])
 
 #define HELP_NONE ""
 
-SHELL_STATIC_SUBCMD_SET_CREATE(
+BT_SHELL_STATIC_SUBCMD_SET_CREATE(
 	obex_add_header_cmds,
-	SHELL_CMD_ARG(count, NULL, "<number of objects (used by Connect)>", cmd_add_header_count, 2,
+	BT_SHELL_CMD_ARG(count, NULL, "<number of objects (used by Connect)>", cmd_add_header_count, 2,
 		      0),
-	SHELL_CMD_ARG(name, NULL, "[name of the object (often a file name)]", cmd_add_header_name,
+	BT_SHELL_CMD_ARG(name, NULL, "[name of the object (often a file name)]", cmd_add_header_name,
 		      1, 1),
-	SHELL_CMD_ARG(type, NULL,
+	BT_SHELL_CMD_ARG(type, NULL,
 		      "<type of object - e.g. text, html, binary, manufacturer specific>",
 		      cmd_add_header_type, 2, 0),
-	SHELL_CMD_ARG(len, NULL, "<length of the object in bytes>", cmd_add_header_len, 2, 0),
-	SHELL_CMD_ARG(time_iso_8601, NULL, "<date/time stamp - ISO 8601 version - preferred>",
+	BT_SHELL_CMD_ARG(len, NULL, "<length of the object in bytes>", cmd_add_header_len, 2, 0),
+	BT_SHELL_CMD_ARG(time_iso_8601, NULL, "<date/time stamp - ISO 8601 version - preferred>",
 		      cmd_add_header_time_iso_8601, 2, 0),
-	SHELL_CMD_ARG(time, NULL, "<date/time stamp - 4 byte version (for compatibility only)>",
+	BT_SHELL_CMD_ARG(time, NULL, "<date/time stamp - 4 byte version (for compatibility only)>",
 		      cmd_add_header_time, 2, 0),
-	SHELL_CMD_ARG(description, NULL, "<text description of the object>",
+	BT_SHELL_CMD_ARG(description, NULL, "<text description of the object>",
 		      cmd_add_header_description, 2, 0),
-	SHELL_CMD_ARG(target, NULL, "<name of service that operation is targeted to>",
+	BT_SHELL_CMD_ARG(target, NULL, "<name of service that operation is targeted to>",
 		      cmd_add_header_target, 2, 0),
-	SHELL_CMD_ARG(http, NULL, "<an HTTP 1.x header>", cmd_add_header_http, 2, 0),
-	SHELL_CMD_ARG(body, NULL, "<a chunk of the object body>", cmd_add_header_body, 2, 0),
-	SHELL_CMD_ARG(end_body, NULL, "<the final chunk of the object body>",
+	BT_SHELL_CMD_ARG(http, NULL, "<an HTTP 1.x header>", cmd_add_header_http, 2, 0),
+	BT_SHELL_CMD_ARG(body, NULL, "<a chunk of the object body>", cmd_add_header_body, 2, 0),
+	BT_SHELL_CMD_ARG(end_body, NULL, "<the final chunk of the object body>",
 		      cmd_add_header_end_body, 2, 0),
-	SHELL_CMD_ARG(who, NULL,
+	BT_SHELL_CMD_ARG(who, NULL,
 		      "<identifies the BIP application, used to tell if talking to a peer>",
 		      cmd_add_header_who, 2, 0),
-	SHELL_CMD_ARG(conn_id, NULL, "<an identifier used for BIP connection multiplexing>",
+	BT_SHELL_CMD_ARG(conn_id, NULL, "<an identifier used for BIP connection multiplexing>",
 		      cmd_add_header_conn_id, 2, 0),
-	SHELL_CMD_ARG(app_param, NULL, "application parameter: <tag> <value> [last]",
+	BT_SHELL_CMD_ARG(app_param, NULL, "application parameter: <tag> <value> [last]",
 		      cmd_add_header_app_param, 3, 1),
-	SHELL_CMD_ARG(auth_challenge, NULL, "authentication digest-challenge: <tag> <value> [last]",
+	BT_SHELL_CMD_ARG(auth_challenge, NULL, "authentication digest-challenge: <tag> <value> [last]",
 		      cmd_add_header_auth_challenge, 3, 1),
-	SHELL_CMD_ARG(auth_rsp, NULL, "authentication digest-response: <tag> <value> [last]",
+	BT_SHELL_CMD_ARG(auth_rsp, NULL, "authentication digest-response: <tag> <value> [last]",
 		      cmd_add_header_auth_rsp, 3, 1),
-	SHELL_CMD_ARG(creator_id, NULL, "<indicates the creator of an object>",
+	BT_SHELL_CMD_ARG(creator_id, NULL, "<indicates the creator of an object>",
 		      cmd_add_header_creator_id, 2, 0),
-	SHELL_CMD_ARG(wan_uuid, NULL, "<uniquely identifies the network client (BIP server)>",
+	BT_SHELL_CMD_ARG(wan_uuid, NULL, "<uniquely identifies the network client (BIP server)>",
 		      cmd_add_header_wan_uuid, 2, 0),
-	SHELL_CMD_ARG(obj_class, NULL, "<BIP Object class of object>", cmd_add_header_obj_class, 2,
+	BT_SHELL_CMD_ARG(obj_class, NULL, "<BIP Object class of object>", cmd_add_header_obj_class, 2,
 		      0),
-	SHELL_CMD_ARG(session_param, NULL, "<parameters used in session commands/responses>",
+	BT_SHELL_CMD_ARG(session_param, NULL, "<parameters used in session commands/responses>",
 		      cmd_add_header_session_param, 2, 0),
-	SHELL_CMD_ARG(session_seq_number, NULL,
+	BT_SHELL_CMD_ARG(session_seq_number, NULL,
 		      "<sequence number used in each BIP packet for reliability>",
 		      cmd_add_header_session_seq_number, 2, 0),
-	SHELL_CMD_ARG(action_id, NULL,
+	BT_SHELL_CMD_ARG(action_id, NULL,
 		      "<specifies the action to be performed (used in ACTION operation)>",
 		      cmd_add_header_action_id, 2, 0),
-	SHELL_CMD_ARG(dest_name, NULL,
+	BT_SHELL_CMD_ARG(dest_name, NULL,
 		      "<the destination object name (used in certain ACTION operations)>",
 		      cmd_add_header_dest_name, 2, 0),
-	SHELL_CMD_ARG(perm, NULL, "<4-byte bit mask for setting permissions>", cmd_add_header_perm,
+	BT_SHELL_CMD_ARG(perm, NULL, "<4-byte bit mask for setting permissions>", cmd_add_header_perm,
 		      2, 0),
-	SHELL_CMD_ARG(srm, NULL, "<1-byte value to setup Single Response Mode (SRM)>",
+	BT_SHELL_CMD_ARG(srm, NULL, "<1-byte value to setup Single Response Mode (SRM)>",
 		      cmd_add_header_srm, 2, 0),
-	SHELL_CMD_ARG(srm_param, NULL, "<Single Response Mode (SRM) Parameter>",
+	BT_SHELL_CMD_ARG(srm_param, NULL, "<Single Response Mode (SRM) Parameter>",
 		      cmd_add_header_srm_param, 2, 0),
-	SHELL_SUBCMD_SET_END);
+	BT_SHELL_SUBCMD_SET_END);
 
-SHELL_STATIC_SUBCMD_SET_CREATE(
+BT_SHELL_STATIC_SUBCMD_SET_CREATE(
 	obex_client_cmds,
-	SHELL_CMD_ARG(set_feats_funcs, NULL, HELP_NONE, cmd_bip_client_set_feats_funcs, 1, 0),
-	SHELL_CMD_ARG(conn, NULL, "<type> [UUID 128]", cmd_bip_client_conn, 2, 1),
-	SHELL_CMD_ARG(disconn, NULL, HELP_NONE, cmd_bip_client_disconn, 1, 0),
-	SHELL_CMD_ARG(abort, NULL, HELP_NONE, cmd_bip_client_abort, 1, 0),
-	SHELL_CMD_ARG(get_caps, NULL, HELP_NONE, cmd_bip_client_get_caps, 1, 0),
-	SHELL_CMD_ARG(get_image_list, NULL, HELP_NONE, cmd_bip_client_get_image_list, 1, 0),
-	SHELL_CMD_ARG(get_image_properties, NULL, HELP_NONE, cmd_bip_client_get_image_properties, 1,
+	BT_SHELL_CMD_ARG(set_feats_funcs, NULL, HELP_NONE, cmd_bip_client_set_feats_funcs, 1, 0),
+	BT_SHELL_CMD_ARG(conn, NULL, "<type> [UUID 128]", cmd_bip_client_conn, 2, 1),
+	BT_SHELL_CMD_ARG(disconn, NULL, HELP_NONE, cmd_bip_client_disconn, 1, 0),
+	BT_SHELL_CMD_ARG(abort, NULL, HELP_NONE, cmd_bip_client_abort, 1, 0),
+	BT_SHELL_CMD_ARG(get_caps, NULL, HELP_NONE, cmd_bip_client_get_caps, 1, 0),
+	BT_SHELL_CMD_ARG(get_image_list, NULL, HELP_NONE, cmd_bip_client_get_image_list, 1, 0),
+	BT_SHELL_CMD_ARG(get_image_properties, NULL, HELP_NONE, cmd_bip_client_get_image_properties, 1,
 		      0),
-	SHELL_CMD_ARG(get_image, NULL, HELP_NONE, cmd_bip_client_get_image, 1, 0),
-	SHELL_CMD_ARG(get_linked_thumbnail, NULL, HELP_NONE, cmd_bip_client_get_linked_thumbnail, 1,
+	BT_SHELL_CMD_ARG(get_image, NULL, HELP_NONE, cmd_bip_client_get_image, 1, 0),
+	BT_SHELL_CMD_ARG(get_linked_thumbnail, NULL, HELP_NONE, cmd_bip_client_get_linked_thumbnail, 1,
 		      0),
-	SHELL_CMD_ARG(get_linked_attachment, NULL, HELP_NONE, cmd_bip_client_get_linked_attachment,
+	BT_SHELL_CMD_ARG(get_linked_attachment, NULL, HELP_NONE, cmd_bip_client_get_linked_attachment,
 		      1, 0),
-	SHELL_CMD_ARG(get_partial_image, NULL, HELP_NONE, cmd_bip_client_get_partial_image, 1, 0),
-	SHELL_CMD_ARG(get_monitoring_image, NULL, HELP_NONE, cmd_bip_client_get_monitoring_image, 1,
+	BT_SHELL_CMD_ARG(get_partial_image, NULL, HELP_NONE, cmd_bip_client_get_partial_image, 1, 0),
+	BT_SHELL_CMD_ARG(get_monitoring_image, NULL, HELP_NONE, cmd_bip_client_get_monitoring_image, 1,
 		      0),
-	SHELL_CMD_ARG(get_status, NULL, HELP_NONE, cmd_bip_client_get_status, 1, 0),
-	SHELL_CMD_ARG(put_image, NULL, HELP_NONE, cmd_bip_client_put_image, 1, 0),
-	SHELL_CMD_ARG(put_linked_thumbnail, NULL, HELP_NONE, cmd_bip_client_put_linked_thumbnail, 1,
+	BT_SHELL_CMD_ARG(get_status, NULL, HELP_NONE, cmd_bip_client_get_status, 1, 0),
+	BT_SHELL_CMD_ARG(put_image, NULL, HELP_NONE, cmd_bip_client_put_image, 1, 0),
+	BT_SHELL_CMD_ARG(put_linked_thumbnail, NULL, HELP_NONE, cmd_bip_client_put_linked_thumbnail, 1,
 		      0),
-	SHELL_CMD_ARG(put_linked_attachment, NULL, HELP_NONE, cmd_bip_client_put_linked_attachment,
+	BT_SHELL_CMD_ARG(put_linked_attachment, NULL, HELP_NONE, cmd_bip_client_put_linked_attachment,
 		      1, 0),
-	SHELL_CMD_ARG(remote_display, NULL, HELP_NONE, cmd_bip_client_remote_display, 1, 0),
-	SHELL_CMD_ARG(delete_image, NULL, HELP_NONE, cmd_bip_client_delete_image, 1, 0),
-	SHELL_CMD_ARG(start_print, NULL, HELP_NONE, cmd_bip_client_start_print, 1, 0),
-	SHELL_CMD_ARG(start_archive, NULL, HELP_NONE, cmd_bip_client_start_archive, 1, 0),
-	SHELL_SUBCMD_SET_END);
+	BT_SHELL_CMD_ARG(remote_display, NULL, HELP_NONE, cmd_bip_client_remote_display, 1, 0),
+	BT_SHELL_CMD_ARG(delete_image, NULL, HELP_NONE, cmd_bip_client_delete_image, 1, 0),
+	BT_SHELL_CMD_ARG(start_print, NULL, HELP_NONE, cmd_bip_client_start_print, 1, 0),
+	BT_SHELL_CMD_ARG(start_archive, NULL, HELP_NONE, cmd_bip_client_start_archive, 1, 0),
+	BT_SHELL_SUBCMD_SET_END);
 
-SHELL_STATIC_SUBCMD_SET_CREATE(
-	obex_server_cmds, SHELL_CMD_ARG(reg, NULL, "<type> [UUID 128]", cmd_bip_server_reg, 2, 1),
-	SHELL_CMD_ARG(unreg, NULL, HELP_NONE, cmd_bip_server_unreg, 1, 0),
-	SHELL_CMD_ARG(conn, NULL, "<rsp: continue, success, error> [rsp_code]", cmd_bip_server_conn,
+BT_SHELL_STATIC_SUBCMD_SET_CREATE(
+	obex_server_cmds, BT_SHELL_CMD_ARG(reg, NULL, "<type> [UUID 128]", cmd_bip_server_reg, 2, 1),
+	BT_SHELL_CMD_ARG(unreg, NULL, HELP_NONE, cmd_bip_server_unreg, 1, 0),
+	BT_SHELL_CMD_ARG(conn, NULL, "<rsp: continue, success, error> [rsp_code]", cmd_bip_server_conn,
 		      2, 1),
-	SHELL_CMD_ARG(disconn, NULL, "<rsp: continue, success, error> [rsp_code]",
+	BT_SHELL_CMD_ARG(disconn, NULL, "<rsp: continue, success, error> [rsp_code]",
 		      cmd_bip_server_disconn, 2, 1),
-	SHELL_CMD_ARG(abort, NULL, "<rsp: continue, success, error> [rsp_code]",
+	BT_SHELL_CMD_ARG(abort, NULL, "<rsp: continue, success, error> [rsp_code]",
 		      cmd_bip_server_abort, 2, 1),
-	SHELL_CMD_ARG(get_caps, NULL, "<rsp: noerror, error> [rsp_code]", cmd_bip_server_get_caps,
+	BT_SHELL_CMD_ARG(get_caps, NULL, "<rsp: noerror, error> [rsp_code]", cmd_bip_server_get_caps,
 		      2, 1),
-	SHELL_CMD_ARG(get_image_list, NULL, "<rsp: noerror, error> [rsp_code]",
+	BT_SHELL_CMD_ARG(get_image_list, NULL, "<rsp: noerror, error> [rsp_code]",
 		      cmd_bip_server_get_image_list, 2, 1),
-	SHELL_CMD_ARG(get_image_properties, NULL, "<rsp: noerror, error> [rsp_code]",
+	BT_SHELL_CMD_ARG(get_image_properties, NULL, "<rsp: noerror, error> [rsp_code]",
 		      cmd_bip_server_get_image_properties, 2, 1),
-	SHELL_CMD_ARG(get_image, NULL, "<rsp: noerror, error> [rsp_code]", cmd_bip_server_get_image,
+	BT_SHELL_CMD_ARG(get_image, NULL, "<rsp: noerror, error> [rsp_code]", cmd_bip_server_get_image,
 		      2, 1),
-	SHELL_CMD_ARG(get_linked_thumbnail, NULL, "<rsp: noerror, error> [rsp_code]",
+	BT_SHELL_CMD_ARG(get_linked_thumbnail, NULL, "<rsp: noerror, error> [rsp_code]",
 		      cmd_bip_server_get_linked_thumbnail, 2, 1),
-	SHELL_CMD_ARG(get_linked_attachment, NULL, "<rsp: noerror, error> [rsp_code]",
+	BT_SHELL_CMD_ARG(get_linked_attachment, NULL, "<rsp: noerror, error> [rsp_code]",
 		      cmd_bip_server_get_linked_attachment, 2, 1),
-	SHELL_CMD_ARG(get_partial_image, NULL, "<rsp: noerror, error> [rsp_code]",
+	BT_SHELL_CMD_ARG(get_partial_image, NULL, "<rsp: noerror, error> [rsp_code]",
 		      cmd_bip_server_get_partial_image, 2, 1),
-	SHELL_CMD_ARG(get_monitoring_image, NULL, "<rsp: noerror, error> [rsp_code]",
+	BT_SHELL_CMD_ARG(get_monitoring_image, NULL, "<rsp: noerror, error> [rsp_code]",
 		      cmd_bip_server_get_monitoring_image, 2, 1),
-	SHELL_CMD_ARG(get_status, NULL, "<rsp: continue, success, error> [rsp_code]",
+	BT_SHELL_CMD_ARG(get_status, NULL, "<rsp: continue, success, error> [rsp_code]",
 		      cmd_bip_server_get_status, 2, 1),
-	SHELL_CMD_ARG(put_image, NULL, "<rsp: noerror, error> [rsp_code]", cmd_bip_server_put_image,
+	BT_SHELL_CMD_ARG(put_image, NULL, "<rsp: noerror, error> [rsp_code]", cmd_bip_server_put_image,
 		      2, 1),
-	SHELL_CMD_ARG(put_linked_thumbnail, NULL, "<rsp: noerror, error> [rsp_code]",
+	BT_SHELL_CMD_ARG(put_linked_thumbnail, NULL, "<rsp: noerror, error> [rsp_code]",
 		      cmd_bip_server_put_linked_thumbnail, 2, 1),
-	SHELL_CMD_ARG(put_linked_attachment, NULL, "<rsp: noerror, error> [rsp_code]",
+	BT_SHELL_CMD_ARG(put_linked_attachment, NULL, "<rsp: noerror, error> [rsp_code]",
 		      cmd_bip_server_put_linked_attachment, 2, 1),
-	SHELL_CMD_ARG(remote_display, NULL, "<rsp: noerror, error> [rsp_code]",
+	BT_SHELL_CMD_ARG(remote_display, NULL, "<rsp: noerror, error> [rsp_code]",
 		      cmd_bip_server_remote_display, 2, 1),
-	SHELL_CMD_ARG(delete_image, NULL, "<rsp: noerror, error> [rsp_code]",
+	BT_SHELL_CMD_ARG(delete_image, NULL, "<rsp: noerror, error> [rsp_code]",
 		      cmd_bip_server_delete_image, 2, 1),
-	SHELL_CMD_ARG(start_print, NULL, "<rsp: noerror, error> [rsp_code]",
+	BT_SHELL_CMD_ARG(start_print, NULL, "<rsp: noerror, error> [rsp_code]",
 		      cmd_bip_server_start_print, 2, 1),
-	SHELL_CMD_ARG(start_archive, NULL, "<rsp: noerror, error> [rsp_code]",
+	BT_SHELL_CMD_ARG(start_archive, NULL, "<rsp: noerror, error> [rsp_code]",
 		      cmd_bip_server_start_archive, 2, 1),
-	SHELL_SUBCMD_SET_END);
+	BT_SHELL_SUBCMD_SET_END);
 
-SHELL_STATIC_SUBCMD_SET_CREATE(
-	bip_sdp_cmds, SHELL_CMD_ARG(reg, NULL, HELP_NONE, cmd_bip_sdp_reg, 1, 0),
-	SHELL_CMD_ARG(set_caps, NULL, "<capabilities>", cmd_sdp_set_caps, 2, 0),
-	SHELL_CMD_ARG(set_features, NULL, "<features>", cmd_sdp_set_features, 2, 0),
-	SHELL_CMD_ARG(set_functions, NULL, "<functions>", cmd_sdp_set_functions, 2, 0),
-	SHELL_CMD_ARG(discover, NULL, HELP_NONE, cmd_sdp_discover, 1, 0),
-	SHELL_SUBCMD_SET_END);
+BT_SHELL_STATIC_SUBCMD_SET_CREATE(
+	bip_sdp_cmds, BT_SHELL_CMD_ARG(reg, NULL, HELP_NONE, cmd_bip_sdp_reg, 1, 0),
+	BT_SHELL_CMD_ARG(set_caps, NULL, "<capabilities>", cmd_sdp_set_caps, 2, 0),
+	BT_SHELL_CMD_ARG(set_features, NULL, "<features>", cmd_sdp_set_features, 2, 0),
+	BT_SHELL_CMD_ARG(set_functions, NULL, "<functions>", cmd_sdp_set_functions, 2, 0),
+	BT_SHELL_CMD_ARG(discover, NULL, HELP_NONE, cmd_sdp_discover, 1, 0),
+	BT_SHELL_SUBCMD_SET_END);
 
-static int cmd_alloc_buf(const struct shell *sh, size_t argc, char **argv)
+static int cmd_alloc_buf(const struct bt_shell *sh, size_t argc, char **argv)
 {
 	if (bip_app.tx_buf != NULL) {
-		shell_error(sh, "Buf %p is using", bip_app.tx_buf);
+		bt_shell_session_error(sh, "Buf %p is using", bip_app.tx_buf);
 		return -EBUSY;
 	}
 
 	bip_app.tx_buf = bt_goep_create_pdu(&bip_app.bip.goep, &tx_pool);
 	if (bip_app.tx_buf == NULL) {
-		shell_error(sh, "Fail to allocate tx buffer");
+		bt_shell_session_error(sh, "Fail to allocate tx buffer");
 		return -ENOBUFS;
 	}
 
 	return 0;
 }
 
-static int cmd_release_buf(const struct shell *sh, size_t argc, char **argv)
+static int cmd_release_buf(const struct bt_shell *sh, size_t argc, char **argv)
 {
 	if (bip_app.tx_buf == NULL) {
-		shell_error(sh, "No buf is using");
+		bt_shell_session_error(sh, "No buf is using");
 		return -EINVAL;
 	}
 
@@ -4466,31 +4468,38 @@ static int cmd_release_buf(const struct shell *sh, size_t argc, char **argv)
 	return 0;
 }
 
-static int cmd_common(const struct shell *sh, size_t argc, char **argv)
+static int cmd_common(const struct bt_shell *sh, size_t argc, char **argv)
 {
 	if (argc == 1) {
-		shell_help(sh);
-		return SHELL_CMD_HELP_PRINTED;
+		bt_shell_help(sh);
+		return BT_SHELL_CMD_HELP_PRINTED;
 	}
 
-	shell_error(sh, "%s unknown parameter: %s", argv[0], argv[1]);
+	bt_shell_session_error(sh, "%s unknown parameter: %s", argv[0], argv[1]);
 
 	return -ENOEXEC;
 }
 
-SHELL_STATIC_SUBCMD_SET_CREATE(
-	bip_cmds, SHELL_CMD_ARG(register-rfcomm, NULL, "<channel>", cmd_register_rfcomm, 2, 0),
-	SHELL_CMD_ARG(connect-rfcomm, NULL, "<channel>", cmd_connect_rfcomm, 2, 0),
-	SHELL_CMD_ARG(disconnect-rfcomm, NULL, HELP_NONE, cmd_disconnect_rfcomm, 1, 0),
-	SHELL_CMD_ARG(register-l2cap, NULL, "<psm>", cmd_register_l2cap, 2, 0),
-	SHELL_CMD_ARG(connect-l2cap, NULL, "<psm>", cmd_connect_l2cap, 2, 0),
-	SHELL_CMD_ARG(disconnect-l2cap, NULL, HELP_NONE, cmd_disconnect_l2cap, 1, 0),
-	SHELL_CMD_ARG(alloc-buf, NULL, "Alloc tx buffer", cmd_alloc_buf, 1, 0),
-	SHELL_CMD_ARG(release-buf, NULL, "Free allocated tx buffer", cmd_release_buf, 1, 0),
-	SHELL_CMD_ARG(add-header, &obex_add_header_cmds, "Adding header sets", cmd_common, 1, 0),
-	SHELL_CMD_ARG(client, &obex_client_cmds, "Client sets", cmd_common, 1, 0),
-	SHELL_CMD_ARG(server, &obex_server_cmds, "Server sets", cmd_common, 1, 0),
-	SHELL_CMD_ARG(sdp, &bip_sdp_cmds, "SDP sets", cmd_common, 1, 0),
-	SHELL_SUBCMD_SET_END);
+BT_SHELL_STATIC_SUBCMD_SET_CREATE(
+	bip_cmds, BT_SHELL_CMD_ARG(register-rfcomm, NULL, "<channel>", cmd_register_rfcomm, 2, 0),
+	BT_SHELL_CMD_ARG(connect-rfcomm, NULL, "<channel>", cmd_connect_rfcomm, 2, 0),
+	BT_SHELL_CMD_ARG(disconnect-rfcomm, NULL, HELP_NONE, cmd_disconnect_rfcomm, 1, 0),
+	BT_SHELL_CMD_ARG(register-l2cap, NULL, "<psm>", cmd_register_l2cap, 2, 0),
+	BT_SHELL_CMD_ARG(connect-l2cap, NULL, "<psm>", cmd_connect_l2cap, 2, 0),
+	BT_SHELL_CMD_ARG(disconnect-l2cap, NULL, HELP_NONE, cmd_disconnect_l2cap, 1, 0),
+	BT_SHELL_CMD_ARG(alloc-buf, NULL, "Alloc tx buffer", cmd_alloc_buf, 1, 0),
+	BT_SHELL_CMD_ARG(release-buf, NULL, "Free allocated tx buffer", cmd_release_buf, 1, 0),
+	BT_SHELL_CMD_ARG(add-header, &obex_add_header_cmds, "Adding header sets", cmd_common, 1, 0),
+	BT_SHELL_CMD_ARG(client, &obex_client_cmds, "Client sets", cmd_common, 1, 0),
+	BT_SHELL_CMD_ARG(server, &obex_server_cmds, "Server sets", cmd_common, 1, 0),
+	BT_SHELL_CMD_ARG(sdp, &bip_sdp_cmds, "SDP sets", cmd_common, 1, 0),
+	BT_SHELL_SUBCMD_SET_END);
 
-SHELL_CMD_ARG_REGISTER(bip, &bip_cmds, "Bluetooth BIP shell commands", cmd_common, 1, 1);
+BT_SHELL_CMD_ARG_REGISTER(bip, &bip_cmds, "Bluetooth BIP shell commands", cmd_common, 1, 1);
+
+/** @brief Initialize module-owned storage before protocol operations. */
+void bt_host_classic_shell_bip_storage_init(void)
+{
+	net_buf_pool_init(&tx_pool);
+	net_buf_pool_init(&sdp_client_pool);
+}

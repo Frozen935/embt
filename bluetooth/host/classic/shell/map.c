@@ -9,20 +9,23 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <embt/base/assert.h>
+#include <embt/base/util_macro.h>
 #include <errno.h>
-#include <zephyr/types.h>
-#include <zephyr/sys/byteorder.h>
-#include <zephyr/sys/util.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <embt/base/byteorder.h>
+#include <embt/base/util.h>
 #include <stdlib.h>
 
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/l2cap.h>
-#include <zephyr/bluetooth/classic/rfcomm.h>
-#include <zephyr/bluetooth/classic/sdp.h>
-#include <zephyr/bluetooth/classic/map.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/l2cap.h>
+#include <embt/bluetooth/classic/rfcomm.h>
+#include <embt/bluetooth/classic/sdp.h>
+#include <embt/bluetooth/classic/map.h>
 
-#include <zephyr/shell/shell.h>
+#include <shell/bt_shell.h>
 
 #include <host/shell/bt.h>
 #include <common/bt_shell_private.h>
@@ -349,7 +352,7 @@ static void clear_local_srm_param(struct net_buf *buf, uint8_t *srm_state)
 	}
 }
 
-static int parse_rsp_code(const struct shell *sh, size_t argc, char *argv[], uint8_t *rsp_code)
+static int parse_rsp_code(const struct bt_shell *sh, size_t argc, char *argv[], uint8_t *rsp_code)
 {
 	const char *rsp;
 
@@ -360,27 +363,27 @@ static int parse_rsp_code(const struct shell *sh, size_t argc, char *argv[], uin
 		*rsp_code = BT_OBEX_RSP_CODE_SUCCESS;
 	} else if (strcmp(rsp, "error") == 0) {
 		if (argc < 3) {
-			shell_error(sh, "[rsp_code] is needed if the rsp is %s", rsp);
-			shell_help(sh);
-			return SHELL_CMD_HELP_PRINTED;
+			bt_shell_session_error(sh, "[rsp_code] is needed if the rsp is %s", rsp);
+			bt_shell_help(sh);
+			return BT_SHELL_CMD_HELP_PRINTED;
 		}
 		*rsp_code = (uint8_t)strtoul(argv[2], NULL, 16);
 	} else {
-		shell_help(sh);
-		return SHELL_CMD_HELP_PRINTED;
+		bt_shell_help(sh);
+		return BT_SHELL_CMD_HELP_PRINTED;
 	}
 
 	return 0;
 }
 
-static int parse_error_code(const struct shell *sh, size_t argc, char *argv[], uint8_t *rsp_code)
+static int parse_error_code(const struct bt_shell *sh, size_t argc, char *argv[], uint8_t *rsp_code)
 {
 	int arg_idx = 1;
 
 	while (arg_idx < argc) {
 		if (strcmp(argv[arg_idx], "error") == 0) {
 			if (arg_idx + 1 >= argc) {
-				shell_error(sh, "[rsp_code] is needed if the rsp is %s",
+				bt_shell_session_error(sh, "[rsp_code] is needed if the rsp is %s",
 					    argv[arg_idx]);
 				return -EINVAL;
 			}
@@ -394,7 +397,7 @@ static int parse_error_code(const struct shell *sh, size_t argc, char *argv[], u
 	return 0;
 }
 
-static int parse_srmp(const struct shell *sh, size_t argc, char *argv[], bool *enable_srmp)
+static int parse_srmp(const struct bt_shell *sh, size_t argc, char *argv[], bool *enable_srmp)
 {
 	int arg_idx = 1;
 
@@ -991,27 +994,27 @@ static struct bt_map_mce_mas_cb mce_mas_cb = {
 };
 
 /* MCE MAS commands */
-static int cmd_mce_mas_select(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_mce_mas_select(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	struct mce_mas_instance *inst;
 	uint8_t instance_id;
 	uint8_t index;
 	int err = 0;
 
-	instance_id = (uint8_t)shell_strtoul(argv[1], 10, &err);
+	instance_id = (uint8_t)bt_shell_strtoul(argv[1], 10, &err);
 	if (err != 0) {
-		shell_error(sh, "Invalid instance_id %s", argv[1]);
+		bt_shell_session_error(sh, "Invalid instance_id %s", argv[1]);
 		return -ENOEXEC;
 	}
 
 	if (default_conn == NULL) {
-		shell_error(sh, "Not connected");
+		bt_shell_session_error(sh, "Not connected");
 		return -ENOEXEC;
 	}
 
 	index = bt_conn_index(default_conn);
 	if (index >= CONFIG_BT_MAX_CONN) {
-		shell_error(sh, "Invalid default_conn index");
+		bt_shell_session_error(sh, "Invalid default_conn index");
 		return -ENOEXEC;
 	}
 
@@ -1020,18 +1023,18 @@ static int cmd_mce_mas_select(const struct shell *sh, size_t argc, char *argv[])
 
 		if (inst->conn != NULL && inst->instance_id == instance_id) {
 			default_mce_mas = &inst->mce_mas;
-			shell_print(sh, "Selected MCE MAS instance_id %u as default",
+			bt_shell_session_print(sh, "Selected MCE MAS instance_id %u as default",
 				    inst->instance_id);
 			return 0;
 		}
 	}
 
-	shell_error(sh, "No matching MCE MAS instance available for conn %s",
+	bt_shell_session_error(sh, "No matching MCE MAS instance available for conn %s",
 		    bt_conn_dst_str(default_conn));
 	return -ENOEXEC;
 }
 
-static int cmd_mce_mas_rfcomm_connect(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_mce_mas_rfcomm_connect(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err = 0;
 	uint8_t channel;
@@ -1040,26 +1043,26 @@ static int cmd_mce_mas_rfcomm_connect(const struct shell *sh, size_t argc, char 
 	uint32_t supported_features;
 
 	if (default_conn == NULL) {
-		shell_error(sh, "Not connected");
+		bt_shell_session_error(sh, "Not connected");
 		return -ENOEXEC;
 	}
 
-	channel = shell_strtoul(argv[1], 16, &err);
+	channel = bt_shell_strtoul(argv[1], 16, &err);
 	if (err != 0) {
-		shell_error(sh, "Invalid channel %s", argv[1]);
+		bt_shell_session_error(sh, "Invalid channel %s", argv[1]);
 		return -ENOEXEC;
 	}
 
-	instance_id = shell_strtoul(argv[2], 10, &err);
+	instance_id = bt_shell_strtoul(argv[2], 10, &err);
 	if (err != 0) {
-		shell_error(sh, "Invalid instance ID %s", argv[2]);
+		bt_shell_session_error(sh, "Invalid instance ID %s", argv[2]);
 		return -ENOEXEC;
 	}
 
 	if (argc > 3) {
-		supported_features = shell_strtoul(argv[3], 16, &err);
+		supported_features = bt_shell_strtoul(argv[3], 16, &err);
 		if (err != 0) {
-			shell_error(sh, "Invalid supported features %s", argv[3]);
+			bt_shell_session_error(sh, "Invalid supported features %s", argv[3]);
 			return -ENOEXEC;
 		}
 	} else {
@@ -1068,7 +1071,7 @@ static int cmd_mce_mas_rfcomm_connect(const struct shell *sh, size_t argc, char 
 
 	inst = mce_mas_alloc(default_conn, instance_id);
 	if (inst == NULL) {
-		shell_error(sh, "Cannot allocate MCE MAS instance");
+		bt_shell_session_error(sh, "Cannot allocate MCE MAS instance");
 		return -ENOMEM;
 	}
 
@@ -1078,30 +1081,30 @@ static int cmd_mce_mas_rfcomm_connect(const struct shell *sh, size_t argc, char 
 	err = bt_map_mce_mas_rfcomm_connect(default_conn, &inst->mce_mas, &mce_mas_cb, channel);
 	if (err != 0) {
 		mce_mas_free(&inst->mce_mas);
-		shell_error(sh, "RFCOMM connect failed (err %d)", err);
+		bt_shell_session_error(sh, "RFCOMM connect failed (err %d)", err);
 	}
 
 	return err;
 }
 
-static int cmd_mce_mas_rfcomm_disconnect(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_mce_mas_rfcomm_disconnect(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 
 	if (default_mce_mas == NULL) {
-		shell_error(sh, "No default MCE MAS conn available");
+		bt_shell_session_error(sh, "No default MCE MAS conn available");
 		return -ENODEV;
 	}
 
 	err = bt_map_mce_mas_rfcomm_disconnect(default_mce_mas);
 	if (err != 0) {
-		shell_error(sh, "RFCOMM disconnect failed (err %d)", err);
+		bt_shell_session_error(sh, "RFCOMM disconnect failed (err %d)", err);
 	}
 
 	return err;
 }
 
-static int cmd_mce_mas_l2cap_connect(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_mce_mas_l2cap_connect(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err = 0;
 	uint16_t psm;
@@ -1110,26 +1113,26 @@ static int cmd_mce_mas_l2cap_connect(const struct shell *sh, size_t argc, char *
 	uint32_t supported_features;
 
 	if (default_conn == NULL) {
-		shell_error(sh, "Not connected");
+		bt_shell_session_error(sh, "Not connected");
 		return -ENOEXEC;
 	}
 
-	psm = shell_strtoul(argv[1], 16, &err);
+	psm = bt_shell_strtoul(argv[1], 16, &err);
 	if (err != 0) {
-		shell_error(sh, "Invalid PSM %s", argv[1]);
+		bt_shell_session_error(sh, "Invalid PSM %s", argv[1]);
 		return -ENOEXEC;
 	}
 
-	instance_id = shell_strtoul(argv[2], 10, &err);
+	instance_id = bt_shell_strtoul(argv[2], 10, &err);
 	if (err != 0) {
-		shell_error(sh, "Invalid instance ID %s", argv[2]);
+		bt_shell_session_error(sh, "Invalid instance ID %s", argv[2]);
 		return -ENOEXEC;
 	}
 
 	if (argc > 3) {
-		supported_features = shell_strtoul(argv[3], 16, &err);
+		supported_features = bt_shell_strtoul(argv[3], 16, &err);
 		if (err != 0) {
-			shell_error(sh, "Invalid supported features %s", argv[3]);
+			bt_shell_session_error(sh, "Invalid supported features %s", argv[3]);
 			return -ENOEXEC;
 		}
 	} else {
@@ -1138,7 +1141,7 @@ static int cmd_mce_mas_l2cap_connect(const struct shell *sh, size_t argc, char *
 
 	inst = mce_mas_alloc(default_conn, instance_id);
 	if (inst == NULL) {
-		shell_error(sh, "Cannot allocate MCE MAS instance");
+		bt_shell_session_error(sh, "Cannot allocate MCE MAS instance");
 		return -ENOMEM;
 	}
 
@@ -1148,30 +1151,30 @@ static int cmd_mce_mas_l2cap_connect(const struct shell *sh, size_t argc, char *
 	err = bt_map_mce_mas_l2cap_connect(default_conn, &inst->mce_mas, &mce_mas_cb, psm);
 	if (err != 0) {
 		mce_mas_free(&inst->mce_mas);
-		shell_error(sh, "L2CAP connect failed (err %d)", err);
+		bt_shell_session_error(sh, "L2CAP connect failed (err %d)", err);
 	}
 
 	return err;
 }
 
-static int cmd_mce_mas_l2cap_disconnect(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_mce_mas_l2cap_disconnect(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 
 	if (default_mce_mas == NULL) {
-		shell_error(sh, "No default MCE MAS conn available");
+		bt_shell_session_error(sh, "No default MCE MAS conn available");
 		return -ENODEV;
 	}
 
 	err = bt_map_mce_mas_l2cap_disconnect(default_mce_mas);
 	if (err != 0) {
-		shell_error(sh, "L2CAP disconnect failed (err %d)", err);
+		bt_shell_session_error(sh, "L2CAP disconnect failed (err %d)", err);
 	}
 
 	return err;
 }
 
-static int cmd_mce_mas_connect(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_mce_mas_connect(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 	struct net_buf *buf;
@@ -1180,7 +1183,7 @@ static int cmd_mce_mas_connect(const struct shell *sh, size_t argc, char *argv[]
 	struct mce_mas_instance *inst;
 
 	if (default_mce_mas == NULL) {
-		shell_error(sh, "No default MCE MAS conn available");
+		bt_shell_session_error(sh, "No default MCE MAS conn available");
 		return -ENODEV;
 	}
 
@@ -1188,7 +1191,7 @@ static int cmd_mce_mas_connect(const struct shell *sh, size_t argc, char *argv[]
 
 	buf = bt_map_mce_mas_create_pdu(default_mce_mas, &mas_tx_pool);
 	if (buf == NULL) {
-		shell_error(sh, "Fail to allocate tx buffer");
+		bt_shell_session_error(sh, "Fail to allocate tx buffer");
 		return -ENOBUFS;
 	}
 
@@ -1197,7 +1200,7 @@ static int cmd_mce_mas_connect(const struct shell *sh, size_t argc, char *argv[]
 	err = bt_obex_add_header_target(buf, sizeof(val), val);
 	if (err != 0) {
 		net_buf_unref(buf);
-		shell_error(sh, "Fail to add target header (err %d)", err);
+		bt_shell_session_error(sh, "Fail to add target header (err %d)", err);
 		return err;
 	}
 
@@ -1212,7 +1215,7 @@ static int cmd_mce_mas_connect(const struct shell *sh, size_t argc, char *argv[]
 		err = bt_obex_add_header_app_param(buf, ARRAY_SIZE(appl_params), appl_params);
 		if (err != 0) {
 			net_buf_unref(buf);
-			shell_error(sh, "Fail to add app param header (err %d)", err);
+			bt_shell_session_error(sh, "Fail to add app param header (err %d)", err);
 			return err;
 		}
 	}
@@ -1220,47 +1223,47 @@ static int cmd_mce_mas_connect(const struct shell *sh, size_t argc, char *argv[]
 	err = bt_map_mce_mas_connect(default_mce_mas, buf);
 	if (err != 0) {
 		net_buf_unref(buf);
-		shell_error(sh, "Connect failed (err %d)", err);
+		bt_shell_session_error(sh, "Connect failed (err %d)", err);
 	}
 
 	return err;
 }
 
-static int cmd_mce_mas_disconnect(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_mce_mas_disconnect(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 
 	if (default_mce_mas == NULL) {
-		shell_error(sh, "No default MCE MAS conn available");
+		bt_shell_session_error(sh, "No default MCE MAS conn available");
 		return -ENODEV;
 	}
 
 	err = bt_map_mce_mas_disconnect(default_mce_mas, NULL);
 	if (err != 0) {
-		shell_error(sh, "Disconnect failed (err %d)", err);
+		bt_shell_session_error(sh, "Disconnect failed (err %d)", err);
 	}
 
 	return err;
 }
 
-static int cmd_mce_mas_abort(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_mce_mas_abort(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 
 	if (default_mce_mas == NULL) {
-		shell_error(sh, "No default MCE MAS conn available");
+		bt_shell_session_error(sh, "No default MCE MAS conn available");
 		return -ENODEV;
 	}
 
 	err = bt_map_mce_mas_abort(default_mce_mas, NULL);
 	if (err != 0) {
-		shell_error(sh, "Abort failed (err %d)", err);
+		bt_shell_session_error(sh, "Abort failed (err %d)", err);
 	}
 
 	return err;
 }
 
-static int cmd_mce_mas_set_folder(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_mce_mas_set_folder(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	struct net_buf *buf;
 	int err;
@@ -1270,7 +1273,7 @@ static int cmd_mce_mas_set_folder(const struct shell *sh, size_t argc, char *arg
 	const char *name;
 
 	if (default_mce_mas == NULL) {
-		shell_error(sh, "No default MCE MAS conn available");
+		bt_shell_session_error(sh, "No default MCE MAS conn available");
 		return -ENODEV;
 	}
 
@@ -1286,9 +1289,9 @@ static int cmd_mce_mas_set_folder(const struct shell *sh, size_t argc, char *arg
 		} else if (path[2] == '\0') {
 			name = NULL;
 		} else {
-			shell_error(sh, "Invalid path");
-			shell_help(sh);
-			return SHELL_CMD_HELP_PRINTED;
+			bt_shell_session_error(sh, "Invalid path");
+			bt_shell_help(sh);
+			return BT_SHELL_CMD_HELP_PRINTED;
 		}
 	} else {
 		flags = BT_MAP_SET_FOLDER_FLAGS_DOWN;
@@ -1296,9 +1299,9 @@ static int cmd_mce_mas_set_folder(const struct shell *sh, size_t argc, char *arg
 			if (path[2] != '\0') {
 				name = &path[2];
 			} else {
-				shell_warn(sh, "Don't need to set current folder");
-				shell_help(sh);
-				return SHELL_CMD_HELP_PRINTED;
+				bt_shell_session_warn(sh, "Don't need to set current folder");
+				bt_shell_help(sh);
+				return BT_SHELL_CMD_HELP_PRINTED;
 			}
 		} else {
 			name = path;
@@ -1307,34 +1310,34 @@ static int cmd_mce_mas_set_folder(const struct shell *sh, size_t argc, char *arg
 
 	buf = bt_map_mce_mas_create_pdu(default_mce_mas, &mas_tx_pool);
 	if (buf == NULL) {
-		shell_error(sh, "Fail to allocate tx buffer");
+		bt_shell_session_error(sh, "Fail to allocate tx buffer");
 		return -ENOBUFS;
 	}
 
 	err = bt_obex_add_header_conn_id(buf, inst->conn_id);
 	if (err != 0) {
 		net_buf_unref(buf);
-		shell_error(sh, "Fail to add conn id header %d", err);
+		bt_shell_session_error(sh, "Fail to add conn id header %d", err);
 		return err;
 	}
 
 	err = add_header_name(buf, name);
 	if (err != 0) {
 		net_buf_unref(buf);
-		shell_error(sh, "Fail to add name header %d", err);
+		bt_shell_session_error(sh, "Fail to add name header %d", err);
 		return err;
 	}
 
 	err = bt_map_mce_mas_set_folder(default_mce_mas, flags, buf);
 	if (err != 0) {
 		net_buf_unref(buf);
-		shell_error(sh, "Set folder failed (err %d)", err);
+		bt_shell_session_error(sh, "Set folder failed (err %d)", err);
 	}
 
 	return err;
 }
 
-static int cmd_mce_mas_set_ntf_reg(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_mce_mas_set_ntf_reg(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 	struct mce_mas_instance *inst;
@@ -1342,7 +1345,7 @@ static int cmd_mce_mas_set_ntf_reg(const struct shell *sh, size_t argc, char *ar
 	uint16_t len = 0;
 
 	if (default_mce_mas == NULL) {
-		shell_error(sh, "No default MCE MAS conn available");
+		bt_shell_session_error(sh, "No default MCE MAS conn available");
 		return -ENODEV;
 	}
 
@@ -1350,26 +1353,26 @@ static int cmd_mce_mas_set_ntf_reg(const struct shell *sh, size_t argc, char *ar
 
 	buf = bt_map_mce_mas_create_pdu(default_mce_mas, &mas_tx_pool);
 	if (buf == NULL) {
-		shell_error(sh, "Fail to allocate tx buffer");
+		bt_shell_session_error(sh, "Fail to allocate tx buffer");
 		return -ENOBUFS;
 	}
 
 	err = bt_obex_add_header_conn_id(buf, inst->conn_id);
 	if (err != 0) {
-		shell_error(sh, "Fail to add conn id header %d", err);
+		bt_shell_session_error(sh, "Fail to add conn id header %d", err);
 		goto failed;
 	}
 
 	err = bt_obex_add_header_type(buf, sizeof(BT_MAP_HDR_TYPE_SET_NTF_REG),
 				      BT_MAP_HDR_TYPE_SET_NTF_REG);
 	if (err != 0) {
-		shell_error(sh, "Fail to add type header %d", err);
+		bt_shell_session_error(sh, "Fail to add type header %d", err);
 		goto failed;
 	}
 
 	err = map_add_app_param(buf, inst->mopl, (size_t)tlv_count, tlvs);
 	if (err != 0) {
-		shell_error(sh, "Fail to add app param header (err %d)", err);
+		bt_shell_session_error(sh, "Fail to add app param header (err %d)", err);
 		goto failed;
 	}
 	tlv_count = 0;
@@ -1382,19 +1385,19 @@ static int cmd_mce_mas_set_ntf_reg(const struct shell *sh, size_t argc, char *ar
 
 		inst->ntf_status ^= 1; /* 0 = "OFF", 1 = "ON" */
 
-		shell_print(sh, "Adding default application parameters:");
-		shell_print(sh, "  Notification status: 0x%02x", inst->ntf_status);
+		bt_shell_session_print(sh, "Adding default application parameters:");
+		bt_shell_session_print(sh, "  Notification status: 0x%02x", inst->ntf_status);
 
 		err = bt_obex_add_header_app_param(buf, ARRAY_SIZE(appl_params), appl_params);
 		if (err != 0) {
-			shell_error(sh, "Fail to add app param header (err %d)", err);
+			bt_shell_session_error(sh, "Fail to add app param header (err %d)", err);
 			goto failed;
 		}
 	}
 
 	err = bt_obex_add_header_body_or_end_body(buf, inst->mopl, 1, BT_MAP_FILLER_BYTE, &len);
 	if (err != 0 || len != 1U) {
-		shell_error(sh, "Fail to add body");
+		bt_shell_session_error(sh, "Fail to add body");
 		goto failed;
 	}
 
@@ -1403,14 +1406,14 @@ static int cmd_mce_mas_set_ntf_reg(const struct shell *sh, size_t argc, char *ar
 		return 0;
 	}
 
-	shell_error(sh, "Set notification registration failed (err %d)", err);
+	bt_shell_session_error(sh, "Set notification registration failed (err %d)", err);
 
 failed:
 	net_buf_unref(buf);
 	return err;
 }
 
-static int cmd_mce_mas_get_folder_listing(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_mce_mas_get_folder_listing(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	struct net_buf *buf;
 	int err;
@@ -1418,7 +1421,7 @@ static int cmd_mce_mas_get_folder_listing(const struct shell *sh, size_t argc, c
 	bool enable_srmp = false;
 
 	if (default_mce_mas == NULL) {
-		shell_error(sh, "No default MCE MAS conn available");
+		bt_shell_session_error(sh, "No default MCE MAS conn available");
 		return -ENODEV;
 	}
 
@@ -1426,25 +1429,25 @@ static int cmd_mce_mas_get_folder_listing(const struct shell *sh, size_t argc, c
 
 	err = parse_srmp(sh, argc, argv, &enable_srmp);
 	if (err != 0) {
-		shell_help(sh);
-		return SHELL_CMD_HELP_PRINTED;
+		bt_shell_help(sh);
+		return BT_SHELL_CMD_HELP_PRINTED;
 	}
 
 	buf = bt_map_mce_mas_create_pdu(default_mce_mas, &mas_tx_pool);
 	if (buf == NULL) {
-		shell_error(sh, "Fail to allocate tx buffer");
+		bt_shell_session_error(sh, "Fail to allocate tx buffer");
 		return -ENOBUFS;
 	}
 
 	err = add_header_srm_param_req(buf, &inst->srm, inst->rsp_code, enable_srmp);
 	if (err != 0) {
-		shell_error(sh, "Fail to add SRMP header %d", err);
+		bt_shell_session_error(sh, "Fail to add SRMP header %d", err);
 		goto failed;
 	}
 
 	if (inst->rsp_code == BT_OBEX_RSP_CODE_CONTINUE) {
 		if (is_srm_no_wait_enabled(inst->srm)) {
-			shell_warn(sh, "SRM Enabled, don't need to send next request");
+			bt_shell_session_warn(sh, "SRM Enabled, don't need to send next request");
 			goto failed;
 		} else {
 			/* SRM Disabled or SRM Enabled but waiting, send next request */
@@ -1454,32 +1457,32 @@ static int cmd_mce_mas_get_folder_listing(const struct shell *sh, size_t argc, c
 
 	err = bt_obex_add_header_conn_id(buf, inst->conn_id);
 	if (err != 0) {
-		shell_error(sh, "Fail to add conn id header %d", err);
+		bt_shell_session_error(sh, "Fail to add conn id header %d", err);
 		goto failed;
 	}
 
 	err = add_header_srm_req(buf, &inst->srm, inst->goep_v2);
 	if (err != 0) {
-		shell_error(sh, "Fail to add SRM header %d", err);
+		bt_shell_session_error(sh, "Fail to add SRM header %d", err);
 		goto failed;
 	}
 
 	err = add_header_srm_param_req(buf, &inst->srm, inst->rsp_code, enable_srmp);
 	if (err != 0) {
-		shell_error(sh, "Fail to add SRMP header %d", err);
+		bt_shell_session_error(sh, "Fail to add SRMP header %d", err);
 		goto failed;
 	}
 
 	err = bt_obex_add_header_type(buf, sizeof(BT_MAP_HDR_TYPE_GET_FOLDER_LISTING),
 				      BT_MAP_HDR_TYPE_GET_FOLDER_LISTING);
 	if (err != 0) {
-		shell_error(sh, "Fail to add type header %d", err);
+		bt_shell_session_error(sh, "Fail to add type header %d", err);
 		goto failed;
 	}
 
 	err = map_add_app_param(buf, inst->mopl, (size_t)tlv_count, tlvs);
 	if (err != 0) {
-		shell_error(sh, "Fail to add app param header (err %d)", err);
+		bt_shell_session_error(sh, "Fail to add app param header (err %d)", err);
 		goto failed;
 	}
 	tlv_count = 0;
@@ -1489,7 +1492,7 @@ continue_req:
 	if (err != 0) {
 		clear_local_srm(buf, &inst->srm);
 		clear_local_srm_param(buf, &inst->srm);
-		shell_error(sh, "Get folder listing failed (err %d)", err);
+		bt_shell_session_error(sh, "Get folder listing failed (err %d)", err);
 	} else {
 		set_srm_no_wait(&inst->srm);
 		return 0;
@@ -1500,14 +1503,14 @@ failed:
 	return err;
 }
 
-static int parse_name(const struct shell *sh, size_t argc, char *argv[], const char **name)
+static int parse_name(const struct bt_shell *sh, size_t argc, char *argv[], const char **name)
 {
 	int arg_idx = 1;
 
 	while (arg_idx < argc) {
 		if (strcmp(argv[arg_idx], "name") == 0) {
 			if (arg_idx + 1 >= argc) {
-				shell_error(sh, "[name_string] is needed if the name is present");
+				bt_shell_session_error(sh, "[name_string] is needed if the name is present");
 				return -EINVAL;
 			}
 			arg_idx++;
@@ -1520,7 +1523,7 @@ static int parse_name(const struct shell *sh, size_t argc, char *argv[], const c
 	return 0;
 }
 
-static int cmd_mce_mas_get_msg_listing(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_mce_mas_get_msg_listing(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	struct net_buf *buf;
 	int err;
@@ -1529,7 +1532,7 @@ static int cmd_mce_mas_get_msg_listing(const struct shell *sh, size_t argc, char
 	const char *name = NULL;
 
 	if (default_mce_mas == NULL) {
-		shell_error(sh, "No default MCE MAS conn available");
+		bt_shell_session_error(sh, "No default MCE MAS conn available");
 		return -ENODEV;
 	}
 
@@ -1537,31 +1540,31 @@ static int cmd_mce_mas_get_msg_listing(const struct shell *sh, size_t argc, char
 
 	err = parse_srmp(sh, argc, argv, &enable_srmp);
 	if (err != 0) {
-		shell_help(sh);
-		return SHELL_CMD_HELP_PRINTED;
+		bt_shell_help(sh);
+		return BT_SHELL_CMD_HELP_PRINTED;
 	}
 
 	err = parse_name(sh, argc, argv, &name);
 	if (err != 0) {
-		shell_help(sh);
-		return SHELL_CMD_HELP_PRINTED;
+		bt_shell_help(sh);
+		return BT_SHELL_CMD_HELP_PRINTED;
 	}
 
 	buf = bt_map_mce_mas_create_pdu(default_mce_mas, &mas_tx_pool);
 	if (buf == NULL) {
-		shell_error(sh, "Fail to allocate tx buffer");
+		bt_shell_session_error(sh, "Fail to allocate tx buffer");
 		return -ENOBUFS;
 	}
 
 	err = add_header_srm_param_req(buf, &inst->srm, inst->rsp_code, enable_srmp);
 	if (err != 0) {
-		shell_error(sh, "Fail to add SRMP header %d", err);
+		bt_shell_session_error(sh, "Fail to add SRMP header %d", err);
 		goto failed;
 	}
 
 	if (inst->rsp_code == BT_OBEX_RSP_CODE_CONTINUE) {
 		if (is_srm_no_wait_enabled(inst->srm)) {
-			shell_warn(sh, "SRM Enabled, don't need to send next request");
+			bt_shell_session_warn(sh, "SRM Enabled, don't need to send next request");
 			goto failed;
 		} else {
 			/* SRM Disabled or SRM Enabled but waiting, send next request */
@@ -1571,38 +1574,38 @@ static int cmd_mce_mas_get_msg_listing(const struct shell *sh, size_t argc, char
 
 	err = bt_obex_add_header_conn_id(buf, inst->conn_id);
 	if (err != 0) {
-		shell_error(sh, "Fail to add conn id header %d", err);
+		bt_shell_session_error(sh, "Fail to add conn id header %d", err);
 		goto failed;
 	}
 
 	err = add_header_srm_req(buf, &inst->srm, inst->goep_v2);
 	if (err != 0) {
-		shell_error(sh, "Fail to add SRM header %d", err);
+		bt_shell_session_error(sh, "Fail to add SRM header %d", err);
 		goto failed;
 	}
 
 	err = add_header_srm_param_req(buf, &inst->srm, inst->rsp_code, enable_srmp);
 	if (err != 0) {
-		shell_error(sh, "Fail to add SRMP header %d", err);
+		bt_shell_session_error(sh, "Fail to add SRMP header %d", err);
 		goto failed;
 	}
 
 	err = bt_obex_add_header_type(buf, sizeof(BT_MAP_HDR_TYPE_GET_MSG_LISTING),
 				      BT_MAP_HDR_TYPE_GET_MSG_LISTING);
 	if (err != 0) {
-		shell_error(sh, "Fail to add type header %d", err);
+		bt_shell_session_error(sh, "Fail to add type header %d", err);
 		goto failed;
 	}
 
 	err = add_header_name(buf, name);
 	if (err != 0) {
-		shell_error(sh, "Fail to add name header %d", err);
+		bt_shell_session_error(sh, "Fail to add name header %d", err);
 		goto failed;
 	}
 
 	err = map_add_app_param(buf, inst->mopl, (size_t)tlv_count, tlvs);
 	if (err != 0) {
-		shell_error(sh, "Fail to add app param header (err %d)", err);
+		bt_shell_session_error(sh, "Fail to add app param header (err %d)", err);
 		goto failed;
 	}
 	tlv_count = 0;
@@ -1612,7 +1615,7 @@ continue_req:
 	if (err != 0) {
 		clear_local_srm(buf, &inst->srm);
 		clear_local_srm_param(buf, &inst->srm);
-		shell_error(sh, "Get message listing failed (err %d)", err);
+		bt_shell_session_error(sh, "Get message listing failed (err %d)", err);
 	} else {
 		set_srm_no_wait(&inst->srm);
 		return 0;
@@ -1623,7 +1626,7 @@ failed:
 	return err;
 }
 
-static int cmd_mce_mas_get_msg(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_mce_mas_get_msg(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	struct net_buf *buf;
 	int err;
@@ -1632,7 +1635,7 @@ static int cmd_mce_mas_get_msg(const struct shell *sh, size_t argc, char *argv[]
 	const char *name = argv[1];
 
 	if (default_mce_mas == NULL) {
-		shell_error(sh, "No default MCE MAS conn available");
+		bt_shell_session_error(sh, "No default MCE MAS conn available");
 		return -ENODEV;
 	}
 
@@ -1640,25 +1643,25 @@ static int cmd_mce_mas_get_msg(const struct shell *sh, size_t argc, char *argv[]
 
 	err = parse_srmp(sh, argc, argv, &enable_srmp);
 	if (err != 0) {
-		shell_help(sh);
-		return SHELL_CMD_HELP_PRINTED;
+		bt_shell_help(sh);
+		return BT_SHELL_CMD_HELP_PRINTED;
 	}
 
 	buf = bt_map_mce_mas_create_pdu(default_mce_mas, &mas_tx_pool);
 	if (buf == NULL) {
-		shell_error(sh, "Fail to allocate tx buffer");
+		bt_shell_session_error(sh, "Fail to allocate tx buffer");
 		return -ENOBUFS;
 	}
 
 	err = add_header_srm_param_req(buf, &inst->srm, inst->rsp_code, enable_srmp);
 	if (err != 0) {
-		shell_error(sh, "Fail to add SRMP header %d", err);
+		bt_shell_session_error(sh, "Fail to add SRMP header %d", err);
 		goto failed;
 	}
 
 	if (inst->rsp_code == BT_OBEX_RSP_CODE_CONTINUE) {
 		if (is_srm_no_wait_enabled(inst->srm)) {
-			shell_warn(sh, "SRM Enabled, don't need to send next request");
+			bt_shell_session_warn(sh, "SRM Enabled, don't need to send next request");
 			goto failed;
 		} else {
 			/* SRM Disabled or SRM Enabled but waiting, send next request */
@@ -1668,38 +1671,38 @@ static int cmd_mce_mas_get_msg(const struct shell *sh, size_t argc, char *argv[]
 
 	err = bt_obex_add_header_conn_id(buf, inst->conn_id);
 	if (err != 0) {
-		shell_error(sh, "Fail to add conn id header %d", err);
+		bt_shell_session_error(sh, "Fail to add conn id header %d", err);
 		goto failed;
 	}
 
 	err = add_header_srm_req(buf, &inst->srm, inst->goep_v2);
 	if (err != 0) {
-		shell_error(sh, "Fail to add SRM header %d", err);
+		bt_shell_session_error(sh, "Fail to add SRM header %d", err);
 		goto failed;
 	}
 
 	err = add_header_srm_param_req(buf, &inst->srm, inst->rsp_code, enable_srmp);
 	if (err != 0) {
-		shell_error(sh, "Fail to add SRMP header %d", err);
+		bt_shell_session_error(sh, "Fail to add SRMP header %d", err);
 		goto failed;
 	}
 
 	err = bt_obex_add_header_type(buf, sizeof(BT_MAP_HDR_TYPE_GET_MSG),
 				      BT_MAP_HDR_TYPE_GET_MSG);
 	if (err != 0) {
-		shell_error(sh, "Fail to add type header %d", err);
+		bt_shell_session_error(sh, "Fail to add type header %d", err);
 		goto failed;
 	}
 
 	err = add_header_name(buf, name);
 	if (err != 0) {
-		shell_error(sh, "Fail to add name header %d", err);
+		bt_shell_session_error(sh, "Fail to add name header %d", err);
 		goto failed;
 	}
 
 	err = map_add_app_param(buf, inst->mopl, (size_t)tlv_count, tlvs);
 	if (err != 0) {
-		shell_error(sh, "Fail to add app param header (err %d)", err);
+		bt_shell_session_error(sh, "Fail to add app param header (err %d)", err);
 		goto failed;
 	}
 	tlv_count = 0;
@@ -1714,13 +1717,13 @@ static int cmd_mce_mas_get_msg(const struct shell *sh, size_t argc, char *argv[]
 			 (const uint8_t *)&charset},
 		};
 
-		shell_print(sh, "Adding default application parameters:");
-		shell_print(sh, "  Attachment: %s (0x%02x)", attachment ? "ON" : "OFF", attachment);
-		shell_print(sh, "  Charset: %s (0x%02x)", charset ? "UTF-8" : "Native", charset);
+		bt_shell_session_print(sh, "Adding default application parameters:");
+		bt_shell_session_print(sh, "  Attachment: %s (0x%02x)", attachment ? "ON" : "OFF", attachment);
+		bt_shell_session_print(sh, "  Charset: %s (0x%02x)", charset ? "UTF-8" : "Native", charset);
 
 		err = bt_obex_add_header_app_param(buf, ARRAY_SIZE(appl_params), appl_params);
 		if (err != 0) {
-			shell_error(sh, "Fail to add app param header (err %d)", err);
+			bt_shell_session_error(sh, "Fail to add app param header (err %d)", err);
 			goto failed;
 		}
 	}
@@ -1730,7 +1733,7 @@ continue_req:
 	if (err != 0) {
 		clear_local_srm(buf, &inst->srm);
 		clear_local_srm_param(buf, &inst->srm);
-		shell_error(sh, "Get message failed (err %d)", err);
+		bt_shell_session_error(sh, "Get message failed (err %d)", err);
 	} else {
 		set_srm_no_wait(&inst->srm);
 		return 0;
@@ -1741,7 +1744,7 @@ failed:
 	return err;
 }
 
-static int cmd_mce_mas_set_msg_status(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_mce_mas_set_msg_status(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 	struct mce_mas_instance *inst;
@@ -1750,7 +1753,7 @@ static int cmd_mce_mas_set_msg_status(const struct shell *sh, size_t argc, char 
 	const char *name = argv[1];
 
 	if (default_mce_mas == NULL) {
-		shell_error(sh, "No default MCE MAS conn available");
+		bt_shell_session_error(sh, "No default MCE MAS conn available");
 		return -ENODEV;
 	}
 
@@ -1758,32 +1761,32 @@ static int cmd_mce_mas_set_msg_status(const struct shell *sh, size_t argc, char 
 
 	buf = bt_map_mce_mas_create_pdu(default_mce_mas, &mas_tx_pool);
 	if (buf == NULL) {
-		shell_error(sh, "Fail to allocate tx buffer");
+		bt_shell_session_error(sh, "Fail to allocate tx buffer");
 		return -ENOBUFS;
 	}
 
 	err = bt_obex_add_header_conn_id(buf, inst->conn_id);
 	if (err != 0) {
-		shell_error(sh, "Fail to add conn id header %d", err);
+		bt_shell_session_error(sh, "Fail to add conn id header %d", err);
 		goto failed;
 	}
 
 	err = add_header_name(buf, name);
 	if (err != 0) {
-		shell_error(sh, "Fail to add name header %d", err);
+		bt_shell_session_error(sh, "Fail to add name header %d", err);
 		goto failed;
 	}
 
 	err = bt_obex_add_header_type(buf, sizeof(BT_MAP_HDR_TYPE_SET_MSG_STATUS),
 				      BT_MAP_HDR_TYPE_SET_MSG_STATUS);
 	if (err != 0) {
-		shell_error(sh, "Fail to add type header %d", err);
+		bt_shell_session_error(sh, "Fail to add type header %d", err);
 		goto failed;
 	}
 
 	err = map_add_app_param(buf, inst->mopl, (size_t)tlv_count, tlvs);
 	if (err != 0) {
-		shell_error(sh, "Fail to add app param header (err %d)", err);
+		bt_shell_session_error(sh, "Fail to add app param header (err %d)", err);
 		goto failed;
 	}
 	tlv_count = 0;
@@ -1798,20 +1801,20 @@ static int cmd_mce_mas_set_msg_status(const struct shell *sh, size_t argc, char 
 			 (const uint8_t *)&status_value},
 		};
 
-		shell_print(sh, "Adding default application parameters:");
-		shell_print(sh, "  Status indicator: 0x%02x", status_indicator);
-		shell_print(sh, "  Status value: 0x%02x", status_value);
+		bt_shell_session_print(sh, "Adding default application parameters:");
+		bt_shell_session_print(sh, "  Status indicator: 0x%02x", status_indicator);
+		bt_shell_session_print(sh, "  Status value: 0x%02x", status_value);
 
 		err = bt_obex_add_header_app_param(buf, ARRAY_SIZE(appl_params), appl_params);
 		if (err != 0) {
-			shell_error(sh, "Fail to add app param header (err %d)", err);
+			bt_shell_session_error(sh, "Fail to add app param header (err %d)", err);
 			goto failed;
 		}
 	}
 
 	err = bt_obex_add_header_body_or_end_body(buf, inst->mopl, 1, BT_MAP_FILLER_BYTE, &len);
 	if (err != 0 || len != 1U) {
-		shell_error(sh, "Fail to add body");
+		bt_shell_session_error(sh, "Fail to add body");
 		goto failed;
 	}
 
@@ -1820,14 +1823,14 @@ static int cmd_mce_mas_set_msg_status(const struct shell *sh, size_t argc, char 
 		return 0;
 	}
 
-	shell_error(sh, "Set message status failed (err %d)", err);
+	bt_shell_session_error(sh, "Set message status failed (err %d)", err);
 
 failed:
 	net_buf_unref(buf);
 	return err;
 }
 
-static int cmd_mce_mas_push_msg(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_mce_mas_push_msg(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	struct net_buf *buf;
 	int err;
@@ -1838,7 +1841,7 @@ static int cmd_mce_mas_push_msg(const struct shell *sh, size_t argc, char *argv[
 	bool final;
 
 	if (default_mce_mas == NULL) {
-		shell_error(sh, "No default MCE MAS conn available");
+		bt_shell_session_error(sh, "No default MCE MAS conn available");
 		return -ENODEV;
 	}
 
@@ -1850,7 +1853,7 @@ static int cmd_mce_mas_push_msg(const struct shell *sh, size_t argc, char *argv[
 
 	buf = bt_map_mce_mas_create_pdu(default_mce_mas, &mas_tx_pool);
 	if (buf == NULL) {
-		shell_error(sh, "Fail to allocate tx buffer");
+		bt_shell_session_error(sh, "Fail to allocate tx buffer");
 		return -ENOBUFS;
 	}
 
@@ -1860,32 +1863,32 @@ static int cmd_mce_mas_push_msg(const struct shell *sh, size_t argc, char *argv[
 
 	err = bt_obex_add_header_conn_id(buf, inst->conn_id);
 	if (err != 0) {
-		shell_error(sh, "Fail to add conn id header %d", err);
+		bt_shell_session_error(sh, "Fail to add conn id header %d", err);
 		goto failed;
 	}
 
 	err = add_header_srm_req(buf, &inst->srm, inst->goep_v2);
 	if (err != 0) {
-		shell_error(sh, "Fail to add SRM header %d", err);
+		bt_shell_session_error(sh, "Fail to add SRM header %d", err);
 		goto failed;
 	}
 
 	err = bt_obex_add_header_type(buf, sizeof(BT_MAP_HDR_TYPE_PUSH_MSG),
 				      BT_MAP_HDR_TYPE_PUSH_MSG);
 	if (err != 0) {
-		shell_error(sh, "Fail to add type header %d", err);
+		bt_shell_session_error(sh, "Fail to add type header %d", err);
 		goto failed;
 	}
 
 	err = add_header_name(buf, name);
 	if (err != 0) {
-		shell_error(sh, "Fail to add name header %d", err);
+		bt_shell_session_error(sh, "Fail to add name header %d", err);
 		goto failed;
 	}
 
 	err = map_add_app_param(buf, inst->mopl, (size_t)tlv_count, tlvs);
 	if (err != 0) {
-		shell_error(sh, "Fail to add app param header (err %d)", err);
+		bt_shell_session_error(sh, "Fail to add app param header (err %d)", err);
 		goto failed;
 	}
 	tlv_count = 0;
@@ -1897,12 +1900,12 @@ static int cmd_mce_mas_push_msg(const struct shell *sh, size_t argc, char *argv[
 			 (const uint8_t *)&charset},
 		};
 
-		shell_print(sh, "Adding default application parameters:");
-		shell_print(sh, "  Charset: %s (0x%02x)", charset ? "UTF-8" : "Native", charset);
+		bt_shell_session_print(sh, "Adding default application parameters:");
+		bt_shell_session_print(sh, "  Charset: %s (0x%02x)", charset ? "UTF-8" : "Native", charset);
 
 		err = bt_obex_add_header_app_param(buf, ARRAY_SIZE(appl_params), appl_params);
 		if (err != 0) {
-			shell_error(sh, "Fail to add app param header (err %d)", err);
+			bt_shell_session_error(sh, "Fail to add app param header (err %d)", err);
 			goto failed;
 		}
 	}
@@ -1912,7 +1915,7 @@ continue_req:
 						  sizeof(MAP_MSG_BODY_UTF_8) - inst->tx_cnt,
 						  body + inst->tx_cnt, &len);
 	if (err != 0) {
-		shell_error(sh, "Fail to add body");
+		bt_shell_session_error(sh, "Fail to add body");
 		goto failed;
 	}
 
@@ -1921,7 +1924,7 @@ continue_req:
 	err = bt_map_mce_mas_push_msg(default_mce_mas, final, buf);
 	if (err != 0) {
 		clear_local_srm(buf, &inst->srm);
-		shell_error(sh, "Push message failed (err %d)", err);
+		bt_shell_session_error(sh, "Push message failed (err %d)", err);
 	} else {
 		if (!final) {
 			inst->tx_cnt += len;
@@ -1937,7 +1940,7 @@ failed:
 	return err;
 }
 
-static int cmd_mce_mas_update_inbox(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_mce_mas_update_inbox(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 	struct mce_mas_instance *inst;
@@ -1945,7 +1948,7 @@ static int cmd_mce_mas_update_inbox(const struct shell *sh, size_t argc, char *a
 	uint16_t len = 0;
 
 	if (default_mce_mas == NULL) {
-		shell_error(sh, "No default MCE MAS conn available");
+		bt_shell_session_error(sh, "No default MCE MAS conn available");
 		return -ENODEV;
 	}
 
@@ -1953,26 +1956,26 @@ static int cmd_mce_mas_update_inbox(const struct shell *sh, size_t argc, char *a
 
 	buf = bt_map_mce_mas_create_pdu(default_mce_mas, &mas_tx_pool);
 	if (buf == NULL) {
-		shell_error(sh, "Fail to allocate tx buffer");
+		bt_shell_session_error(sh, "Fail to allocate tx buffer");
 		return -ENOBUFS;
 	}
 
 	err = bt_obex_add_header_conn_id(buf, inst->conn_id);
 	if (err != 0) {
-		shell_error(sh, "Fail to add conn id header %d", err);
+		bt_shell_session_error(sh, "Fail to add conn id header %d", err);
 		goto failed;
 	}
 
 	err = bt_obex_add_header_type(buf, sizeof(BT_MAP_HDR_TYPE_UPDATE_INBOX),
 				      BT_MAP_HDR_TYPE_UPDATE_INBOX);
 	if (err != 0) {
-		shell_error(sh, "Fail to add type header %d", err);
+		bt_shell_session_error(sh, "Fail to add type header %d", err);
 		goto failed;
 	}
 
 	err = bt_obex_add_header_body_or_end_body(buf, inst->mopl, 1, BT_MAP_FILLER_BYTE, &len);
 	if (err != 0 || len != 1U) {
-		shell_error(sh, "Fail to add body");
+		bt_shell_session_error(sh, "Fail to add body");
 		goto failed;
 	}
 
@@ -1981,14 +1984,14 @@ static int cmd_mce_mas_update_inbox(const struct shell *sh, size_t argc, char *a
 		return 0;
 	}
 
-	shell_error(sh, "Update inbox failed (err %d)", err);
+	bt_shell_session_error(sh, "Update inbox failed (err %d)", err);
 
 failed:
 	net_buf_unref(buf);
 	return err;
 }
 
-static int cmd_mce_mas_get_mas_inst_info(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_mce_mas_get_mas_inst_info(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	struct net_buf *buf;
 	int err;
@@ -1996,7 +1999,7 @@ static int cmd_mce_mas_get_mas_inst_info(const struct shell *sh, size_t argc, ch
 	bool enable_srmp = false;
 
 	if (default_mce_mas == NULL) {
-		shell_error(sh, "No default MCE MAS conn available");
+		bt_shell_session_error(sh, "No default MCE MAS conn available");
 		return -ENODEV;
 	}
 
@@ -2004,25 +2007,25 @@ static int cmd_mce_mas_get_mas_inst_info(const struct shell *sh, size_t argc, ch
 
 	err = parse_srmp(sh, argc, argv, &enable_srmp);
 	if (err != 0) {
-		shell_help(sh);
-		return SHELL_CMD_HELP_PRINTED;
+		bt_shell_help(sh);
+		return BT_SHELL_CMD_HELP_PRINTED;
 	}
 
 	buf = bt_map_mce_mas_create_pdu(default_mce_mas, &mas_tx_pool);
 	if (buf == NULL) {
-		shell_error(sh, "Fail to allocate tx buffer");
+		bt_shell_session_error(sh, "Fail to allocate tx buffer");
 		return -ENOBUFS;
 	}
 
 	err = add_header_srm_param_req(buf, &inst->srm, inst->rsp_code, enable_srmp);
 	if (err != 0) {
-		shell_error(sh, "Fail to add SRMP header %d", err);
+		bt_shell_session_error(sh, "Fail to add SRMP header %d", err);
 		goto failed;
 	}
 
 	if (inst->rsp_code == BT_OBEX_RSP_CODE_CONTINUE) {
 		if (is_srm_no_wait_enabled(inst->srm)) {
-			shell_warn(sh, "SRM Enabled, don't need to send next request");
+			bt_shell_session_warn(sh, "SRM Enabled, don't need to send next request");
 			goto failed;
 		} else {
 			/* SRM Disabled or SRM Enabled but waiting, send next request */
@@ -2032,32 +2035,32 @@ static int cmd_mce_mas_get_mas_inst_info(const struct shell *sh, size_t argc, ch
 
 	err = bt_obex_add_header_conn_id(buf, inst->conn_id);
 	if (err != 0) {
-		shell_error(sh, "Fail to add conn id header %d", err);
+		bt_shell_session_error(sh, "Fail to add conn id header %d", err);
 		goto failed;
 	}
 
 	err = add_header_srm_req(buf, &inst->srm, inst->goep_v2);
 	if (err != 0) {
-		shell_error(sh, "Fail to add SRM header %d", err);
+		bt_shell_session_error(sh, "Fail to add SRM header %d", err);
 		goto failed;
 	}
 
 	err = add_header_srm_param_req(buf, &inst->srm, inst->rsp_code, enable_srmp);
 	if (err != 0) {
-		shell_error(sh, "Fail to add SRMP header %d", err);
+		bt_shell_session_error(sh, "Fail to add SRMP header %d", err);
 		goto failed;
 	}
 
 	err = bt_obex_add_header_type(buf, sizeof(BT_MAP_HDR_TYPE_GET_MAS_INST_INFO),
 				      BT_MAP_HDR_TYPE_GET_MAS_INST_INFO);
 	if (err != 0) {
-		shell_error(sh, "Fail to add type header %d", err);
+		bt_shell_session_error(sh, "Fail to add type header %d", err);
 		goto failed;
 	}
 
 	err = map_add_app_param(buf, inst->mopl, (size_t)tlv_count, tlvs);
 	if (err != 0) {
-		shell_error(sh, "Fail to add app param header (err %d)", err);
+		bt_shell_session_error(sh, "Fail to add app param header (err %d)", err);
 		goto failed;
 	}
 	tlv_count = 0;
@@ -2068,12 +2071,12 @@ static int cmd_mce_mas_get_mas_inst_info(const struct shell *sh, size_t argc, ch
 						     sizeof(instance_id),
 						     (const uint8_t *)&instance_id}};
 
-		shell_print(sh, "Adding default application parameters:");
-		shell_print(sh, "  Instance ID: %u", instance_id);
+		bt_shell_session_print(sh, "Adding default application parameters:");
+		bt_shell_session_print(sh, "  Instance ID: %u", instance_id);
 
 		err = bt_obex_add_header_app_param(buf, ARRAY_SIZE(appl_params), appl_params);
 		if (err != 0) {
-			shell_error(sh, "Fail to add app param header (err %d)", err);
+			bt_shell_session_error(sh, "Fail to add app param header (err %d)", err);
 			goto failed;
 		}
 	}
@@ -2083,7 +2086,7 @@ continue_req:
 	if (err != 0) {
 		clear_local_srm(buf, &inst->srm);
 		clear_local_srm_param(buf, &inst->srm);
-		shell_error(sh, "Get MAS instance info failed (err %d)", err);
+		bt_shell_session_error(sh, "Get MAS instance info failed (err %d)", err);
 	} else {
 		set_srm_no_wait(&inst->srm);
 		return 0;
@@ -2094,7 +2097,7 @@ failed:
 	return err;
 }
 
-static int cmd_mce_mas_set_owner_status(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_mce_mas_set_owner_status(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 	struct mce_mas_instance *inst;
@@ -2102,7 +2105,7 @@ static int cmd_mce_mas_set_owner_status(const struct shell *sh, size_t argc, cha
 	uint16_t len = 0;
 
 	if (default_mce_mas == NULL) {
-		shell_error(sh, "No default MCE MAS conn available");
+		bt_shell_session_error(sh, "No default MCE MAS conn available");
 		return -ENODEV;
 	}
 
@@ -2110,26 +2113,26 @@ static int cmd_mce_mas_set_owner_status(const struct shell *sh, size_t argc, cha
 
 	buf = bt_map_mce_mas_create_pdu(default_mce_mas, &mas_tx_pool);
 	if (buf == NULL) {
-		shell_error(sh, "Fail to allocate tx buffer");
+		bt_shell_session_error(sh, "Fail to allocate tx buffer");
 		return -ENOBUFS;
 	}
 
 	err = bt_obex_add_header_conn_id(buf, inst->conn_id);
 	if (err != 0) {
-		shell_error(sh, "Fail to add conn id header %d", err);
+		bt_shell_session_error(sh, "Fail to add conn id header %d", err);
 		goto failed;
 	}
 
 	err = bt_obex_add_header_type(buf, sizeof(BT_MAP_HDR_TYPE_SET_OWNER_STATUS),
 				      BT_MAP_HDR_TYPE_SET_OWNER_STATUS);
 	if (err != 0) {
-		shell_error(sh, "Fail to add type header %d", err);
+		bt_shell_session_error(sh, "Fail to add type header %d", err);
 		goto failed;
 	}
 
 	err = map_add_app_param(buf, inst->mopl, (size_t)tlv_count, tlvs);
 	if (err != 0) {
-		shell_error(sh, "Fail to add app param header (err %d)", err);
+		bt_shell_session_error(sh, "Fail to add app param header (err %d)", err);
 		goto failed;
 	}
 	tlv_count = 0;
@@ -2140,19 +2143,19 @@ static int cmd_mce_mas_set_owner_status(const struct shell *sh, size_t argc, cha
 						     sizeof(chat_state),
 						     (const uint8_t *)&chat_state}};
 
-		shell_print(sh, "Adding default application parameters:");
-		shell_print(sh, "  Chat state: 0x%02x", chat_state);
+		bt_shell_session_print(sh, "Adding default application parameters:");
+		bt_shell_session_print(sh, "  Chat state: 0x%02x", chat_state);
 
 		err = bt_obex_add_header_app_param(buf, ARRAY_SIZE(appl_params), appl_params);
 		if (err != 0) {
-			shell_error(sh, "Fail to add app param header (err %d)", err);
+			bt_shell_session_error(sh, "Fail to add app param header (err %d)", err);
 			goto failed;
 		}
 	}
 
 	err = bt_obex_add_header_body_or_end_body(buf, inst->mopl, 1, BT_MAP_FILLER_BYTE, &len);
 	if (err != 0 || len != 1U) {
-		shell_error(sh, "Fail to add body");
+		bt_shell_session_error(sh, "Fail to add body");
 		goto failed;
 	}
 
@@ -2161,14 +2164,14 @@ static int cmd_mce_mas_set_owner_status(const struct shell *sh, size_t argc, cha
 		return 0;
 	}
 
-	shell_error(sh, "Set owner status failed (err %d)", err);
+	bt_shell_session_error(sh, "Set owner status failed (err %d)", err);
 
 failed:
 	net_buf_unref(buf);
 	return err;
 }
 
-static int cmd_mce_mas_get_owner_status(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_mce_mas_get_owner_status(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	struct net_buf *buf;
 	int err;
@@ -2176,7 +2179,7 @@ static int cmd_mce_mas_get_owner_status(const struct shell *sh, size_t argc, cha
 	bool enable_srmp = false;
 
 	if (default_mce_mas == NULL) {
-		shell_error(sh, "No default MCE MAS conn available");
+		bt_shell_session_error(sh, "No default MCE MAS conn available");
 		return -ENODEV;
 	}
 
@@ -2184,25 +2187,25 @@ static int cmd_mce_mas_get_owner_status(const struct shell *sh, size_t argc, cha
 
 	err = parse_srmp(sh, argc, argv, &enable_srmp);
 	if (err != 0) {
-		shell_help(sh);
-		return SHELL_CMD_HELP_PRINTED;
+		bt_shell_help(sh);
+		return BT_SHELL_CMD_HELP_PRINTED;
 	}
 
 	buf = bt_map_mce_mas_create_pdu(default_mce_mas, &mas_tx_pool);
 	if (buf == NULL) {
-		shell_error(sh, "Fail to allocate tx buffer");
+		bt_shell_session_error(sh, "Fail to allocate tx buffer");
 		return -ENOBUFS;
 	}
 
 	err = add_header_srm_param_req(buf, &inst->srm, inst->rsp_code, enable_srmp);
 	if (err != 0) {
-		shell_error(sh, "Fail to add SRMP header %d", err);
+		bt_shell_session_error(sh, "Fail to add SRMP header %d", err);
 		goto failed;
 	}
 
 	if (inst->rsp_code == BT_OBEX_RSP_CODE_CONTINUE) {
 		if (is_srm_no_wait_enabled(inst->srm)) {
-			shell_warn(sh, "SRM Enabled, don't need to send next request");
+			bt_shell_session_warn(sh, "SRM Enabled, don't need to send next request");
 			goto failed;
 		} else {
 			/* SRM Disabled or SRM Enabled but waiting, send next request */
@@ -2212,32 +2215,32 @@ static int cmd_mce_mas_get_owner_status(const struct shell *sh, size_t argc, cha
 
 	err = bt_obex_add_header_conn_id(buf, inst->conn_id);
 	if (err != 0) {
-		shell_error(sh, "Fail to add conn id header %d", err);
+		bt_shell_session_error(sh, "Fail to add conn id header %d", err);
 		goto failed;
 	}
 
 	err = add_header_srm_req(buf, &inst->srm, inst->goep_v2);
 	if (err != 0) {
-		shell_error(sh, "Fail to add SRM header %d", err);
+		bt_shell_session_error(sh, "Fail to add SRM header %d", err);
 		goto failed;
 	}
 
 	err = add_header_srm_param_req(buf, &inst->srm, inst->rsp_code, enable_srmp);
 	if (err != 0) {
-		shell_error(sh, "Fail to add SRMP header %d", err);
+		bt_shell_session_error(sh, "Fail to add SRMP header %d", err);
 		goto failed;
 	}
 
 	err = bt_obex_add_header_type(buf, sizeof(BT_MAP_HDR_TYPE_GET_OWNER_STATUS),
 				      BT_MAP_HDR_TYPE_GET_OWNER_STATUS);
 	if (err != 0) {
-		shell_error(sh, "Fail to add type header %d", err);
+		bt_shell_session_error(sh, "Fail to add type header %d", err);
 		goto failed;
 	}
 
 	err = map_add_app_param(buf, inst->mopl, (size_t)tlv_count, tlvs);
 	if (err != 0) {
-		shell_error(sh, "Fail to add app param header (err %d)", err);
+		bt_shell_session_error(sh, "Fail to add app param header (err %d)", err);
 		goto failed;
 	}
 	tlv_count = 0;
@@ -2247,7 +2250,7 @@ continue_req:
 	if (err != 0) {
 		clear_local_srm(buf, &inst->srm);
 		clear_local_srm_param(buf, &inst->srm);
-		shell_error(sh, "Get owner status failed (err %d)", err);
+		bt_shell_session_error(sh, "Get owner status failed (err %d)", err);
 	} else {
 		set_srm_no_wait(&inst->srm);
 		return 0;
@@ -2258,7 +2261,7 @@ failed:
 	return err;
 }
 
-static int cmd_mce_mas_get_convo_listing(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_mce_mas_get_convo_listing(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	struct net_buf *buf;
 	int err;
@@ -2266,7 +2269,7 @@ static int cmd_mce_mas_get_convo_listing(const struct shell *sh, size_t argc, ch
 	bool enable_srmp = false;
 
 	if (default_mce_mas == NULL) {
-		shell_error(sh, "No default MCE MAS conn available");
+		bt_shell_session_error(sh, "No default MCE MAS conn available");
 		return -ENODEV;
 	}
 
@@ -2274,25 +2277,25 @@ static int cmd_mce_mas_get_convo_listing(const struct shell *sh, size_t argc, ch
 
 	err = parse_srmp(sh, argc, argv, &enable_srmp);
 	if (err != 0) {
-		shell_help(sh);
-		return SHELL_CMD_HELP_PRINTED;
+		bt_shell_help(sh);
+		return BT_SHELL_CMD_HELP_PRINTED;
 	}
 
 	buf = bt_map_mce_mas_create_pdu(default_mce_mas, &mas_tx_pool);
 	if (buf == NULL) {
-		shell_error(sh, "Fail to allocate tx buffer");
+		bt_shell_session_error(sh, "Fail to allocate tx buffer");
 		return -ENOBUFS;
 	}
 
 	err = add_header_srm_param_req(buf, &inst->srm, inst->rsp_code, enable_srmp);
 	if (err != 0) {
-		shell_error(sh, "Fail to add SRMP header %d", err);
+		bt_shell_session_error(sh, "Fail to add SRMP header %d", err);
 		goto failed;
 	}
 
 	if (inst->rsp_code == BT_OBEX_RSP_CODE_CONTINUE) {
 		if (is_srm_no_wait_enabled(inst->srm)) {
-			shell_warn(sh, "SRM Enabled, don't need to send next request");
+			bt_shell_session_warn(sh, "SRM Enabled, don't need to send next request");
 			goto failed;
 		} else {
 			/* SRM Disabled or SRM Enabled but waiting, send next request */
@@ -2302,32 +2305,32 @@ static int cmd_mce_mas_get_convo_listing(const struct shell *sh, size_t argc, ch
 
 	err = bt_obex_add_header_conn_id(buf, inst->conn_id);
 	if (err != 0) {
-		shell_error(sh, "Fail to add conn id header %d", err);
+		bt_shell_session_error(sh, "Fail to add conn id header %d", err);
 		goto failed;
 	}
 
 	err = add_header_srm_req(buf, &inst->srm, inst->goep_v2);
 	if (err != 0) {
-		shell_error(sh, "Fail to add SRM header %d", err);
+		bt_shell_session_error(sh, "Fail to add SRM header %d", err);
 		goto failed;
 	}
 
 	err = add_header_srm_param_req(buf, &inst->srm, inst->rsp_code, enable_srmp);
 	if (err != 0) {
-		shell_error(sh, "Fail to add SRMP header %d", err);
+		bt_shell_session_error(sh, "Fail to add SRMP header %d", err);
 		goto failed;
 	}
 
 	err = bt_obex_add_header_type(buf, sizeof(BT_MAP_HDR_TYPE_GET_CONVO_LISTING),
 				      BT_MAP_HDR_TYPE_GET_CONVO_LISTING);
 	if (err != 0) {
-		shell_error(sh, "Fail to add type header %d", err);
+		bt_shell_session_error(sh, "Fail to add type header %d", err);
 		goto failed;
 	}
 
 	err = map_add_app_param(buf, inst->mopl, (size_t)tlv_count, tlvs);
 	if (err != 0) {
-		shell_error(sh, "Fail to add app param header (err %d)", err);
+		bt_shell_session_error(sh, "Fail to add app param header (err %d)", err);
 		goto failed;
 	}
 	tlv_count = 0;
@@ -2337,7 +2340,7 @@ continue_req:
 	if (err != 0) {
 		clear_local_srm(buf, &inst->srm);
 		clear_local_srm_param(buf, &inst->srm);
-		shell_error(sh, "Get conversation listing failed (err %d)", err);
+		bt_shell_session_error(sh, "Get conversation listing failed (err %d)", err);
 	} else {
 		set_srm_no_wait(&inst->srm);
 		return 0;
@@ -2348,7 +2351,7 @@ failed:
 	return err;
 }
 
-static int cmd_mce_mas_set_ntf_filter(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_mce_mas_set_ntf_filter(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 	struct mce_mas_instance *inst;
@@ -2356,7 +2359,7 @@ static int cmd_mce_mas_set_ntf_filter(const struct shell *sh, size_t argc, char 
 	uint16_t len = 0;
 
 	if (default_mce_mas == NULL) {
-		shell_error(sh, "No default MCE MAS conn available");
+		bt_shell_session_error(sh, "No default MCE MAS conn available");
 		return -ENODEV;
 	}
 
@@ -2364,26 +2367,26 @@ static int cmd_mce_mas_set_ntf_filter(const struct shell *sh, size_t argc, char 
 
 	buf = bt_map_mce_mas_create_pdu(default_mce_mas, &mas_tx_pool);
 	if (buf == NULL) {
-		shell_error(sh, "Fail to allocate tx buffer");
+		bt_shell_session_error(sh, "Fail to allocate tx buffer");
 		return -ENOBUFS;
 	}
 
 	err = bt_obex_add_header_conn_id(buf, inst->conn_id);
 	if (err != 0) {
-		shell_error(sh, "Fail to add conn id header %d", err);
+		bt_shell_session_error(sh, "Fail to add conn id header %d", err);
 		goto failed;
 	}
 
 	err = bt_obex_add_header_type(buf, sizeof(BT_MAP_HDR_TYPE_SET_NTF_FILTER),
 				      BT_MAP_HDR_TYPE_SET_NTF_FILTER);
 	if (err != 0) {
-		shell_error(sh, "Fail to add type header %d", err);
+		bt_shell_session_error(sh, "Fail to add type header %d", err);
 		goto failed;
 	}
 
 	err = map_add_app_param(buf, inst->mopl, (size_t)tlv_count, tlvs);
 	if (err != 0) {
-		shell_error(sh, "Fail to add app param header (err %d)", err);
+		bt_shell_session_error(sh, "Fail to add app param header (err %d)", err);
 		goto failed;
 	}
 	tlv_count = 0;
@@ -2396,20 +2399,20 @@ static int cmd_mce_mas_set_ntf_filter(const struct shell *sh, size_t argc, char 
 			 (const uint8_t *)&ntf_filter_mask},
 		};
 
-		shell_print(sh, "Adding default application parameters:");
-		shell_print(sh, "  Notification filter mask: 0x%08x",
+		bt_shell_session_print(sh, "Adding default application parameters:");
+		bt_shell_session_print(sh, "  Notification filter mask: 0x%08x",
 			    sys_be32_to_cpu(ntf_filter_mask));
 
 		err = bt_obex_add_header_app_param(buf, ARRAY_SIZE(appl_params), appl_params);
 		if (err != 0) {
-			shell_error(sh, "Fail to add app param header (err %d)", err);
+			bt_shell_session_error(sh, "Fail to add app param header (err %d)", err);
 			goto failed;
 		}
 	}
 
 	err = bt_obex_add_header_body_or_end_body(buf, inst->mopl, 1, BT_MAP_FILLER_BYTE, &len);
 	if (err != 0 || len != 1U) {
-		shell_error(sh, "Fail to add body");
+		bt_shell_session_error(sh, "Fail to add body");
 		goto failed;
 	}
 
@@ -2418,7 +2421,7 @@ static int cmd_mce_mas_set_ntf_filter(const struct shell *sh, size_t argc, char 
 		return 0;
 	}
 
-	shell_error(sh, "Set notification filter failed (err %d)", err);
+	bt_shell_session_error(sh, "Set notification filter failed (err %d)", err);
 
 failed:
 	net_buf_unref(buf);
@@ -2502,7 +2505,7 @@ static struct bt_map_mce_mns_cb mce_mns_cb = {
 };
 
 /* MCE MNS commands */
-static int cmd_mce_mns_register(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_mce_mns_register(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 
@@ -2511,11 +2514,11 @@ static int cmd_mce_mns_register(const struct shell *sh, size_t argc, char *argv[
 
 		err = bt_map_mce_mns_register(&inst->mce_mns, &mce_mns_cb);
 		if (err != 0) {
-			shell_error(sh, "Failed to register MCE MNS server [%zu] (err %d)", i, err);
+			bt_shell_session_error(sh, "Failed to register MCE MNS server [%zu] (err %d)", i, err);
 			return -ENOEXEC;
 		}
 	}
-	shell_print(sh, "MCE MNS server(s) registered");
+	bt_shell_session_print(sh, "MCE MNS server(s) registered");
 
 	return 0;
 }
@@ -2639,12 +2642,12 @@ static int mce_mns_rfcomm_accept(struct bt_conn *conn, struct bt_map_mce_mns_rfc
 	return 0;
 }
 
-static int cmd_mce_mns_rfcomm_register(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_mce_mns_rfcomm_register(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 
 	if (mce_server.rfcomm_server.server.rfcomm.channel != 0) {
-		shell_error(sh, "RFCOMM server (channel %02x) has been registered",
+		bt_shell_session_error(sh, "RFCOMM server (channel %02x) has been registered",
 			    mce_server.rfcomm_server.server.rfcomm.channel);
 		return -EBUSY;
 	}
@@ -2653,11 +2656,11 @@ static int cmd_mce_mns_rfcomm_register(const struct shell *sh, size_t argc, char
 	mce_server.rfcomm_server.accept = mce_mns_rfcomm_accept;
 	err = bt_map_mce_mns_rfcomm_register(&mce_server.rfcomm_server);
 	if (err != 0) {
-		shell_error(sh, "Fail to register RFCOMM server (err %d)", err);
+		bt_shell_session_error(sh, "Fail to register RFCOMM server (err %d)", err);
 		mce_server.rfcomm_server.server.rfcomm.channel = 0;
 		return -ENOEXEC;
 	}
-	shell_print(sh, "RFCOMM server (channel %02x, map_supported_features %08x) is registered",
+	bt_shell_session_print(sh, "RFCOMM server (channel %02x, map_supported_features %08x) is registered",
 		    mce_server.rfcomm_server.server.rfcomm.channel, mce_server.supported_features);
 
 	if (mce_server.l2cap_server.server.l2cap.psm != 0) {
@@ -2666,10 +2669,10 @@ static int cmd_mce_mns_rfcomm_register(const struct shell *sh, size_t argc, char
 
 	err = bt_sdp_register_service(&mce_mns_rec);
 	if (err < 0) {
-		shell_error(sh, "Failed to register MCE MNS SDP record (err %d)", err);
+		bt_shell_session_error(sh, "Failed to register MCE MNS SDP record (err %d)", err);
 		return err;
 	}
-	shell_print(sh, "MCE MNS SDP record registered");
+	bt_shell_session_print(sh, "MCE MNS SDP record registered");
 
 	return 0;
 }
@@ -2693,7 +2696,7 @@ static struct mce_mns_instance *mce_mns_find_by_conn(struct bt_conn *conn)
 	return &mce_mns_instances[index];
 }
 
-static int cmd_mce_mns_rfcomm_disconnect(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_mce_mns_rfcomm_disconnect(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	struct mce_mns_instance *inst;
 	int err;
@@ -2705,7 +2708,7 @@ static int cmd_mce_mns_rfcomm_disconnect(const struct shell *sh, size_t argc, ch
 
 	err = bt_map_mce_mns_rfcomm_disconnect(&inst->mce_mns);
 	if (err != 0) {
-		shell_error(sh, "RFCOMM disconnect failed (err %d)", err);
+		bt_shell_session_error(sh, "RFCOMM disconnect failed (err %d)", err);
 	}
 
 	return err;
@@ -2727,12 +2730,12 @@ static int mce_mns_l2cap_accept(struct bt_conn *conn, struct bt_map_mce_mns_l2ca
 	return 0;
 }
 
-static int cmd_mce_mns_l2cap_register(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_mce_mns_l2cap_register(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 
 	if (mce_server.l2cap_server.server.l2cap.psm != 0) {
-		shell_error(sh, "L2CAP server (psm %04x) has been registered",
+		bt_shell_session_error(sh, "L2CAP server (psm %04x) has been registered",
 			    mce_server.l2cap_server.server.l2cap.psm);
 		return -EBUSY;
 	}
@@ -2741,11 +2744,11 @@ static int cmd_mce_mns_l2cap_register(const struct shell *sh, size_t argc, char 
 	mce_server.l2cap_server.accept = mce_mns_l2cap_accept;
 	err = bt_map_mce_mns_l2cap_register(&mce_server.l2cap_server);
 	if (err != 0) {
-		shell_error(sh, "Fail to register L2CAP server (err %d)", err);
+		bt_shell_session_error(sh, "Fail to register L2CAP server (err %d)", err);
 		mce_server.l2cap_server.server.l2cap.psm = 0;
 		return -ENOEXEC;
 	}
-	shell_print(sh, "L2CAP server (psm %04x, map_supported_features %08x) is registered",
+	bt_shell_session_print(sh, "L2CAP server (psm %04x, map_supported_features %08x) is registered",
 		    mce_server.l2cap_server.server.l2cap.psm, mce_server.supported_features);
 
 	if (mce_server.rfcomm_server.server.rfcomm.channel != 0) {
@@ -2754,15 +2757,15 @@ static int cmd_mce_mns_l2cap_register(const struct shell *sh, size_t argc, char 
 
 	err = bt_sdp_register_service(&mce_mns_rec);
 	if (err < 0) {
-		shell_error(sh, "Failed to register MCE MNS SDP record (err %d)", err);
+		bt_shell_session_error(sh, "Failed to register MCE MNS SDP record (err %d)", err);
 		return err;
 	}
-	shell_print(sh, "MCE MNS SDP record registered");
+	bt_shell_session_print(sh, "MCE MNS SDP record registered");
 
 	return 0;
 }
 
-static int cmd_mce_mns_l2cap_disconnect(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_mce_mns_l2cap_disconnect(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	struct mce_mns_instance *inst;
 	int err;
@@ -2774,13 +2777,13 @@ static int cmd_mce_mns_l2cap_disconnect(const struct shell *sh, size_t argc, cha
 
 	err = bt_map_mce_mns_l2cap_disconnect(&inst->mce_mns);
 	if (err != 0) {
-		shell_error(sh, "L2CAP disconnect failed (err %d)", err);
+		bt_shell_session_error(sh, "L2CAP disconnect failed (err %d)", err);
 	}
 
 	return err;
 }
 
-static int cmd_mce_mns_connect(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_mce_mns_connect(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	struct mce_mns_instance *inst;
 	uint8_t rsp_code;
@@ -2798,13 +2801,13 @@ static int cmd_mce_mns_connect(const struct shell *sh, size_t argc, char *argv[]
 
 	err = bt_map_mce_mns_connect(&inst->mce_mns, rsp_code, NULL);
 	if (err != 0) {
-		shell_error(sh, "MCE MNS connect rsp failed (err %d)", err);
+		bt_shell_session_error(sh, "MCE MNS connect rsp failed (err %d)", err);
 	}
 
 	return err;
 }
 
-static int cmd_mce_mns_disconnect(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_mce_mns_disconnect(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	struct mce_mns_instance *inst;
 	uint8_t rsp_code;
@@ -2822,13 +2825,13 @@ static int cmd_mce_mns_disconnect(const struct shell *sh, size_t argc, char *arg
 
 	err = bt_map_mce_mns_disconnect(&inst->mce_mns, rsp_code, NULL);
 	if (err != 0) {
-		shell_error(sh, "MCE MNS disconnect rsp failed (err %d)", err);
+		bt_shell_session_error(sh, "MCE MNS disconnect rsp failed (err %d)", err);
 	}
 
 	return err;
 }
 
-static int cmd_mce_mns_abort(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_mce_mns_abort(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	struct mce_mns_instance *inst;
 	uint8_t rsp_code;
@@ -2846,7 +2849,7 @@ static int cmd_mce_mns_abort(const struct shell *sh, size_t argc, char *argv[])
 
 	err = bt_map_mce_mns_abort(&inst->mce_mns, rsp_code, NULL);
 	if (err != 0) {
-		shell_error(sh, "MCE MNS abort rsp failed (err %d)", err);
+		bt_shell_session_error(sh, "MCE MNS abort rsp failed (err %d)", err);
 	} else {
 		inst->srm = 0;
 		inst->tx_cnt = 0;
@@ -2855,7 +2858,7 @@ static int cmd_mce_mns_abort(const struct shell *sh, size_t argc, char *argv[])
 	return err;
 }
 
-static int cmd_mce_mns_send_event(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_mce_mns_send_event(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint8_t rsp_code = 0;
 	struct net_buf *buf = NULL;
@@ -2870,14 +2873,14 @@ static int cmd_mce_mns_send_event(const struct shell *sh, size_t argc, char *arg
 
 	err = parse_error_code(sh, argc, argv, &rsp_code);
 	if (err != 0) {
-		shell_help(sh);
-		return SHELL_CMD_HELP_PRINTED;
+		bt_shell_help(sh);
+		return BT_SHELL_CMD_HELP_PRINTED;
 	}
 
 	err = parse_srmp(sh, argc, argv, &enable_srmp);
 	if (err != 0) {
-		shell_help(sh);
-		return SHELL_CMD_HELP_PRINTED;
+		bt_shell_help(sh);
+		return BT_SHELL_CMD_HELP_PRINTED;
 	}
 
 	if (rsp_code != 0U) {
@@ -2886,20 +2889,20 @@ static int cmd_mce_mns_send_event(const struct shell *sh, size_t argc, char *arg
 
 	buf = bt_map_mce_mns_create_pdu(&inst->mce_mns, &mns_tx_pool);
 	if (buf == NULL) {
-		shell_error(sh, "Fail to allocate tx buffer");
+		bt_shell_session_error(sh, "Fail to allocate tx buffer");
 		return -ENOBUFS;
 	}
 
 	err = add_header_srm_rsp(buf, &inst->srm, inst->goep_v2);
 	if (err != 0) {
-		shell_error(sh, "Fail to add SRM header %d", err);
+		bt_shell_session_error(sh, "Fail to add SRM header %d", err);
 		net_buf_unref(buf);
 		return err;
 	}
 
 	err = add_header_srm_param_rsp(buf, &inst->srm, enable_srmp);
 	if (err != 0) {
-		shell_error(sh, "Fail to add SRMP header %d", err);
+		bt_shell_session_error(sh, "Fail to add SRMP header %d", err);
 		net_buf_unref(buf);
 		return err;
 	}
@@ -2918,7 +2921,7 @@ error_rsp:
 			clear_local_srm_param(buf, &inst->srm);
 			net_buf_unref(buf);
 		}
-		shell_error(sh, "MCE MNS send event rsp failed (err %d)", err);
+		bt_shell_session_error(sh, "MCE MNS send event rsp failed (err %d)", err);
 	} else {
 		if (rsp_code == BT_OBEX_RSP_CODE_CONTINUE) {
 			set_srm_no_wait(&inst->srm);
@@ -3375,27 +3378,27 @@ static struct bt_map_mse_mas_cb mse_mas_cb = {
 };
 
 /* MSE MAS commands */
-static int cmd_mse_mas_select(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_mse_mas_select(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	struct mse_mas_instance *inst;
 	uint8_t instance_id;
 	uint8_t index;
 	int err = 0;
 
-	instance_id = (uint8_t)shell_strtoul(argv[1], 10, &err);
+	instance_id = (uint8_t)bt_shell_strtoul(argv[1], 10, &err);
 	if (err != 0) {
-		shell_error(sh, "Invalid instance_id %s", argv[1]);
+		bt_shell_session_error(sh, "Invalid instance_id %s", argv[1]);
 		return -ENOEXEC;
 	}
 
 	if (default_conn == NULL) {
-		shell_error(sh, "Not connected");
+		bt_shell_session_error(sh, "Not connected");
 		return -ENOEXEC;
 	}
 
 	index = bt_conn_index(default_conn);
 	if (index >= CONFIG_BT_MAX_CONN) {
-		shell_error(sh, "Invalid default_conn index");
+		bt_shell_session_error(sh, "Invalid default_conn index");
 		return -ENOEXEC;
 	}
 
@@ -3404,18 +3407,18 @@ static int cmd_mse_mas_select(const struct shell *sh, size_t argc, char *argv[])
 
 		if (inst->conn != NULL && inst->instance_id == instance_id) {
 			default_mse_mas = &inst->mse_mas;
-			shell_print(sh, "Selected MSE MAS instance_id %u as default",
+			bt_shell_session_print(sh, "Selected MSE MAS instance_id %u as default",
 				    inst->instance_id);
 			return 0;
 		}
 	}
 
-	shell_error(sh, "No matching MSE MAS instance available for conn %s",
+	bt_shell_session_error(sh, "No matching MSE MAS instance available for conn %s",
 		    bt_conn_dst_str(default_conn));
 	return -ENOEXEC;
 }
 
-static int cmd_mse_mas_register(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_mse_mas_register(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 
@@ -3425,14 +3428,14 @@ static int cmd_mse_mas_register(const struct shell *sh, size_t argc, char *argv[
 
 			err = bt_map_mse_mas_register(&inst->mse_mas, &mse_mas_cb);
 			if (err != 0) {
-				shell_error(sh,
+				bt_shell_session_error(sh,
 					    "Failed to register MSE MAS server [%zu][%zu] (err %d)",
 					    i, j, err);
 				return -ENOEXEC;
 			}
 		}
 	}
-	shell_print(sh, "MSE MAS server(s) registered");
+	bt_shell_session_print(sh, "MSE MAS server(s) registered");
 
 	return 0;
 }
@@ -3592,13 +3595,13 @@ static int mse_mas_rfcomm_accept(struct bt_conn *conn, struct bt_map_mse_mas_rfc
 	return 0;
 }
 
-static int cmd_mse_mas_rfcomm_register(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_mse_mas_rfcomm_register(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 
 	ARRAY_FOR_EACH(mse_server, index) {
 		if (mse_server[index].rfcomm_server.server.rfcomm.channel != 0) {
-			shell_warn(sh, "RFCOMM server (channel %02x) has been registered",
+			bt_shell_session_warn(sh, "RFCOMM server (channel %02x) has been registered",
 				   mse_server[index].rfcomm_server.server.rfcomm.channel);
 			continue;
 		}
@@ -3607,11 +3610,11 @@ static int cmd_mse_mas_rfcomm_register(const struct shell *sh, size_t argc, char
 		mse_server[index].rfcomm_server.accept = mse_mas_rfcomm_accept;
 		err = bt_map_mse_mas_rfcomm_register(&mse_server[index].rfcomm_server);
 		if (err != 0) {
-			shell_error(sh, "Fail to register RFCOMM server (err %d)", err);
+			bt_shell_session_error(sh, "Fail to register RFCOMM server (err %d)", err);
 			mse_server[index].rfcomm_server.server.rfcomm.channel = 0;
 			return -ENOEXEC;
 		}
-		shell_print(sh,
+		bt_shell_session_print(sh,
 			    "RFCOMM server (channel %02x, mas_instance_id %u, "
 			    "map_supported_features %08x) is registered",
 			    mse_server[index].rfcomm_server.server.rfcomm.channel,
@@ -3623,28 +3626,28 @@ static int cmd_mse_mas_rfcomm_register(const struct shell *sh, size_t argc, char
 
 		err = bt_sdp_register_service(&mse_mas_rec[index]);
 		if (err < 0) {
-			shell_error(sh, "Failed to register MSE MAS SDP record %d (err %d)", index,
+			bt_shell_session_error(sh, "Failed to register MSE MAS SDP record %d (err %d)", index,
 				    err);
 			return err;
 		}
-		shell_print(sh, "MSE MAS SDP record %d registered", index);
+		bt_shell_session_print(sh, "MSE MAS SDP record %d registered", index);
 	}
 
 	return 0;
 }
 
-static int cmd_mse_mas_rfcomm_disconnect(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_mse_mas_rfcomm_disconnect(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 
 	if (default_mse_mas == NULL) {
-		shell_error(sh, "No default MSE MAS conn available");
+		bt_shell_session_error(sh, "No default MSE MAS conn available");
 		return -ENODEV;
 	}
 
 	err = bt_map_mse_mas_rfcomm_disconnect(default_mse_mas);
 	if (err != 0) {
-		shell_error(sh, "RFCOMM disconnect failed (err %d)", err);
+		bt_shell_session_error(sh, "RFCOMM disconnect failed (err %d)", err);
 	}
 
 	return err;
@@ -3680,13 +3683,13 @@ static int mse_mas_l2cap_accept(struct bt_conn *conn, struct bt_map_mse_mas_l2ca
 	return 0;
 }
 
-static int cmd_mse_mas_l2cap_register(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_mse_mas_l2cap_register(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 
 	ARRAY_FOR_EACH(mse_server, index) {
 		if (mse_server[index].l2cap_server.server.l2cap.psm != 0) {
-			shell_warn(sh, "L2CAP server (psm %04x) has been registered",
+			bt_shell_session_warn(sh, "L2CAP server (psm %04x) has been registered",
 				   mse_server[index].l2cap_server.server.l2cap.psm);
 			continue;
 		}
@@ -3695,11 +3698,11 @@ static int cmd_mse_mas_l2cap_register(const struct shell *sh, size_t argc, char 
 		mse_server[index].l2cap_server.accept = mse_mas_l2cap_accept;
 		err = bt_map_mse_mas_l2cap_register(&mse_server[index].l2cap_server);
 		if (err != 0) {
-			shell_error(sh, "Fail to register L2CAP server (err %d)", err);
+			bt_shell_session_error(sh, "Fail to register L2CAP server (err %d)", err);
 			mse_server[index].l2cap_server.server.l2cap.psm = 0;
 			return -ENOEXEC;
 		}
-		shell_print(sh,
+		bt_shell_session_print(sh,
 			    "L2CAP server (psm %04x, mas_instance_id %u, "
 			    "map_supported_features %08x) is registered",
 			    mse_server[index].l2cap_server.server.l2cap.psm,
@@ -3711,40 +3714,40 @@ static int cmd_mse_mas_l2cap_register(const struct shell *sh, size_t argc, char 
 
 		err = bt_sdp_register_service(&mse_mas_rec[index]);
 		if (err < 0) {
-			shell_error(sh, "Failed to register MSE MAS SDP record %d (err %d)", index,
+			bt_shell_session_error(sh, "Failed to register MSE MAS SDP record %d (err %d)", index,
 				    err);
 			return err;
 		}
-		shell_print(sh, "MSE MAS SDP record %d registered", index);
+		bt_shell_session_print(sh, "MSE MAS SDP record %d registered", index);
 	}
 
 	return 0;
 }
 
-static int cmd_mse_mas_l2cap_disconnect(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_mse_mas_l2cap_disconnect(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 
 	if (default_mse_mas == NULL) {
-		shell_error(sh, "No default MSE MAS conn available");
+		bt_shell_session_error(sh, "No default MSE MAS conn available");
 		return -ENODEV;
 	}
 
 	err = bt_map_mse_mas_l2cap_disconnect(default_mse_mas);
 	if (err != 0) {
-		shell_error(sh, "L2CAP disconnect failed (err %d)", err);
+		bt_shell_session_error(sh, "L2CAP disconnect failed (err %d)", err);
 	}
 
 	return err;
 }
 
-static int cmd_mse_mas_connect(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_mse_mas_connect(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint8_t rsp_code;
 	int err;
 
 	if (default_mse_mas == NULL) {
-		shell_error(sh, "No default MSE MAS conn available");
+		bt_shell_session_error(sh, "No default MSE MAS conn available");
 		return -ENODEV;
 	}
 
@@ -3755,19 +3758,19 @@ static int cmd_mse_mas_connect(const struct shell *sh, size_t argc, char *argv[]
 
 	err = bt_map_mse_mas_connect(default_mse_mas, rsp_code, NULL);
 	if (err != 0) {
-		shell_error(sh, "MSE MAS connect rsp failed (err %d)", err);
+		bt_shell_session_error(sh, "MSE MAS connect rsp failed (err %d)", err);
 	}
 
 	return err;
 }
 
-static int cmd_mse_mas_disconnect(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_mse_mas_disconnect(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint8_t rsp_code;
 	int err;
 
 	if (default_mse_mas == NULL) {
-		shell_error(sh, "No default MSE MAS conn available");
+		bt_shell_session_error(sh, "No default MSE MAS conn available");
 		return -ENODEV;
 	}
 
@@ -3778,20 +3781,20 @@ static int cmd_mse_mas_disconnect(const struct shell *sh, size_t argc, char *arg
 
 	err = bt_map_mse_mas_disconnect(default_mse_mas, rsp_code, NULL);
 	if (err != 0) {
-		shell_error(sh, "MSE MAS disconnect rsp failed (err %d)", err);
+		bt_shell_session_error(sh, "MSE MAS disconnect rsp failed (err %d)", err);
 	}
 
 	return err;
 }
 
-static int cmd_mse_mas_abort(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_mse_mas_abort(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint8_t rsp_code;
 	struct mse_mas_instance *inst;
 	int err;
 
 	if (default_mse_mas == NULL) {
-		shell_error(sh, "No default MSE MAS conn available");
+		bt_shell_session_error(sh, "No default MSE MAS conn available");
 		return -ENODEV;
 	}
 
@@ -3804,7 +3807,7 @@ static int cmd_mse_mas_abort(const struct shell *sh, size_t argc, char *argv[])
 
 	err = bt_map_mse_mas_abort(default_mse_mas, rsp_code, NULL);
 	if (err != 0) {
-		shell_error(sh, "MSE MAS abort rsp failed (err %d)", err);
+		bt_shell_session_error(sh, "MSE MAS abort rsp failed (err %d)", err);
 	} else {
 		inst->srm = 0;
 		inst->tx_cnt = 0;
@@ -3813,13 +3816,13 @@ static int cmd_mse_mas_abort(const struct shell *sh, size_t argc, char *argv[])
 	return err;
 }
 
-static int cmd_mse_mas_set_folder(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_mse_mas_set_folder(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint8_t rsp_code;
 	int err;
 
 	if (default_mse_mas == NULL) {
-		shell_error(sh, "No default MSE MAS conn available");
+		bt_shell_session_error(sh, "No default MSE MAS conn available");
 		return -ENODEV;
 	}
 
@@ -3830,20 +3833,20 @@ static int cmd_mse_mas_set_folder(const struct shell *sh, size_t argc, char *arg
 
 	err = bt_map_mse_mas_set_folder(default_mse_mas, rsp_code, NULL);
 	if (err != 0) {
-		shell_error(sh, "MSE MAS set folder rsp failed (err %d)", err);
+		bt_shell_session_error(sh, "MSE MAS set folder rsp failed (err %d)", err);
 	}
 
 	return err;
 }
 
-static int cmd_mse_mas_set_ntf_reg(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_mse_mas_set_ntf_reg(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint8_t rsp_code = 0;
 	struct mse_mas_instance *inst;
 	int err;
 
 	if (default_mse_mas == NULL) {
-		shell_error(sh, "No default MSE MAS conn available");
+		bt_shell_session_error(sh, "No default MSE MAS conn available");
 		return -ENODEV;
 	}
 
@@ -3851,8 +3854,8 @@ static int cmd_mse_mas_set_ntf_reg(const struct shell *sh, size_t argc, char *ar
 
 	err = parse_error_code(sh, argc, argv, &rsp_code);
 	if (err != 0) {
-		shell_help(sh);
-		return SHELL_CMD_HELP_PRINTED;
+		bt_shell_help(sh);
+		return BT_SHELL_CMD_HELP_PRINTED;
 	}
 
 	if (rsp_code != 0U) {
@@ -3868,7 +3871,7 @@ static int cmd_mse_mas_set_ntf_reg(const struct shell *sh, size_t argc, char *ar
 error_rsp:
 	err = bt_map_mse_mas_set_ntf_reg(default_mse_mas, rsp_code, NULL);
 	if (err != 0) {
-		shell_error(sh, "MSE MAS set notification registration rsp failed (err %d)", err);
+		bt_shell_session_error(sh, "MSE MAS set notification registration rsp failed (err %d)", err);
 	}
 
 	return err;
@@ -3884,7 +3887,7 @@ error_rsp:
 	"    <folder name=\"draft\"/>\r\n"                                                         \
 	"</folder-listing>"
 
-static int cmd_mse_mas_get_folder_listing(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_mse_mas_get_folder_listing(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	struct net_buf *buf = NULL;
 	uint8_t rsp_code = 0;
@@ -3895,7 +3898,7 @@ static int cmd_mse_mas_get_folder_listing(const struct shell *sh, size_t argc, c
 	int err;
 
 	if (default_mse_mas == NULL) {
-		shell_error(sh, "No default MSE MAS conn available");
+		bt_shell_session_error(sh, "No default MSE MAS conn available");
 		return -ENODEV;
 	}
 
@@ -3903,14 +3906,14 @@ static int cmd_mse_mas_get_folder_listing(const struct shell *sh, size_t argc, c
 
 	err = parse_error_code(sh, argc, argv, &rsp_code);
 	if (err != 0) {
-		shell_help(sh);
-		return SHELL_CMD_HELP_PRINTED;
+		bt_shell_help(sh);
+		return BT_SHELL_CMD_HELP_PRINTED;
 	}
 
 	err = parse_srmp(sh, argc, argv, &enable_srmp);
 	if (err != 0) {
-		shell_help(sh);
-		return SHELL_CMD_HELP_PRINTED;
+		bt_shell_help(sh);
+		return BT_SHELL_CMD_HELP_PRINTED;
 	}
 
 	if (rsp_code != 0U) {
@@ -3919,20 +3922,20 @@ static int cmd_mse_mas_get_folder_listing(const struct shell *sh, size_t argc, c
 
 	buf = bt_map_mse_mas_create_pdu(default_mse_mas, &mas_tx_pool);
 	if (buf == NULL) {
-		shell_error(sh, "Fail to allocate tx buffer");
+		bt_shell_session_error(sh, "Fail to allocate tx buffer");
 		return -ENOBUFS;
 	}
 
 	err = add_header_srm_rsp(buf, &inst->srm, inst->goep_v2);
 	if (err != 0) {
-		shell_error(sh, "Fail to add SRM header %d", err);
+		bt_shell_session_error(sh, "Fail to add SRM header %d", err);
 		net_buf_unref(buf);
 		return err;
 	}
 
 	err = add_header_srm_param_rsp(buf, &inst->srm, enable_srmp);
 	if (err != 0) {
-		shell_error(sh, "Fail to add SRMP header %d", err);
+		bt_shell_session_error(sh, "Fail to add SRMP header %d", err);
 		net_buf_unref(buf);
 		return err;
 	}
@@ -3943,7 +3946,7 @@ static int cmd_mse_mas_get_folder_listing(const struct shell *sh, size_t argc, c
 
 	err = map_add_app_param(buf, inst->mopl, (size_t)tlv_count, tlvs);
 	if (err != 0) {
-		shell_error(sh, "Fail to add app param header (err %d)", err);
+		bt_shell_session_error(sh, "Fail to add app param header (err %d)", err);
 		net_buf_unref(buf);
 		return err;
 	}
@@ -3955,7 +3958,7 @@ add_body:
 						  body + inst->tx_cnt, &len);
 
 	if (err != 0) {
-		shell_error(sh, "Fail to add body");
+		bt_shell_session_error(sh, "Fail to add body");
 		net_buf_unref(buf);
 		return -ENOEXEC;
 	}
@@ -3974,7 +3977,7 @@ error_rsp:
 			clear_local_srm_param(buf, &inst->srm);
 			net_buf_unref(buf);
 		}
-		shell_error(sh, "Fail to send get folder listing rsp %d", err);
+		bt_shell_session_error(sh, "Fail to send get folder listing rsp %d", err);
 	} else {
 		if (rsp_code == BT_OBEX_RSP_CODE_CONTINUE) {
 			set_srm_no_wait(&inst->srm);
@@ -4003,7 +4006,7 @@ error_rsp:
 	"attachment_size=\"0\" priority=\"no\" read=\"yes\" sent=\"no\" protected=\"no\"/>\r\n"    \
 	"</MAP-msg-listing>"
 
-static int cmd_mse_mas_get_msg_listing(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_mse_mas_get_msg_listing(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	struct net_buf *buf = NULL;
 	uint8_t rsp_code = 0;
@@ -4014,7 +4017,7 @@ static int cmd_mse_mas_get_msg_listing(const struct shell *sh, size_t argc, char
 	int err;
 
 	if (default_mse_mas == NULL) {
-		shell_error(sh, "No default MSE MAS conn available");
+		bt_shell_session_error(sh, "No default MSE MAS conn available");
 		return -ENODEV;
 	}
 
@@ -4022,14 +4025,14 @@ static int cmd_mse_mas_get_msg_listing(const struct shell *sh, size_t argc, char
 
 	err = parse_error_code(sh, argc, argv, &rsp_code);
 	if (err != 0) {
-		shell_help(sh);
-		return SHELL_CMD_HELP_PRINTED;
+		bt_shell_help(sh);
+		return BT_SHELL_CMD_HELP_PRINTED;
 	}
 
 	err = parse_srmp(sh, argc, argv, &enable_srmp);
 	if (err != 0) {
-		shell_help(sh);
-		return SHELL_CMD_HELP_PRINTED;
+		bt_shell_help(sh);
+		return BT_SHELL_CMD_HELP_PRINTED;
 	}
 
 	if (rsp_code != 0U) {
@@ -4038,20 +4041,20 @@ static int cmd_mse_mas_get_msg_listing(const struct shell *sh, size_t argc, char
 
 	buf = bt_map_mse_mas_create_pdu(default_mse_mas, &mas_tx_pool);
 	if (buf == NULL) {
-		shell_error(sh, "Fail to allocate tx buffer");
+		bt_shell_session_error(sh, "Fail to allocate tx buffer");
 		return -ENOBUFS;
 	}
 
 	err = add_header_srm_rsp(buf, &inst->srm, inst->goep_v2);
 	if (err != 0) {
-		shell_error(sh, "Fail to add SRM header %d", err);
+		bt_shell_session_error(sh, "Fail to add SRM header %d", err);
 		net_buf_unref(buf);
 		return err;
 	}
 
 	err = add_header_srm_param_rsp(buf, &inst->srm, enable_srmp);
 	if (err != 0) {
-		shell_error(sh, "Fail to add SRMP header %d", err);
+		bt_shell_session_error(sh, "Fail to add SRMP header %d", err);
 		net_buf_unref(buf);
 		return err;
 	}
@@ -4062,7 +4065,7 @@ static int cmd_mse_mas_get_msg_listing(const struct shell *sh, size_t argc, char
 
 	err = map_add_app_param(buf, inst->mopl, (size_t)tlv_count, tlvs);
 	if (err != 0) {
-		shell_error(sh, "Fail to add app param header (err %d)", err);
+		bt_shell_session_error(sh, "Fail to add app param header (err %d)", err);
 		net_buf_unref(buf);
 		return err;
 	}
@@ -4080,14 +4083,14 @@ static int cmd_mse_mas_get_msg_listing(const struct shell *sh, size_t argc, char
 			 (const uint8_t *)&listing_size},
 		};
 
-		shell_print(sh, "Adding default application parameters:");
-		shell_print(sh, "  New message: %d", new_msg);
-		shell_print(sh, "  MSE time: %s", mse_time);
-		shell_print(sh, "  Listing size: %d", sys_be16_to_cpu(listing_size));
+		bt_shell_session_print(sh, "Adding default application parameters:");
+		bt_shell_session_print(sh, "  New message: %d", new_msg);
+		bt_shell_session_print(sh, "  MSE time: %s", mse_time);
+		bt_shell_session_print(sh, "  Listing size: %d", sys_be16_to_cpu(listing_size));
 
 		err = bt_obex_add_header_app_param(buf, ARRAY_SIZE(appl_params), appl_params);
 		if (err != 0) {
-			shell_error(sh, "Fail to add app param header (err %d)", err);
+			bt_shell_session_error(sh, "Fail to add app param header (err %d)", err);
 			net_buf_unref(buf);
 			return -ENOEXEC;
 		}
@@ -4099,7 +4102,7 @@ add_body:
 						  body + inst->tx_cnt, &len);
 
 	if (err != 0) {
-		shell_error(sh, "Fail to add body");
+		bt_shell_session_error(sh, "Fail to add body");
 		net_buf_unref(buf);
 		return -ENOEXEC;
 	}
@@ -4118,7 +4121,7 @@ error_rsp:
 			clear_local_srm_param(buf, &inst->srm);
 			net_buf_unref(buf);
 		}
-		shell_error(sh, "Fail to send get message listing rsp %d", err);
+		bt_shell_session_error(sh, "Fail to send get message listing rsp %d", err);
 	} else {
 		if (rsp_code == BT_OBEX_RSP_CODE_CONTINUE) {
 			set_srm_no_wait(&inst->srm);
@@ -4132,7 +4135,7 @@ error_rsp:
 	return err;
 }
 
-static int cmd_mse_mas_get_msg(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_mse_mas_get_msg(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	struct net_buf *buf = NULL;
 	uint8_t rsp_code = 0;
@@ -4143,7 +4146,7 @@ static int cmd_mse_mas_get_msg(const struct shell *sh, size_t argc, char *argv[]
 	int err;
 
 	if (default_mse_mas == NULL) {
-		shell_error(sh, "No default MSE MAS conn available");
+		bt_shell_session_error(sh, "No default MSE MAS conn available");
 		return -ENODEV;
 	}
 
@@ -4151,14 +4154,14 @@ static int cmd_mse_mas_get_msg(const struct shell *sh, size_t argc, char *argv[]
 
 	err = parse_error_code(sh, argc, argv, &rsp_code);
 	if (err != 0) {
-		shell_help(sh);
-		return SHELL_CMD_HELP_PRINTED;
+		bt_shell_help(sh);
+		return BT_SHELL_CMD_HELP_PRINTED;
 	}
 
 	err = parse_srmp(sh, argc, argv, &enable_srmp);
 	if (err != 0) {
-		shell_help(sh);
-		return SHELL_CMD_HELP_PRINTED;
+		bt_shell_help(sh);
+		return BT_SHELL_CMD_HELP_PRINTED;
 	}
 
 	if (rsp_code != 0U) {
@@ -4167,20 +4170,20 @@ static int cmd_mse_mas_get_msg(const struct shell *sh, size_t argc, char *argv[]
 
 	buf = bt_map_mse_mas_create_pdu(default_mse_mas, &mas_tx_pool);
 	if (buf == NULL) {
-		shell_error(sh, "Fail to allocate tx buffer");
+		bt_shell_session_error(sh, "Fail to allocate tx buffer");
 		return -ENOBUFS;
 	}
 
 	err = add_header_srm_rsp(buf, &inst->srm, inst->goep_v2);
 	if (err != 0) {
-		shell_error(sh, "Fail to add SRM header %d", err);
+		bt_shell_session_error(sh, "Fail to add SRM header %d", err);
 		net_buf_unref(buf);
 		return err;
 	}
 
 	err = add_header_srm_param_rsp(buf, &inst->srm, enable_srmp);
 	if (err != 0) {
-		shell_error(sh, "Fail to add SRMP header %d", err);
+		bt_shell_session_error(sh, "Fail to add SRMP header %d", err);
 		net_buf_unref(buf);
 		return err;
 	}
@@ -4191,7 +4194,7 @@ static int cmd_mse_mas_get_msg(const struct shell *sh, size_t argc, char *argv[]
 
 	err = map_add_app_param(buf, inst->mopl, (size_t)tlv_count, tlvs);
 	if (err != 0) {
-		shell_error(sh, "Fail to add app param header (err %d)", err);
+		bt_shell_session_error(sh, "Fail to add app param header (err %d)", err);
 		net_buf_unref(buf);
 		return err;
 	}
@@ -4203,7 +4206,7 @@ add_body:
 						  body + inst->tx_cnt, &len);
 
 	if (err != 0) {
-		shell_error(sh, "Fail to add body");
+		bt_shell_session_error(sh, "Fail to add body");
 		net_buf_unref(buf);
 		return -ENOEXEC;
 	}
@@ -4222,7 +4225,7 @@ error_rsp:
 			clear_local_srm_param(buf, &inst->srm);
 			net_buf_unref(buf);
 		}
-		shell_error(sh, "Fail to send get message rsp %d", err);
+		bt_shell_session_error(sh, "Fail to send get message rsp %d", err);
 	} else {
 		if (rsp_code == BT_OBEX_RSP_CODE_CONTINUE) {
 			set_srm_no_wait(&inst->srm);
@@ -4236,14 +4239,14 @@ error_rsp:
 	return err;
 }
 
-static int cmd_mse_mas_set_msg_status(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_mse_mas_set_msg_status(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint8_t rsp_code = 0;
 	struct mse_mas_instance *inst;
 	int err;
 
 	if (default_mse_mas == NULL) {
-		shell_error(sh, "No default MSE MAS conn available");
+		bt_shell_session_error(sh, "No default MSE MAS conn available");
 		return -ENODEV;
 	}
 
@@ -4251,8 +4254,8 @@ static int cmd_mse_mas_set_msg_status(const struct shell *sh, size_t argc, char 
 
 	err = parse_error_code(sh, argc, argv, &rsp_code);
 	if (err != 0) {
-		shell_help(sh);
-		return SHELL_CMD_HELP_PRINTED;
+		bt_shell_help(sh);
+		return BT_SHELL_CMD_HELP_PRINTED;
 	}
 
 	if (rsp_code != 0U) {
@@ -4268,13 +4271,13 @@ static int cmd_mse_mas_set_msg_status(const struct shell *sh, size_t argc, char 
 error_rsp:
 	err = bt_map_mse_mas_set_msg_status(default_mse_mas, rsp_code, NULL);
 	if (err != 0) {
-		shell_error(sh, "MSE MAS set message status rsp failed (err %d)", err);
+		bt_shell_session_error(sh, "MSE MAS set message status rsp failed (err %d)", err);
 	}
 
 	return err;
 }
 
-static int cmd_mse_mas_push_msg(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_mse_mas_push_msg(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	struct net_buf *buf = NULL;
 	uint8_t rsp_code = 0;
@@ -4283,7 +4286,7 @@ static int cmd_mse_mas_push_msg(const struct shell *sh, size_t argc, char *argv[
 	int err;
 
 	if (default_mse_mas == NULL) {
-		shell_error(sh, "No default MSE MAS conn available");
+		bt_shell_session_error(sh, "No default MSE MAS conn available");
 		return -ENODEV;
 	}
 
@@ -4291,14 +4294,14 @@ static int cmd_mse_mas_push_msg(const struct shell *sh, size_t argc, char *argv[
 
 	err = parse_error_code(sh, argc, argv, &rsp_code);
 	if (err != 0) {
-		shell_help(sh);
-		return SHELL_CMD_HELP_PRINTED;
+		bt_shell_help(sh);
+		return BT_SHELL_CMD_HELP_PRINTED;
 	}
 
 	err = parse_srmp(sh, argc, argv, &enable_srmp);
 	if (err != 0) {
-		shell_help(sh);
-		return SHELL_CMD_HELP_PRINTED;
+		bt_shell_help(sh);
+		return BT_SHELL_CMD_HELP_PRINTED;
 	}
 
 	if (rsp_code != 0U) {
@@ -4307,20 +4310,20 @@ static int cmd_mse_mas_push_msg(const struct shell *sh, size_t argc, char *argv[
 
 	buf = bt_map_mse_mas_create_pdu(default_mse_mas, &mas_tx_pool);
 	if (buf == NULL) {
-		shell_error(sh, "Fail to allocate tx buffer");
+		bt_shell_session_error(sh, "Fail to allocate tx buffer");
 		return -ENOBUFS;
 	}
 
 	err = add_header_srm_rsp(buf, &inst->srm, inst->goep_v2);
 	if (err != 0) {
-		shell_error(sh, "Fail to add SRM header %d", err);
+		bt_shell_session_error(sh, "Fail to add SRM header %d", err);
 		net_buf_unref(buf);
 		return err;
 	}
 
 	err = add_header_srm_param_rsp(buf, &inst->srm, enable_srmp);
 	if (err != 0) {
-		shell_error(sh, "Fail to add SRMP header %d", err);
+		bt_shell_session_error(sh, "Fail to add SRMP header %d", err);
 		net_buf_unref(buf);
 		return err;
 	}
@@ -4330,7 +4333,7 @@ static int cmd_mse_mas_push_msg(const struct shell *sh, size_t argc, char *argv[
 
 		err = add_header_name(buf, msg_handle);
 		if (err != 0) {
-			shell_error(sh, "Fail to add name header %d", err);
+			bt_shell_session_error(sh, "Fail to add name header %d", err);
 			net_buf_unref(buf);
 			return err;
 		}
@@ -4347,7 +4350,7 @@ error_rsp:
 			clear_local_srm_param(buf, &inst->srm);
 			net_buf_unref(buf);
 		}
-		shell_error(sh, "MSE MAS push message rsp failed (err %d)", err);
+		bt_shell_session_error(sh, "MSE MAS push message rsp failed (err %d)", err);
 	} else {
 		if (rsp_code == BT_OBEX_RSP_CODE_CONTINUE) {
 			set_srm_no_wait(&inst->srm);
@@ -4359,14 +4362,14 @@ error_rsp:
 	return err;
 }
 
-static int cmd_mse_mas_update_inbox(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_mse_mas_update_inbox(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint8_t rsp_code = 0;
 	struct mse_mas_instance *inst;
 	int err;
 
 	if (default_mse_mas == NULL) {
-		shell_error(sh, "No default MSE MAS conn available");
+		bt_shell_session_error(sh, "No default MSE MAS conn available");
 		return -ENODEV;
 	}
 
@@ -4374,8 +4377,8 @@ static int cmd_mse_mas_update_inbox(const struct shell *sh, size_t argc, char *a
 
 	err = parse_error_code(sh, argc, argv, &rsp_code);
 	if (err != 0) {
-		shell_help(sh);
-		return SHELL_CMD_HELP_PRINTED;
+		bt_shell_help(sh);
+		return BT_SHELL_CMD_HELP_PRINTED;
 	}
 
 	if (rsp_code != 0U) {
@@ -4391,14 +4394,14 @@ static int cmd_mse_mas_update_inbox(const struct shell *sh, size_t argc, char *a
 error_rsp:
 	err = bt_map_mse_mas_update_inbox(default_mse_mas, rsp_code, NULL);
 	if (err != 0) {
-		shell_error(sh, "MSE MAS update inbox rsp failed (err %d)", err);
+		bt_shell_session_error(sh, "MSE MAS update inbox rsp failed (err %d)", err);
 	}
 
 	return err;
 }
 
 #define MAP_INSTANCE_INFO_BODY "MAS Instance Info"
-static int cmd_mse_mas_get_mas_inst_info(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_mse_mas_get_mas_inst_info(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	struct net_buf *buf = NULL;
 	uint8_t rsp_code = 0;
@@ -4409,7 +4412,7 @@ static int cmd_mse_mas_get_mas_inst_info(const struct shell *sh, size_t argc, ch
 	int err;
 
 	if (default_mse_mas == NULL) {
-		shell_error(sh, "No default MSE MAS conn available");
+		bt_shell_session_error(sh, "No default MSE MAS conn available");
 		return -ENODEV;
 	}
 
@@ -4417,14 +4420,14 @@ static int cmd_mse_mas_get_mas_inst_info(const struct shell *sh, size_t argc, ch
 
 	err = parse_error_code(sh, argc, argv, &rsp_code);
 	if (err != 0) {
-		shell_help(sh);
-		return SHELL_CMD_HELP_PRINTED;
+		bt_shell_help(sh);
+		return BT_SHELL_CMD_HELP_PRINTED;
 	}
 
 	err = parse_srmp(sh, argc, argv, &enable_srmp);
 	if (err != 0) {
-		shell_help(sh);
-		return SHELL_CMD_HELP_PRINTED;
+		bt_shell_help(sh);
+		return BT_SHELL_CMD_HELP_PRINTED;
 	}
 
 	if (rsp_code != 0U) {
@@ -4433,20 +4436,20 @@ static int cmd_mse_mas_get_mas_inst_info(const struct shell *sh, size_t argc, ch
 
 	buf = bt_map_mse_mas_create_pdu(default_mse_mas, &mas_tx_pool);
 	if (buf == NULL) {
-		shell_error(sh, "Fail to allocate tx buffer");
+		bt_shell_session_error(sh, "Fail to allocate tx buffer");
 		return -ENOBUFS;
 	}
 
 	err = add_header_srm_rsp(buf, &inst->srm, inst->goep_v2);
 	if (err != 0) {
-		shell_error(sh, "Fail to add SRM header %d", err);
+		bt_shell_session_error(sh, "Fail to add SRM header %d", err);
 		net_buf_unref(buf);
 		return err;
 	}
 
 	err = add_header_srm_param_rsp(buf, &inst->srm, enable_srmp);
 	if (err != 0) {
-		shell_error(sh, "Fail to add SRMP header %d", err);
+		bt_shell_session_error(sh, "Fail to add SRMP header %d", err);
 		net_buf_unref(buf);
 		return err;
 	}
@@ -4457,7 +4460,7 @@ static int cmd_mse_mas_get_mas_inst_info(const struct shell *sh, size_t argc, ch
 
 	err = map_add_app_param(buf, inst->mopl, (size_t)tlv_count, tlvs);
 	if (err != 0) {
-		shell_error(sh, "Fail to add app param header (err %d)", err);
+		bt_shell_session_error(sh, "Fail to add app param header (err %d)", err);
 		net_buf_unref(buf);
 		return err;
 	}
@@ -4469,7 +4472,7 @@ add_body:
 						  body + inst->tx_cnt, &len);
 
 	if (err != 0) {
-		shell_error(sh, "Fail to add body");
+		bt_shell_session_error(sh, "Fail to add body");
 		net_buf_unref(buf);
 		return -ENOEXEC;
 	}
@@ -4488,7 +4491,7 @@ error_rsp:
 			clear_local_srm_param(buf, &inst->srm);
 			net_buf_unref(buf);
 		}
-		shell_error(sh, "Fail to send get MAS instance info rsp %d", err);
+		bt_shell_session_error(sh, "Fail to send get MAS instance info rsp %d", err);
 	} else {
 		if (rsp_code == BT_OBEX_RSP_CODE_CONTINUE) {
 			set_srm_no_wait(&inst->srm);
@@ -4502,14 +4505,14 @@ error_rsp:
 	return err;
 }
 
-static int cmd_mse_mas_set_owner_status(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_mse_mas_set_owner_status(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint8_t rsp_code = 0;
 	struct mse_mas_instance *inst;
 	int err;
 
 	if (default_mse_mas == NULL) {
-		shell_error(sh, "No default MSE MAS conn available");
+		bt_shell_session_error(sh, "No default MSE MAS conn available");
 		return -ENODEV;
 	}
 
@@ -4517,8 +4520,8 @@ static int cmd_mse_mas_set_owner_status(const struct shell *sh, size_t argc, cha
 
 	err = parse_error_code(sh, argc, argv, &rsp_code);
 	if (err != 0) {
-		shell_help(sh);
-		return SHELL_CMD_HELP_PRINTED;
+		bt_shell_help(sh);
+		return BT_SHELL_CMD_HELP_PRINTED;
 	}
 
 	if (rsp_code != 0U) {
@@ -4534,13 +4537,13 @@ static int cmd_mse_mas_set_owner_status(const struct shell *sh, size_t argc, cha
 error_rsp:
 	err = bt_map_mse_mas_set_owner_status(default_mse_mas, rsp_code, NULL);
 	if (err != 0) {
-		shell_error(sh, "MSE MAS set owner status rsp failed (err %d)", err);
+		bt_shell_session_error(sh, "MSE MAS set owner status rsp failed (err %d)", err);
 	}
 
 	return err;
 }
 
-static int cmd_mse_mas_get_owner_status(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_mse_mas_get_owner_status(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	struct net_buf *buf = NULL;
 	uint8_t rsp_code = 0;
@@ -4550,7 +4553,7 @@ static int cmd_mse_mas_get_owner_status(const struct shell *sh, size_t argc, cha
 	int err;
 
 	if (default_mse_mas == NULL) {
-		shell_error(sh, "No default MSE MAS conn available");
+		bt_shell_session_error(sh, "No default MSE MAS conn available");
 		return -ENODEV;
 	}
 
@@ -4558,14 +4561,14 @@ static int cmd_mse_mas_get_owner_status(const struct shell *sh, size_t argc, cha
 
 	err = parse_error_code(sh, argc, argv, &rsp_code);
 	if (err != 0) {
-		shell_help(sh);
-		return SHELL_CMD_HELP_PRINTED;
+		bt_shell_help(sh);
+		return BT_SHELL_CMD_HELP_PRINTED;
 	}
 
 	err = parse_srmp(sh, argc, argv, &enable_srmp);
 	if (err != 0) {
-		shell_help(sh);
-		return SHELL_CMD_HELP_PRINTED;
+		bt_shell_help(sh);
+		return BT_SHELL_CMD_HELP_PRINTED;
 	}
 
 	if (rsp_code != 0U) {
@@ -4574,20 +4577,20 @@ static int cmd_mse_mas_get_owner_status(const struct shell *sh, size_t argc, cha
 
 	buf = bt_map_mse_mas_create_pdu(default_mse_mas, &mas_tx_pool);
 	if (buf == NULL) {
-		shell_error(sh, "Fail to allocate tx buffer");
+		bt_shell_session_error(sh, "Fail to allocate tx buffer");
 		return -ENOBUFS;
 	}
 
 	err = add_header_srm_rsp(buf, &inst->srm, inst->goep_v2);
 	if (err != 0) {
-		shell_error(sh, "Fail to add SRM header %d", err);
+		bt_shell_session_error(sh, "Fail to add SRM header %d", err);
 		net_buf_unref(buf);
 		return err;
 	}
 
 	err = add_header_srm_param_rsp(buf, &inst->srm, enable_srmp);
 	if (err != 0) {
-		shell_error(sh, "Fail to add SRMP header %d", err);
+		bt_shell_session_error(sh, "Fail to add SRMP header %d", err);
 		net_buf_unref(buf);
 		return err;
 	}
@@ -4598,7 +4601,7 @@ static int cmd_mse_mas_get_owner_status(const struct shell *sh, size_t argc, cha
 
 	err = map_add_app_param(buf, inst->mopl, (size_t)tlv_count, tlvs);
 	if (err != 0) {
-		shell_error(sh, "Fail to add app param header (err %d)", err);
+		bt_shell_session_error(sh, "Fail to add app param header (err %d)", err);
 		net_buf_unref(buf);
 		return err;
 	}
@@ -4614,13 +4617,13 @@ static int cmd_mse_mas_get_owner_status(const struct shell *sh, size_t argc, cha
 			 (const uint8_t *)presence_text},
 		};
 
-		shell_print(sh, "Adding default application parameters:");
-		shell_print(sh, "  Presence:  0x%02x", presence);
-		shell_print(sh, "  Presence text: %s", presence_text);
+		bt_shell_session_print(sh, "Adding default application parameters:");
+		bt_shell_session_print(sh, "  Presence:  0x%02x", presence);
+		bt_shell_session_print(sh, "  Presence text: %s", presence_text);
 
 		err = bt_obex_add_header_app_param(buf, ARRAY_SIZE(appl_params), appl_params);
 		if (err != 0) {
-			shell_error(sh, "Fail to add app param header (err %d)", err);
+			bt_shell_session_error(sh, "Fail to add app param header (err %d)", err);
 			net_buf_unref(buf);
 			return -ENOEXEC;
 		}
@@ -4629,7 +4632,7 @@ static int cmd_mse_mas_get_owner_status(const struct shell *sh, size_t argc, cha
 add_body:
 	err = bt_obex_add_header_body_or_end_body(buf, inst->mopl, 0, NULL, &len);
 	if (err != 0 || len != 0U) {
-		shell_error(sh, "Fail to add body");
+		bt_shell_session_error(sh, "Fail to add body");
 		net_buf_unref(buf);
 		return -ENOEXEC;
 	}
@@ -4648,7 +4651,7 @@ error_rsp:
 			clear_local_srm_param(buf, &inst->srm);
 			net_buf_unref(buf);
 		}
-		shell_error(sh, "Fail to send get owner status rsp %d", err);
+		bt_shell_session_error(sh, "Fail to send get owner status rsp %d", err);
 	} else {
 		if (rsp_code == BT_OBEX_RSP_CODE_CONTINUE) {
 			set_srm_no_wait(&inst->srm);
@@ -4681,7 +4684,7 @@ error_rsp:
 	"    </conversation>\r\n"                                                                  \
 	"</convo-listing>"
 
-static int cmd_mse_mas_get_convo_listing(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_mse_mas_get_convo_listing(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	struct net_buf *buf = NULL;
 	uint8_t rsp_code = 0;
@@ -4692,7 +4695,7 @@ static int cmd_mse_mas_get_convo_listing(const struct shell *sh, size_t argc, ch
 	int err;
 
 	if (default_mse_mas == NULL) {
-		shell_error(sh, "No default MSE MAS conn available");
+		bt_shell_session_error(sh, "No default MSE MAS conn available");
 		return -ENODEV;
 	}
 
@@ -4700,14 +4703,14 @@ static int cmd_mse_mas_get_convo_listing(const struct shell *sh, size_t argc, ch
 
 	err = parse_error_code(sh, argc, argv, &rsp_code);
 	if (err != 0) {
-		shell_help(sh);
-		return SHELL_CMD_HELP_PRINTED;
+		bt_shell_help(sh);
+		return BT_SHELL_CMD_HELP_PRINTED;
 	}
 
 	err = parse_srmp(sh, argc, argv, &enable_srmp);
 	if (err != 0) {
-		shell_help(sh);
-		return SHELL_CMD_HELP_PRINTED;
+		bt_shell_help(sh);
+		return BT_SHELL_CMD_HELP_PRINTED;
 	}
 
 	if (rsp_code != 0U) {
@@ -4716,20 +4719,20 @@ static int cmd_mse_mas_get_convo_listing(const struct shell *sh, size_t argc, ch
 
 	buf = bt_map_mse_mas_create_pdu(default_mse_mas, &mas_tx_pool);
 	if (buf == NULL) {
-		shell_error(sh, "Fail to allocate tx buffer");
+		bt_shell_session_error(sh, "Fail to allocate tx buffer");
 		return -ENOBUFS;
 	}
 
 	err = add_header_srm_rsp(buf, &inst->srm, inst->goep_v2);
 	if (err != 0) {
-		shell_error(sh, "Fail to add SRM header %d", err);
+		bt_shell_session_error(sh, "Fail to add SRM header %d", err);
 		net_buf_unref(buf);
 		return err;
 	}
 
 	err = add_header_srm_param_rsp(buf, &inst->srm, enable_srmp);
 	if (err != 0) {
-		shell_error(sh, "Fail to add SRMP header %d", err);
+		bt_shell_session_error(sh, "Fail to add SRMP header %d", err);
 		net_buf_unref(buf);
 		return err;
 	}
@@ -4740,7 +4743,7 @@ static int cmd_mse_mas_get_convo_listing(const struct shell *sh, size_t argc, ch
 
 	err = map_add_app_param(buf, inst->mopl, (size_t)tlv_count, tlvs);
 	if (err != 0) {
-		shell_error(sh, "Fail to add app param header (err %d)", err);
+		bt_shell_session_error(sh, "Fail to add app param header (err %d)", err);
 		net_buf_unref(buf);
 		return err;
 	}
@@ -4759,14 +4762,14 @@ static int cmd_mse_mas_get_convo_listing(const struct shell *sh, size_t argc, ch
 			 (const uint8_t *)convo_ver_cntr},
 		};
 
-		shell_print(sh, "Adding default application parameters:");
-		shell_print(sh, "  Listing size: %d", sys_be16_to_cpu(listing_size));
-		shell_print(sh, "  Database ID: %s", database_id);
-		shell_print(sh, "  Conversation version counter: %s", convo_ver_cntr);
+		bt_shell_session_print(sh, "Adding default application parameters:");
+		bt_shell_session_print(sh, "  Listing size: %d", sys_be16_to_cpu(listing_size));
+		bt_shell_session_print(sh, "  Database ID: %s", database_id);
+		bt_shell_session_print(sh, "  Conversation version counter: %s", convo_ver_cntr);
 
 		err = bt_obex_add_header_app_param(buf, ARRAY_SIZE(appl_params), appl_params);
 		if (err != 0) {
-			shell_error(sh, "Fail to add app param header (err %d)", err);
+			bt_shell_session_error(sh, "Fail to add app param header (err %d)", err);
 			net_buf_unref(buf);
 			return err;
 		}
@@ -4778,7 +4781,7 @@ add_body:
 						  body + inst->tx_cnt, &len);
 
 	if (err != 0) {
-		shell_error(sh, "Fail to add body");
+		bt_shell_session_error(sh, "Fail to add body");
 		net_buf_unref(buf);
 		return err;
 	}
@@ -4797,7 +4800,7 @@ error_rsp:
 			clear_local_srm_param(buf, &inst->srm);
 			net_buf_unref(buf);
 		}
-		shell_error(sh, "Fail to send get conversation listing rsp %d", err);
+		bt_shell_session_error(sh, "Fail to send get conversation listing rsp %d", err);
 	} else {
 		if (rsp_code == BT_OBEX_RSP_CODE_CONTINUE) {
 			set_srm_no_wait(&inst->srm);
@@ -4811,14 +4814,14 @@ error_rsp:
 	return err;
 }
 
-static int cmd_mse_mas_set_ntf_filter(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_mse_mas_set_ntf_filter(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint8_t rsp_code = 0;
 	struct mse_mas_instance *inst;
 	int err;
 
 	if (default_mse_mas == NULL) {
-		shell_error(sh, "No default MSE MAS conn available");
+		bt_shell_session_error(sh, "No default MSE MAS conn available");
 		return -ENODEV;
 	}
 
@@ -4826,8 +4829,8 @@ static int cmd_mse_mas_set_ntf_filter(const struct shell *sh, size_t argc, char 
 
 	err = parse_error_code(sh, argc, argv, &rsp_code);
 	if (err != 0) {
-		shell_help(sh);
-		return SHELL_CMD_HELP_PRINTED;
+		bt_shell_help(sh);
+		return BT_SHELL_CMD_HELP_PRINTED;
 	}
 
 	if (rsp_code != 0U) {
@@ -4843,7 +4846,7 @@ static int cmd_mse_mas_set_ntf_filter(const struct shell *sh, size_t argc, char 
 error_rsp:
 	err = bt_map_mse_mas_set_ntf_filter(default_mse_mas, rsp_code, NULL);
 	if (err != 0) {
-		shell_error(sh, "MSE MAS set notification filter rsp failed (err %d)", err);
+		bt_shell_session_error(sh, "MSE MAS set notification filter rsp failed (err %d)", err);
 	}
 
 	return err;
@@ -4948,7 +4951,7 @@ static struct bt_map_mse_mns_cb mse_mns_cb = {
 };
 
 /* MSE MNS commands */
-static int cmd_mse_mns_rfcomm_connect(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_mse_mns_rfcomm_connect(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err = 0;
 	uint8_t channel;
@@ -4956,20 +4959,20 @@ static int cmd_mse_mns_rfcomm_connect(const struct shell *sh, size_t argc, char 
 	struct mse_mns_instance *inst;
 
 	if (default_conn == NULL) {
-		shell_error(sh, "Not connected");
+		bt_shell_session_error(sh, "Not connected");
 		return -ENOEXEC;
 	}
 
-	channel = shell_strtoul(argv[1], 16, &err);
+	channel = bt_shell_strtoul(argv[1], 16, &err);
 	if (err != 0) {
-		shell_error(sh, "Invalid channel %s", argv[1]);
+		bt_shell_session_error(sh, "Invalid channel %s", argv[1]);
 		return -ENOEXEC;
 	}
 
 	if (argc > 2) {
-		supported_features = shell_strtoul(argv[2], 16, &err);
+		supported_features = bt_shell_strtoul(argv[2], 16, &err);
 		if (err != 0) {
-			shell_error(sh, "Invalid supported features %s", argv[2]);
+			bt_shell_session_error(sh, "Invalid supported features %s", argv[2]);
 			return -ENOEXEC;
 		}
 	} else {
@@ -4978,7 +4981,7 @@ static int cmd_mse_mns_rfcomm_connect(const struct shell *sh, size_t argc, char 
 
 	inst = mse_mns_alloc(default_conn);
 	if (inst == NULL) {
-		shell_error(sh, "Cannot allocate MSE MNS instance");
+		bt_shell_session_error(sh, "Cannot allocate MSE MNS instance");
 		return -ENOMEM;
 	}
 
@@ -4987,7 +4990,7 @@ static int cmd_mse_mns_rfcomm_connect(const struct shell *sh, size_t argc, char 
 	err = bt_map_mse_mns_rfcomm_connect(default_conn, &inst->mse_mns, &mse_mns_cb, channel);
 	if (err != 0) {
 		mse_mns_free(&inst->mse_mns);
-		shell_error(sh, "RFCOMM connect failed (err %d)", err);
+		bt_shell_session_error(sh, "RFCOMM connect failed (err %d)", err);
 	}
 
 	return err;
@@ -5012,7 +5015,7 @@ static struct mse_mns_instance *mse_mns_find_by_conn(struct bt_conn *conn)
 	return &mse_mns_instances[index];
 }
 
-static int cmd_mse_mns_rfcomm_disconnect(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_mse_mns_rfcomm_disconnect(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	struct mse_mns_instance *inst;
 	int err;
@@ -5024,13 +5027,13 @@ static int cmd_mse_mns_rfcomm_disconnect(const struct shell *sh, size_t argc, ch
 
 	err = bt_map_mse_mns_rfcomm_disconnect(&inst->mse_mns);
 	if (err != 0) {
-		shell_error(sh, "RFCOMM disconnect failed (err %d)", err);
+		bt_shell_session_error(sh, "RFCOMM disconnect failed (err %d)", err);
 	}
 
 	return err;
 }
 
-static int cmd_mse_mns_l2cap_connect(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_mse_mns_l2cap_connect(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err = 0;
 	uint16_t psm;
@@ -5038,20 +5041,20 @@ static int cmd_mse_mns_l2cap_connect(const struct shell *sh, size_t argc, char *
 	struct mse_mns_instance *inst;
 
 	if (default_conn == NULL) {
-		shell_error(sh, "Not connected");
+		bt_shell_session_error(sh, "Not connected");
 		return -ENOEXEC;
 	}
 
-	psm = shell_strtoul(argv[1], 16, &err);
+	psm = bt_shell_strtoul(argv[1], 16, &err);
 	if (err != 0) {
-		shell_error(sh, "Invalid PSM %s", argv[1]);
+		bt_shell_session_error(sh, "Invalid PSM %s", argv[1]);
 		return -ENOEXEC;
 	}
 
 	if (argc > 2) {
-		supported_features = shell_strtoul(argv[2], 16, &err);
+		supported_features = bt_shell_strtoul(argv[2], 16, &err);
 		if (err != 0) {
-			shell_error(sh, "Invalid supported features %s", argv[2]);
+			bt_shell_session_error(sh, "Invalid supported features %s", argv[2]);
 			return -ENOEXEC;
 		}
 	} else {
@@ -5060,7 +5063,7 @@ static int cmd_mse_mns_l2cap_connect(const struct shell *sh, size_t argc, char *
 
 	inst = mse_mns_alloc(default_conn);
 	if (inst == NULL) {
-		shell_error(sh, "Cannot allocate MSE MNS instance");
+		bt_shell_session_error(sh, "Cannot allocate MSE MNS instance");
 		return -ENOMEM;
 	}
 
@@ -5069,13 +5072,13 @@ static int cmd_mse_mns_l2cap_connect(const struct shell *sh, size_t argc, char *
 	err = bt_map_mse_mns_l2cap_connect(default_conn, &inst->mse_mns, &mse_mns_cb, psm);
 	if (err != 0) {
 		mse_mns_free(&inst->mse_mns);
-		shell_error(sh, "L2CAP connect failed (err %d)", err);
+		bt_shell_session_error(sh, "L2CAP connect failed (err %d)", err);
 	}
 
 	return err;
 }
 
-static int cmd_mse_mns_l2cap_disconnect(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_mse_mns_l2cap_disconnect(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	struct mse_mns_instance *inst;
 	int err;
@@ -5087,13 +5090,13 @@ static int cmd_mse_mns_l2cap_disconnect(const struct shell *sh, size_t argc, cha
 
 	err = bt_map_mse_mns_l2cap_disconnect(&inst->mse_mns);
 	if (err != 0) {
-		shell_error(sh, "L2CAP disconnect failed (err %d)", err);
+		bt_shell_session_error(sh, "L2CAP disconnect failed (err %d)", err);
 	}
 
 	return err;
 }
 
-static int cmd_mse_mns_connect(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_mse_mns_connect(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 	struct net_buf *buf;
@@ -5108,7 +5111,7 @@ static int cmd_mse_mns_connect(const struct shell *sh, size_t argc, char *argv[]
 
 	buf = bt_map_mse_mns_create_pdu(&inst->mse_mns, &mns_tx_pool);
 	if (buf == NULL) {
-		shell_error(sh, "Fail to allocate tx buffer");
+		bt_shell_session_error(sh, "Fail to allocate tx buffer");
 		return -ENOBUFS;
 	}
 
@@ -5117,20 +5120,20 @@ static int cmd_mse_mns_connect(const struct shell *sh, size_t argc, char *argv[]
 	err = bt_obex_add_header_target(buf, sizeof(val), val);
 	if (err != 0) {
 		net_buf_unref(buf);
-		shell_error(sh, "Fail to add target header (err %d)", err);
+		bt_shell_session_error(sh, "Fail to add target header (err %d)", err);
 		return err;
 	}
 
 	err = bt_map_mse_mns_connect(&inst->mse_mns, buf);
 	if (err != 0) {
 		net_buf_unref(buf);
-		shell_error(sh, "Connect failed (err %d)", err);
+		bt_shell_session_error(sh, "Connect failed (err %d)", err);
 	}
 
 	return err;
 }
 
-static int cmd_mse_mns_disconnect(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_mse_mns_disconnect(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	struct mse_mns_instance *inst;
 	int err;
@@ -5142,13 +5145,13 @@ static int cmd_mse_mns_disconnect(const struct shell *sh, size_t argc, char *arg
 
 	err = bt_map_mse_mns_disconnect(&inst->mse_mns, NULL);
 	if (err != 0) {
-		shell_error(sh, "Disconnect failed (err %d)", err);
+		bt_shell_session_error(sh, "Disconnect failed (err %d)", err);
 	}
 
 	return err;
 }
 
-static int cmd_mse_mns_abort(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_mse_mns_abort(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	struct mse_mns_instance *inst;
 	int err;
@@ -5160,7 +5163,7 @@ static int cmd_mse_mns_abort(const struct shell *sh, size_t argc, char *argv[])
 
 	err = bt_map_mse_mns_abort(&inst->mse_mns, NULL);
 	if (err != 0) {
-		shell_error(sh, "Abort failed (err %d)", err);
+		bt_shell_session_error(sh, "Abort failed (err %d)", err);
 	}
 
 	return err;
@@ -5173,7 +5176,7 @@ static int cmd_mse_mns_abort(const struct shell *sh, size_t argc, char *argv[])
 	"old_folder=\"\" msg_type=\"SMS_GSM\"/>\r\n"                                               \
 	"</MAP-event-report>"
 
-static int cmd_mse_mns_send_event(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_mse_mns_send_event(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	struct net_buf *buf;
 	int err;
@@ -5189,7 +5192,7 @@ static int cmd_mse_mns_send_event(const struct shell *sh, size_t argc, char *arg
 
 	buf = bt_map_mse_mns_create_pdu(&inst->mse_mns, &mns_tx_pool);
 	if (buf == NULL) {
-		shell_error(sh, "Fail to allocate tx buffer");
+		bt_shell_session_error(sh, "Fail to allocate tx buffer");
 		return -ENOBUFS;
 	}
 
@@ -5199,26 +5202,26 @@ static int cmd_mse_mns_send_event(const struct shell *sh, size_t argc, char *arg
 
 	err = bt_obex_add_header_conn_id(buf, inst->conn_id);
 	if (err != 0) {
-		shell_error(sh, "Fail to add conn id header %d", err);
+		bt_shell_session_error(sh, "Fail to add conn id header %d", err);
 		goto failed;
 	}
 
 	err = add_header_srm_req(buf, &inst->srm, inst->goep_v2);
 	if (err != 0) {
-		shell_error(sh, "Fail to add SRM header %d", err);
+		bt_shell_session_error(sh, "Fail to add SRM header %d", err);
 		goto failed;
 	}
 
 	err = bt_obex_add_header_type(buf, sizeof(BT_MAP_HDR_TYPE_SEND_EVENT),
 				      BT_MAP_HDR_TYPE_SEND_EVENT);
 	if (err != 0) {
-		shell_error(sh, "Fail to add type header %d", err);
+		bt_shell_session_error(sh, "Fail to add type header %d", err);
 		goto failed;
 	}
 
 	err = map_add_app_param(buf, inst->mopl, (size_t)tlv_count, tlvs);
 	if (err != 0) {
-		shell_error(sh, "Fail to add app param header (err %d)", err);
+		bt_shell_session_error(sh, "Fail to add app param header (err %d)", err);
 		goto failed;
 	}
 	tlv_count = 0;
@@ -5230,12 +5233,12 @@ static int cmd_mse_mns_send_event(const struct shell *sh, size_t argc, char *arg
 			 (const uint8_t *)&instance_id},
 		};
 
-		shell_print(sh, "Adding default application parameters:");
-		shell_print(sh, "  Instance ID: %u", instance_id);
+		bt_shell_session_print(sh, "Adding default application parameters:");
+		bt_shell_session_print(sh, "  Instance ID: %u", instance_id);
 
 		err = bt_obex_add_header_app_param(buf, ARRAY_SIZE(appl_params), appl_params);
 		if (err != 0) {
-			shell_error(sh, "Fail to add default app param header (err %d)", err);
+			bt_shell_session_error(sh, "Fail to add default app param header (err %d)", err);
 			goto failed;
 		}
 	}
@@ -5245,7 +5248,7 @@ continue_req:
 						  sizeof(MAP_EVENT_REPORT_BODY) - inst->tx_cnt,
 						  (const uint8_t *)(body + inst->tx_cnt), &len);
 	if (err != 0) {
-		shell_error(sh, "Fail to add body (err %d)", err);
+		bt_shell_session_error(sh, "Fail to add body (err %d)", err);
 		goto failed;
 	}
 
@@ -5254,7 +5257,7 @@ continue_req:
 	err = bt_map_mse_mns_send_event(&inst->mse_mns, final, buf);
 	if (err != 0) {
 		clear_local_srm(buf, &inst->srm);
-		shell_error(sh, "Send event failed (err %d)", err);
+		bt_shell_session_error(sh, "Send event failed (err %d)", err);
 		goto failed;
 	} else {
 		if (!final) {
@@ -5274,15 +5277,15 @@ failed:
 #endif /* CONFIG_BT_MAP_MSE */
 
 /* Common helper commands */
-static int add_tlv(const struct shell *sh, uint8_t tag, const uint8_t *data, size_t len)
+static int add_tlv(const struct bt_shell *sh, uint8_t tag, const uint8_t *data, size_t len)
 {
 	if (tlv_count >= (uint8_t)ARRAY_SIZE(tlvs)) {
-		shell_error(sh, "No space in TLV array (max %d)", ARRAY_SIZE(tlvs));
+		bt_shell_session_error(sh, "No space in TLV array (max %d)", ARRAY_SIZE(tlvs));
 		return -ENOEXEC;
 	}
 
 	if (len > TLV_BUFFER_SIZE) {
-		shell_error(sh, "Value length %zu exceeds buffer size %d", len, TLV_BUFFER_SIZE);
+		bt_shell_session_error(sh, "Value length %zu exceeds buffer size %d", len, TLV_BUFFER_SIZE);
 		return -ENOEXEC;
 	}
 
@@ -5295,7 +5298,7 @@ static int add_tlv(const struct shell *sh, uint8_t tag, const uint8_t *data, siz
 	return 0;
 }
 
-static int cmd_app_param_max_list_count(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_app_param_max_list_count(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint16_t value;
 	uint8_t buf[2];
@@ -5306,12 +5309,12 @@ static int cmd_app_param_max_list_count(const struct shell *sh, size_t argc, cha
 
 	err = add_tlv(sh, BT_MAP_APPL_PARAM_TAG_ID_MAX_LIST_CNT, buf, 2);
 	if (err == 0) {
-		shell_print(sh, "Added MaxListCount: %u", value);
+		bt_shell_session_print(sh, "Added MaxListCount: %u", value);
 	}
 	return err;
 }
 
-static int cmd_app_param_list_start_offset(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_app_param_list_start_offset(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint16_t value;
 	uint8_t buf[2];
@@ -5322,12 +5325,12 @@ static int cmd_app_param_list_start_offset(const struct shell *sh, size_t argc, 
 
 	err = add_tlv(sh, BT_MAP_APPL_PARAM_TAG_ID_LIST_START_OFFSET, buf, 2);
 	if (err == 0) {
-		shell_print(sh, "Added ListStartOffset: %u", value);
+		bt_shell_session_print(sh, "Added ListStartOffset: %u", value);
 	}
 	return err;
 }
 
-static int cmd_app_param_filter_msg_type(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_app_param_filter_msg_type(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint8_t value;
 	int err;
@@ -5336,8 +5339,8 @@ static int cmd_app_param_filter_msg_type(const struct shell *sh, size_t argc, ch
 
 	err = add_tlv(sh, BT_MAP_APPL_PARAM_TAG_ID_FILTER_MSG_TYPE, &value, 1);
 	if (err == 0) {
-		shell_print(sh, "Added FilterMessageType: 0x%02x", value);
-		shell_print(sh, "  EMAIL=%s, SMS_GSM=%s, SMS_CDMA=%s, MMS=%s, IM=%s",
+		bt_shell_session_print(sh, "Added FilterMessageType: 0x%02x", value);
+		bt_shell_session_print(sh, "  EMAIL=%s, SMS_GSM=%s, SMS_CDMA=%s, MMS=%s, IM=%s",
 			    (value & BIT(0)) ? "Y" : "N", (value & BIT(1)) ? "Y" : "N",
 			    (value & BIT(2)) ? "Y" : "N", (value & BIT(3)) ? "Y" : "N",
 			    (value & BIT(4)) ? "Y" : "N");
@@ -5345,7 +5348,7 @@ static int cmd_app_param_filter_msg_type(const struct shell *sh, size_t argc, ch
 	return err;
 }
 
-static int cmd_app_param_filter_period_begin(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_app_param_filter_period_begin(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	const char *time_str = argv[1];
 	size_t len = strlen(time_str);
@@ -5354,12 +5357,12 @@ static int cmd_app_param_filter_period_begin(const struct shell *sh, size_t argc
 	err = add_tlv(sh, BT_MAP_APPL_PARAM_TAG_ID_FILTER_PERIOD_BEGIN, (const uint8_t *)time_str,
 		      len);
 	if (err == 0) {
-		shell_print(sh, "Added FilterPeriodBegin: %s", time_str);
+		bt_shell_session_print(sh, "Added FilterPeriodBegin: %s", time_str);
 	}
 	return err;
 }
 
-static int cmd_app_param_filter_period_end(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_app_param_filter_period_end(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	const char *time_str = argv[1];
 	size_t len = strlen(time_str);
@@ -5368,12 +5371,12 @@ static int cmd_app_param_filter_period_end(const struct shell *sh, size_t argc, 
 	err = add_tlv(sh, BT_MAP_APPL_PARAM_TAG_ID_FILTER_PERIOD_END, (const uint8_t *)time_str,
 		      len);
 	if (err == 0) {
-		shell_print(sh, "Added FilterPeriodEnd: %s", time_str);
+		bt_shell_session_print(sh, "Added FilterPeriodEnd: %s", time_str);
 	}
 	return err;
 }
 
-static int cmd_app_param_filter_read_status(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_app_param_filter_read_status(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint8_t value;
 	int err;
@@ -5385,18 +5388,18 @@ static int cmd_app_param_filter_read_status(const struct shell *sh, size_t argc,
 	} else if (strcmp(argv[1], "read") == 0) {
 		value = 2;
 	} else {
-		shell_error(sh, "Invalid value (use: no_filter/unread/read)");
+		bt_shell_session_error(sh, "Invalid value (use: no_filter/unread/read)");
 		return -EINVAL;
 	}
 
 	err = add_tlv(sh, BT_MAP_APPL_PARAM_TAG_ID_FILTER_READ_STATUS, &value, 1);
 	if (err == 0) {
-		shell_print(sh, "Added FilterReadStatus: %s (%u)", argv[1], value);
+		bt_shell_session_print(sh, "Added FilterReadStatus: %s (%u)", argv[1], value);
 	}
 	return err;
 }
 
-static int cmd_app_param_filter_recipient(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_app_param_filter_recipient(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	const char *recipient = argv[1];
 	size_t len = strlen(recipient);
@@ -5405,12 +5408,12 @@ static int cmd_app_param_filter_recipient(const struct shell *sh, size_t argc, c
 	err = add_tlv(sh, BT_MAP_APPL_PARAM_TAG_ID_FILTER_RECIPIENT, (const uint8_t *)recipient,
 		      len);
 	if (err == 0) {
-		shell_print(sh, "Added FilterRecipient: %s", recipient);
+		bt_shell_session_print(sh, "Added FilterRecipient: %s", recipient);
 	}
 	return err;
 }
 
-static int cmd_app_param_filter_originator(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_app_param_filter_originator(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	const char *originator = argv[1];
 	size_t len = strlen(originator);
@@ -5419,12 +5422,12 @@ static int cmd_app_param_filter_originator(const struct shell *sh, size_t argc, 
 	err = add_tlv(sh, BT_MAP_APPL_PARAM_TAG_ID_FILTER_ORIGINATOR, (const uint8_t *)originator,
 		      len);
 	if (err == 0) {
-		shell_print(sh, "Added FilterOriginator: %s", originator);
+		bt_shell_session_print(sh, "Added FilterOriginator: %s", originator);
 	}
 	return err;
 }
 
-static int cmd_app_param_filter_priority(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_app_param_filter_priority(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint8_t value;
 	int err;
@@ -5436,118 +5439,118 @@ static int cmd_app_param_filter_priority(const struct shell *sh, size_t argc, ch
 	} else if (strcmp(argv[1], "non_high") == 0) {
 		value = 2;
 	} else {
-		shell_error(sh, "Invalid value (use: no_filter/high/non_high)");
+		bt_shell_session_error(sh, "Invalid value (use: no_filter/high/non_high)");
 		return -EINVAL;
 	}
 
 	err = add_tlv(sh, BT_MAP_APPL_PARAM_TAG_ID_FILTER_PRIORITY, &value, 1);
 	if (err == 0) {
-		shell_print(sh, "Added FilterPriority: %s (%u)", argv[1], value);
+		bt_shell_session_print(sh, "Added FilterPriority: %s (%u)", argv[1], value);
 	}
 	return err;
 }
 
-static int cmd_app_param_attachment(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_app_param_attachment(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	bool bool_value;
 	uint8_t value;
 	int err = 0;
 
-	bool_value = shell_strtobool(argv[1], 0, &err);
+	bool_value = bt_shell_strtobool(argv[1], 0, &err);
 	if (err != 0) {
-		shell_error(sh, "Invalid value (use: on/off)");
+		bt_shell_session_error(sh, "Invalid value (use: on/off)");
 		return -EINVAL;
 	}
 	value = bool_value ? 1 : 0;
 
 	err = add_tlv(sh, BT_MAP_APPL_PARAM_TAG_ID_ATTACHMENT, &value, 1);
 	if (err == 0) {
-		shell_print(sh, "Added Attachment: %s (%u)", argv[1], value);
+		bt_shell_session_print(sh, "Added Attachment: %s (%u)", argv[1], value);
 	}
 	return err;
 }
 
-static int cmd_app_param_transparent(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_app_param_transparent(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	bool bool_value;
 	uint8_t value;
 	int err = 0;
 
-	bool_value = shell_strtobool(argv[1], 0, &err);
+	bool_value = bt_shell_strtobool(argv[1], 0, &err);
 	if (err != 0) {
-		shell_error(sh, "Invalid value (use: on/off)");
+		bt_shell_session_error(sh, "Invalid value (use: on/off)");
 		return -EINVAL;
 	}
 	value = bool_value ? 1 : 0;
 
 	err = add_tlv(sh, BT_MAP_APPL_PARAM_TAG_ID_TRANSPARENT, &value, 1);
 	if (err == 0) {
-		shell_print(sh, "Added Transparent: %s (%u)", argv[1], value);
+		bt_shell_session_print(sh, "Added Transparent: %s (%u)", argv[1], value);
 	}
 	return err;
 }
 
-static int cmd_app_param_retry(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_app_param_retry(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	bool bool_value;
 	uint8_t value;
 	int err = 0;
 
-	bool_value = shell_strtobool(argv[1], 0, &err);
+	bool_value = bt_shell_strtobool(argv[1], 0, &err);
 	if (err != 0) {
-		shell_error(sh, "Invalid value (use: on/off)");
+		bt_shell_session_error(sh, "Invalid value (use: on/off)");
 		return -EINVAL;
 	}
 	value = bool_value ? 1 : 0;
 
 	err = add_tlv(sh, BT_MAP_APPL_PARAM_TAG_ID_RETRY, &value, 1);
 	if (err == 0) {
-		shell_print(sh, "Added Retry: %s (%u)", argv[1], value);
+		bt_shell_session_print(sh, "Added Retry: %s (%u)", argv[1], value);
 	}
 	return err;
 }
 
-static int cmd_app_param_new_message(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_app_param_new_message(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	bool bool_value;
 	uint8_t value;
 	int err = 0;
 
-	bool_value = shell_strtobool(argv[1], 0, &err);
+	bool_value = bt_shell_strtobool(argv[1], 0, &err);
 	if (err != 0) {
-		shell_error(sh, "Invalid value (use: on/off)");
+		bt_shell_session_error(sh, "Invalid value (use: on/off)");
 		return -EINVAL;
 	}
 	value = bool_value ? 1 : 0;
 
 	err = add_tlv(sh, BT_MAP_APPL_PARAM_TAG_ID_NEW_MSG, &value, 1);
 	if (err == 0) {
-		shell_print(sh, "Added NewMessage: %s (%u)", argv[1], value);
+		bt_shell_session_print(sh, "Added NewMessage: %s (%u)", argv[1], value);
 	}
 	return err;
 }
 
-static int cmd_app_param_notification_status(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_app_param_notification_status(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	bool bool_value;
 	uint8_t value;
 	int err = 0;
 
-	bool_value = shell_strtobool(argv[1], 0, &err);
+	bool_value = bt_shell_strtobool(argv[1], 0, &err);
 	if (err != 0) {
-		shell_error(sh, "Invalid value (use: on/off)");
+		bt_shell_session_error(sh, "Invalid value (use: on/off)");
 		return -EINVAL;
 	}
 	value = bool_value ? 1 : 0;
 
 	err = add_tlv(sh, BT_MAP_APPL_PARAM_TAG_ID_NTF_STATUS, &value, 1);
 	if (err == 0) {
-		shell_print(sh, "Added NotificationStatus: %s (%u)", argv[1], value);
+		bt_shell_session_print(sh, "Added NotificationStatus: %s (%u)", argv[1], value);
 	}
 	return err;
 }
 
-static int cmd_app_param_mas_instance_id(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_app_param_mas_instance_id(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint8_t value;
 	int err;
@@ -5556,12 +5559,12 @@ static int cmd_app_param_mas_instance_id(const struct shell *sh, size_t argc, ch
 
 	err = add_tlv(sh, BT_MAP_APPL_PARAM_TAG_ID_MAS_INST_ID, &value, 1);
 	if (err == 0) {
-		shell_print(sh, "Added MASInstanceID: %u", value);
+		bt_shell_session_print(sh, "Added MASInstanceID: %u", value);
 	}
 	return err;
 }
 
-static int cmd_app_param_parameter_mask(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_app_param_parameter_mask(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint32_t value;
 	uint8_t buf[4];
@@ -5572,12 +5575,12 @@ static int cmd_app_param_parameter_mask(const struct shell *sh, size_t argc, cha
 
 	err = add_tlv(sh, BT_MAP_APPL_PARAM_TAG_ID_PARAM_MASK, buf, 4);
 	if (err == 0) {
-		shell_print(sh, "Added ParameterMask: 0x%08x", value);
+		bt_shell_session_print(sh, "Added ParameterMask: 0x%08x", value);
 	}
 	return err;
 }
 
-static int cmd_app_param_folder_listing_size(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_app_param_folder_listing_size(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint16_t value;
 	uint8_t buf[2];
@@ -5588,12 +5591,12 @@ static int cmd_app_param_folder_listing_size(const struct shell *sh, size_t argc
 
 	err = add_tlv(sh, BT_MAP_APPL_PARAM_TAG_ID_FOLDER_LISTING_SIZE, buf, 2);
 	if (err == 0) {
-		shell_print(sh, "Added FolderListingSize: %u", value);
+		bt_shell_session_print(sh, "Added FolderListingSize: %u", value);
 	}
 	return err;
 }
 
-static int cmd_app_param_listing_size(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_app_param_listing_size(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint16_t value;
 	uint8_t buf[2];
@@ -5604,12 +5607,12 @@ static int cmd_app_param_listing_size(const struct shell *sh, size_t argc, char 
 
 	err = add_tlv(sh, BT_MAP_APPL_PARAM_TAG_ID_LISTING_SIZE, buf, 2);
 	if (err == 0) {
-		shell_print(sh, "Added ListingSize: %u", value);
+		bt_shell_session_print(sh, "Added ListingSize: %u", value);
 	}
 	return err;
 }
 
-static int cmd_app_param_subject_length(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_app_param_subject_length(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint8_t value;
 	int err;
@@ -5618,12 +5621,12 @@ static int cmd_app_param_subject_length(const struct shell *sh, size_t argc, cha
 
 	err = add_tlv(sh, BT_MAP_APPL_PARAM_TAG_ID_SUBJECT_LEN, &value, 1);
 	if (err == 0) {
-		shell_print(sh, "Added SubjectLength: %u", value);
+		bt_shell_session_print(sh, "Added SubjectLength: %u", value);
 	}
 	return err;
 }
 
-static int cmd_app_param_charset(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_app_param_charset(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint8_t value;
 	int err;
@@ -5633,18 +5636,18 @@ static int cmd_app_param_charset(const struct shell *sh, size_t argc, char *argv
 	} else if (strcmp(argv[1], "utf8") == 0) {
 		value = 1;
 	} else {
-		shell_error(sh, "Invalid value (use: native/utf8)");
+		bt_shell_session_error(sh, "Invalid value (use: native/utf8)");
 		return -EINVAL;
 	}
 
 	err = add_tlv(sh, BT_MAP_APPL_PARAM_TAG_ID_CHARSET, &value, 1);
 	if (err == 0) {
-		shell_print(sh, "Added Charset: %s (%u)", argv[1], value);
+		bt_shell_session_print(sh, "Added Charset: %s (%u)", argv[1], value);
 	}
 	return err;
 }
 
-static int cmd_app_param_fraction_request(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_app_param_fraction_request(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint8_t value;
 	int err;
@@ -5654,18 +5657,18 @@ static int cmd_app_param_fraction_request(const struct shell *sh, size_t argc, c
 	} else if (strcmp(argv[1], "next") == 0) {
 		value = 1;
 	} else {
-		shell_error(sh, "Invalid value (use: first/next)");
+		bt_shell_session_error(sh, "Invalid value (use: first/next)");
 		return -EINVAL;
 	}
 
 	err = add_tlv(sh, BT_MAP_APPL_PARAM_TAG_ID_FRACTION_REQUEST, &value, 1);
 	if (err == 0) {
-		shell_print(sh, "Added FractionRequest: %s (%u)", argv[1], value);
+		bt_shell_session_print(sh, "Added FractionRequest: %s (%u)", argv[1], value);
 	}
 	return err;
 }
 
-static int cmd_app_param_fraction_deliver(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_app_param_fraction_deliver(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint8_t value;
 	int err;
@@ -5675,18 +5678,18 @@ static int cmd_app_param_fraction_deliver(const struct shell *sh, size_t argc, c
 	} else if (strcmp(argv[1], "last") == 0) {
 		value = 1;
 	} else {
-		shell_error(sh, "Invalid value (use: more/last)");
+		bt_shell_session_error(sh, "Invalid value (use: more/last)");
 		return -EINVAL;
 	}
 
 	err = add_tlv(sh, BT_MAP_APPL_PARAM_TAG_ID_FRACTION_DELIVER, &value, 1);
 	if (err == 0) {
-		shell_print(sh, "Added FractionDeliver: %s (%u)", argv[1], value);
+		bt_shell_session_print(sh, "Added FractionDeliver: %s (%u)", argv[1], value);
 	}
 	return err;
 }
 
-static int cmd_app_param_status_indicator(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_app_param_status_indicator(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint8_t value;
 	int err;
@@ -5698,18 +5701,18 @@ static int cmd_app_param_status_indicator(const struct shell *sh, size_t argc, c
 	} else if (strcmp(argv[1], "extended") == 0) {
 		value = 2;
 	} else {
-		shell_error(sh, "Invalid value (use: read/deleted/extended)");
+		bt_shell_session_error(sh, "Invalid value (use: read/deleted/extended)");
 		return -EINVAL;
 	}
 
 	err = add_tlv(sh, BT_MAP_APPL_PARAM_TAG_ID_STATUS_IND, &value, 1);
 	if (err == 0) {
-		shell_print(sh, "Added StatusIndicator: %s (%u)", argv[1], value);
+		bt_shell_session_print(sh, "Added StatusIndicator: %s (%u)", argv[1], value);
 	}
 	return err;
 }
 
-static int cmd_app_param_status_value(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_app_param_status_value(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint8_t value;
 	int err;
@@ -5719,18 +5722,18 @@ static int cmd_app_param_status_value(const struct shell *sh, size_t argc, char 
 	} else if (strcmp(argv[1], "yes") == 0) {
 		value = 1;
 	} else {
-		shell_error(sh, "Invalid value (use: yes/no)");
+		bt_shell_session_error(sh, "Invalid value (use: yes/no)");
 		return -EINVAL;
 	}
 
 	err = add_tlv(sh, BT_MAP_APPL_PARAM_TAG_ID_STATUS_VAL, &value, 1);
 	if (err == 0) {
-		shell_print(sh, "Added StatusValue: %s (%u)", argv[1], value);
+		bt_shell_session_print(sh, "Added StatusValue: %s (%u)", argv[1], value);
 	}
 	return err;
 }
 
-static int cmd_app_param_mse_time(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_app_param_mse_time(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	const char *time_str = argv[1];
 	size_t len = strlen(time_str);
@@ -5738,49 +5741,49 @@ static int cmd_app_param_mse_time(const struct shell *sh, size_t argc, char *arg
 
 	err = add_tlv(sh, BT_MAP_APPL_PARAM_TAG_ID_MSE_TIME, (const uint8_t *)time_str, len);
 	if (err == 0) {
-		shell_print(sh, "Added MSETime: %s", time_str);
+		bt_shell_session_print(sh, "Added MSETime: %s", time_str);
 	}
 	return err;
 }
 
-static int cmd_app_param_database_id(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_app_param_database_id(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	const char *id_str = argv[1];
 	size_t len = strlen(id_str);
 	int err;
 
 	if (len > 32) {
-		shell_error(sh, "Database ID length %zu exceeds maximum 32", len);
+		bt_shell_session_error(sh, "Database ID length %zu exceeds maximum 32", len);
 		return -EINVAL;
 	}
 
 	err = add_tlv(sh, BT_MAP_APPL_PARAM_TAG_ID_DB_ID, (const uint8_t *)id_str, len);
 	if (err == 0) {
-		shell_print(sh, "Added DatabaseIdentifier: %s", id_str);
+		bt_shell_session_print(sh, "Added DatabaseIdentifier: %s", id_str);
 	}
 	return err;
 }
 
-static int cmd_app_param_convo_listing_ver(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_app_param_convo_listing_ver(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	const char *ver_str = argv[1];
 	size_t len = strlen(ver_str);
 	int err;
 
 	if (len > 32) {
-		shell_error(sh, "Version counter length %zu exceeds maximum 32", len);
+		bt_shell_session_error(sh, "Version counter length %zu exceeds maximum 32", len);
 		return -EINVAL;
 	}
 
 	err = add_tlv(sh, BT_MAP_APPL_PARAM_TAG_ID_CONVO_LISTING_VER_CNTR, (const uint8_t *)ver_str,
 		      len);
 	if (err == 0) {
-		shell_print(sh, "Added ConvoListingVersionCounter: %s", ver_str);
+		bt_shell_session_print(sh, "Added ConvoListingVersionCounter: %s", ver_str);
 	}
 	return err;
 }
 
-static int cmd_app_param_presence_availability(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_app_param_presence_availability(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint8_t value;
 	int err;
@@ -5800,19 +5803,19 @@ static int cmd_app_param_presence_availability(const struct shell *sh, size_t ar
 	} else if (strcmp(argv[1], "meeting") == 0) {
 		value = 6;
 	} else {
-		shell_error(sh,
+		bt_shell_session_error(sh,
 			    "Invalid value (use: unknown/offline/online/away/dnd/busy/meeting)");
 		return -EINVAL;
 	}
 
 	err = add_tlv(sh, BT_MAP_APPL_PARAM_TAG_ID_PRESENCE_AVAIL, &value, 1);
 	if (err == 0) {
-		shell_print(sh, "Added PresenceAvailability: %s (%u)", argv[1], value);
+		bt_shell_session_print(sh, "Added PresenceAvailability: %s (%u)", argv[1], value);
 	}
 	return err;
 }
 
-static int cmd_app_param_presence_text(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_app_param_presence_text(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	const char *text = argv[1];
 	size_t len = strlen(text);
@@ -5820,12 +5823,12 @@ static int cmd_app_param_presence_text(const struct shell *sh, size_t argc, char
 
 	err = add_tlv(sh, BT_MAP_APPL_PARAM_TAG_ID_PRESENCE_TEXT, (const uint8_t *)text, len);
 	if (err == 0) {
-		shell_print(sh, "Added PresenceText: %s", text);
+		bt_shell_session_print(sh, "Added PresenceText: %s", text);
 	}
 	return err;
 }
 
-static int cmd_app_param_last_activity(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_app_param_last_activity(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	const char *time_str = argv[1];
 	size_t len = strlen(time_str);
@@ -5833,12 +5836,12 @@ static int cmd_app_param_last_activity(const struct shell *sh, size_t argc, char
 
 	err = add_tlv(sh, BT_MAP_APPL_PARAM_TAG_ID_LAST_ACTIVITY, (const uint8_t *)time_str, len);
 	if (err == 0) {
-		shell_print(sh, "Added LastActivity: %s", time_str);
+		bt_shell_session_print(sh, "Added LastActivity: %s", time_str);
 	}
 	return err;
 }
 
-static int cmd_app_param_filter_last_activity_begin(const struct shell *sh, size_t argc,
+static int cmd_app_param_filter_last_activity_begin(const struct bt_shell *sh, size_t argc,
 						    char *argv[])
 {
 	const char *time_str = argv[1];
@@ -5848,12 +5851,12 @@ static int cmd_app_param_filter_last_activity_begin(const struct shell *sh, size
 	err = add_tlv(sh, BT_MAP_APPL_PARAM_TAG_ID_FILTER_LAST_ACTIVITY_BEGIN,
 		      (const uint8_t *)time_str, len);
 	if (err == 0) {
-		shell_print(sh, "Added FilterLastActivityBegin: %s", time_str);
+		bt_shell_session_print(sh, "Added FilterLastActivityBegin: %s", time_str);
 	}
 	return err;
 }
 
-static int cmd_app_param_filter_last_activity_end(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_app_param_filter_last_activity_end(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	const char *time_str = argv[1];
 	size_t len = strlen(time_str);
@@ -5862,12 +5865,12 @@ static int cmd_app_param_filter_last_activity_end(const struct shell *sh, size_t
 	err = add_tlv(sh, BT_MAP_APPL_PARAM_TAG_ID_FILTER_LAST_ACTIVITY_END,
 		      (const uint8_t *)time_str, len);
 	if (err == 0) {
-		shell_print(sh, "Added FilterLastActivityEnd: %s", time_str);
+		bt_shell_session_print(sh, "Added FilterLastActivityEnd: %s", time_str);
 	}
 	return err;
 }
 
-static int cmd_app_param_chat_state(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_app_param_chat_state(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint8_t value;
 	int err;
@@ -5885,74 +5888,74 @@ static int cmd_app_param_chat_state(const struct shell *sh, size_t argc, char *a
 	} else if (strcmp(argv[1], "gone") == 0) {
 		value = 5;
 	} else {
-		shell_error(sh,
+		bt_shell_session_error(sh,
 			    "Invalid value (use: unknown/inactive/active/composing/paused/gone)");
 		return -EINVAL;
 	}
 
 	err = add_tlv(sh, BT_MAP_APPL_PARAM_TAG_ID_CHAT_STATE, &value, 1);
 	if (err == 0) {
-		shell_print(sh, "Added ChatState: %s (%u)", argv[1], value);
+		bt_shell_session_print(sh, "Added ChatState: %s (%u)", argv[1], value);
 	}
 	return err;
 }
 
-static int cmd_app_param_conversation_id(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_app_param_conversation_id(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	const char *id_str = argv[1];
 	size_t len = strlen(id_str);
 	int err;
 
 	if (len > 32) {
-		shell_error(sh, "Conversation ID length %zu exceeds maximum 32", len);
+		bt_shell_session_error(sh, "Conversation ID length %zu exceeds maximum 32", len);
 		return -EINVAL;
 	}
 
 	err = add_tlv(sh, BT_MAP_APPL_PARAM_TAG_ID_CONVO_ID, (const uint8_t *)id_str, len);
 	if (err == 0) {
-		shell_print(sh, "Added ConversationID: %s", id_str);
+		bt_shell_session_print(sh, "Added ConversationID: %s", id_str);
 	}
 	return err;
 }
 
-static int cmd_app_param_folder_ver(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_app_param_folder_ver(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	const char *ver_str = argv[1];
 	size_t len = strlen(ver_str);
 	int err;
 
 	if (len > 32) {
-		shell_error(sh, "Folder version counter length %zu exceeds maximum 32", len);
+		bt_shell_session_error(sh, "Folder version counter length %zu exceeds maximum 32", len);
 		return -EINVAL;
 	}
 
 	err = add_tlv(sh, BT_MAP_APPL_PARAM_TAG_ID_FOLDER_VER_CNTR, (const uint8_t *)ver_str, len);
 	if (err == 0) {
-		shell_print(sh, "Added FolderVersionCounter: %s", ver_str);
+		bt_shell_session_print(sh, "Added FolderVersionCounter: %s", ver_str);
 	}
 	return err;
 }
 
-static int cmd_app_param_filter_msg_handle(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_app_param_filter_msg_handle(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	const char *handle_str = argv[1];
 	size_t len = strlen(handle_str);
 	int err;
 
 	if (len > 16) {
-		shell_error(sh, "Filter message handle length %zu exceeds maximum 16", len);
+		bt_shell_session_error(sh, "Filter message handle length %zu exceeds maximum 16", len);
 		return -EINVAL;
 	}
 
 	err = add_tlv(sh, BT_MAP_APPL_PARAM_TAG_ID_FILTER_MSG_HANDLE, (const uint8_t *)handle_str,
 		      len);
 	if (err == 0) {
-		shell_print(sh, "Added FilterMsgHandle: %s", handle_str);
+		bt_shell_session_print(sh, "Added FilterMsgHandle: %s", handle_str);
 	}
 	return err;
 }
 
-static int cmd_app_param_notification_filter_mask(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_app_param_notification_filter_mask(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint32_t value;
 	uint8_t buf[4];
@@ -5963,12 +5966,12 @@ static int cmd_app_param_notification_filter_mask(const struct shell *sh, size_t
 
 	err = add_tlv(sh, BT_MAP_APPL_PARAM_TAG_ID_NTF_FILTER_MASK, buf, 4);
 	if (err == 0) {
-		shell_print(sh, "Added NotificationFilterMask: 0x%08x", value);
+		bt_shell_session_print(sh, "Added NotificationFilterMask: 0x%08x", value);
 	}
 	return err;
 }
 
-static int cmd_app_param_convo_parameter_mask(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_app_param_convo_parameter_mask(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint32_t value;
 	uint8_t buf[4];
@@ -5979,12 +5982,12 @@ static int cmd_app_param_convo_parameter_mask(const struct shell *sh, size_t arg
 
 	err = add_tlv(sh, BT_MAP_APPL_PARAM_TAG_ID_CONVO_PARAM_MASK, buf, 4);
 	if (err == 0) {
-		shell_print(sh, "Added ConvoParameterMask: 0x%08x", value);
+		bt_shell_session_print(sh, "Added ConvoParameterMask: 0x%08x", value);
 	}
 	return err;
 }
 
-static int cmd_app_param_owner_uci(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_app_param_owner_uci(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	const char *uci = argv[1];
 	size_t len = strlen(uci);
@@ -5992,12 +5995,12 @@ static int cmd_app_param_owner_uci(const struct shell *sh, size_t argc, char *ar
 
 	err = add_tlv(sh, BT_MAP_APPL_PARAM_TAG_ID_OWNER_UCI, (const uint8_t *)uci, len);
 	if (err == 0) {
-		shell_print(sh, "Added OwnerUCI: %s", uci);
+		bt_shell_session_print(sh, "Added OwnerUCI: %s", uci);
 	}
 	return err;
 }
 
-static int cmd_app_param_extended_data(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_app_param_extended_data(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	const char *data = argv[1];
 	size_t len = strlen(data);
@@ -6005,12 +6008,12 @@ static int cmd_app_param_extended_data(const struct shell *sh, size_t argc, char
 
 	err = add_tlv(sh, BT_MAP_APPL_PARAM_TAG_ID_EXT_DATA, (const uint8_t *)data, len);
 	if (err == 0) {
-		shell_print(sh, "Added ExtendedData: %s", data);
+		bt_shell_session_print(sh, "Added ExtendedData: %s", data);
 	}
 	return err;
 }
 
-static int cmd_app_param_map_supported_features(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_app_param_map_supported_features(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint32_t value;
 	uint8_t buf[4];
@@ -6021,30 +6024,30 @@ static int cmd_app_param_map_supported_features(const struct shell *sh, size_t a
 
 	err = add_tlv(sh, BT_MAP_APPL_PARAM_TAG_ID_MAP_SUPPORTED_FEATURES, buf, 4);
 	if (err == 0) {
-		shell_print(sh, "Added MAPSupportedFeatures: 0x%08x", value);
+		bt_shell_session_print(sh, "Added MAPSupportedFeatures: 0x%08x", value);
 	}
 	return err;
 }
 
-static int cmd_app_param_message_handle(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_app_param_message_handle(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	const char *handle_str = argv[1];
 	size_t len = strlen(handle_str);
 	int err;
 
 	if (len > 16) {
-		shell_error(sh, "Message handle length %zu exceeds maximum 16", len);
+		bt_shell_session_error(sh, "Message handle length %zu exceeds maximum 16", len);
 		return -EINVAL;
 	}
 
 	err = add_tlv(sh, BT_MAP_APPL_PARAM_TAG_ID_MSG_HANDLE, (const uint8_t *)handle_str, len);
 	if (err == 0) {
-		shell_print(sh, "Added MessageHandle: %s", handle_str);
+		bt_shell_session_print(sh, "Added MessageHandle: %s", handle_str);
 	}
 	return err;
 }
 
-static int cmd_app_param_modify_text(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_app_param_modify_text(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint8_t value;
 	int err;
@@ -6054,35 +6057,35 @@ static int cmd_app_param_modify_text(const struct shell *sh, size_t argc, char *
 	} else if (strcmp(argv[1], "prepend") == 0) {
 		value = 1;
 	} else {
-		shell_error(sh, "Invalid value (use: prepend/replace)");
+		bt_shell_session_error(sh, "Invalid value (use: prepend/replace)");
 		return -EINVAL;
 	}
 
 	err = add_tlv(sh, BT_MAP_APPL_PARAM_TAG_ID_MODIFY_TEXT, &value, 1);
 	if (err == 0) {
-		shell_print(sh, "Added ModifyText: %s (%u)", argv[1], value);
+		bt_shell_session_print(sh, "Added ModifyText: %s (%u)", argv[1], value);
 	}
 	return err;
 }
 
-static int cmd_clear_header_app_param(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_clear_header_app_param(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	tlv_count = 0;
-	shell_print(sh, "Cleared all application parameters");
+	bt_shell_session_print(sh, "Cleared all application parameters");
 	return 0;
 }
 
-static int cmd_list_header_app_param(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_list_header_app_param(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	if (tlv_count == 0) {
-		shell_print(sh, "No application parameters added");
+		bt_shell_session_print(sh, "No application parameters added");
 		return 0;
 	}
 
-	shell_print(sh, "Added application parameters (%u):", tlv_count);
+	bt_shell_session_print(sh, "Added application parameters (%u):", tlv_count);
 	for (uint8_t i = 0; i < tlv_count; i++) {
-		shell_print(sh, "  [%u] Tag=0x%02x, Len=%u", i, tlvs[i].type, tlvs[i].data_len);
-		shell_hexdump(sh, tlvs[i].data, tlvs[i].data_len);
+		bt_shell_session_print(sh, "  [%u] Tag=0x%02x, Len=%u", i, tlvs[i].type, tlvs[i].data_len);
+		bt_shell_hexdump_to(sh, tlvs[i].data, tlvs[i].data_len);
 	}
 	return 0;
 }
@@ -6311,13 +6314,13 @@ static int map_sdp_discover(uint16_t service)
 }
 
 #if defined(CONFIG_BT_MAP_MCE)
-static int cmd_sdp_discover_mse(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_sdp_discover_mse(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 
 	err = map_sdp_discover(BT_SDP_MAP_MSE_SVCLASS);
 	if (err != 0) {
-		shell_error(sh, "Failed to start SDP discovery %d", err);
+		bt_shell_session_error(sh, "Failed to start SDP discovery %d", err);
 		return err;
 	}
 
@@ -6326,13 +6329,13 @@ static int cmd_sdp_discover_mse(const struct shell *sh, size_t argc, char *argv[
 #endif /* CONFIG_BT_MAP_MCE */
 
 #if defined(CONFIG_BT_MAP_MSE)
-static int cmd_sdp_discover_mce(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_sdp_discover_mce(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 
 	err = map_sdp_discover(BT_SDP_MAP_MCE_SVCLASS);
 	if (err != 0) {
-		shell_error(sh, "Failed to start SDP discovery %d", err);
+		bt_shell_session_error(sh, "Failed to start SDP discovery %d", err);
 		return err;
 	}
 
@@ -6340,14 +6343,14 @@ static int cmd_sdp_discover_mce(const struct shell *sh, size_t argc, char *argv[
 }
 #endif /* CONFIG_BT_MAP_MSE */
 
-static int cmd_common(const struct shell *sh, size_t argc, char **argv)
+static int cmd_common(const struct bt_shell *sh, size_t argc, char **argv)
 {
 	if (argc == 1) {
-		shell_help(sh);
-		return SHELL_CMD_HELP_PRINTED;
+		bt_shell_help(sh);
+		return BT_SHELL_CMD_HELP_PRINTED;
 	}
 
-	shell_error(sh, "%s unknown parameter: %s", argv[0], argv[1]);
+	bt_shell_session_error(sh, "%s unknown parameter: %s", argv[0], argv[1]);
 
 	return -ENOEXEC;
 }
@@ -6356,201 +6359,209 @@ static int cmd_common(const struct shell *sh, size_t argc, char **argv)
 #define RSP_HELP_1 "<rsp: noerror, error> [rsp_code]"
 #define RSP_HELP_2 "<rsp: noerror, error> [rsp_code] [srmp]"
 
-SHELL_STATIC_SUBCMD_SET_CREATE(
+BT_SHELL_STATIC_SUBCMD_SET_CREATE(
 	map_app_param_cmds,
-	SHELL_CMD_ARG(list, NULL, "List all added application parameters",
+	BT_SHELL_CMD_ARG(list, NULL, "List all added application parameters",
 		      cmd_list_header_app_param, 1, 0),
-	SHELL_CMD_ARG(clear, NULL, "Clear all application parameters", cmd_clear_header_app_param,
+	BT_SHELL_CMD_ARG(clear, NULL, "Clear all application parameters", cmd_clear_header_app_param,
 		      1, 0),
-	SHELL_CMD_ARG(max_list_count, NULL, "<count: 0-65535>", cmd_app_param_max_list_count, 2, 0),
-	SHELL_CMD_ARG(list_start_offset, NULL, "<offset: 0-65535>", cmd_app_param_list_start_offset,
+	BT_SHELL_CMD_ARG(max_list_count, NULL, "<count: 0-65535>", cmd_app_param_max_list_count, 2, 0),
+	BT_SHELL_CMD_ARG(list_start_offset, NULL, "<offset: 0-65535>", cmd_app_param_list_start_offset,
 		      2, 0),
-	SHELL_CMD_ARG(filter_msg_type, NULL, "<type_mask: hex>", cmd_app_param_filter_msg_type, 2,
+	BT_SHELL_CMD_ARG(filter_msg_type, NULL, "<type_mask: hex>", cmd_app_param_filter_msg_type, 2,
 		      0),
-	SHELL_CMD_ARG(filter_period_begin, NULL, "<time: YYYYMMDDTHHMMSS[+/-HHMM]>",
+	BT_SHELL_CMD_ARG(filter_period_begin, NULL, "<time: YYYYMMDDTHHMMSS[+/-HHMM]>",
 		      cmd_app_param_filter_period_begin, 2, 0),
-	SHELL_CMD_ARG(filter_period_end, NULL, "<time: YYYYMMDDTHHMMSS[+/-HHMM]>",
+	BT_SHELL_CMD_ARG(filter_period_end, NULL, "<time: YYYYMMDDTHHMMSS[+/-HHMM]>",
 		      cmd_app_param_filter_period_end, 2, 0),
-	SHELL_CMD_ARG(filter_read_status, NULL, "<no_filter/unread/read>",
+	BT_SHELL_CMD_ARG(filter_read_status, NULL, "<no_filter/unread/read>",
 		      cmd_app_param_filter_read_status, 2, 0),
-	SHELL_CMD_ARG(filter_recipient, NULL, "<recipient_address>", cmd_app_param_filter_recipient,
+	BT_SHELL_CMD_ARG(filter_recipient, NULL, "<recipient_address>", cmd_app_param_filter_recipient,
 		      2, 0),
-	SHELL_CMD_ARG(filter_originator, NULL, "<originator_address>",
+	BT_SHELL_CMD_ARG(filter_originator, NULL, "<originator_address>",
 		      cmd_app_param_filter_originator, 2, 0),
-	SHELL_CMD_ARG(filter_priority, NULL, "<no_filter/high/non_high>",
+	BT_SHELL_CMD_ARG(filter_priority, NULL, "<no_filter/high/non_high>",
 		      cmd_app_param_filter_priority, 2, 0),
-	SHELL_CMD_ARG(attachment, NULL, "<on/off>", cmd_app_param_attachment, 2, 0),
-	SHELL_CMD_ARG(transparent, NULL, "<on/off>", cmd_app_param_transparent, 2, 0),
-	SHELL_CMD_ARG(retry, NULL, "<on/off>", cmd_app_param_retry, 2, 0),
-	SHELL_CMD_ARG(new_message, NULL, "<on/off>", cmd_app_param_new_message, 2, 0),
-	SHELL_CMD_ARG(notification_status, NULL, "<on/off>", cmd_app_param_notification_status, 2,
+	BT_SHELL_CMD_ARG(attachment, NULL, "<on/off>", cmd_app_param_attachment, 2, 0),
+	BT_SHELL_CMD_ARG(transparent, NULL, "<on/off>", cmd_app_param_transparent, 2, 0),
+	BT_SHELL_CMD_ARG(retry, NULL, "<on/off>", cmd_app_param_retry, 2, 0),
+	BT_SHELL_CMD_ARG(new_message, NULL, "<on/off>", cmd_app_param_new_message, 2, 0),
+	BT_SHELL_CMD_ARG(notification_status, NULL, "<on/off>", cmd_app_param_notification_status, 2,
 		      0),
-	SHELL_CMD_ARG(mas_instance_id, NULL, "<id: 0-255>", cmd_app_param_mas_instance_id, 2, 0),
-	SHELL_CMD_ARG(parameter_mask, NULL, "<mask: hex>", cmd_app_param_parameter_mask, 2, 0),
-	SHELL_CMD_ARG(folder_listing_size, NULL, "<size: 0-65535>",
+	BT_SHELL_CMD_ARG(mas_instance_id, NULL, "<id: 0-255>", cmd_app_param_mas_instance_id, 2, 0),
+	BT_SHELL_CMD_ARG(parameter_mask, NULL, "<mask: hex>", cmd_app_param_parameter_mask, 2, 0),
+	BT_SHELL_CMD_ARG(folder_listing_size, NULL, "<size: 0-65535>",
 		      cmd_app_param_folder_listing_size, 2, 0),
-	SHELL_CMD_ARG(listing_size, NULL, "<size: 0-65535>", cmd_app_param_listing_size, 2, 0),
-	SHELL_CMD_ARG(subject_length, NULL, "<length: 0-255>", cmd_app_param_subject_length, 2, 0),
-	SHELL_CMD_ARG(charset, NULL, "<native/utf8>", cmd_app_param_charset, 2, 0),
-	SHELL_CMD_ARG(fraction_request, NULL, "<first/next>", cmd_app_param_fraction_request, 2, 0),
-	SHELL_CMD_ARG(fraction_deliver, NULL, "<more/last>", cmd_app_param_fraction_deliver, 2, 0),
-	SHELL_CMD_ARG(status_indicator, NULL, "<read/deleted/extended>",
+	BT_SHELL_CMD_ARG(listing_size, NULL, "<size: 0-65535>", cmd_app_param_listing_size, 2, 0),
+	BT_SHELL_CMD_ARG(subject_length, NULL, "<length: 0-255>", cmd_app_param_subject_length, 2, 0),
+	BT_SHELL_CMD_ARG(charset, NULL, "<native/utf8>", cmd_app_param_charset, 2, 0),
+	BT_SHELL_CMD_ARG(fraction_request, NULL, "<first/next>", cmd_app_param_fraction_request, 2, 0),
+	BT_SHELL_CMD_ARG(fraction_deliver, NULL, "<more/last>", cmd_app_param_fraction_deliver, 2, 0),
+	BT_SHELL_CMD_ARG(status_indicator, NULL, "<read/deleted/extended>",
 		      cmd_app_param_status_indicator, 2, 0),
-	SHELL_CMD_ARG(status_value, NULL, "<yes/no>", cmd_app_param_status_value, 2, 0),
-	SHELL_CMD_ARG(mse_time, NULL, "<time: YYYYMMDDTHHMMSS[+/-HHMM]>", cmd_app_param_mse_time, 2,
+	BT_SHELL_CMD_ARG(status_value, NULL, "<yes/no>", cmd_app_param_status_value, 2, 0),
+	BT_SHELL_CMD_ARG(mse_time, NULL, "<time: YYYYMMDDTHHMMSS[+/-HHMM]>", cmd_app_param_mse_time, 2,
 		      0),
-	SHELL_CMD_ARG(database_id, NULL, "<id_string: max 32 chars>", cmd_app_param_database_id, 2,
+	BT_SHELL_CMD_ARG(database_id, NULL, "<id_string: max 32 chars>", cmd_app_param_database_id, 2,
 		      0),
-	SHELL_CMD_ARG(convo_listing_ver, NULL, "<version_string: max 32 chars>",
+	BT_SHELL_CMD_ARG(convo_listing_ver, NULL, "<version_string: max 32 chars>",
 		      cmd_app_param_convo_listing_ver, 2, 0),
-	SHELL_CMD_ARG(presence_availability, NULL, "<unknown/offline/online/away/dnd/busy/meeting>",
+	BT_SHELL_CMD_ARG(presence_availability, NULL, "<unknown/offline/online/away/dnd/busy/meeting>",
 		      cmd_app_param_presence_availability, 2, 0),
-	SHELL_CMD_ARG(presence_text, NULL, "<text>", cmd_app_param_presence_text, 2, 0),
-	SHELL_CMD_ARG(last_activity, NULL, "<time: YYYYMMDDTHHMMSS[+/-HHMM]>",
+	BT_SHELL_CMD_ARG(presence_text, NULL, "<text>", cmd_app_param_presence_text, 2, 0),
+	BT_SHELL_CMD_ARG(last_activity, NULL, "<time: YYYYMMDDTHHMMSS[+/-HHMM]>",
 		      cmd_app_param_last_activity, 2, 0),
-	SHELL_CMD_ARG(filter_last_activity_begin, NULL, "<time: YYYYMMDDTHHMMSS[+/-HHMM]>",
+	BT_SHELL_CMD_ARG(filter_last_activity_begin, NULL, "<time: YYYYMMDDTHHMMSS[+/-HHMM]>",
 		      cmd_app_param_filter_last_activity_begin, 2, 0),
-	SHELL_CMD_ARG(filter_last_activity_end, NULL, "<time: YYYYMMDDTHHMMSS[+/-HHMM]>",
+	BT_SHELL_CMD_ARG(filter_last_activity_end, NULL, "<time: YYYYMMDDTHHMMSS[+/-HHMM]>",
 		      cmd_app_param_filter_last_activity_end, 2, 0),
-	SHELL_CMD_ARG(chat_state, NULL, "<unknown/inactive/active/composing/paused/gone>",
+	BT_SHELL_CMD_ARG(chat_state, NULL, "<unknown/inactive/active/composing/paused/gone>",
 		      cmd_app_param_chat_state, 2, 0),
-	SHELL_CMD_ARG(conversation_id, NULL, "<id_string: max 32 chars>",
+	BT_SHELL_CMD_ARG(conversation_id, NULL, "<id_string: max 32 chars>",
 		      cmd_app_param_conversation_id, 2, 0),
-	SHELL_CMD_ARG(folder_ver, NULL, "<version_string: max 32 chars>", cmd_app_param_folder_ver,
+	BT_SHELL_CMD_ARG(folder_ver, NULL, "<version_string: max 32 chars>", cmd_app_param_folder_ver,
 		      2, 0),
-	SHELL_CMD_ARG(filter_msg_handle, NULL, "<handle_string: max 16 chars>",
+	BT_SHELL_CMD_ARG(filter_msg_handle, NULL, "<handle_string: max 16 chars>",
 		      cmd_app_param_filter_msg_handle, 2, 0),
-	SHELL_CMD_ARG(notification_filter_mask, NULL, "<mask: hex>",
+	BT_SHELL_CMD_ARG(notification_filter_mask, NULL, "<mask: hex>",
 		      cmd_app_param_notification_filter_mask, 2, 0),
-	SHELL_CMD_ARG(convo_parameter_mask, NULL, "<mask: hex>", cmd_app_param_convo_parameter_mask,
+	BT_SHELL_CMD_ARG(convo_parameter_mask, NULL, "<mask: hex>", cmd_app_param_convo_parameter_mask,
 		      2, 0),
-	SHELL_CMD_ARG(owner_uci, NULL, "<uci_string>", cmd_app_param_owner_uci, 2, 0),
-	SHELL_CMD_ARG(extended_data, NULL, "<data_string>", cmd_app_param_extended_data, 2, 0),
-	SHELL_CMD_ARG(map_supported_features, NULL, HELP_NONE, cmd_app_param_map_supported_features,
+	BT_SHELL_CMD_ARG(owner_uci, NULL, "<uci_string>", cmd_app_param_owner_uci, 2, 0),
+	BT_SHELL_CMD_ARG(extended_data, NULL, "<data_string>", cmd_app_param_extended_data, 2, 0),
+	BT_SHELL_CMD_ARG(map_supported_features, NULL, HELP_NONE, cmd_app_param_map_supported_features,
 		      1, 0),
-	SHELL_CMD_ARG(message_handle, NULL, "<handle_string: max 16 chars>",
+	BT_SHELL_CMD_ARG(message_handle, NULL, "<handle_string: max 16 chars>",
 		      cmd_app_param_message_handle, 2, 0),
-	SHELL_CMD_ARG(modify_text, NULL, "<prepend/replace>", cmd_app_param_modify_text, 2, 0),
-	SHELL_SUBCMD_SET_END);
+	BT_SHELL_CMD_ARG(modify_text, NULL, "<prepend/replace>", cmd_app_param_modify_text, 2, 0),
+	BT_SHELL_SUBCMD_SET_END);
 
 #if defined(CONFIG_BT_MAP_MCE)
-SHELL_STATIC_SUBCMD_SET_CREATE(
+BT_SHELL_STATIC_SUBCMD_SET_CREATE(
 	mce_mas_cmds,
-	SHELL_CMD_ARG(discover, NULL, HELP_NONE, cmd_sdp_discover_mse, 1, 0),
-	SHELL_CMD_ARG(select, NULL, "<instance_id>", cmd_mce_mas_select, 2, 0),
-	SHELL_CMD_ARG(rfcomm_connect, NULL, "<channel> <instance_id> [supported_features]",
+	BT_SHELL_CMD_ARG(discover, NULL, HELP_NONE, cmd_sdp_discover_mse, 1, 0),
+	BT_SHELL_CMD_ARG(select, NULL, "<instance_id>", cmd_mce_mas_select, 2, 0),
+	BT_SHELL_CMD_ARG(rfcomm_connect, NULL, "<channel> <instance_id> [supported_features]",
 		      cmd_mce_mas_rfcomm_connect, 3, 1),
-	SHELL_CMD_ARG(rfcomm_disconnect, NULL, HELP_NONE, cmd_mce_mas_rfcomm_disconnect, 1, 0),
-	SHELL_CMD_ARG(l2cap_connect, NULL, "<psm> <instance_id> [supported_features]",
+	BT_SHELL_CMD_ARG(rfcomm_disconnect, NULL, HELP_NONE, cmd_mce_mas_rfcomm_disconnect, 1, 0),
+	BT_SHELL_CMD_ARG(l2cap_connect, NULL, "<psm> <instance_id> [supported_features]",
 		      cmd_mce_mas_l2cap_connect, 3, 1),
-	SHELL_CMD_ARG(l2cap_disconnect, NULL, HELP_NONE, cmd_mce_mas_l2cap_disconnect, 1, 0),
-	SHELL_CMD_ARG(connect, NULL, HELP_NONE, cmd_mce_mas_connect, 1, 0),
-	SHELL_CMD_ARG(disconnect, NULL, HELP_NONE, cmd_mce_mas_disconnect, 1, 0),
-	SHELL_CMD_ARG(abort, NULL, HELP_NONE, cmd_mce_mas_abort, 1, 0),
-	SHELL_CMD_ARG(set_folder, NULL, "<path: \"/\" | \"..\" | \"../folder\" | \"folder\">",
+	BT_SHELL_CMD_ARG(l2cap_disconnect, NULL, HELP_NONE, cmd_mce_mas_l2cap_disconnect, 1, 0),
+	BT_SHELL_CMD_ARG(connect, NULL, HELP_NONE, cmd_mce_mas_connect, 1, 0),
+	BT_SHELL_CMD_ARG(disconnect, NULL, HELP_NONE, cmd_mce_mas_disconnect, 1, 0),
+	BT_SHELL_CMD_ARG(abort, NULL, HELP_NONE, cmd_mce_mas_abort, 1, 0),
+	BT_SHELL_CMD_ARG(set_folder, NULL, "<path: \"/\" | \"..\" | \"../folder\" | \"folder\">",
 		      cmd_mce_mas_set_folder, 2, 0),
-	SHELL_CMD_ARG(set_ntf_reg, NULL, HELP_NONE, cmd_mce_mas_set_ntf_reg, 1, 0),
-	SHELL_CMD_ARG(get_folder_listing, NULL, "[srmp]", cmd_mce_mas_get_folder_listing, 1, 1),
-	SHELL_CMD_ARG(get_msg_listing, NULL, "[name <folder_name>] [srmp]",
+	BT_SHELL_CMD_ARG(set_ntf_reg, NULL, HELP_NONE, cmd_mce_mas_set_ntf_reg, 1, 0),
+	BT_SHELL_CMD_ARG(get_folder_listing, NULL, "[srmp]", cmd_mce_mas_get_folder_listing, 1, 1),
+	BT_SHELL_CMD_ARG(get_msg_listing, NULL, "[name <folder_name>] [srmp]",
 		      cmd_mce_mas_get_msg_listing, 1, 3),
-	SHELL_CMD_ARG(get_msg, NULL, "<msg_handle> [srmp]", cmd_mce_mas_get_msg, 2, 1),
-	SHELL_CMD_ARG(set_msg_status, NULL, "<msg_handle>", cmd_mce_mas_set_msg_status, 2, 0),
-	SHELL_CMD_ARG(push_msg, NULL, "[folder_name]", cmd_mce_mas_push_msg, 1, 1),
-	SHELL_CMD_ARG(update_inbox, NULL, HELP_NONE, cmd_mce_mas_update_inbox, 1, 0),
-	SHELL_CMD_ARG(get_mas_inst_info, NULL, "[srmp]", cmd_mce_mas_get_mas_inst_info, 1, 1),
-	SHELL_CMD_ARG(set_owner_status, NULL, HELP_NONE, cmd_mce_mas_set_owner_status, 1, 0),
-	SHELL_CMD_ARG(get_owner_status, NULL, "[srmp]", cmd_mce_mas_get_owner_status, 1, 1),
-	SHELL_CMD_ARG(get_convo_listing, NULL, "[srmp]", cmd_mce_mas_get_convo_listing, 1, 1),
-	SHELL_CMD_ARG(set_ntf_filter, NULL, HELP_NONE, cmd_mce_mas_set_ntf_filter, 1, 0),
-	SHELL_SUBCMD_SET_END);
+	BT_SHELL_CMD_ARG(get_msg, NULL, "<msg_handle> [srmp]", cmd_mce_mas_get_msg, 2, 1),
+	BT_SHELL_CMD_ARG(set_msg_status, NULL, "<msg_handle>", cmd_mce_mas_set_msg_status, 2, 0),
+	BT_SHELL_CMD_ARG(push_msg, NULL, "[folder_name]", cmd_mce_mas_push_msg, 1, 1),
+	BT_SHELL_CMD_ARG(update_inbox, NULL, HELP_NONE, cmd_mce_mas_update_inbox, 1, 0),
+	BT_SHELL_CMD_ARG(get_mas_inst_info, NULL, "[srmp]", cmd_mce_mas_get_mas_inst_info, 1, 1),
+	BT_SHELL_CMD_ARG(set_owner_status, NULL, HELP_NONE, cmd_mce_mas_set_owner_status, 1, 0),
+	BT_SHELL_CMD_ARG(get_owner_status, NULL, "[srmp]", cmd_mce_mas_get_owner_status, 1, 1),
+	BT_SHELL_CMD_ARG(get_convo_listing, NULL, "[srmp]", cmd_mce_mas_get_convo_listing, 1, 1),
+	BT_SHELL_CMD_ARG(set_ntf_filter, NULL, HELP_NONE, cmd_mce_mas_set_ntf_filter, 1, 0),
+	BT_SHELL_SUBCMD_SET_END);
 
-SHELL_STATIC_SUBCMD_SET_CREATE(
+BT_SHELL_STATIC_SUBCMD_SET_CREATE(
 	mce_mns_cmds,
-	SHELL_CMD_ARG(register, NULL, HELP_NONE, cmd_mce_mns_register, 1, 0),
-	SHELL_CMD_ARG(rfcomm_register, NULL, HELP_NONE, cmd_mce_mns_rfcomm_register, 1, 0),
-	SHELL_CMD_ARG(rfcomm_disconnect, NULL, HELP_NONE, cmd_mce_mns_rfcomm_disconnect, 1, 0),
-	SHELL_CMD_ARG(l2cap_register, NULL, HELP_NONE, cmd_mce_mns_l2cap_register, 1, 0),
-	SHELL_CMD_ARG(l2cap_disconnect, NULL, HELP_NONE, cmd_mce_mns_l2cap_disconnect, 1, 0),
-	SHELL_CMD_ARG(connect, NULL, "<rsp: success, error> [rsp_code]", cmd_mce_mns_connect, 2, 1),
-	SHELL_CMD_ARG(disconnect, NULL, "<rsp: success, error> [rsp_code]", cmd_mce_mns_disconnect,
+	BT_SHELL_CMD_ARG(register, NULL, HELP_NONE, cmd_mce_mns_register, 1, 0),
+	BT_SHELL_CMD_ARG(rfcomm_register, NULL, HELP_NONE, cmd_mce_mns_rfcomm_register, 1, 0),
+	BT_SHELL_CMD_ARG(rfcomm_disconnect, NULL, HELP_NONE, cmd_mce_mns_rfcomm_disconnect, 1, 0),
+	BT_SHELL_CMD_ARG(l2cap_register, NULL, HELP_NONE, cmd_mce_mns_l2cap_register, 1, 0),
+	BT_SHELL_CMD_ARG(l2cap_disconnect, NULL, HELP_NONE, cmd_mce_mns_l2cap_disconnect, 1, 0),
+	BT_SHELL_CMD_ARG(connect, NULL, "<rsp: success, error> [rsp_code]", cmd_mce_mns_connect, 2, 1),
+	BT_SHELL_CMD_ARG(disconnect, NULL, "<rsp: success, error> [rsp_code]", cmd_mce_mns_disconnect,
 		      2, 1),
-	SHELL_CMD_ARG(abort, NULL, "<rsp: success, error> [rsp_code]", cmd_mce_mns_abort, 2, 1),
-	SHELL_CMD_ARG(send_event, NULL, RSP_HELP_2, cmd_mce_mns_send_event, 2, 2),
-	SHELL_SUBCMD_SET_END);
+	BT_SHELL_CMD_ARG(abort, NULL, "<rsp: success, error> [rsp_code]", cmd_mce_mns_abort, 2, 1),
+	BT_SHELL_CMD_ARG(send_event, NULL, RSP_HELP_2, cmd_mce_mns_send_event, 2, 2),
+	BT_SHELL_SUBCMD_SET_END);
 
-SHELL_STATIC_SUBCMD_SET_CREATE(
+BT_SHELL_STATIC_SUBCMD_SET_CREATE(
 	mce_cmds,
-	SHELL_CMD_ARG(mas, &mce_mas_cmds, "MCE MAS commands", cmd_common, 1, 0),
-	SHELL_CMD_ARG(mns, &mce_mns_cmds, "MCE MNS commands", cmd_common, 1, 0),
-	SHELL_SUBCMD_SET_END);
+	BT_SHELL_CMD_ARG(mas, &mce_mas_cmds, "MCE MAS commands", cmd_common, 1, 0),
+	BT_SHELL_CMD_ARG(mns, &mce_mns_cmds, "MCE MNS commands", cmd_common, 1, 0),
+	BT_SHELL_SUBCMD_SET_END);
 #endif /* CONFIG_BT_MAP_MCE */
 
 #if defined(CONFIG_BT_MAP_MSE)
-SHELL_STATIC_SUBCMD_SET_CREATE(
+BT_SHELL_STATIC_SUBCMD_SET_CREATE(
 	mse_mas_cmds,
-	SHELL_CMD_ARG(select, NULL, "<instance_id>", cmd_mse_mas_select, 2, 0),
-	SHELL_CMD_ARG(register, NULL, HELP_NONE, cmd_mse_mas_register, 1, 0),
-	SHELL_CMD_ARG(rfcomm_register, NULL, HELP_NONE, cmd_mse_mas_rfcomm_register, 1, 0),
-	SHELL_CMD_ARG(rfcomm_disconnect, NULL, HELP_NONE, cmd_mse_mas_rfcomm_disconnect, 1, 0),
-	SHELL_CMD_ARG(l2cap_register, NULL, HELP_NONE, cmd_mse_mas_l2cap_register, 1, 0),
-	SHELL_CMD_ARG(l2cap_disconnect, NULL, HELP_NONE, cmd_mse_mas_l2cap_disconnect, 1, 0),
-	SHELL_CMD_ARG(connect, NULL, "<rsp: success, error> [rsp_code]", cmd_mse_mas_connect, 2, 1),
-	SHELL_CMD_ARG(disconnect, NULL, "<rsp: success, error> [rsp_code]", cmd_mse_mas_disconnect,
+	BT_SHELL_CMD_ARG(select, NULL, "<instance_id>", cmd_mse_mas_select, 2, 0),
+	BT_SHELL_CMD_ARG(register, NULL, HELP_NONE, cmd_mse_mas_register, 1, 0),
+	BT_SHELL_CMD_ARG(rfcomm_register, NULL, HELP_NONE, cmd_mse_mas_rfcomm_register, 1, 0),
+	BT_SHELL_CMD_ARG(rfcomm_disconnect, NULL, HELP_NONE, cmd_mse_mas_rfcomm_disconnect, 1, 0),
+	BT_SHELL_CMD_ARG(l2cap_register, NULL, HELP_NONE, cmd_mse_mas_l2cap_register, 1, 0),
+	BT_SHELL_CMD_ARG(l2cap_disconnect, NULL, HELP_NONE, cmd_mse_mas_l2cap_disconnect, 1, 0),
+	BT_SHELL_CMD_ARG(connect, NULL, "<rsp: success, error> [rsp_code]", cmd_mse_mas_connect, 2, 1),
+	BT_SHELL_CMD_ARG(disconnect, NULL, "<rsp: success, error> [rsp_code]", cmd_mse_mas_disconnect,
 		      2, 1),
-	SHELL_CMD_ARG(abort, NULL, "<rsp: success, error> [rsp_code]", cmd_mse_mas_abort, 2, 1),
-	SHELL_CMD_ARG(set_folder, NULL, "<rsp: success, error> [rsp_code]", cmd_mse_mas_set_folder,
+	BT_SHELL_CMD_ARG(abort, NULL, "<rsp: success, error> [rsp_code]", cmd_mse_mas_abort, 2, 1),
+	BT_SHELL_CMD_ARG(set_folder, NULL, "<rsp: success, error> [rsp_code]", cmd_mse_mas_set_folder,
 		      2, 1),
-	SHELL_CMD_ARG(set_ntf_reg, NULL, RSP_HELP_1, cmd_mse_mas_set_ntf_reg, 2, 1),
-	SHELL_CMD_ARG(get_folder_listing, NULL, RSP_HELP_2, cmd_mse_mas_get_folder_listing, 2, 2),
-	SHELL_CMD_ARG(get_msg_listing, NULL, RSP_HELP_2, cmd_mse_mas_get_msg_listing, 2, 2),
-	SHELL_CMD_ARG(get_msg, NULL, RSP_HELP_2, cmd_mse_mas_get_msg, 2, 2),
-	SHELL_CMD_ARG(set_msg_status, NULL, RSP_HELP_1, cmd_mse_mas_set_msg_status, 2, 1),
-	SHELL_CMD_ARG(push_msg, NULL, RSP_HELP_2, cmd_mse_mas_push_msg, 2, 2),
-	SHELL_CMD_ARG(update_inbox, NULL, RSP_HELP_1, cmd_mse_mas_update_inbox, 2, 1),
-	SHELL_CMD_ARG(get_mas_inst_info, NULL, RSP_HELP_2, cmd_mse_mas_get_mas_inst_info, 2, 2),
-	SHELL_CMD_ARG(set_owner_status, NULL, RSP_HELP_1, cmd_mse_mas_set_owner_status, 2, 1),
-	SHELL_CMD_ARG(get_owner_status, NULL, RSP_HELP_2, cmd_mse_mas_get_owner_status, 2, 2),
-	SHELL_CMD_ARG(get_convo_listing, NULL, RSP_HELP_2, cmd_mse_mas_get_convo_listing, 2, 2),
-	SHELL_CMD_ARG(set_ntf_filter, NULL, RSP_HELP_1, cmd_mse_mas_set_ntf_filter, 2, 1),
-	SHELL_SUBCMD_SET_END);
+	BT_SHELL_CMD_ARG(set_ntf_reg, NULL, RSP_HELP_1, cmd_mse_mas_set_ntf_reg, 2, 1),
+	BT_SHELL_CMD_ARG(get_folder_listing, NULL, RSP_HELP_2, cmd_mse_mas_get_folder_listing, 2, 2),
+	BT_SHELL_CMD_ARG(get_msg_listing, NULL, RSP_HELP_2, cmd_mse_mas_get_msg_listing, 2, 2),
+	BT_SHELL_CMD_ARG(get_msg, NULL, RSP_HELP_2, cmd_mse_mas_get_msg, 2, 2),
+	BT_SHELL_CMD_ARG(set_msg_status, NULL, RSP_HELP_1, cmd_mse_mas_set_msg_status, 2, 1),
+	BT_SHELL_CMD_ARG(push_msg, NULL, RSP_HELP_2, cmd_mse_mas_push_msg, 2, 2),
+	BT_SHELL_CMD_ARG(update_inbox, NULL, RSP_HELP_1, cmd_mse_mas_update_inbox, 2, 1),
+	BT_SHELL_CMD_ARG(get_mas_inst_info, NULL, RSP_HELP_2, cmd_mse_mas_get_mas_inst_info, 2, 2),
+	BT_SHELL_CMD_ARG(set_owner_status, NULL, RSP_HELP_1, cmd_mse_mas_set_owner_status, 2, 1),
+	BT_SHELL_CMD_ARG(get_owner_status, NULL, RSP_HELP_2, cmd_mse_mas_get_owner_status, 2, 2),
+	BT_SHELL_CMD_ARG(get_convo_listing, NULL, RSP_HELP_2, cmd_mse_mas_get_convo_listing, 2, 2),
+	BT_SHELL_CMD_ARG(set_ntf_filter, NULL, RSP_HELP_1, cmd_mse_mas_set_ntf_filter, 2, 1),
+	BT_SHELL_SUBCMD_SET_END);
 
-SHELL_STATIC_SUBCMD_SET_CREATE(
+BT_SHELL_STATIC_SUBCMD_SET_CREATE(
 	mse_mns_cmds,
-	SHELL_CMD_ARG(discover, NULL, HELP_NONE, cmd_sdp_discover_mce, 1, 0),
-	SHELL_CMD_ARG(rfcomm_connect, NULL, "<channel> [supported_features]",
+	BT_SHELL_CMD_ARG(discover, NULL, HELP_NONE, cmd_sdp_discover_mce, 1, 0),
+	BT_SHELL_CMD_ARG(rfcomm_connect, NULL, "<channel> [supported_features]",
 		      cmd_mse_mns_rfcomm_connect, 2, 1),
-	SHELL_CMD_ARG(rfcomm_disconnect, NULL, HELP_NONE, cmd_mse_mns_rfcomm_disconnect, 1, 0),
-	SHELL_CMD_ARG(l2cap_connect, NULL, "<psm> [supported_features]", cmd_mse_mns_l2cap_connect,
+	BT_SHELL_CMD_ARG(rfcomm_disconnect, NULL, HELP_NONE, cmd_mse_mns_rfcomm_disconnect, 1, 0),
+	BT_SHELL_CMD_ARG(l2cap_connect, NULL, "<psm> [supported_features]", cmd_mse_mns_l2cap_connect,
 		      2, 1),
-	SHELL_CMD_ARG(l2cap_disconnect, NULL, HELP_NONE, cmd_mse_mns_l2cap_disconnect, 1, 0),
-	SHELL_CMD_ARG(connect, NULL, HELP_NONE, cmd_mse_mns_connect, 1, 0),
-	SHELL_CMD_ARG(disconnect, NULL, HELP_NONE, cmd_mse_mns_disconnect, 1, 0),
-	SHELL_CMD_ARG(abort, NULL, HELP_NONE, cmd_mse_mns_abort, 1, 0),
-	SHELL_CMD_ARG(send_event, NULL, HELP_NONE, cmd_mse_mns_send_event, 1, 0),
-	SHELL_SUBCMD_SET_END);
+	BT_SHELL_CMD_ARG(l2cap_disconnect, NULL, HELP_NONE, cmd_mse_mns_l2cap_disconnect, 1, 0),
+	BT_SHELL_CMD_ARG(connect, NULL, HELP_NONE, cmd_mse_mns_connect, 1, 0),
+	BT_SHELL_CMD_ARG(disconnect, NULL, HELP_NONE, cmd_mse_mns_disconnect, 1, 0),
+	BT_SHELL_CMD_ARG(abort, NULL, HELP_NONE, cmd_mse_mns_abort, 1, 0),
+	BT_SHELL_CMD_ARG(send_event, NULL, HELP_NONE, cmd_mse_mns_send_event, 1, 0),
+	BT_SHELL_SUBCMD_SET_END);
 
-SHELL_STATIC_SUBCMD_SET_CREATE(
+BT_SHELL_STATIC_SUBCMD_SET_CREATE(
 	mse_cmds,
-	SHELL_CMD_ARG(mas, &mse_mas_cmds, "MSE MAS commands", cmd_common, 1, 0),
-	SHELL_CMD_ARG(mns, &mse_mns_cmds, "MSE MNS commands", cmd_common, 1, 0),
-	SHELL_SUBCMD_SET_END);
+	BT_SHELL_CMD_ARG(mas, &mse_mas_cmds, "MSE MAS commands", cmd_common, 1, 0),
+	BT_SHELL_CMD_ARG(mns, &mse_mns_cmds, "MSE MNS commands", cmd_common, 1, 0),
+	BT_SHELL_SUBCMD_SET_END);
 #endif /* CONFIG_BT_MAP_MSE */
 
-SHELL_STATIC_SUBCMD_SET_CREATE(
+BT_SHELL_STATIC_SUBCMD_SET_CREATE(
 	map_add_header_cmds,
-	SHELL_CMD_ARG(app_param, &map_app_param_cmds, "Application parameter commands",
+	BT_SHELL_CMD_ARG(app_param, &map_app_param_cmds, "Application parameter commands",
 		      cmd_common, 1, 1),
-	SHELL_SUBCMD_SET_END);
+	BT_SHELL_SUBCMD_SET_END);
 
-SHELL_STATIC_SUBCMD_SET_CREATE(
+BT_SHELL_STATIC_SUBCMD_SET_CREATE(
 	map_cmds,
-	SHELL_CMD_ARG(add_header, &map_add_header_cmds, "Adding header sets", cmd_common, 1, 0),
+	BT_SHELL_CMD_ARG(add_header, &map_add_header_cmds, "Adding header sets", cmd_common, 1, 0),
 #if defined(CONFIG_BT_MAP_MCE)
-	SHELL_CMD_ARG(mce, &mce_cmds, "MCE commands", cmd_common, 1, 0),
+	BT_SHELL_CMD_ARG(mce, &mce_cmds, "MCE commands", cmd_common, 1, 0),
 #endif /* CONFIG_BT_MAP_MCE */
 #if defined(CONFIG_BT_MAP_MSE)
-	SHELL_CMD_ARG(mse, &mse_cmds, "MSE commands", cmd_common, 1, 0),
+	BT_SHELL_CMD_ARG(mse, &mse_cmds, "MSE commands", cmd_common, 1, 0),
 #endif /* CONFIG_BT_MAP_MSE */
-	SHELL_SUBCMD_SET_END);
+	BT_SHELL_SUBCMD_SET_END);
 
-SHELL_CMD_ARG_REGISTER(map, &map_cmds, "Bluetooth MAP shell commands", cmd_common, 1, 1);
+BT_SHELL_CMD_ARG_REGISTER(map, &map_cmds, "Bluetooth MAP shell commands", cmd_common, 1, 1);
+
+/** @brief Initialize module-owned storage before protocol operations. */
+void bt_host_classic_shell_map_storage_init(void)
+{
+	net_buf_pool_init(&mas_tx_pool);
+	net_buf_pool_init(&mns_tx_pool);
+	net_buf_pool_init(&sdp_client_pool);
+}

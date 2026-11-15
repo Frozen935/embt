@@ -7,20 +7,20 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
+#include <embt/base/util_macro.h>
 #include <errno.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 
-#include <zephyr/autoconf.h>
-#include <zephyr/bluetooth/assigned_numbers.h>
-#include <zephyr/bluetooth/audio/tbs.h>
-#include <zephyr/bluetooth/audio/ccp.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/shell/shell.h>
-#include <zephyr/shell/shell_string_conv.h>
-#include <zephyr/sys/__assert.h>
-#include <zephyr/toolchain.h>
+#include <embt/autoconf.h>
+#include <embt/bluetooth/assigned_numbers.h>
+#include <embt/bluetooth/audio/tbs.h>
+#include <embt/bluetooth/audio/ccp.h>
+#include <embt/bluetooth/conn.h>
+#include <shell/bt_shell.h>
+#include <embt/base/assert.h>
+#include <embt/compiler.h>
 
 #include "common/bt_shell_private.h"
 #include "host/shell/bt.h"
@@ -138,7 +138,7 @@ static struct bt_ccp_call_control_client_cb ccp_call_control_client_cbs = {
 #endif /* CONFIG_BT_TBS_CLIENT_BEARER_URI_SCHEMES_SUPPORTED_LIST */
 };
 
-static int cmd_ccp_call_control_client_discover(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_ccp_call_control_client_discover(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	static bool cb_registered;
 	int err;
@@ -147,14 +147,14 @@ static int cmd_ccp_call_control_client_discover(const struct shell *sh, size_t a
 	ARG_UNUSED(argv);
 
 	if (default_conn == NULL) {
-		shell_error(sh, "Not connected");
+		bt_shell_session_error(sh, "Not connected");
 		return -ENOEXEC;
 	}
 
 	if (!cb_registered) {
 		err = bt_ccp_call_control_client_register_cb(&ccp_call_control_client_cbs);
 		if (err != 0) {
-			shell_error(sh, "Failed to register CCP Call Control Client cbs (err %d)",
+			bt_shell_session_error(sh, "Failed to register CCP Call Control Client cbs (err %d)",
 				    err);
 			return -ENOEXEC;
 		}
@@ -165,7 +165,7 @@ static int cmd_ccp_call_control_client_discover(const struct shell *sh, size_t a
 	err = bt_ccp_call_control_client_discover(default_conn,
 						  &clients[bt_conn_index(default_conn)]);
 	if (err != 0) {
-		shell_error(sh, "Failed to discover GTBS: %d", err);
+		bt_shell_session_error(sh, "Failed to discover GTBS: %d", err);
 
 		return -ENOEXEC;
 	}
@@ -173,20 +173,20 @@ static int cmd_ccp_call_control_client_discover(const struct shell *sh, size_t a
 	return 0;
 }
 
-__maybe_unused static int validate_and_get_index(const struct shell *sh, const char *index_arg)
+__maybe_unused static int validate_and_get_index(const struct bt_shell *sh, const char *index_arg)
 {
 	unsigned long index;
 	int err = 0;
 
-	index = shell_strtoul(index_arg, 0, &err);
+	index = bt_shell_strtoul(index_arg, 0, &err);
 	if (err != 0) {
-		shell_error(sh, "Could not parse index: %d", err);
+		bt_shell_session_error(sh, "Could not parse index: %d", err);
 
 		return -ENOEXEC;
 	}
 
 	if (index >= CONFIG_BT_CCP_CALL_CONTROL_CLIENT_BEARER_COUNT) {
-		shell_error(sh, "Invalid index: %lu", index);
+		bt_shell_session_error(sh, "Invalid index: %lu", index);
 
 		return -ENOEXEC;
 	}
@@ -226,7 +226,7 @@ __maybe_unused static struct bt_ccp_call_control_client_bearer *get_bearer_by_in
 }
 
 #if defined(CONFIG_BT_TBS_CLIENT_BEARER_PROVIDER_NAME)
-static int cmd_ccp_call_control_client_read_bearer_name(const struct shell *sh, size_t argc,
+static int cmd_ccp_call_control_client_read_bearer_name(const struct bt_shell *sh, size_t argc,
 							char *argv[])
 {
 	struct bt_ccp_call_control_client_bearer *bearer;
@@ -242,14 +242,14 @@ static int cmd_ccp_call_control_client_read_bearer_name(const struct shell *sh, 
 
 	bearer = get_bearer_by_index(index);
 	if (bearer == NULL) {
-		shell_error(sh, "Failed to get bearer for index %d", index);
+		bt_shell_session_error(sh, "Failed to get bearer for index %d", index);
 
 		return -ENOEXEC;
 	}
 
 	err = bt_ccp_call_control_client_read_bearer_provider_name(bearer);
 	if (err != 0) {
-		shell_error(sh, "Failed to read bearer[%d] provider name: %d", index, err);
+		bt_shell_session_error(sh, "Failed to read bearer[%d] provider name: %d", index, err);
 
 		return -ENOEXEC;
 	}
@@ -259,7 +259,7 @@ static int cmd_ccp_call_control_client_read_bearer_name(const struct shell *sh, 
 #endif /* CONFIG_BT_TBS_CLIENT_BEARER_PROVIDER_NAME */
 
 #if defined(CONFIG_BT_TBS_CLIENT_BEARER_UCI)
-static int cmd_ccp_call_control_client_read_bearer_uci(const struct shell *sh, size_t argc,
+static int cmd_ccp_call_control_client_read_bearer_uci(const struct bt_shell *sh, size_t argc,
 						       char *argv[])
 {
 	struct bt_ccp_call_control_client_bearer *bearer;
@@ -275,14 +275,14 @@ static int cmd_ccp_call_control_client_read_bearer_uci(const struct shell *sh, s
 
 	bearer = get_bearer_by_index(index);
 	if (bearer == NULL) {
-		shell_error(sh, "Failed to get bearer for index %d", index);
+		bt_shell_session_error(sh, "Failed to get bearer for index %d", index);
 
 		return -ENOEXEC;
 	}
 
 	err = bt_ccp_call_control_client_read_bearer_uci(bearer);
 	if (err != 0) {
-		shell_error(sh, "Failed to read bearer[%d] UCI: %d", index, err);
+		bt_shell_session_error(sh, "Failed to read bearer[%d] UCI: %d", index, err);
 
 		return -ENOEXEC;
 	}
@@ -292,7 +292,7 @@ static int cmd_ccp_call_control_client_read_bearer_uci(const struct shell *sh, s
 #endif /* CONFIG_BT_TBS_CLIENT_BEARER_UCI */
 
 #if defined(CONFIG_BT_TBS_CLIENT_BEARER_TECHNOLOGY)
-static int cmd_ccp_call_control_client_read_bearer_tech(const struct shell *sh, size_t argc,
+static int cmd_ccp_call_control_client_read_bearer_tech(const struct bt_shell *sh, size_t argc,
 							char *argv[])
 {
 	struct bt_ccp_call_control_client_bearer *bearer;
@@ -308,14 +308,14 @@ static int cmd_ccp_call_control_client_read_bearer_tech(const struct shell *sh, 
 
 	bearer = get_bearer_by_index(index);
 	if (bearer == NULL) {
-		shell_error(sh, "Failed to get bearer for index %d", index);
+		bt_shell_session_error(sh, "Failed to get bearer for index %d", index);
 
 		return -ENOEXEC;
 	}
 
 	err = bt_ccp_call_control_client_read_bearer_tech(bearer);
 	if (err != 0) {
-		shell_error(sh, "Failed to read bearer[%d] technology: %d", index, err);
+		bt_shell_session_error(sh, "Failed to read bearer[%d] technology: %d", index, err);
 
 		return -ENOEXEC;
 	}
@@ -325,7 +325,7 @@ static int cmd_ccp_call_control_client_read_bearer_tech(const struct shell *sh, 
 #endif /* CONFIG_BT_TBS_CLIENT_BEARER_TECHNOLOGY */
 
 #if defined(CONFIG_BT_TBS_CLIENT_BEARER_URI_SCHEMES_SUPPORTED_LIST)
-static int cmd_ccp_call_control_client_read_bearer_uri_schemes(const struct shell *sh, size_t argc,
+static int cmd_ccp_call_control_client_read_bearer_uri_schemes(const struct bt_shell *sh, size_t argc,
 							       char *argv[])
 {
 	struct bt_ccp_call_control_client_bearer *bearer;
@@ -341,14 +341,14 @@ static int cmd_ccp_call_control_client_read_bearer_uri_schemes(const struct shel
 
 	bearer = get_bearer_by_index(index);
 	if (bearer == NULL) {
-		shell_error(sh, "Failed to get bearer for index %d", index);
+		bt_shell_session_error(sh, "Failed to get bearer for index %d", index);
 
 		return -ENOEXEC;
 	}
 
 	err = bt_ccp_call_control_client_read_bearer_uri_schemes(bearer);
 	if (err != 0) {
-		shell_error(sh, "Failed to read bearer[%d] URI schemes: %d", index, err);
+		bt_shell_session_error(sh, "Failed to read bearer[%d] URI schemes: %d", index, err);
 
 		return -ENOEXEC;
 	}
@@ -357,41 +357,41 @@ static int cmd_ccp_call_control_client_read_bearer_uri_schemes(const struct shel
 }
 #endif /* CONFIG_BT_TBS_CLIENT_BEARER_URI_SCHEMES_SUPPORTED_LIST */
 
-static int cmd_ccp_call_control_client(const struct shell *sh, size_t argc, char **argv)
+static int cmd_ccp_call_control_client(const struct bt_shell *sh, size_t argc, char **argv)
 {
 	if (argc > 1) {
-		shell_error(sh, "%s unknown parameter: %s", argv[0], argv[1]);
+		bt_shell_session_error(sh, "%s unknown parameter: %s", argv[0], argv[1]);
 	} else {
-		shell_error(sh, "%s Missing subcommand", argv[0]);
+		bt_shell_session_error(sh, "%s Missing subcommand", argv[0]);
 	}
 
 	return -ENOEXEC;
 }
 
-SHELL_STATIC_SUBCMD_SET_CREATE(
+BT_SHELL_STATIC_SUBCMD_SET_CREATE(
 	ccp_call_control_client_cmds,
-	SHELL_CMD_ARG(discover, NULL, "Discover GTBS and TBS on remote device",
+	BT_SHELL_CMD_ARG(discover, NULL, "Discover GTBS and TBS on remote device",
 		      cmd_ccp_call_control_client_discover, 1, 0),
 
 #if defined(CONFIG_BT_TBS_CLIENT_BEARER_PROVIDER_NAME)
-	SHELL_CMD_ARG(read_bearer_name, NULL, "Read bearer name [index]",
+	BT_SHELL_CMD_ARG(read_bearer_name, NULL, "Read bearer name [index]",
 		      cmd_ccp_call_control_client_read_bearer_name, 1, 1),
 #endif /* CONFIG_BT_TBS_CLIENT_BEARER_PROVIDER_NAME */
 #if defined(CONFIG_BT_TBS_CLIENT_BEARER_UCI)
-	SHELL_CMD_ARG(read_bearer_uci, NULL, "Read bearer UCI [index]",
+	BT_SHELL_CMD_ARG(read_bearer_uci, NULL, "Read bearer UCI [index]",
 		      cmd_ccp_call_control_client_read_bearer_uci, 1, 1),
 #endif /* CONFIG_BT_TBS_CLIENT_BEARER_UCI */
 #if defined(CONFIG_BT_TBS_CLIENT_BEARER_TECHNOLOGY)
-	SHELL_CMD_ARG(read_bearer_tech, NULL, "Read bearer technology [index]",
+	BT_SHELL_CMD_ARG(read_bearer_tech, NULL, "Read bearer technology [index]",
 		      cmd_ccp_call_control_client_read_bearer_tech, 1, 1),
 #endif /* CONFIG_BT_TBS_CLIENT_BEARER_TECHNOLOGY */
 #if defined(CONFIG_BT_TBS_CLIENT_BEARER_URI_SCHEMES_SUPPORTED_LIST)
-	SHELL_CMD_ARG(read_bearer_uri_schemes, NULL,
+	BT_SHELL_CMD_ARG(read_bearer_uri_schemes, NULL,
 		      "Read bearer URI schemes supported list [index]",
 		      cmd_ccp_call_control_client_read_bearer_uri_schemes, 1, 1),
 #endif /* CONFIG_BT_TBS_CLIENT_BEARER_URI_SCHEMES_SUPPORTED_LIST */
-	SHELL_SUBCMD_SET_END);
+	BT_SHELL_SUBCMD_SET_END);
 
-SHELL_CMD_ARG_REGISTER(ccp_call_control_client, &ccp_call_control_client_cmds,
+BT_SHELL_CMD_ARG_REGISTER(ccp_call_control_client, &ccp_call_control_client_cmds,
 		       "Bluetooth CCP Call Control Client shell commands",
 		       cmd_ccp_call_control_client, 1, 1);

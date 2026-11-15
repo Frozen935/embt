@@ -7,7 +7,7 @@
 #ifndef __BT_SHELL_PRIVATE_H
 #define __BT_SHELL_PRIVATE_H
 
-#include <zephyr/shell/shell.h>
+#include <shell/bt_shell.h>
 
 /**
  * @brief printf-like function which sends formatted data stream to the shell.
@@ -20,7 +20,7 @@
  * @param[in] fmt   Format string.
  * @param[in] ...   List of parameters to print.
  */
-__printf_like(2, 3) void bt_shell_fprintf(enum shell_vt100_color color,
+__printf_like(2, 3) void bt_shell_fprintf(enum bt_shell_color color,
 					  const char *fmt, ...);
 
 /**
@@ -87,4 +87,11 @@ void bt_shell_hexdump(const uint8_t *data, size_t len);
 #define bt_shell_error(_ft, ...) \
 	bt_shell_fprintf_error(_ft "\n", ##__VA_ARGS__)
 
+struct bt_shell;
+/** @brief Register the configured Bluetooth command descriptors and callback storage. */
+int bt_shell_commands_init(struct bt_shell *sh);
+
 #endif /* __BT_SHELL_PRIVATE_H */
+
+/** @brief Initialize selected command modules before shell operation. */
+int bt_shell_storage_init(void);

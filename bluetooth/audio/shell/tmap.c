@@ -9,21 +9,24 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <string.h>
+#include <embt/base/assert.h>
+#include <embt/base/util_macro.h>
 #include <errno.h>
 #include <stddef.h>
 
-#include <zephyr/autoconf.h>
-#include <zephyr/bluetooth/audio/tmap.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/shell/shell.h>
-#include <zephyr/sys/util.h>
-#include <zephyr/sys/util_macro.h>
-#include <zephyr/toolchain.h>
+#include <embt/autoconf.h>
+#include <embt/bluetooth/audio/tmap.h>
+#include <embt/bluetooth/conn.h>
+#include <shell/bt_shell.h>
+#include <embt/base/util.h>
+#include <embt/base/util_macro.h>
+#include <embt/compiler.h>
 
 #include "host/shell/bt.h"
 #include "common/bt_shell_private.h"
 
-static int cmd_tmap_init(const struct shell *sh, size_t argc, char **argv)
+static int cmd_tmap_init(const struct bt_shell *sh, size_t argc, char **argv)
 {
 	const enum bt_tmap_role role =
 		(IS_ENABLED(CONFIG_BT_TMAP_CG_SUPPORTED) ? BT_TMAP_ROLE_CG : 0U) |
@@ -37,11 +40,11 @@ static int cmd_tmap_init(const struct shell *sh, size_t argc, char **argv)
 	ARG_UNUSED(argc);
 	ARG_UNUSED(argv);
 
-	shell_info(sh, "Registering TMAS with role: 0x%04X", role);
+	bt_shell_session_info(sh, "Registering TMAS with role: 0x%04X", role);
 
 	err = bt_tmap_register(role);
 	if (err != 0) {
-		shell_error(sh, "bt_tmap_register (err %d)", err);
+		bt_shell_session_error(sh, "bt_tmap_register (err %d)", err);
 
 		return -ENOEXEC;
 	}
@@ -63,7 +66,7 @@ static const struct bt_tmap_cb tmap_cb = {
 	.discovery_complete = tmap_discover_cb,
 };
 
-static int cmd_tmap_discover(const struct shell *sh, size_t argc, char **argv)
+static int cmd_tmap_discover(const struct bt_shell *sh, size_t argc, char **argv)
 {
 	int err;
 
@@ -71,14 +74,14 @@ static int cmd_tmap_discover(const struct shell *sh, size_t argc, char **argv)
 	ARG_UNUSED(argv);
 
 	if (default_conn == NULL) {
-		shell_error(sh, "Not connected");
+		bt_shell_session_error(sh, "Not connected");
 
 		return -ENOEXEC;
 	}
 
 	err = bt_tmap_discover(default_conn, &tmap_cb);
 	if (err != 0) {
-		shell_error(sh, "bt_tmap_discover (err %d)", err);
+		bt_shell_session_error(sh, "bt_tmap_discover (err %d)", err);
 
 		return -ENOEXEC;
 	}
@@ -86,21 +89,21 @@ static int cmd_tmap_discover(const struct shell *sh, size_t argc, char **argv)
 	return err;
 }
 
-static int cmd_tmap(const struct shell *sh, size_t argc, char **argv)
+static int cmd_tmap(const struct bt_shell *sh, size_t argc, char **argv)
 {
 	if (argc > 1) {
-		shell_error(sh, "%s unknown parameter: %s", argv[0], argv[1]);
+		bt_shell_session_error(sh, "%s unknown parameter: %s", argv[0], argv[1]);
 	} else {
-		shell_error(sh, "%s missing subcomand", argv[0]);
+		bt_shell_session_error(sh, "%s missing subcomand", argv[0]);
 	}
 
 	return -ENOEXEC;
 }
 
-SHELL_STATIC_SUBCMD_SET_CREATE(tmap_cmds,
-	SHELL_CMD_ARG(init, NULL, "Initialize and register the TMAS", cmd_tmap_init, 1, 0),
-	SHELL_CMD_ARG(discover, NULL, "Discover TMAS on remote device", cmd_tmap_discover, 1, 0),
-	SHELL_SUBCMD_SET_END
+BT_SHELL_STATIC_SUBCMD_SET_CREATE(tmap_cmds,
+	BT_SHELL_CMD_ARG(init, NULL, "Initialize and register the TMAS", cmd_tmap_init, 1, 0),
+	BT_SHELL_CMD_ARG(discover, NULL, "Discover TMAS on remote device", cmd_tmap_discover, 1, 0),
+	BT_SHELL_SUBCMD_SET_END
 );
 
-SHELL_CMD_ARG_REGISTER(tmap, &tmap_cmds, "Bluetooth tmap client shell commands", cmd_tmap, 1, 1);
+BT_SHELL_CMD_ARG_REGISTER(tmap, &tmap_cmds, "Bluetooth tmap client shell commands", cmd_tmap, 1, 1);

@@ -13,6 +13,10 @@
 #ifndef AUDIO_SHELL_AUDIO_H
 #define AUDIO_SHELL_AUDIO_H
 
+#include <embt/base/work.h>
+#include <embt/base/atomic.h>
+#include <embt/base/assert.h>
+#include <embt/base/util_macro.h>
 #include <errno.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -21,19 +25,23 @@
 #include <string.h>
 #include <sys/types.h>
 
-#include <zephyr/autoconf.h>
-#include <zephyr/bluetooth/assigned_numbers.h>
-#include <zephyr/bluetooth/audio/ascs.h>
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/data.h>
-#include <zephyr/bluetooth/hci_types.h>
-#include <zephyr/bluetooth/iso.h>
-#include <zephyr/shell/shell.h>
-#include <zephyr/sys/atomic_types.h>
-#include <zephyr/sys/byteorder.h>
-#include <zephyr/sys/util.h>
-#include <zephyr/sys/util_macro.h>
-#include <zephyr/toolchain.h>
+#include <embt/autoconf.h>
+#if defined(CONFIG_EMBT_AUDIO_SHELL) && defined(CONFIG_EMBT_BAP_PLAYER)
+#include <embt/audio/bap_player.h>
+/** @brief Release playback contexts and queued SDUs from an application control thread. */
+int bt_audio_shell_bap_playback_shutdown(void);
+#endif
+#include <embt/bluetooth/assigned_numbers.h>
+#include <embt/bluetooth/audio/ascs.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/data.h>
+#include <embt/bluetooth/hci_types.h>
+#include <embt/bluetooth/iso.h>
+#include <shell/bt_shell.h>
+#include <embt/base/byteorder.h>
+#include <embt/base/util.h>
+#include <embt/base/util_macro.h>
+#include <embt/compiler.h>
 
 #include "common/bt_shell_private.h"
 #include "host/shell/bt.h"
@@ -57,10 +65,10 @@ size_t cap_initiator_pa_data_add(struct bt_data *data_array, const size_t data_a
 /* Must guard before including audio.h as audio.h uses Kconfigs guarded by
  * CONFIG_BT_AUDIO
  */
-#include <zephyr/bluetooth/audio/audio.h>
-#include <zephyr/bluetooth/audio/bap.h>
-#include <zephyr/bluetooth/audio/bap_lc3_preset.h>
-#include <zephyr/bluetooth/audio/cap.h>
+#include <embt/bluetooth/audio/audio.h>
+#include <embt/bluetooth/audio/bap.h>
+#include <embt/bluetooth/audio/bap_lc3_preset.h>
+#include <embt/bluetooth/audio/cap.h>
 
 #if defined(CONFIG_LIBLC3)
 #include "lc3.h"
@@ -104,11 +112,11 @@ struct shell_stream {
 	union {
 #if defined(CONFIG_BT_AUDIO_TX)
 		struct {
-			/* The uptime tick measured when stream was connected */
-			int64_t connected_at_ticks;
+			/* Monotonic microseconds measured when the stream was connected. */
+			uint64_t connected_at_us;
 			uint16_t seq_num;
 #if defined(CONFIG_LIBLC3)
-			atomic_t lc3_enqueue_cnt;
+			bt_atomic_t lc3_enqueue_cnt;
 			bool active;
 			size_t encoded_cnt;
 			size_t lc3_sdu_cnt;
@@ -132,6 +140,9 @@ struct shell_stream {
 #if defined(CONFIG_LIBLC3)
 			lc3_decoder_mem_48k_t lc3_decoder_mem;
 			lc3_decoder_t lc3_decoder;
+#if defined(CONFIG_EMBT_AUDIO_SHELL) && defined(CONFIG_EMBT_BAP_PLAYER)
+			struct bt_bap_player *player;
+#endif
 			size_t decoded_cnt;
 #endif /* CONFIG_LIBLC3 */
 		} rx;
@@ -145,7 +156,6 @@ const struct named_lc3_preset *bap_get_named_preset(bool is_unicast, enum bt_aud
 size_t bap_get_rx_streaming_cnt(void);
 size_t bap_get_tx_streaming_cnt(void);
 void bap_foreach_stream(void (*func)(struct shell_stream *sh_stream, void *data), void *data);
-
 
 uint16_t get_next_seq_num(struct bt_bap_stream *bap_stream);
 struct shell_stream *shell_stream_from_bap_stream(struct bt_bap_stream *bap_stream);
@@ -200,7 +210,7 @@ struct scan_delegator_sync_state {
 	const struct bt_bap_scan_delegator_recv_state *recv_state;
 	struct bt_le_per_adv_sync *pa_sync;
 	struct bt_conn *conn;
-	struct k_work_delayable pa_timer;
+	struct bt_work_delayable pa_timer;
 	uint32_t bis_sync_req_bitfield;
 	uint32_t broadcast_id;
 	uint16_t pa_interval;
@@ -248,7 +258,7 @@ extern struct bt_bap_ep *srcs[CONFIG_BT_MAX_CONN][CONFIG_BT_BAP_UNICAST_CLIENT_A
 extern struct named_lc3_preset default_sink_preset;
 extern struct named_lc3_preset default_source_preset;
 
-int cap_ac_unicast(const struct shell *sh, const struct cap_unicast_ac_param *param);
+int cap_ac_unicast(const struct bt_shell *sh, const struct cap_unicast_ac_param *param);
 
 #if defined(CONFIG_BT_CAP_INITIATOR)
 #define CAP_UNICAST_CLIENT_STREAM_COUNT ARRAY_SIZE(unicast_streams)
@@ -884,7 +894,7 @@ struct bap_broadcast_ac_param {
 	size_t chan_cnt;
 };
 
-int cap_ac_broadcast(const struct shell *sh, size_t argc, char **argv,
+int cap_ac_broadcast(const struct bt_shell *sh, size_t argc, char **argv,
 		     const struct bap_broadcast_ac_param *param);
 
 extern struct shell_stream broadcast_source_streams[CONFIG_BT_BAP_BROADCAST_SRC_STREAM_COUNT];

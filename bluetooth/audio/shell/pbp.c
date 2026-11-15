@@ -8,22 +8,24 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <string.h>
+#include <embt/base/assert.h>
+#include <embt/base/util_macro.h>
 #include <errno.h>
 #include <stddef.h>
 #include <stdint.h>
 
-#include <zephyr/bluetooth/assigned_numbers.h>
-#include <zephyr/bluetooth/audio/audio.h>
-#include <zephyr/bluetooth/audio/pbp.h>
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/data.h>
-#include <zephyr/bluetooth/gap.h>
-#include <zephyr/net_buf.h>
-#include <zephyr/shell/shell.h>
-#include <zephyr/shell/shell_string_conv.h>
-#include <zephyr/sys/__assert.h>
-#include <zephyr/sys/util.h>
-#include <zephyr/toolchain.h>
+#include <embt/bluetooth/assigned_numbers.h>
+#include <embt/bluetooth/audio/audio.h>
+#include <embt/bluetooth/audio/pbp.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/data.h>
+#include <embt/bluetooth/gap.h>
+#include <embt/net_buf.h>
+#include <shell/bt_shell.h>
+#include <embt/base/assert.h>
+#include <embt/base/util.h>
+#include <embt/compiler.h>
 
 #include "common/bt_shell_private.h"
 
@@ -37,16 +39,16 @@ NET_BUF_SIMPLE_DEFINE_STATIC(pbp_ad_buf, BT_PBP_MIN_PBA_SIZE + ARRAY_SIZE(pba_me
 
 static enum bt_pbp_announcement_feature pbp_features;
 
-static int cmd_pbp_set_features(const struct shell *sh, size_t argc, char **argv)
+static int cmd_pbp_set_features(const struct bt_shell *sh, size_t argc, char **argv)
 {
 	int err = 0;
 	enum bt_pbp_announcement_feature features;
 
 	ARG_UNUSED(argc);
 
-	features = shell_strtoul(argv[1], 16, &err);
+	features = bt_shell_strtoul(argv[1], 16, &err);
 	if (err != 0) {
-		shell_error(sh, "Could not parse received features: %d", err);
+		bt_shell_session_error(sh, "Could not parse received features: %d", err);
 
 		return -ENOEXEC;
 	}
@@ -81,22 +83,22 @@ size_t pbp_ad_data_add(struct bt_data data[], size_t data_size)
 	return 1U;
 }
 
-static int cmd_pbp(const struct shell *sh, size_t argc, char **argv)
+static int cmd_pbp(const struct bt_shell *sh, size_t argc, char **argv)
 {
 	if (argc > 1) {
-		shell_error(sh, "%s unknown parameter: %s", argv[0], argv[1]);
+		bt_shell_session_error(sh, "%s unknown parameter: %s", argv[0], argv[1]);
 	} else {
-		shell_error(sh, "%s missing subcomand", argv[0]);
+		bt_shell_session_error(sh, "%s missing subcomand", argv[0]);
 	}
 
 	return -ENOEXEC;
 }
 
-SHELL_STATIC_SUBCMD_SET_CREATE(pbp_cmds,
-	SHELL_CMD_ARG(set_features, NULL,
+BT_SHELL_STATIC_SUBCMD_SET_CREATE(pbp_cmds,
+	BT_SHELL_CMD_ARG(set_features, NULL,
 		      "Set the Public Broadcast Announcement features",
 		      cmd_pbp_set_features, 2, 0),
-	SHELL_SUBCMD_SET_END
+	BT_SHELL_SUBCMD_SET_END
 );
 
-SHELL_CMD_ARG_REGISTER(pbp, &pbp_cmds, "Bluetooth pbp shell commands", cmd_pbp, 1, 1);
+BT_SHELL_CMD_ARG_REGISTER(pbp, &pbp_cmds, "Bluetooth pbp shell commands", cmd_pbp, 1, 1);
