@@ -1,1 +1,0 @@
-Fake vendor blob license, for SBOM test purposes only.

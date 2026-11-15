@@ -1,5 +1,0 @@
-# Configuration specific to individual backends
-# Copyright (c) 2026 Embeint Inc
-
-configdefault MODEM_CHAT_COMMANDS_CONDITIONAL
-	default y if DT_HAS_NORDIC_NRF93M1_ENABLED

@@ -1,6 +1,0 @@
-board:
-  name: mt8390_genio_700_evk
-  full_name: Genio 700 EVK
-  vendor: mediatek
-  socs:
-    - name: mt8188

@@ -1,6 +1,0 @@
-# Copyright (c) 2026 Hongquan Li
-# SPDX-License-Identifier: Apache-2.0
-
-choice BOOTLOADER
-	default BOOTLOADER_MCUBOOT
-endchoice

@@ -1,0 +1,6 @@
+# SPDX-License-Identifier: Apache-2.0
+
+zephyr_library()
+zephyr_library_property(ALLOW_EMPTY TRUE)
+zephyr_library_include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../..)
+add_subdirectory(hci)
