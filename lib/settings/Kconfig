@@ -4,6 +4,7 @@
 
 menuconfig SETTINGS
 	bool "Settings"
+	select SETTINGS_FILE
 	help
 	  The settings subsystem allows its users to serialize and
 	  deserialize state in memory into and from non-volatile memory.
@@ -13,9 +14,9 @@ menuconfig SETTINGS
 if SETTINGS
 
 config SETTINGS_RUNTIME
-	bool "runtime storage back-end"
+	bool "Runtime access to settings handlers"
 	help
-	  Enables runtime storage back-end.
+	  Enables direct handler get/set/commit APIs without persistent storage.
 
 config SETTINGS_DYNAMIC_HANDLERS
 	bool "dynamic settings handlers"
@@ -45,5 +46,30 @@ config SETTINGS_SAVE_SINGLE_SUBTREE_WITHOUT_MODIFICATION_VALUE_SIZE
 
 config SETTINGS_ENCODE_LEN
 	bool
+
+config SETTINGS_FILE
+	bool
+	default y
+	select SETTINGS_ENCODE_LEN
+	help
+	  Preserve the settings store and handler design with a POSIX file
+	  backend. No flash, NVS, FCB or other persistent backend is built.
+
+config SETTINGS_FILE_PATH
+	string "Default settings file"
+	default ".embt/settings.bin"
+	depends on SETTINGS_FILE
+	help
+	  Absolute path or path relative to the process working directory.
+	  Missing directories are created with owner-only permissions.
+
+config SETTINGS_FILE_MAX_LINES
+	int "File compression threshold"
+	range 2 2147483647
+	default 32
+	depends on SETTINGS_FILE
+	help
+	  Append records and compact superseded values at this threshold.
+
 
 endif # SETTINGS

@@ -5,24 +5,32 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#undef LOG_TAG
+#define LOG_TAG "settings"
+#include <base/log.h>
+#include <base/base.h>
 #include <string.h>
 #include <stdio.h>
 
-#include <zephyr/types.h>
+#include <embt/types.h>
 #include <stddef.h>
 #include <sys/types.h>
 #include <errno.h>
-#include <zephyr/sys/iterable_sections.h>
-#include <zephyr/settings/settings.h>
+#include <embt/settings/settings.h>
 #include "settings_priv.h"
-
-LOG_MODULE_DECLARE(settings, CONFIG_SETTINGS_LOG_LEVEL);
 
 sys_slist_t settings_load_srcs;
 struct settings_store *settings_save_dst;
 
 void settings_src_register(struct settings_store *cs)
 {
+	struct settings_store *existing;
+
+	SYS_SLIST_FOR_EACH_CONTAINER(&settings_load_srcs, existing, cs_next) {
+		if (existing == cs) {
+			return;
+		}
+	}
 	sys_slist_append(&settings_load_srcs, &cs->cs_next);
 }
 
@@ -52,7 +60,11 @@ int settings_load_subtree(const char *subtree)
 	 */
 	settings_lock_take();
 	SYS_SLIST_FOR_EACH_CONTAINER(&settings_load_srcs, cs, cs_next) {
-		cs->cs_itf->csi_load(cs, &arg);
+		rc = cs->cs_itf->csi_load(cs, &arg);
+		if (rc) {
+			settings_lock_release();
+			return rc;
+		}
 	}
 	rc = settings_commit_subtree(subtree);
 	settings_lock_release();
@@ -65,6 +77,7 @@ int settings_load_subtree_direct(
 	void                   *param)
 {
 	struct settings_store *cs;
+	int rc = 0;
 
 	const struct settings_load_arg arg = {
 		.subtree = subtree,
@@ -79,7 +92,11 @@ int settings_load_subtree_direct(
 	 */
 	settings_lock_take();
 	SYS_SLIST_FOR_EACH_CONTAINER(&settings_load_srcs, cs, cs_next) {
-		cs->cs_itf->csi_load(cs, &arg);
+		rc = cs->cs_itf->csi_load(cs, &arg);
+		if (rc) {
+			settings_lock_release();
+			return rc;
+		}
 	}
 	settings_lock_release();
 	return 0;
@@ -137,6 +154,9 @@ ssize_t settings_get_val_len(const char *name)
 	int rc = 0;
 	size_t val_len = 0;
 
+	if (!name || !name[0]) {
+		return -EINVAL;
+	}
 	/*
 	 * for every config store that supports this function
 	 * get the value's length.
@@ -144,14 +164,22 @@ ssize_t settings_get_val_len(const char *name)
 	settings_lock_take();
 	SYS_SLIST_FOR_EACH_CONTAINER(&settings_load_srcs, cs, cs_next) {
 		if (cs->cs_itf->csi_get_val_len) {
-			val_len = cs->cs_itf->csi_get_val_len(cs, name);
+			ssize_t length = cs->cs_itf->csi_get_val_len(cs, name);
+
+			if (length < 0) {
+				rc = (int)length;
+				break;
+			}
+			val_len = (size_t)length;
 		} else {
 			const struct settings_load_arg arg = {
 				.subtree = name,
 				.cb = &settings_get_val_len_default_cb,
-				.param = &val_len
-			};
+				.param = &val_len};
 			rc = cs->cs_itf->csi_load(cs, &arg);
+		}
+		if (rc < 0) {
+			break;
 		}
 	}
 	settings_lock_release();
@@ -170,6 +198,9 @@ ssize_t settings_load_one(const char *name, void *buf, size_t buf_len)
 	size_t val_len = 0;
 	int rc = 0;
 
+	if (!name || !name[0] || (buf_len && !buf)) {
+		return -EINVAL;
+	}
 	/*
 	 * For every config store that defines csi_load_one() function use it.
 	 * Otherwise, use the csi_load() function to load the key/value pair
@@ -181,16 +212,13 @@ ssize_t settings_load_one(const char *name, void *buf, size_t buf_len)
 			val_len = (rc >= 0) ? rc : 0;
 		} else {
 			struct default_param param = {
-				.buf = buf,
-				.buf_len = buf_len,
-				.val_len = &val_len
-			};
+				.buf = buf, .buf_len = buf_len, .val_len = &val_len};
 			const struct settings_load_arg arg = {
-				.subtree = name,
-				.cb = &settings_set_default_cb,
-				.param = &param
-			};
+				.subtree = name, .cb = &settings_set_default_cb, .param = &param};
 			rc = cs->cs_itf->csi_load(cs, &arg);
+		}
+		if (rc < 0) {
+			break;
 		}
 	}
 	settings_lock_release();
@@ -244,12 +272,18 @@ int settings_save_subtree(const char *subtree)
 		return -ENOENT;
 	}
 
+	settings_lock_take();
 	if (cs->cs_itf->csi_save_start) {
-		cs->cs_itf->csi_save_start(cs);
+		rc = cs->cs_itf->csi_save_start(cs);
+		if (rc) {
+			settings_lock_release();
+			return rc;
+		}
 	}
 	rc = 0;
 
-	STRUCT_SECTION_FOREACH(settings_handler_static, ch) {
+	SETTINGS_STATIC_FOREACH(ch)
+	{
 		if (subtree && !settings_name_steq(ch->name, subtree, NULL)) {
 			continue;
 		}
@@ -277,8 +311,12 @@ int settings_save_subtree(const char *subtree)
 #endif /* CONFIG_SETTINGS_DYNAMIC_HANDLERS */
 
 	if (cs->cs_itf->csi_save_end) {
-		cs->cs_itf->csi_save_end(cs);
+		rc2 = cs->cs_itf->csi_save_end(cs);
+		if (!rc) {
+			rc = rc2;
+		}
 	}
+	settings_lock_release();
 	return rc;
 }
 
@@ -334,7 +372,7 @@ int settings_save_subtree_or_single_without_modification(const char *name,
 	 * For single settings, we need to be able to retrieve the value of the setting, if this
 	 * is not supported then single saving cannot be done with this key.
 	 */
-	if (handler->h_get == NULL) {
+	if (!handler || handler->h_get == NULL) {
 		return -ENOSYS;
 	}
 

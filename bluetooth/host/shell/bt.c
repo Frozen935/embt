@@ -1297,11 +1297,21 @@ static void bt_ready(int err)
 		return;
 	}
 
-	bt_shell_print("Bluetooth initialized");
-
 	if (IS_ENABLED(CONFIG_SETTINGS) && !no_settings_load) {
-		settings_load();
+		err = settings_load();
+		if (err) {
+			bt_shell_error("Settings load failed (err %d)", err);
+			if (IS_ENABLED(CONFIG_BT_SETTINGS)) {
+				bt_finalize_init(err);
+			}
+			return;
+		}
 		bt_shell_print("Settings Loaded");
+	}
+	if (IS_ENABLED(CONFIG_BT_SETTINGS) && !bt_is_ready()) {
+		bt_shell_print("Bluetooth initialization awaits settings-load");
+	} else {
+		bt_shell_print("Bluetooth initialized");
 	}
 
 	if (IS_ENABLED(CONFIG_BT_SMP_OOB_LEGACY_PAIR_ONLY)) {

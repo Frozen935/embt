@@ -4,22 +4,26 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#undef LOG_TAG
+#define LOG_TAG "bt_settings"
+#include <base/log.h>
+#include <base/base.h>
 #include <errno.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
 
-#include <zephyr/autoconf.h>
-#include <zephyr/bluetooth/addr.h>
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/hci.h>
-#include <zephyr/settings/settings.h>
-#include <zephyr/sys/atomic.h>
-#include <zephyr/sys/printk.h>
-#include <zephyr/sys/util.h>
-#include <zephyr/sys/util_macro.h>
-#include <zephyr/toolchain.h>
+#include <embt/autoconf.h>
+#include <embt/bluetooth/addr.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/hci.h>
+#include <embt/settings/settings.h>
+#include <base/bt_atomic.h>
+#include <embt/sys/printk.h>
+#include <embt/sys/util.h>
+#include <embt/sys/util_macro.h>
+#include <embt/toolchain.h>
 
 #include "common/bt_settings_commit.h"
 #include "common/bt_str.h"
@@ -27,9 +31,6 @@
 #include "hci_core.h"
 #include "settings.h"
 #include "sys/types.h"
-
-#define LOG_LEVEL CONFIG_BT_SETTINGS_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_settings);
 
 #if defined(CONFIG_BT_SETTINGS_USE_PRINTK)
 int bt_settings_encode_key(char *path, size_t path_size, const char *subsys,
@@ -195,7 +196,7 @@ static int set_setting(const char *name, size_t len_rd, settings_read_cb read_cb
 	ssize_t len;
 	const char *next;
 
-	if (!atomic_test_bit(bt_dev.flags, BT_DEV_OPEN)) {
+	if (!bt_atomic_test_bit(bt_dev.flags, BT_DEV_OPEN)) {
 		/* The Bluetooth settings loader needs to communicate with the Bluetooth
 		 * controller to setup identities. This will not work before
 		 * bt_enable(). The doc on @ref bt_enable requires the "bt/" settings
@@ -214,7 +215,7 @@ static int set_setting(const char *name, size_t len_rd, settings_read_cb read_cb
 
 	if ((len == 2) && (memcmp(name, "id", len) == 0)) {
 		/* Any previously provided identities supersede flash */
-		if (atomic_test_bit(bt_dev.flags, BT_DEV_PRESET_ID)) {
+		if (bt_atomic_test_bit(bt_dev.flags, BT_DEV_PRESET_ID)) {
 			LOG_WRN("Ignoring identities stored in flash");
 			return 0;
 		}
@@ -307,7 +308,7 @@ static int commit_settings(void)
 
 	LOG_DBG("");
 
-	if (!atomic_test_bit(bt_dev.flags, BT_DEV_OPEN)) {
+	if (!bt_atomic_test_bit(bt_dev.flags, BT_DEV_OPEN)) {
 		/* The Bluetooth settings loader needs to communicate with the Bluetooth
 		 * controller to setup identities. This will not work before
 		 * bt_enable(). The doc on @ref bt_enable requires the "bt/" settings
@@ -359,7 +360,7 @@ static int commit_settings(void)
 	/* If any part of the Identity Information of the device has been
 	 * generated this Identity needs to be saved persistently.
 	 */
-	if (atomic_test_and_clear_bit(bt_dev.flags, BT_DEV_STORE_ID)) {
+	if (bt_atomic_test_and_clear_bit(bt_dev.flags, BT_DEV_STORE_ID)) {
 		LOG_DBG("Storing Identity Information");
 		bt_settings_store_id();
 		bt_settings_store_irk();
@@ -376,16 +377,57 @@ finalize:
 SETTINGS_STATIC_HANDLER_DEFINE_WITH_CPRIO(bt, "bt", NULL, set_setting, commit_settings, NULL,
 					  BT_SETTINGS_CPRIO_0);
 
+#if defined(CONFIG_BT_CONN)
+extern const struct settings_handler_static settings_handler_bt_ccc;
+#if defined(CONFIG_BT_SMP)
+extern const struct settings_handler_static settings_handler_bt_keys;
+#endif
+#if defined(CONFIG_BT_GATT_SERVICE_CHANGED)
+extern const struct settings_handler_static settings_handler_bt_sc;
+#endif
+#if defined(CONFIG_BT_GATT_CACHING)
+extern const struct settings_handler_static settings_handler_bt_cf;
+extern const struct settings_handler_static settings_handler_bt_hash;
+#endif
+#endif
+#if defined(CONFIG_BT_CLASSIC)
+extern const struct settings_handler_static settings_handler_bt_link_key;
+#endif
+
 int bt_settings_init(void)
 {
-	int err;
+	static const struct settings_handler_static *const handlers[] = {
+		&settings_handler_bt,
+#if defined(CONFIG_BT_CONN)
+		&settings_handler_bt_ccc,
+#if defined(CONFIG_BT_SMP)
+		&settings_handler_bt_keys,
+#endif
+#if defined(CONFIG_BT_GATT_SERVICE_CHANGED)
+		&settings_handler_bt_sc,
+#endif
+#if defined(CONFIG_BT_GATT_CACHING)
+		&settings_handler_bt_cf,
+		&settings_handler_bt_hash,
+#endif
+#endif
+#if defined(CONFIG_BT_CLASSIC)
+		&settings_handler_bt_link_key,
+#endif
+	};
+	int err = settings_subsys_init();
 
 	LOG_DBG("");
 
-	err = settings_subsys_init();
 	if (err) {
 		LOG_ERR("settings_subsys_init failed (err %d)", err);
 		return err;
+	}
+	for (size_t i = 0; i < ARRAY_SIZE(handlers); i++) {
+		err = settings_register_static(handlers[i]);
+		if (err) {
+			return err;
+		}
 	}
 
 	return 0;

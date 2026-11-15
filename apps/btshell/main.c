@@ -23,6 +23,9 @@
 #include <embt/bluetooth/bluetooth.h>
 #include <embt/bluetooth/transport.h>
 #include <embt/drivers/bluetooth.h>
+#if defined(CONFIG_SETTINGS)
+#include <embt/settings/settings.h>
+#endif
 #include "common/bt_shell_private.h"
 #include <errno.h>
 #include <stdio.h>
@@ -145,6 +148,13 @@ int main(int argc, char **argv)
 		fprintf(stderr, "Stack mechanism initialization failed (%d)\n", err);
 		return 1;
 	}
+#if defined(CONFIG_SETTINGS)
+	err = settings_subsys_init();
+	if (err) {
+		fprintf(stderr, "Settings initialization failed (%d)\n", err);
+		return 1;
+	}
+#endif
 	bt_shell_init(&sh, stdout);
 	err = bt_shell_commands_init(&sh);
 	if (err) {

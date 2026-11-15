@@ -4,6 +4,10 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
+#undef LOG_TAG
+#define LOG_TAG "settings"
+#include <base/log.h>
+#include <base/base.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -11,22 +15,39 @@
 #include <errno.h>
 #include <limits.h>
 
-#include <zephyr/settings/settings.h>
+#include <embt/settings/settings.h>
 #include "settings_priv.h"
-#include <zephyr/types.h>
-#include <zephyr/sys/iterable_sections.h>
-LOG_MODULE_REGISTER(settings, CONFIG_SETTINGS_LOG_LEVEL);
+#include <embt/types.h>
 
 #if defined(CONFIG_SETTINGS_DYNAMIC_HANDLERS)
 sys_slist_t settings_handlers;
 #endif /* CONFIG_SETTINGS_DYNAMIC_HANDLERS */
 
-static K_MUTEX_DEFINE(settings_lock);
+static os_mutex_t settings_lock;
+static bt_atomic_t settings_lock_state;
+sys_slist_t settings_static_handlers;
+
+int settings_ensure_lock(void)
+{
+	for (;;) {
+		if (bt_atomic_get(&settings_lock_state) == 2) {
+			return 0;
+		}
+		if (bt_atomic_cas(&settings_lock_state, 0, 1)) {
+			int err = osi_mutex_init(&settings_lock, OS_MUTEX_RECURSIVE);
+
+			bt_atomic_set(&settings_lock_state, err ? 0 : 2);
+			return err;
+		}
+		osi_thread_yield();
+	}
+}
 
 void settings_store_init(void);
 
 void settings_init(void)
 {
+	sys_slist_init(&settings_static_handlers);
 #if defined(CONFIG_SETTINGS_DYNAMIC_HANDLERS)
 	sys_slist_init(&settings_handlers);
 #endif /* CONFIG_SETTINGS_DYNAMIC_HANDLERS */
@@ -38,13 +59,17 @@ int settings_register_with_cprio(struct settings_handler *handler, int cprio)
 {
 	int rc = 0;
 
-	STRUCT_SECTION_FOREACH(settings_handler_static, ch) {
+	if (!handler || !handler->name || !handler->name[0]) {
+		return -EINVAL;
+	}
+	settings_lock_take();
+	SETTINGS_STATIC_FOREACH(ch)
+	{
 		if (strcmp(handler->name, ch->name) == 0) {
-			return -EEXIST;
+			rc = -EEXIST;
+			goto end;
 		}
 	}
-
-	settings_lock_take();
 
 	struct settings_handler *ch;
 	SYS_SLIST_FOR_EACH_CONTAINER(&settings_handlers, ch, node) {
@@ -83,8 +108,8 @@ int settings_name_steq(const char *name, const char *key, const char **next)
 	 * limited to what can be read
 	 */
 
-	while ((*key != '\0') && (*key == *name) &&
-	       (*name != '\0') && (*name != SETTINGS_NAME_END)) {
+	while ((*key != '\0') && (*key == *name) && (*name != '\0') &&
+	       (*name != SETTINGS_NAME_END)) {
 		key++;
 		name++;
 	}
@@ -150,19 +175,20 @@ struct settings_handler_static *settings_parse_and_lookup(const char *name,
 		*next = NULL;
 	}
 
-	STRUCT_SECTION_FOREACH(settings_handler_static, ch) {
+	SETTINGS_STATIC_FOREACH(ch)
+	{
 		if (!settings_name_steq(name, ch->name, &tmpnext)) {
 			continue;
 		}
 		if (!bestmatch) {
-			bestmatch = ch;
+			bestmatch = (struct settings_handler_static *)ch;
 			if (next) {
 				*next = tmpnext;
 			}
 			continue;
 		}
 		if (settings_name_steq(ch->name, bestmatch->name, NULL)) {
-			bestmatch = ch;
+			bestmatch = (struct settings_handler_static *)ch;
 			if (next) {
 				*next = tmpnext;
 			}
@@ -219,7 +245,7 @@ int settings_call_set_handler(const char *name,
 			return 0;
 		}
 
-		rc = ch->h_set(name_key, len, read_cb, read_cb_arg);
+		rc = ch->h_set ? ch->h_set(name_key, len, read_cb, read_cb_arg) : 0;
 
 		if (rc != 0) {
 			LOG_ERR("set-value failure. key: %s error(%d)",
@@ -262,12 +288,14 @@ int settings_commit_subtree(const char *subtree)
 	int rc2;
 	int cprio = INT_MIN;
 
+	settings_lock_take();
 	rc = 0;
 
 	while (true) {
 		int next_cprio = cprio;
 
-		STRUCT_SECTION_FOREACH(settings_handler_static, ch) {
+		SETTINGS_STATIC_FOREACH(ch)
+		{
 			if (subtree && !settings_name_steq(ch->name, subtree, NULL)) {
 				continue;
 			}
@@ -314,15 +342,55 @@ int settings_commit_subtree(const char *subtree)
 		cprio = next_cprio;
 	}
 
+	settings_lock_release();
 	return rc;
 }
 
 void settings_lock_take(void)
 {
-	k_mutex_lock(&settings_lock, K_FOREVER);
+	bt_base_require(settings_ensure_lock());
+	bt_base_require(osi_mutex_lock(&settings_lock, OS_TIMEOUT_FOREVER));
 }
 
 void settings_lock_release(void)
 {
-	k_mutex_unlock(&settings_lock);
+	bt_base_require(osi_mutex_unlock(&settings_lock));
+}
+
+int settings_register_static(const struct settings_handler_static *handler)
+{
+	struct settings_static_registration *entry;
+	int err = 0;
+
+	if (!handler || !handler->name || !handler->name[0]) {
+		return -EINVAL;
+	}
+	settings_lock_take();
+	SETTINGS_STATIC_FOREACH(ch)
+	{
+		if (!strcmp(handler->name, ch->name)) {
+			err = handler == ch ? 0 : -EEXIST;
+			goto out;
+		}
+	}
+#if defined(CONFIG_SETTINGS_DYNAMIC_HANDLERS)
+	struct settings_handler *dynamic;
+
+	SYS_SLIST_FOR_EACH_CONTAINER(&settings_handlers, dynamic, node) {
+		if (!strcmp(handler->name, dynamic->name)) {
+			err = -EEXIST;
+			goto out;
+		}
+	}
+#endif
+	entry = osi_calloc(1, sizeof(*entry));
+	if (!entry) {
+		err = -ENOMEM;
+		goto out;
+	}
+	entry->handler = handler;
+	sys_slist_append(&settings_static_handlers, &entry->node);
+out:
+	settings_lock_release();
+	return err;
 }

@@ -22,3 +22,6 @@ __pycache__/
 /third_party/mbedtls/upstream/
 
 /third_party/cmocka/upstream/
+
+# Default runtime settings data.
+/.embt/
