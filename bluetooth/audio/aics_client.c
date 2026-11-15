@@ -7,13 +7,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#undef LOG_TAG
+#define LOG_TAG "bt_aics_client"
+#include <base/log.h>
+#include <base/base.h>
 #include <errno.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
 
-#include <zephyr/autoconf.h>
+#include <embt/autoconf.h>
 #include <zephyr/bluetooth/audio/aics.h>
 #include <zephyr/bluetooth/att.h>
 #include <zephyr/bluetooth/bluetooth.h>
@@ -22,15 +26,13 @@
 #include <zephyr/bluetooth/gatt.h>
 #include <zephyr/bluetooth/uuid.h>
 #include <zephyr/sys/__assert.h>
-#include <zephyr/sys/atomic.h>
+#include <base/bt_atomic.h>
 #include <zephyr/sys/util.h>
 #include <zephyr/toolchain.h>
 #include <zephyr/types.h>
 
 #include "aics_internal.h"
 #include "common/bt_str.h"
-
-LOG_MODULE_REGISTER(bt_aics_client, CONFIG_BT_AICS_CLIENT_LOG_LEVEL);
 
 static struct bt_aics aics_insts[CONFIG_BT_MAX_CONN * CONFIG_BT_AICS_CLIENT_MAX_INSTANCE_COUNT];
 
@@ -40,7 +42,7 @@ static struct bt_aics *lookup_aics_by_handle(struct bt_conn *conn, uint16_t hand
 {
 	for (int i = 0; i < ARRAY_SIZE(aics_insts); i++) {
 		if (aics_insts[i].cli.conn == conn &&
-		    atomic_test_bit(aics_insts[i].cli.flags, BT_AICS_CLIENT_FLAG_ACTIVE) &&
+		    bt_atomic_test_bit(aics_insts[i].cli.flags, BT_AICS_CLIENT_FLAG_ACTIVE) &&
 		    aics_insts[i].cli.start_handle <= handle &&
 		    aics_insts[i].cli.end_handle >= handle) {
 			return &aics_insts[i];
@@ -138,7 +140,7 @@ static uint8_t aics_client_read_state_cb(struct bt_conn *conn, uint8_t err,
 	}
 
 	LOG_DBG("Inst %p: err: 0x%02X", inst, err);
-	atomic_clear_bit(inst->cli.flags, BT_AICS_CLIENT_FLAG_BUSY);
+	bt_atomic_clear_bit(inst->cli.flags, BT_AICS_CLIENT_FLAG_BUSY);
 
 	if (cb_err) {
 		LOG_DBG("State read failed: %d", err);
@@ -192,7 +194,7 @@ static uint8_t aics_client_read_gain_settings_cb(struct bt_conn *conn, uint8_t e
 	}
 
 	LOG_DBG("Inst %p: err: 0x%02X", inst, err);
-	atomic_clear_bit(inst->cli.flags, BT_AICS_CLIENT_FLAG_BUSY);
+	bt_atomic_clear_bit(inst->cli.flags, BT_AICS_CLIENT_FLAG_BUSY);
 
 	if (cb_err) {
 		LOG_DBG("Gain settings read failed: %d", err);
@@ -243,7 +245,7 @@ static uint8_t aics_client_read_type_cb(struct bt_conn *conn, uint8_t err,
 	}
 
 	LOG_DBG("Inst %p: err: 0x%02X", inst, err);
-	atomic_clear_bit(inst->cli.flags, BT_AICS_CLIENT_FLAG_BUSY);
+	bt_atomic_clear_bit(inst->cli.flags, BT_AICS_CLIENT_FLAG_BUSY);
 
 	if (cb_err) {
 		LOG_DBG("Type read failed: %d", err);
@@ -288,7 +290,7 @@ static uint8_t aics_client_read_status_cb(struct bt_conn *conn, uint8_t err,
 	}
 
 	LOG_DBG("Inst %p: err: 0x%02X", inst, err);
-	atomic_clear_bit(inst->cli.flags, BT_AICS_CLIENT_FLAG_BUSY);
+	bt_atomic_clear_bit(inst->cli.flags, BT_AICS_CLIENT_FLAG_BUSY);
 
 	if (cb_err) {
 		LOG_DBG("Status read failed: %d", err);
@@ -382,7 +384,7 @@ static uint8_t internal_read_state_cb(struct bt_conn *conn, uint8_t err,
 			inst->cli.change_counter = state->change_counter;
 
 			/* clear busy flag to reuse function */
-			atomic_clear_bit(inst->cli.flags, BT_AICS_CLIENT_FLAG_BUSY);
+			bt_atomic_clear_bit(inst->cli.flags, BT_AICS_CLIENT_FLAG_BUSY);
 
 			if (inst->cli.cp_val.cp.opcode == BT_AICS_OPCODE_SET_GAIN) {
 				write_err = bt_aics_client_gain_set(inst,
@@ -405,8 +407,8 @@ static uint8_t internal_read_state_cb(struct bt_conn *conn, uint8_t err,
 	}
 
 	if (cb_err) {
-		atomic_clear_bit(inst->cli.flags, BT_AICS_CLIENT_FLAG_CP_RETRIED);
-		atomic_clear_bit(inst->cli.flags, BT_AICS_CLIENT_FLAG_BUSY);
+		bt_atomic_clear_bit(inst->cli.flags, BT_AICS_CLIENT_FLAG_CP_RETRIED);
+		bt_atomic_clear_bit(inst->cli.flags, BT_AICS_CLIENT_FLAG_BUSY);
 		aics_cp_notify_app(inst, cb_err);
 	}
 
@@ -436,7 +438,7 @@ static void aics_client_write_aics_cp_cb(struct bt_conn *conn, uint8_t err,
 	 * the second time, we return an error to the application.
 	 */
 	if (cb_err == BT_AICS_ERR_INVALID_COUNTER &&
-	    atomic_test_bit(inst->cli.flags, BT_AICS_CLIENT_FLAG_CP_RETRIED)) {
+	    bt_atomic_test_bit(inst->cli.flags, BT_AICS_CLIENT_FLAG_CP_RETRIED)) {
 		cb_err = BT_ATT_ERR_UNLIKELY;
 	} else if (cb_err == BT_AICS_ERR_INVALID_COUNTER && inst->cli.state_handle) {
 		inst->cli.read_params.func = internal_read_state_cb;
@@ -444,7 +446,7 @@ static void aics_client_write_aics_cp_cb(struct bt_conn *conn, uint8_t err,
 		inst->cli.read_params.single.handle = inst->cli.state_handle;
 		inst->cli.read_params.single.offset = 0U;
 
-		atomic_set_bit(inst->cli.flags, BT_AICS_CLIENT_FLAG_CP_RETRIED);
+		bt_atomic_set_bit(inst->cli.flags, BT_AICS_CLIENT_FLAG_CP_RETRIED);
 
 		cb_err = bt_gatt_read(conn, &inst->cli.read_params);
 		if (cb_err != 0) {
@@ -457,8 +459,8 @@ static void aics_client_write_aics_cp_cb(struct bt_conn *conn, uint8_t err,
 		/* Write failed, fallthrough and notify application */
 	}
 
-	atomic_clear_bit(inst->cli.flags, BT_AICS_CLIENT_FLAG_CP_RETRIED);
-	atomic_clear_bit(inst->cli.flags, BT_AICS_CLIENT_FLAG_BUSY);
+	bt_atomic_clear_bit(inst->cli.flags, BT_AICS_CLIENT_FLAG_CP_RETRIED);
+	bt_atomic_clear_bit(inst->cli.flags, BT_AICS_CLIENT_FLAG_BUSY);
 
 	aics_cp_notify_app(inst, cb_err);
 }
@@ -485,7 +487,7 @@ static int aics_client_common_control(uint8_t opcode, struct bt_aics *inst)
 	if (!inst->cli.control_handle) {
 		LOG_DBG("Handle not set for opcode %u", opcode);
 		return -EINVAL;
-	} else if (atomic_test_and_set_bit(inst->cli.flags, BT_AICS_CLIENT_FLAG_BUSY)) {
+	} else if (bt_atomic_test_and_set_bit(inst->cli.flags, BT_AICS_CLIENT_FLAG_BUSY)) {
 		return -EBUSY;
 	}
 
@@ -500,7 +502,7 @@ static int aics_client_common_control(uint8_t opcode, struct bt_aics *inst)
 
 	err = bt_gatt_write(inst->cli.conn, &inst->cli.write_params);
 	if (err != 0) {
-		atomic_clear_bit(inst->cli.flags, BT_AICS_CLIENT_FLAG_BUSY);
+		bt_atomic_clear_bit(inst->cli.flags, BT_AICS_CLIENT_FLAG_BUSY);
 	}
 
 	return err;
@@ -521,7 +523,7 @@ static uint8_t aics_client_read_desc_cb(struct bt_conn *conn, uint8_t err,
 		return BT_GATT_ITER_STOP;
 	}
 
-	atomic_clear_bit(inst->cli.flags, BT_AICS_CLIENT_FLAG_BUSY);
+	bt_atomic_clear_bit(inst->cli.flags, BT_AICS_CLIENT_FLAG_BUSY);
 
 	if (cb_err) {
 		LOG_DBG("Description read failed: %d", err);
@@ -596,7 +598,7 @@ static int store_attr_handle_and_subscribe(struct bt_aics_client *client_inst, s
 		}
 
 		if ((chrc->properties & BT_GATT_CHRC_WRITE_WITHOUT_RESP) != 0U) {
-			atomic_set_bit(client_inst->flags, BT_AICS_CLIENT_FLAG_DESC_WRITABLE);
+			bt_atomic_set_bit(client_inst->flags, BT_AICS_CLIENT_FLAG_DESC_WRITABLE);
 		}
 	} else {
 		LOG_DBG("Unknown characteristic %s", bt_uuid_str(chrc->uuid));
@@ -613,7 +615,7 @@ static int store_attr_handle_and_subscribe(struct bt_aics_client *client_inst, s
 		 */
 		sub_params->ccc_handle = chrc->value_handle + 1;
 		sub_params->notify = aics_client_notify_handler;
-		atomic_set_bit(sub_params->flags, BT_GATT_SUBSCRIBE_FLAG_VOLATILE);
+		bt_atomic_set_bit(sub_params->flags, BT_GATT_SUBSCRIBE_FLAG_VOLATILE);
 
 		err = bt_gatt_subscribe(conn, sub_params);
 		if (err != 0 && err != -EALREADY) {
@@ -640,7 +642,7 @@ static uint8_t aics_discover_func(struct bt_conn *conn, const struct bt_gatt_att
 
 		memset(params, 0, sizeof(*params));
 
-		atomic_clear_bit(inst->cli.flags, BT_AICS_CLIENT_FLAG_BUSY);
+		bt_atomic_clear_bit(inst->cli.flags, BT_AICS_CLIENT_FLAG_BUSY);
 
 		if (inst->cli.cb && inst->cli.cb->discover) {
 			err = valid_inst_discovered(inst) ? 0 : -ENOENT;
@@ -663,7 +665,7 @@ static uint8_t aics_discover_func(struct bt_conn *conn, const struct bt_gatt_att
 
 	err = store_attr_handle_and_subscribe(client_inst, conn, chrc);
 	if (err != 0) {
-		atomic_clear_bit(inst->cli.flags, BT_AICS_CLIENT_FLAG_BUSY);
+		bt_atomic_clear_bit(inst->cli.flags, BT_AICS_CLIENT_FLAG_BUSY);
 
 		if (client_inst->cb && client_inst->cb->discover) {
 			client_inst->cb->discover(inst, err);
@@ -688,8 +690,8 @@ static void aics_client_reset(struct bt_aics *inst)
 	inst->cli.control_handle = 0;
 	inst->cli.desc_handle = 0;
 
-	atomic_clear_bit(inst->cli.flags, BT_AICS_CLIENT_FLAG_DESC_WRITABLE);
-	atomic_clear_bit(inst->cli.flags, BT_AICS_CLIENT_FLAG_CP_RETRIED);
+	bt_atomic_clear_bit(inst->cli.flags, BT_AICS_CLIENT_FLAG_DESC_WRITABLE);
+	bt_atomic_clear_bit(inst->cli.flags, BT_AICS_CLIENT_FLAG_CP_RETRIED);
 
 	bt_conn_drop(&inst->cli.conn);
 }
@@ -732,12 +734,12 @@ int bt_aics_discover(struct bt_conn *conn, struct bt_aics *inst,
 		return -EINVAL;
 	}
 
-	if (!atomic_test_bit(inst->cli.flags, BT_AICS_CLIENT_FLAG_ACTIVE)) {
+	if (!bt_atomic_test_bit(inst->cli.flags, BT_AICS_CLIENT_FLAG_ACTIVE)) {
 		LOG_DBG("Inactive instance");
 		return -EINVAL;
 	}
 
-	if (atomic_test_and_set_bit(inst->cli.flags, BT_AICS_CLIENT_FLAG_BUSY)) {
+	if (bt_atomic_test_and_set_bit(inst->cli.flags, BT_AICS_CLIENT_FLAG_BUSY)) {
 		LOG_DBG("Instance is busy");
 		return -EBUSY;
 	}
@@ -769,14 +771,14 @@ int bt_aics_discover(struct bt_conn *conn, struct bt_aics *inst,
 	return 0;
 
 cleanup:
-	atomic_clear_bit(inst->cli.flags, BT_AICS_CLIENT_FLAG_BUSY);
+	bt_atomic_clear_bit(inst->cli.flags, BT_AICS_CLIENT_FLAG_BUSY);
 	return err;
 }
 
 struct bt_aics *bt_aics_client_free_instance_get(void)
 {
 	for (int i = 0; i < ARRAY_SIZE(aics_insts); i++) {
-		if (!atomic_test_and_set_bit(aics_insts[i].cli.flags, BT_AICS_CLIENT_FLAG_ACTIVE)) {
+		if (!bt_atomic_test_and_set_bit(aics_insts[i].cli.flags, BT_AICS_CLIENT_FLAG_ACTIVE)) {
 			aics_insts[i].client_instance = true;
 			return &aics_insts[i];
 		}
@@ -789,7 +791,7 @@ int bt_aics_client_free_instance(struct bt_aics *aics)
 {
 	ARRAY_FOR_EACH_PTR(aics_insts, inst) {
 		if (aics == inst) {
-			if (!atomic_test_bit(inst->cli.flags, BT_AICS_CLIENT_FLAG_ACTIVE)) {
+			if (!bt_atomic_test_bit(inst->cli.flags, BT_AICS_CLIENT_FLAG_ACTIVE)) {
 				return -EALREADY;
 			}
 
@@ -797,14 +799,14 @@ int bt_aics_client_free_instance(struct bt_aics *aics)
 			 * eliminate, chance of any operations happening while we are free'ing this
 			 * instance.
 			 */
-			if (atomic_test_and_set_bit(inst->cli.flags, BT_AICS_CLIENT_FLAG_BUSY)) {
+			if (bt_atomic_test_and_set_bit(inst->cli.flags, BT_AICS_CLIENT_FLAG_BUSY)) {
 				return -EBUSY;
 			}
 
 			aics_client_reset(inst);
 
-			atomic_clear_bit(inst->cli.flags, BT_AICS_CLIENT_FLAG_BUSY);
-			atomic_clear_bit(inst->cli.flags, BT_AICS_CLIENT_FLAG_ACTIVE);
+			bt_atomic_clear_bit(inst->cli.flags, BT_AICS_CLIENT_FLAG_BUSY);
+			bt_atomic_clear_bit(inst->cli.flags, BT_AICS_CLIENT_FLAG_ACTIVE);
 
 			return 0;
 		}
@@ -857,7 +859,7 @@ int bt_aics_client_state_get(struct bt_aics *inst)
 	if (!inst->cli.state_handle) {
 		LOG_DBG("Handle not set");
 		return -EINVAL;
-	} else if (atomic_test_and_set_bit(inst->cli.flags, BT_AICS_CLIENT_FLAG_BUSY)) {
+	} else if (bt_atomic_test_and_set_bit(inst->cli.flags, BT_AICS_CLIENT_FLAG_BUSY)) {
 		return -EBUSY;
 	}
 
@@ -867,7 +869,7 @@ int bt_aics_client_state_get(struct bt_aics *inst)
 
 	err = bt_gatt_read(inst->cli.conn, &inst->cli.read_params);
 	if (err != 0) {
-		atomic_clear_bit(inst->cli.flags, BT_AICS_CLIENT_FLAG_BUSY);
+		bt_atomic_clear_bit(inst->cli.flags, BT_AICS_CLIENT_FLAG_BUSY);
 	}
 
 	return err;
@@ -895,7 +897,7 @@ int bt_aics_client_gain_setting_get(struct bt_aics *inst)
 	if (!inst->cli.gain_handle) {
 		LOG_DBG("Handle not set");
 		return -EINVAL;
-	} else if (atomic_test_and_set_bit(inst->cli.flags, BT_AICS_CLIENT_FLAG_BUSY)) {
+	} else if (bt_atomic_test_and_set_bit(inst->cli.flags, BT_AICS_CLIENT_FLAG_BUSY)) {
 		return -EBUSY;
 	}
 
@@ -905,7 +907,7 @@ int bt_aics_client_gain_setting_get(struct bt_aics *inst)
 
 	err = bt_gatt_read(inst->cli.conn, &inst->cli.read_params);
 	if (err != 0) {
-		atomic_clear_bit(inst->cli.flags, BT_AICS_CLIENT_FLAG_BUSY);
+		bt_atomic_clear_bit(inst->cli.flags, BT_AICS_CLIENT_FLAG_BUSY);
 	}
 
 	return err;
@@ -933,7 +935,7 @@ int bt_aics_client_type_get(struct bt_aics *inst)
 	if (!inst->cli.type_handle) {
 		LOG_DBG("Handle not set");
 		return -EINVAL;
-	} else if (atomic_test_and_set_bit(inst->cli.flags, BT_AICS_CLIENT_FLAG_BUSY)) {
+	} else if (bt_atomic_test_and_set_bit(inst->cli.flags, BT_AICS_CLIENT_FLAG_BUSY)) {
 		return -EBUSY;
 	}
 
@@ -943,7 +945,7 @@ int bt_aics_client_type_get(struct bt_aics *inst)
 
 	err = bt_gatt_read(inst->cli.conn, &inst->cli.read_params);
 	if (err != 0) {
-		atomic_clear_bit(inst->cli.flags, BT_AICS_CLIENT_FLAG_BUSY);
+		bt_atomic_clear_bit(inst->cli.flags, BT_AICS_CLIENT_FLAG_BUSY);
 	}
 
 	return err;
@@ -971,7 +973,7 @@ int bt_aics_client_status_get(struct bt_aics *inst)
 	if (!inst->cli.status_handle) {
 		LOG_DBG("Handle not set");
 		return -EINVAL;
-	} else if (atomic_test_and_set_bit(inst->cli.flags, BT_AICS_CLIENT_FLAG_BUSY)) {
+	} else if (bt_atomic_test_and_set_bit(inst->cli.flags, BT_AICS_CLIENT_FLAG_BUSY)) {
 		return -EBUSY;
 	}
 
@@ -981,7 +983,7 @@ int bt_aics_client_status_get(struct bt_aics *inst)
 
 	err = bt_gatt_read(inst->cli.conn, &inst->cli.read_params);
 	if (err != 0) {
-		atomic_clear_bit(inst->cli.flags, BT_AICS_CLIENT_FLAG_BUSY);
+		bt_atomic_clear_bit(inst->cli.flags, BT_AICS_CLIENT_FLAG_BUSY);
 	}
 
 	return err;
@@ -1029,7 +1031,7 @@ int bt_aics_client_gain_set(struct bt_aics *inst, int8_t gain)
 	if (!inst->cli.control_handle) {
 		LOG_DBG("Handle not set");
 		return -EINVAL;
-	} else if (atomic_test_and_set_bit(inst->cli.flags, BT_AICS_CLIENT_FLAG_BUSY)) {
+	} else if (bt_atomic_test_and_set_bit(inst->cli.flags, BT_AICS_CLIENT_FLAG_BUSY)) {
 		return -EBUSY;
 	}
 
@@ -1044,7 +1046,7 @@ int bt_aics_client_gain_set(struct bt_aics *inst, int8_t gain)
 
 	err = bt_gatt_write(inst->cli.conn, &inst->cli.write_params);
 	if (err != 0) {
-		atomic_clear_bit(inst->cli.flags, BT_AICS_CLIENT_FLAG_BUSY);
+		bt_atomic_clear_bit(inst->cli.flags, BT_AICS_CLIENT_FLAG_BUSY);
 	}
 
 	return err;
@@ -1072,7 +1074,7 @@ int bt_aics_client_description_get(struct bt_aics *inst)
 	if (!inst->cli.desc_handle) {
 		LOG_DBG("Handle not set");
 		return -EINVAL;
-	} else if (atomic_test_and_set_bit(inst->cli.flags, BT_AICS_CLIENT_FLAG_BUSY)) {
+	} else if (bt_atomic_test_and_set_bit(inst->cli.flags, BT_AICS_CLIENT_FLAG_BUSY)) {
 		return -EBUSY;
 	}
 
@@ -1082,7 +1084,7 @@ int bt_aics_client_description_get(struct bt_aics *inst)
 
 	err = bt_gatt_read(inst->cli.conn, &inst->cli.read_params);
 	if (err != 0) {
-		atomic_clear_bit(inst->cli.flags, BT_AICS_CLIENT_FLAG_BUSY);
+		bt_atomic_clear_bit(inst->cli.flags, BT_AICS_CLIENT_FLAG_BUSY);
 	}
 
 	return err;
@@ -1109,10 +1111,10 @@ int bt_aics_client_description_set(struct bt_aics *inst,
 	if (!inst->cli.desc_handle) {
 		LOG_DBG("Handle not set");
 		return -EINVAL;
-	} else if (!atomic_test_bit(inst->cli.flags, BT_AICS_CLIENT_FLAG_DESC_WRITABLE)) {
+	} else if (!bt_atomic_test_bit(inst->cli.flags, BT_AICS_CLIENT_FLAG_DESC_WRITABLE)) {
 		LOG_DBG("Description is not writable on peer service instance");
 		return -EPERM;
-	} else if (atomic_test_bit(inst->cli.flags, BT_AICS_CLIENT_FLAG_BUSY)) {
+	} else if (bt_atomic_test_bit(inst->cli.flags, BT_AICS_CLIENT_FLAG_BUSY)) {
 		return -EBUSY;
 	}
 

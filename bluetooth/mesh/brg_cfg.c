@@ -7,6 +7,9 @@
 /* Implementation for states of Subnet Bridge feature in Bluetooth Mesh Protocol v1.1
  * specification
  */
+#undef LOG_TAG
+#define LOG_TAG "bt_mesh_brg_cfg"
+#include <base/log.h>
 #include <errno.h>
 #include <zephyr/bluetooth/mesh.h>
 
@@ -16,9 +19,7 @@
 #include "brg_cfg.h"
 #include "foundation.h"
 
-#define LOG_LEVEL CONFIG_BT_MESH_BRG_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_mesh_brg_cfg);
-
+#define LOG_LEVEL CONFIG_EMBT_LOG_LEVEL
 /* Bridging table state and counter */
 static struct bt_mesh_brg_cfg_row brg_tbl[CONFIG_BT_MESH_BRG_TABLE_ITEMS_MAX];
 static uint32_t bt_mesh_brg_cfg_row_cnt;
@@ -30,7 +31,7 @@ enum {
 	TABLE_UPDATED,
 	BRG_CFG_FLAGS_COUNT,
 };
-static ATOMIC_DEFINE(brg_cfg_flags, BRG_CFG_FLAGS_COUNT);
+static BT_ATOMIC_DEFINE(brg_cfg_flags, BRG_CFG_FLAGS_COUNT);
 
 /* Compact the bridge table for all removed entries, input is first removed entry */
 static void brg_tbl_compact(int j)
@@ -126,7 +127,7 @@ int bt_mesh_brg_cfg_enable_set(bool enable)
 	brg_enabled = enable;
 
 	if (IS_ENABLED(CONFIG_BT_SETTINGS)) {
-		atomic_set_bit(brg_cfg_flags, STATE_UPDATED);
+		bt_atomic_set_bit(brg_cfg_flags, STATE_UPDATED);
 		bt_mesh_settings_store_schedule(BT_MESH_SETTINGS_BRG_PENDING);
 	}
 
@@ -139,7 +140,7 @@ void bt_mesh_brg_cfg_pending_store(void)
 	char *path_tbl = "bt/mesh/brg_tbl";
 	int err;
 
-	if (atomic_test_and_clear_bit(brg_cfg_flags, STATE_UPDATED)) {
+	if (bt_atomic_test_and_clear_bit(brg_cfg_flags, STATE_UPDATED)) {
 		if (brg_enabled) {
 			err = settings_save_one(path_en, &brg_enabled, sizeof(brg_enabled));
 		} else {
@@ -151,7 +152,7 @@ void bt_mesh_brg_cfg_pending_store(void)
 		}
 	}
 
-	if (atomic_test_and_clear_bit(brg_cfg_flags, TABLE_UPDATED)) {
+	if (bt_atomic_test_and_clear_bit(brg_cfg_flags, TABLE_UPDATED)) {
 		if (bt_mesh_brg_cfg_row_cnt) {
 			err = settings_save_one(path_tbl, &brg_tbl,
 						bt_mesh_brg_cfg_row_cnt * sizeof(brg_tbl[0]));
@@ -191,7 +192,7 @@ static void brg_tbl_netkey_removed_evt(struct bt_mesh_subnet *sub, enum bt_mesh_
 		brg_tbl_compact(first_removed);
 
 		if (IS_ENABLED(CONFIG_BT_SETTINGS)) {
-			atomic_set_bit(brg_cfg_flags, TABLE_UPDATED);
+			bt_atomic_set_bit(brg_cfg_flags, TABLE_UPDATED);
 			bt_mesh_settings_store_schedule(BT_MESH_SETTINGS_BRG_PENDING);
 		}
 	}
@@ -209,7 +210,7 @@ int bt_mesh_brg_cfg_tbl_reset(void)
 	brg_enabled = false;
 	bt_mesh_brg_cfg_row_cnt = 0;
 	memset(brg_tbl, 0, sizeof(brg_tbl));
-	atomic_clear(brg_cfg_flags);
+	bt_atomic_clear(brg_cfg_flags);
 
 	if (!IS_ENABLED(CONFIG_BT_SETTINGS)) {
 		return 0;
@@ -290,7 +291,7 @@ int bt_mesh_brg_cfg_tbl_add(uint8_t direction, uint16_t net_idx1, uint16_t net_i
 
 store:
 	if (IS_ENABLED(CONFIG_BT_SETTINGS)) {
-		atomic_set_bit(brg_cfg_flags, TABLE_UPDATED);
+		bt_atomic_set_bit(brg_cfg_flags, TABLE_UPDATED);
 		bt_mesh_settings_store_schedule(BT_MESH_SETTINGS_BRG_PENDING);
 	}
 
@@ -366,7 +367,7 @@ int bt_mesh_brg_cfg_tbl_remove(uint16_t net_idx1, uint16_t net_idx2, uint16_t ad
 		brg_tbl_compact(first_removed);
 
 		if (IS_ENABLED(CONFIG_BT_SETTINGS)) {
-			atomic_set_bit(brg_cfg_flags, TABLE_UPDATED);
+			bt_atomic_set_bit(brg_cfg_flags, TABLE_UPDATED);
 			bt_mesh_settings_store_schedule(BT_MESH_SETTINGS_BRG_PENDING);
 		}
 	}

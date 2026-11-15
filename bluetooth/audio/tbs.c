@@ -7,6 +7,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#undef LOG_TAG
+#define LOG_TAG "bt_tbs"
+#include <base/log.h>
+#include <base/base.h>
 #include <errno.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -15,7 +19,7 @@
 #include <ctype.h>
 #include <sys/types.h>
 
-#include <zephyr/autoconf.h>
+#include <embt/autoconf.h>
 #include <zephyr/bluetooth/assigned_numbers.h>
 #include <zephyr/bluetooth/att.h>
 #include <zephyr/bluetooth/audio/ccid.h>
@@ -26,7 +30,7 @@
 #include <zephyr/bluetooth/uuid.h>
 #include <zephyr/net_buf.h>
 #include <zephyr/sys/__assert.h>
-#include <zephyr/sys/atomic.h>
+#include <base/bt_atomic.h>
 #include <zephyr/sys/byteorder.h>
 #include <zephyr/sys/time_units.h>
 #include <zephyr/sys/util.h>
@@ -38,8 +42,6 @@
 #include "audio_internal.h"
 #include "tbs_internal.h"
 #include "common/bt_str.h"
-
-LOG_MODULE_REGISTER(bt_tbs, CONFIG_BT_TBS_LOG_LEVEL);
 
 #define BT_TBS_VALID_STATUS_FLAGS(val) ((val) <= (BIT(0U) | BIT(1U)))
 #define MUTEX_TIMEOUT                  K_MSEC(CONFIG_BT_TBS_LOCK_TIMEOUT)
@@ -3368,7 +3370,7 @@ void bt_tbs_register_cb(struct bt_tbs_cb *cbs)
 	tbs_cbs = cbs;
 }
 
-#if defined(CONFIG_BT_TBS_LOG_LEVEL_DBG)
+#if (CONFIG_EMBT_LOG_LEVEL >= 4)
 void bt_tbs_dbg_print_calls(void)
 {
 	for (size_t i = 0U; i < ARRAY_SIZE(svc_insts); i++) {
@@ -3387,4 +3389,4 @@ void bt_tbs_dbg_print_calls(void)
 		}
 	}
 }
-#endif /* defined(CONFIG_BT_TBS_LOG_LEVEL_DBG) */
+#endif /* (CONFIG_EMBT_LOG_LEVEL >= 4) */

@@ -5,6 +5,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#undef LOG_TAG
+#define LOG_TAG "bt_mesh_adv"
+#include <base/log.h>
+#include <base/base.h>
 #include <zephyr/sys/util.h>
 
 #include <zephyr/net_buf.h>
@@ -24,9 +28,7 @@
 #include "solicitation.h"
 #include "statistic.h"
 
-#define LOG_LEVEL CONFIG_BT_MESH_ADV_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_mesh_adv);
-
+#define LOG_LEVEL CONFIG_EMBT_LOG_LEVEL
 /* Window and Interval are equal for continuous scanning */
 #define MESH_SCAN_INTERVAL    BT_MESH_ADV_SCAN_UNIT(BT_MESH_SCAN_INTERVAL_MS)
 #define MESH_SCAN_WINDOW      BT_MESH_ADV_SCAN_UNIT(BT_MESH_SCAN_WINDOW_MS)
@@ -89,7 +91,7 @@ static struct bt_mesh_adv *adv_create_from_pool(struct k_mem_slab *buf_pool,
 	struct bt_mesh_adv *adv;
 	int err;
 
-	if (atomic_test_bit(bt_mesh.flags, BT_MESH_SUSPENDED)) {
+	if (bt_atomic_test_bit(bt_mesh.flags, BT_MESH_SUSPENDED)) {
 		LOG_WRN("Refusing to allocate buffer while suspended");
 		return NULL;
 	}
@@ -259,7 +261,7 @@ void bt_mesh_adv_send(struct bt_mesh_adv *adv, const struct bt_mesh_send_cb *cb,
 	LOG_DBG("type 0x%02x len %u: %s", adv->ctx.type, adv->b.len,
 		bt_hex(adv->b.data, adv->b.len));
 
-	if (atomic_test_bit(bt_mesh.flags, BT_MESH_SUSPENDED)) {
+	if (bt_atomic_test_bit(bt_mesh.flags, BT_MESH_SUSPENDED)) {
 		LOG_WRN("Sending advertisement while suspended");
 	}
 

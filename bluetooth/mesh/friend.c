@@ -4,6 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#undef LOG_TAG
+#define LOG_TAG "bt_mesh_friend"
+#include <base/log.h>
+#include <base/base.h>
 #include <stdint.h>
 #include <zephyr/sys/byteorder.h>
 #include <zephyr/sys/iterable_sections.h>
@@ -21,9 +25,7 @@
 #include "friend.h"
 #include "va.h"
 
-#define LOG_LEVEL CONFIG_BT_MESH_FRIEND_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_mesh_friend);
-
+#define LOG_LEVEL CONFIG_EMBT_LOG_LEVEL
 /**
  * Log modes other than the deferred may cause unintended delays during processing of log messages.
  * This in turns will affect scheduling of the receive delay and receive window.

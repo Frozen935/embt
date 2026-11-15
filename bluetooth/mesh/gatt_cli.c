@@ -4,6 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#undef LOG_TAG
+#define LOG_TAG "bt_mesh_gatt_client"
+#include <base/log.h>
+#include <base/base.h>
 #include <zephyr/sys/byteorder.h>
 
 #include <zephyr/net_buf.h>
@@ -30,9 +34,7 @@
 #include "gatt_cli.h"
 #include "pb_gatt_cli.h"
 
-#define LOG_LEVEL CONFIG_BT_MESH_PROXY_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_mesh_gatt_client);
-
+#define LOG_LEVEL CONFIG_EMBT_LOG_LEVEL
 static struct bt_mesh_gatt_server {
 	struct bt_conn *conn;
 	uint16_t svc_start_handle;

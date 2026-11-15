@@ -10,10 +10,11 @@
 #ifndef ZEPHYR_SUBSYS_BLUETOOTH_AUDIO_MCP_INTERNAL_
 #define ZEPHYR_SUBSYS_BLUETOOTH_AUDIO_MCP_INTERNAL_
 
+#include <base/base.h>
 #include <stdbool.h>
 #include <stdint.h>
 
-#include <zephyr/autoconf.h>
+#include <embt/autoconf.h>
 #include <zephyr/bluetooth/audio/mcs.h>
 
 #ifdef __cplusplus

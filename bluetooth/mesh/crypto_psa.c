@@ -4,14 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#undef LOG_TAG
+#define LOG_TAG "bt_mesh_crypto_psa"
+#include <base/log.h>
 #include <errno.h>
 
 #include <zephyr/bluetooth/mesh.h>
 #include <zephyr/psa/key_ids.h>
 
-#define LOG_LEVEL CONFIG_BT_MESH_CRYPTO_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_mesh_crypto_psa);
-
+#define LOG_LEVEL CONFIG_EMBT_LOG_LEVEL
 #include "mesh.h"
 #include "crypto.h"
 #include "prov.h"
@@ -45,7 +46,7 @@ static struct {
 	uint8_t public_key_be[PUB_KEY_SIZE + 1];
 } dh_pair;
 
-static ATOMIC_DEFINE(pst_keys, BT_MESH_PSA_KEY_ID_RANGE_SIZE);
+static BT_ATOMIC_DEFINE(pst_keys, BT_MESH_PSA_KEY_ID_RANGE_SIZE);
 
 int bt_mesh_crypto_init(void)
 {
@@ -354,8 +355,8 @@ end:
 static psa_key_id_t keyid_alloc(void)
 {
 	for (int i = 0; i < BT_MESH_PSA_KEY_ID_RANGE_SIZE; i++) {
-		if (!atomic_test_bit(pst_keys, i)) {
-			atomic_set_bit(pst_keys, i);
+		if (!bt_atomic_test_bit(pst_keys, i)) {
+			bt_atomic_set_bit(pst_keys, i);
 			return BT_MESH_PSA_KEY_ID_MIN + i;
 		}
 	}
@@ -367,7 +368,7 @@ static int keyid_free(psa_key_id_t key_id)
 {
 	if (IN_RANGE(key_id, BT_MESH_PSA_KEY_ID_MIN,
 			BT_MESH_PSA_KEY_ID_MIN + BT_MESH_PSA_KEY_ID_RANGE_SIZE - 1)) {
-		atomic_clear_bit(pst_keys, key_id - BT_MESH_PSA_KEY_ID_MIN);
+		bt_atomic_clear_bit(pst_keys, key_id - BT_MESH_PSA_KEY_ID_MIN);
 		return 0;
 	}
 
@@ -378,7 +379,7 @@ static void keyid_assign(psa_key_id_t key_id)
 {
 	if (IN_RANGE(key_id, BT_MESH_PSA_KEY_ID_MIN,
 				BT_MESH_PSA_KEY_ID_MIN + BT_MESH_PSA_KEY_ID_RANGE_SIZE - 1)) {
-		atomic_set_bit(pst_keys, key_id - BT_MESH_PSA_KEY_ID_MIN);
+		bt_atomic_set_bit(pst_keys, key_id - BT_MESH_PSA_KEY_ID_MIN);
 	}
 }
 

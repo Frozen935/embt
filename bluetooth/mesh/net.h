@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <base/base.h>
 #include <stdint.h>
 
 #include "adv.h"
@@ -11,7 +12,7 @@
 #include <zephyr/bluetooth/mesh/keys.h>
 #include <zephyr/bluetooth/mesh/sar_cfg.h>
 #include <zephyr/net_buf.h>
-#include <zephyr/sys/atomic.h>
+#include <base/bt_atomic.h>
 #include <zephyr/sys/slist.h>
 
 #define BT_MESH_IV_UPDATE(flags)   ((flags >> 1) & 0x01)
@@ -192,9 +193,9 @@ struct bt_mesh_lpn {
 	struct bt_mesh_net_cred cred[2];
 
 	/* Bit fields for tracking which groups the Friend knows about */
-	ATOMIC_DEFINE(added, LPN_GROUPS);
-	ATOMIC_DEFINE(pending, LPN_GROUPS);
-	ATOMIC_DEFINE(to_remove, LPN_GROUPS);
+	BT_ATOMIC_DEFINE(added, LPN_GROUPS);
+	BT_ATOMIC_DEFINE(pending, LPN_GROUPS);
+	BT_ATOMIC_DEFINE(to_remove, LPN_GROUPS);
 };
 
 /* bt_mesh_net.flags */
@@ -227,7 +228,7 @@ struct bt_mesh_net {
 	uint32_t iv_index; /* Current IV Index */
 	uint32_t seq;      /* Next outgoing sequence number (24 bits) */
 
-	ATOMIC_DEFINE(flags, BT_MESH_FLAG_COUNT);
+	BT_ATOMIC_DEFINE(flags, BT_MESH_FLAG_COUNT);
 
 	/* Local network interface */
 	struct k_work local_work;
@@ -304,7 +305,7 @@ struct bt_mesh_net_tx {
 extern struct bt_mesh_net bt_mesh;
 
 #define BT_MESH_NET_IVI_TX (bt_mesh.iv_index - \
-			    atomic_test_bit(bt_mesh.flags, \
+			    bt_atomic_test_bit(bt_mesh.flags, \
 					    BT_MESH_IVU_IN_PROGRESS))
 #define BT_MESH_NET_IVI_RX(rx) (bt_mesh.iv_index - (rx)->old_iv)
 

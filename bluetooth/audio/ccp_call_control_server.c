@@ -5,6 +5,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#undef LOG_TAG
+#define LOG_TAG "bt_ccp_call_control_server"
+#include <base/log.h>
+#include <base/base.h>
 #include <ctype.h>
 #include <errno.h>
 #include <stdbool.h>
@@ -12,7 +16,7 @@
 #include <stdint.h>
 #include <string.h>
 
-#include <zephyr/autoconf.h>
+#include <embt/autoconf.h>
 #include <zephyr/bluetooth/assigned_numbers.h>
 #include <zephyr/bluetooth/att.h>
 #include <zephyr/bluetooth/audio/tbs.h>
@@ -20,8 +24,6 @@
 #include <zephyr/sys/util.h>
 #include <zephyr/sys/util_utf8.h>
 #include <zephyr/toolchain.h>
-
-LOG_MODULE_REGISTER(bt_ccp_call_control_server, CONFIG_BT_CCP_CALL_CONTROL_SERVER_LOG_LEVEL);
 
 #define MUTEX_TIMEOUT K_MSEC(1000U)
 

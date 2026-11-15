@@ -5,6 +5,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#undef LOG_TAG
+#define LOG_TAG "bt_mesh_adv_legacy"
+#include <base/log.h>
+#include <base/base.h>
 #include <zephyr/sys/util.h>
 
 #include <zephyr/net_buf.h>
@@ -23,9 +27,7 @@
 #include "prov.h"
 #include "solicitation.h"
 
-#define LOG_LEVEL CONFIG_BT_MESH_ADV_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_mesh_adv_legacy);
-
+#define LOG_LEVEL CONFIG_EMBT_LOG_LEVEL
 /* Pre-5.0 controllers enforce a minimum interval of 100ms
  * whereas 5.0+ controllers can go down to 20ms.
  */
@@ -38,7 +40,7 @@ static int32_t adv_timeout;
 
 static bool is_mesh_suspended(void)
 {
-	return atomic_test_bit(bt_mesh.flags, BT_MESH_SUSPENDED);
+	return bt_atomic_test_bit(bt_mesh.flags, BT_MESH_SUSPENDED);
 }
 
 static int bt_data_send(uint8_t num_events, uint16_t adv_int,

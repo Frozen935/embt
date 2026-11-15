@@ -7,18 +7,21 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#undef LOG_TAG
+#define LOG_TAG "bt_bap_iso"
+#include <base/log.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
 
-#include <zephyr/autoconf.h>
+#include <embt/autoconf.h>
 #include <zephyr/bluetooth/audio/audio.h>
 #include <zephyr/bluetooth/audio/bap.h>
 #include <zephyr/bluetooth/hci_types.h>
 #include <zephyr/bluetooth/iso.h>
 #include <zephyr/sys/__assert.h>
-#include <zephyr/sys/atomic.h>
+#include <base/bt_atomic.h>
 #include <zephyr/sys/util.h>
 #include <zephyr/sys/util_macro.h>
 
@@ -26,8 +29,6 @@
 #include "audio_internal.h"
 #include "bap_endpoint.h"
 #include "bap_internal.h"
-
-LOG_MODULE_REGISTER(bt_bap_iso, CONFIG_BT_BAP_ISO_LOG_LEVEL);
 
 /* TODO: Optimize the ISO_POOL_SIZE */
 #define ISO_POOL_SIZE CONFIG_BT_ISO_MAX_CHAN
@@ -39,7 +40,7 @@ struct bt_bap_iso *bt_bap_iso_new(void)
 	struct bt_bap_iso *iso = NULL;
 
 	for (size_t i = 0U; i < ARRAY_SIZE(iso_pool); i++) {
-		if (atomic_cas(&iso_pool[i].ref, 0, 1)) {
+		if (bt_atomic_cas(&iso_pool[i].ref, 0, 1)) {
 			iso = &iso_pool[i];
 			break;
 		}
@@ -56,7 +57,7 @@ struct bt_bap_iso *bt_bap_iso_new(void)
 
 struct bt_bap_iso *bt_bap_iso_ref(struct bt_bap_iso *iso)
 {
-	atomic_val_t old;
+	bt_atomic_val_t old;
 
 	__ASSERT_NO_MSG(iso != NULL);
 
@@ -66,23 +67,23 @@ struct bt_bap_iso *bt_bap_iso_ref(struct bt_bap_iso *iso)
 	 * count since the read, and start over again when that happens.
 	 */
 	do {
-		old = atomic_get(&iso->ref);
+		old = bt_atomic_get(&iso->ref);
 
 		if (!old) {
 			return NULL;
 		}
-	} while (!atomic_cas(&iso->ref, old, old + 1));
+	} while (!bt_atomic_cas(&iso->ref, old, old + 1));
 
 	return iso;
 }
 
 void bt_bap_iso_unref(struct bt_bap_iso *iso)
 {
-	atomic_val_t old;
+	bt_atomic_val_t old;
 
 	__ASSERT_NO_MSG(iso != NULL);
 
-	old = atomic_dec(&iso->ref);
+	old = bt_atomic_dec(&iso->ref);
 
 	__ASSERT(old > 0, "iso reference counter is 0");
 }

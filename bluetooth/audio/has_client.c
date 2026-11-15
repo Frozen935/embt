@@ -3,13 +3,17 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
+#undef LOG_TAG
+#define LOG_TAG "bt_has_client"
+#include <base/log.h>
+#include <base/base.h>
 #include <errno.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
 
-#include <zephyr/autoconf.h>
+#include <embt/autoconf.h>
 #include <zephyr/bluetooth/att.h>
 #include <zephyr/bluetooth/audio/has.h>
 #include <zephyr/bluetooth/bluetooth.h>
@@ -17,15 +21,13 @@
 #include <zephyr/bluetooth/gatt.h>
 #include <zephyr/bluetooth/uuid.h>
 #include <zephyr/net_buf.h>
-#include <zephyr/sys/atomic.h>
+#include <base/bt_atomic.h>
 #include <zephyr/sys/util.h>
 #include <zephyr/sys/util_macro.h>
 #include <zephyr/sys/util_utf8.h>
 #include <zephyr/toolchain.h>
 
 #include "has_internal.h"
-
-LOG_MODULE_REGISTER(bt_has_client, CONFIG_BT_HAS_CLIENT_LOG_LEVEL);
 
 #define HAS_INST(_has) CONTAINER_OF(_has, struct bt_has_client, has)
 #define HANDLE_IS_VALID(handle) ((handle) != 0x0000)
@@ -240,7 +242,7 @@ static void discover_complete(struct bt_has_client *inst)
 {
 	LOG_DBG("conn %p", (void *)inst->conn);
 
-	atomic_clear_bit(inst->flags, HAS_CLIENT_DISCOVER_IN_PROGRESS);
+	bt_atomic_clear_bit(inst->flags, HAS_CLIENT_DISCOVER_IN_PROGRESS);
 
 	client_cb->discover(inst->conn, 0, &inst->has,
 			    inst->has.features & BT_HAS_FEAT_HEARING_AID_TYPE_MASK,
@@ -285,7 +287,7 @@ static void read_presets_req_cb(struct bt_conn *conn, uint8_t err,
 
 	LOG_DBG("conn %p err 0x%02x param %p", (void *)conn, err, params);
 
-	atomic_clear_bit(inst->flags, HAS_CLIENT_CP_OPERATION_IN_PROGRESS);
+	bt_atomic_clear_bit(inst->flags, HAS_CLIENT_CP_OPERATION_IN_PROGRESS);
 
 	if (err != 0) {
 		client_cb->preset_read_rsp(&inst->has, err, NULL, true);
@@ -318,7 +320,7 @@ static void set_active_preset_cb(struct bt_conn *conn, uint8_t err,
 
 	LOG_DBG("conn %p err 0x%02x param %p", (void *)conn, err, params);
 
-	atomic_clear_bit(inst->flags, HAS_CLIENT_CP_OPERATION_IN_PROGRESS);
+	bt_atomic_clear_bit(inst->flags, HAS_CLIENT_CP_OPERATION_IN_PROGRESS);
 
 	if (err != 0) {
 		client_cb->preset_switch(&inst->has, err, inst->has.active_index);
@@ -399,7 +401,7 @@ static uint8_t active_preset_notify_cb(struct bt_conn *conn,
 
 	prev = active_index_update(inst, data, len);
 
-	if (atomic_test_bit(inst->flags, HAS_CLIENT_DISCOVER_IN_PROGRESS)) {
+	if (bt_atomic_test_bit(inst->flags, HAS_CLIENT_DISCOVER_IN_PROGRESS)) {
 		/* Got notification during discovery process, postpone the active_index callback
 		 * until discovery is complete.
 		 */
@@ -444,7 +446,7 @@ static int active_index_subscribe(struct bt_has_client *inst, uint16_t value_han
 	inst->active_index_subscription.end_handle = BT_ATT_LAST_ATTRIBUTE_HANDLE;
 	inst->active_index_subscription.disc_params = &inst->params.discover;
 	inst->active_index_subscription.value = BT_GATT_CCC_NOTIFY;
-	atomic_set_bit(inst->active_index_subscription.flags, BT_GATT_SUBSCRIBE_FLAG_VOLATILE);
+	bt_atomic_set_bit(inst->active_index_subscription.flags, BT_GATT_SUBSCRIBE_FLAG_VOLATILE);
 
 	err = bt_gatt_subscribe(inst->conn, &inst->active_index_subscription);
 	if (err != 0 && err != -EALREADY) {
@@ -545,7 +547,7 @@ static int control_point_subscribe(struct bt_has_client *inst, uint16_t value_ha
 	inst->control_point_subscription.ccc_handle = BT_GATT_AUTO_DISCOVER_CCC_HANDLE;
 	inst->control_point_subscription.end_handle = BT_ATT_LAST_ATTRIBUTE_HANDLE;
 	inst->control_point_subscription.disc_params = &inst->params.discover;
-	atomic_set_bit(inst->control_point_subscription.flags, BT_GATT_SUBSCRIBE_FLAG_VOLATILE);
+	bt_atomic_set_bit(inst->control_point_subscription.flags, BT_GATT_SUBSCRIBE_FLAG_VOLATILE);
 
 	if (IS_ENABLED(CONFIG_BT_EATT) && properties & BT_GATT_CHRC_NOTIFY) {
 		inst->control_point_subscription.value = BT_GATT_CCC_INDICATE | BT_GATT_CCC_NOTIFY;
@@ -742,7 +744,7 @@ static int features_subscribe(struct bt_has_client *inst, uint16_t value_handle)
 	inst->features_subscription.end_handle = BT_ATT_LAST_ATTRIBUTE_HANDLE;
 	inst->features_subscription.disc_params = &inst->params.discover;
 	inst->features_subscription.value = BT_GATT_CCC_NOTIFY;
-	atomic_set_bit(inst->features_subscription.flags, BT_GATT_SUBSCRIBE_FLAG_VOLATILE);
+	bt_atomic_set_bit(inst->features_subscription.flags, BT_GATT_SUBSCRIBE_FLAG_VOLATILE);
 
 	err = bt_gatt_subscribe(inst->conn, &inst->features_subscription);
 	if (err != 0 && err != -EALREADY) {
@@ -848,8 +850,8 @@ int bt_has_client_discover(struct bt_conn *conn)
 
 	inst = &clients[bt_conn_index(conn)];
 
-	if (atomic_test_bit(inst->flags, HAS_CLIENT_CP_OPERATION_IN_PROGRESS) ||
-	    atomic_test_and_set_bit(inst->flags, HAS_CLIENT_DISCOVER_IN_PROGRESS)) {
+	if (bt_atomic_test_bit(inst->flags, HAS_CLIENT_CP_OPERATION_IN_PROGRESS) ||
+	    bt_atomic_test_and_set_bit(inst->flags, HAS_CLIENT_DISCOVER_IN_PROGRESS)) {
 		return -EBUSY;
 	}
 
@@ -874,7 +876,7 @@ int bt_has_client_discover(struct bt_conn *conn)
 	return 0;
 
 cleanup:
-	atomic_clear_bit(inst->flags, HAS_CLIENT_DISCOVER_IN_PROGRESS);
+	bt_atomic_clear_bit(inst->flags, HAS_CLIENT_DISCOVER_IN_PROGRESS);
 	return err;
 }
 
@@ -898,8 +900,8 @@ int bt_has_client_presets_read(struct bt_has *has, uint8_t start_index, uint8_t 
 		return -ENOTCONN;
 	}
 
-	if (atomic_test_bit(inst->flags, HAS_CLIENT_DISCOVER_IN_PROGRESS) ||
-	    atomic_test_and_set_bit(inst->flags, HAS_CLIENT_CP_OPERATION_IN_PROGRESS)) {
+	if (bt_atomic_test_bit(inst->flags, HAS_CLIENT_DISCOVER_IN_PROGRESS) ||
+	    bt_atomic_test_and_set_bit(inst->flags, HAS_CLIENT_CP_OPERATION_IN_PROGRESS)) {
 		return -EBUSY;
 	}
 
@@ -913,7 +915,7 @@ int bt_has_client_presets_read(struct bt_has *has, uint8_t start_index, uint8_t 
 
 	err = read_presets_req(inst, start_index, count);
 	if (err != 0) {
-		atomic_clear_bit(inst->flags, HAS_CLIENT_CP_OPERATION_IN_PROGRESS);
+		bt_atomic_clear_bit(inst->flags, HAS_CLIENT_CP_OPERATION_IN_PROGRESS);
 	}
 
 	return err;
@@ -938,8 +940,8 @@ int bt_has_client_preset_set(struct bt_has *has, uint8_t index, bool sync)
 		return -EOPNOTSUPP;
 	}
 
-	if (atomic_test_bit(inst->flags, HAS_CLIENT_DISCOVER_IN_PROGRESS) ||
-	    atomic_test_and_set_bit(inst->flags, HAS_CLIENT_CP_OPERATION_IN_PROGRESS)) {
+	if (bt_atomic_test_bit(inst->flags, HAS_CLIENT_DISCOVER_IN_PROGRESS) ||
+	    bt_atomic_test_and_set_bit(inst->flags, HAS_CLIENT_CP_OPERATION_IN_PROGRESS)) {
 		return -EBUSY;
 	}
 
@@ -963,8 +965,8 @@ int bt_has_client_preset_next(struct bt_has *has, bool sync)
 		return -EOPNOTSUPP;
 	}
 
-	if (atomic_test_bit(inst->flags, HAS_CLIENT_DISCOVER_IN_PROGRESS) ||
-	    atomic_test_and_set_bit(inst->flags, HAS_CLIENT_CP_OPERATION_IN_PROGRESS)) {
+	if (bt_atomic_test_bit(inst->flags, HAS_CLIENT_DISCOVER_IN_PROGRESS) ||
+	    bt_atomic_test_and_set_bit(inst->flags, HAS_CLIENT_CP_OPERATION_IN_PROGRESS)) {
 		return -EBUSY;
 	}
 
@@ -988,8 +990,8 @@ int bt_has_client_preset_prev(struct bt_has *has, bool sync)
 		return -EOPNOTSUPP;
 	}
 
-	if (atomic_test_bit(inst->flags, HAS_CLIENT_DISCOVER_IN_PROGRESS) ||
-	    atomic_test_and_set_bit(inst->flags, HAS_CLIENT_CP_OPERATION_IN_PROGRESS)) {
+	if (bt_atomic_test_bit(inst->flags, HAS_CLIENT_DISCOVER_IN_PROGRESS) ||
+	    bt_atomic_test_and_set_bit(inst->flags, HAS_CLIENT_CP_OPERATION_IN_PROGRESS)) {
 		return -EBUSY;
 	}
 
@@ -1013,7 +1015,7 @@ static void disconnected(struct bt_conn *conn, uint8_t reason)
 		return;
 	}
 
-	if (atomic_test_bit(inst->flags, HAS_CLIENT_DISCOVER_IN_PROGRESS)) {
+	if (bt_atomic_test_bit(inst->flags, HAS_CLIENT_DISCOVER_IN_PROGRESS)) {
 		discover_failed(conn, -ECONNABORTED);
 	}
 

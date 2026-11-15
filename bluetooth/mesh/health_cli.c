@@ -4,6 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#undef LOG_TAG
+#define LOG_TAG "bt_mesh_health_cli"
+#include <base/log.h>
+#include <base/base.h>
 #include <string.h>
 #include <errno.h>
 #include <stdbool.h>
@@ -21,9 +25,7 @@
 #include "foundation.h"
 #include "msg.h"
 
-#define LOG_LEVEL CONFIG_BT_MESH_MODEL_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_mesh_health_cli);
-
+#define LOG_LEVEL CONFIG_EMBT_LOG_LEVEL
 static int32_t msg_timeout;
 
 struct health_fault_param {

@@ -7,6 +7,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#undef LOG_TAG
+#define LOG_TAG "bt_bap_scan_delegator"
+#include <base/log.h>
+#include <base/base.h>
 #include <errno.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -14,7 +18,7 @@
 #include <string.h>
 #include <sys/types.h>
 
-#include <zephyr/autoconf.h>
+#include <embt/autoconf.h>
 #include <zephyr/bluetooth/addr.h>
 #include <zephyr/bluetooth/att.h>
 #include <zephyr/bluetooth/audio/audio.h>
@@ -31,15 +35,14 @@
 #include <zephyr/net_buf.h>
 #include <zephyr/settings/settings.h>
 #include <zephyr/sys/__assert.h>
-#include <zephyr/sys/atomic.h>
+#include <base/bt_atomic.h>
 #include <zephyr/sys/byteorder.h>
 #include <zephyr/sys/util.h>
 #include <zephyr/sys/util_macro.h>
 #include <zephyr/toolchain.h>
 
-LOG_MODULE_REGISTER(bt_bap_scan_delegator, CONFIG_BT_BAP_SCAN_DELEGATOR_LOG_LEVEL);
 
-#if !defined(CONFIG_ARCH_POSIX) && defined(CONFIG_BT_BAP_SCAN_DELEGATOR_LOG_LEVEL_DBG) &&          \
+#if !defined(CONFIG_ARCH_POSIX) && (CONFIG_EMBT_LOG_LEVEL >= 4) &&          \
 	defined(CONFIG_LOG) && !defined(CONFIG_LOG_MODE_DEFERRED)
 #warning Logging when non-deferred log mode is selected is not fully supported. \
 	 Use the CONFIG_LOG_MODE_DEFERRED Kconfig option when this feature is enabled.
@@ -103,7 +106,7 @@ enum scan_delegator_flag {
 	SCAN_DELEGATOR_FLAG_NUM,
 };
 
-static ATOMIC_DEFINE(scan_delegator_flags, SCAN_DELEGATOR_FLAG_NUM);
+static BT_ATOMIC_DEFINE(scan_delegator_flags, SCAN_DELEGATOR_FLAG_NUM);
 
 static struct bt_bap_scan_delegator_inst scan_delegator;
 static struct bt_bap_scan_delegator_cb *scan_delegator_cbs;
@@ -285,7 +288,7 @@ static void net_buf_put_recv_state(const struct bass_recv_state_internal *intern
 static void receive_state_updated(struct bt_conn *conn,
 				  struct bass_recv_state_internal *internal_state)
 {
-	if (IS_ENABLED(CONFIG_BT_BAP_SCAN_DELEGATOR_LOG_LEVEL_DBG)) {
+	if ((CONFIG_EMBT_LOG_LEVEL >= 4)) {
 		bt_debug_dump_recv_state(internal_state);
 	}
 
@@ -300,8 +303,8 @@ static void notify_work_handler(struct k_work *work)
 		k_work_delayable_from_work(work), struct bass_recv_state_internal, notify_work);
 	__maybe_unused int err;
 
-	if (atomic_test_bit(scan_delegator_flags, SCAN_DELEGATOR_FLAG_UNREGISTERING) ||
-	    !atomic_test_bit(scan_delegator_flags, SCAN_DELEGATOR_FLAG_REGISTERED)) {
+	if (bt_atomic_test_bit(scan_delegator_flags, SCAN_DELEGATOR_FLAG_UNREGISTERING) ||
+	    !bt_atomic_test_bit(scan_delegator_flags, SCAN_DELEGATOR_FLAG_REGISTERED)) {
 		LOG_DBG("Skipping work handler due to service not active");
 		return;
 	}
@@ -556,7 +559,7 @@ static void security_changed_cb(struct bt_conn *conn, bt_security_t level,
 	 * address or trigger notification work for bonded devices
 	 */
 
-	if (!atomic_test_bit(scan_delegator_flags, SCAN_DELEGATOR_FLAG_REGISTERED)) {
+	if (!bt_atomic_test_bit(scan_delegator_flags, SCAN_DELEGATOR_FLAG_REGISTERED)) {
 		/* Not yet registered, ignore callback */
 		return;
 	}
@@ -608,7 +611,7 @@ static void disconnected_cb(struct bt_conn *conn, uint8_t reason)
 		return;
 	}
 
-	if (!atomic_test_bit(scan_delegator_flags, SCAN_DELEGATOR_FLAG_REGISTERED)) {
+	if (!bt_atomic_test_bit(scan_delegator_flags, SCAN_DELEGATOR_FLAG_REGISTERED)) {
 		/* Not yet registered, ignore callback */
 		return;
 	}
@@ -1638,7 +1641,7 @@ static ssize_t read_recv_state(struct bt_conn *conn,
 	__maybe_unused int err;
 	ssize_t ret_val;
 
-	if (IS_ENABLED(CONFIG_BT_BAP_SCAN_DELEGATOR_LOG_LEVEL_DBG)) {
+	if ((CONFIG_EMBT_LOG_LEVEL >= 4)) {
 		bt_debug_dump_recv_state(internal_state);
 	}
 
@@ -1718,14 +1721,14 @@ int bt_bap_scan_delegator_register(struct bt_bap_scan_delegator_cb *cb)
 {
 	int err;
 
-	if (atomic_test_and_set_bit(scan_delegator_flags, SCAN_DELEGATOR_FLAG_REGISTERED)) {
+	if (bt_atomic_test_and_set_bit(scan_delegator_flags, SCAN_DELEGATOR_FLAG_REGISTERED)) {
 		LOG_DBG("Scan delegator already registered");
 		return -EALREADY;
 	}
 
 	err = bass_register();
 	if (err != 0) {
-		atomic_clear_bit(scan_delegator_flags, SCAN_DELEGATOR_FLAG_REGISTERED);
+		bt_atomic_clear_bit(scan_delegator_flags, SCAN_DELEGATOR_FLAG_REGISTERED);
 		return err;
 	}
 
@@ -1738,14 +1741,14 @@ int bt_bap_scan_delegator_unregister(void)
 {
 	int err;
 
-	if (atomic_test_and_set_bit(scan_delegator_flags, SCAN_DELEGATOR_FLAG_UNREGISTERING)) {
+	if (bt_atomic_test_and_set_bit(scan_delegator_flags, SCAN_DELEGATOR_FLAG_UNREGISTERING)) {
 		LOG_DBG("Scan delegator already unregistering");
 		return -EALREADY;
 	}
 
-	if (!atomic_test_bit(scan_delegator_flags, SCAN_DELEGATOR_FLAG_REGISTERED)) {
+	if (!bt_atomic_test_bit(scan_delegator_flags, SCAN_DELEGATOR_FLAG_REGISTERED)) {
 		LOG_DBG("Scan delegator not yet registered");
-		atomic_clear_bit(scan_delegator_flags, SCAN_DELEGATOR_FLAG_UNREGISTERING);
+		bt_atomic_clear_bit(scan_delegator_flags, SCAN_DELEGATOR_FLAG_UNREGISTERING);
 
 		return -EAGAIN;
 	}
@@ -1778,8 +1781,8 @@ int bt_bap_scan_delegator_unregister(void)
 		__ASSERT(err == 0, "Failed to unlock mutex: %d", err);
 	}
 
-	atomic_clear_bit(scan_delegator_flags, SCAN_DELEGATOR_FLAG_REGISTERED);
-	atomic_clear_bit(scan_delegator_flags, SCAN_DELEGATOR_FLAG_UNREGISTERING);
+	bt_atomic_clear_bit(scan_delegator_flags, SCAN_DELEGATOR_FLAG_REGISTERED);
+	bt_atomic_clear_bit(scan_delegator_flags, SCAN_DELEGATOR_FLAG_UNREGISTERING);
 
 	return 0;
 }
@@ -1970,8 +1973,8 @@ int bt_bap_scan_delegator_add_src(const struct bt_bap_scan_delegator_add_src_par
 	struct bt_bap_scan_delegator_recv_state *state;
 	__maybe_unused int err;
 
-	if (atomic_test_bit(scan_delegator_flags, SCAN_DELEGATOR_FLAG_UNREGISTERING) ||
-	    !atomic_test_bit(scan_delegator_flags, SCAN_DELEGATOR_FLAG_REGISTERED)) {
+	if (bt_atomic_test_bit(scan_delegator_flags, SCAN_DELEGATOR_FLAG_UNREGISTERING) ||
+	    !bt_atomic_test_bit(scan_delegator_flags, SCAN_DELEGATOR_FLAG_REGISTERED)) {
 		LOG_DBG("Scan delegator not available");
 		return -EAGAIN;
 	}

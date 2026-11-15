@@ -7,6 +7,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#undef LOG_TAG
+#define LOG_TAG "bt_mesh_proxy"
+#include <base/log.h>
+#include <base/base.h>
 #include <zephyr/sys/byteorder.h>
 
 #include <zephyr/net_buf.h>
@@ -30,9 +34,7 @@
 #include "proxy.h"
 #include "proxy_msg.h"
 
-#define LOG_LEVEL CONFIG_BT_MESH_PROXY_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_mesh_proxy);
-
+#define LOG_LEVEL CONFIG_EMBT_LOG_LEVEL
 #define PDU_SAR(data)      (data[0] >> 6)
 
 /* MshPRTv1.1: 6.3.2.2:

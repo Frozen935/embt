@@ -5,11 +5,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#undef LOG_TAG
+#define LOG_TAG "bt_mesh_net_keys"
+#include <base/log.h>
+#include <base/base.h>
 #include <string.h>
 #include <errno.h>
 #include <stdbool.h>
 #include <stdlib.h>
-#include <zephyr/sys/atomic.h>
+#include <base/bt_atomic.h>
 #include <zephyr/sys/util.h>
 #include <zephyr/sys/byteorder.h>
 #include <zephyr/sys/iterable_sections.h>
@@ -33,9 +37,7 @@
 #include "settings.h"
 #include "prov.h"
 
-#define LOG_LEVEL CONFIG_BT_MESH_KEYS_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_mesh_net_keys);
-
+#define LOG_LEVEL CONFIG_EMBT_LOG_LEVEL
 /* Tracking of what storage changes are pending for Net Keys. We track this in
  * a separate array here instead of within the respective bt_mesh_subnet
  * struct itself, since once a key gets deleted its struct becomes invalid
@@ -148,7 +150,7 @@ uint8_t bt_mesh_net_flags(struct bt_mesh_subnet *sub)
 		flags |= BT_MESH_NET_FLAG_KR;
 	}
 
-	if (atomic_test_bit(bt_mesh.flags, BT_MESH_IVU_IN_PROGRESS)) {
+	if (bt_atomic_test_bit(bt_mesh.flags, BT_MESH_IVU_IN_PROGRESS)) {
 		flags |= BT_MESH_NET_FLAG_IVU;
 	}
 

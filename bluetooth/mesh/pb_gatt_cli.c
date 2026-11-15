@@ -4,6 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#undef LOG_TAG
+#define LOG_TAG "bt_mesh_pb_gatt_client"
+#include <base/log.h>
+#include <base/base.h>
 #include <zephyr/sys/byteorder.h>
 
 #include <zephyr/net_buf.h>
@@ -27,9 +31,7 @@
 #include "gatt_cli.h"
 #include "proxy_msg.h"
 
-#define LOG_LEVEL CONFIG_BT_MESH_PROV_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_mesh_pb_gatt_client);
-
+#define LOG_LEVEL CONFIG_EMBT_LOG_LEVEL
 static struct {
 	bool target_set;
 	uint8_t target_uuid[16];

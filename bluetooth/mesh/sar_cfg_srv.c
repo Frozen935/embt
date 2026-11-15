@@ -4,6 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#undef LOG_TAG
+#define LOG_TAG "bt_mesh_sar_cfg_srv"
+#include <base/log.h>
+#include <base/base.h>
 #include <string.h>
 #include <errno.h>
 #include <stdbool.h>
@@ -22,9 +26,7 @@
 #include "sar_cfg_internal.h"
 #include "settings.h"
 
-#define LOG_LEVEL CONFIG_BT_MESH_MODEL_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_mesh_sar_cfg_srv);
-
+#define LOG_LEVEL CONFIG_EMBT_LOG_LEVEL
 static int sar_rx_store(const struct bt_mesh_model *model, bool delete)
 {
 	const void *data = delete ? NULL : &bt_mesh.sar_rx;

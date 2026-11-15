@@ -8,6 +8,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#undef LOG_TAG
+#define LOG_TAG "bt_mcs"
+#include <base/log.h>
+#include <base/base.h>
 #include <errno.h>
 #include <sys/types.h>
 #include <stdbool.h>
@@ -15,7 +19,7 @@
 #include <stdint.h>
 #include <string.h>
 
-#include <zephyr/autoconf.h>
+#include <embt/autoconf.h>
 #include <zephyr/bluetooth/att.h>
 #include <zephyr/bluetooth/audio/mcp.h>
 #include <zephyr/bluetooth/audio/mcs.h>
@@ -25,7 +29,7 @@
 #include <zephyr/bluetooth/uuid.h>
 #include <zephyr/bluetooth/services/ots.h>
 #include <zephyr/sys/__assert.h>
-#include <zephyr/sys/atomic.h>
+#include <base/bt_atomic.h>
 #include <zephyr/sys/byteorder.h>
 #include <zephyr/sys/util.h>
 #include <zephyr/sys/util_macro.h>
@@ -35,8 +39,6 @@
 #include "audio_internal.h"
 #include "common/bt_str.h"
 #include "mcs_internal.h"
-
-LOG_MODULE_REGISTER(bt_mcs, CONFIG_BT_MCS_LOG_LEVEL);
 
 /* The value 1000 was arbitrarily chosen. No action should take longer than this, and using a
  * non-K_FOREVER value may help catch any programming issues as locking the mutexes may trigger
@@ -717,7 +719,7 @@ static ssize_t write_current_track_id(struct bt_conn *conn,
 
 	id = sys_get_le48((uint8_t *)buf);
 
-	if (IS_ENABLED(CONFIG_BT_MCS_LOG_LEVEL_DBG)) {
+	if ((CONFIG_EMBT_LOG_LEVEL >= 4)) {
 		char str[BT_OTS_OBJ_ID_STR_LEN];
 		(void)bt_ots_obj_id_to_str(id, str, sizeof(str));
 		LOG_DBG("Current track write: offset: %d, len: %d, track ID: %s", offset, len, str);
@@ -796,7 +798,7 @@ static ssize_t write_next_track_id(struct bt_conn *conn,
 
 	id = sys_get_le48((uint8_t *)buf);
 
-	if (IS_ENABLED(CONFIG_BT_MCS_LOG_LEVEL_DBG)) {
+	if ((CONFIG_EMBT_LOG_LEVEL >= 4)) {
 		char str[BT_OTS_OBJ_ID_STR_LEN];
 		(void)bt_ots_obj_id_to_str(id, str, sizeof(str));
 		LOG_DBG("Next  track write: offset: %d, len: %d, track ID: %s", offset, len, str);
@@ -902,7 +904,7 @@ static ssize_t write_current_group_id(struct bt_conn *conn,
 
 	id = sys_get_le48((uint8_t *)buf);
 
-	if (IS_ENABLED(CONFIG_BT_MCS_LOG_LEVEL_DBG)) {
+	if ((CONFIG_EMBT_LOG_LEVEL >= 4)) {
 		char str[BT_OTS_OBJ_ID_STR_LEN];
 		(void)bt_ots_obj_id_to_str(id, str, sizeof(str));
 		LOG_DBG("Current group ID write: offset: %d, len: %d, track ID: %s", offset, len,

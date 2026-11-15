@@ -5,13 +5,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#undef LOG_TAG
+#define LOG_TAG "bt_tmap"
+#include <base/log.h>
+#include <base/base.h>
 #include <errno.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
 #include <sys/types.h>
 
-#include <zephyr/autoconf.h>
+#include <embt/autoconf.h>
 #include <zephyr/bluetooth/att.h>
 #include <zephyr/bluetooth/audio/tmap.h>
 #include <zephyr/bluetooth/bluetooth.h>
@@ -24,8 +28,6 @@
 #include <zephyr/types.h>
 
 #include "audio_internal.h"
-
-LOG_MODULE_REGISTER(bt_tmap, CONFIG_BT_TMAP_LOG_LEVEL);
 
 /* TMAP mandates the support for CAP Handover if it supports both UMS and BMS */
 BUILD_ASSERT(!(IS_ENABLED(CONFIG_BT_TMAP_UMS_SUPPORTED) &&

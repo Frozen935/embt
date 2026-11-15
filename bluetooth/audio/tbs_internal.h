@@ -13,13 +13,13 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include <zephyr/autoconf.h>
+#include <embt/autoconf.h>
 #include <zephyr/bluetooth/assigned_numbers.h>
 #include <zephyr/bluetooth/att.h>
 #include <zephyr/bluetooth/audio/tbs.h>
 #include <zephyr/bluetooth/gatt.h>
 #include <zephyr/net_buf.h>
-#include <zephyr/sys/atomic.h>
+#include <base/bt_atomic.h>
 #include <zephyr/types.h>
 
 #define BT_TBS_MIN_URI_LEN                         3U /* a:b */
@@ -398,6 +398,6 @@ struct bt_tbs_instance {
 	uint8_t read_buf[BT_TBS_CLIENT_INST_READ_BUF_SIZE];
 	struct net_buf_simple net_buf;
 
-	ATOMIC_DEFINE(flags, BT_TBS_CLIENT_FLAG_NUM_FLAGS);
+	BT_ATOMIC_DEFINE(flags, BT_TBS_CLIENT_FLAG_NUM_FLAGS);
 };
 #endif /* CONFIG_BT_TBS_CLIENT */

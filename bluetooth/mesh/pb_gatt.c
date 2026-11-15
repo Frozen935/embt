@@ -4,6 +4,9 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
+#undef LOG_TAG
+#define LOG_TAG "bt_mesh_pb_gatt"
+#include <base/log.h>
 #include <zephyr/bluetooth/mesh.h>
 #include <zephyr/bluetooth/conn.h>
 #include "net.h"
@@ -18,9 +21,7 @@
 
 #include "common/bt_str.h"
 
-#define LOG_LEVEL CONFIG_BT_MESH_PROV_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_mesh_pb_gatt);
-
+#define LOG_LEVEL CONFIG_EMBT_LOG_LEVEL
 struct prov_bearer_send_cb {
 	prov_bearer_send_complete_t cb;
 	void *cb_data;
@@ -56,13 +57,13 @@ static void link_closed(enum prov_bearer_link_status status)
 
 static void protocol_timeout(struct k_work *work)
 {
-	if (!atomic_test_bit(bt_mesh_prov_link.flags, LINK_ACTIVE)) {
+	if (!bt_atomic_test_bit(bt_mesh_prov_link.flags, LINK_ACTIVE)) {
 		return;
 	}
 
 	/* If connection failed or timeout, not allow establish connection */
 	if (IS_ENABLED(CONFIG_BT_MESH_PB_GATT_CLIENT) &&
-	    atomic_test_bit(bt_mesh_prov_link.flags, PROVISIONER)) {
+	    bt_atomic_test_bit(bt_mesh_prov_link.flags, PROVISIONER)) {
 		if (link.conn) {
 			(void)bt_conn_disconnect(link.conn,
 						 BT_HCI_ERR_REMOTE_USER_TERM_CONN);

@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#undef LOG_TAG
+#define LOG_TAG "bt_mesh_solicitation"
+#include <base/log.h>
 #include <zephyr/bluetooth/mesh.h>
 #include <zephyr/sys/byteorder.h>
 #include <stdlib.h>
@@ -23,17 +26,15 @@
 
 #include "host/hci_core.h"
 
-#define LOG_LEVEL CONFIG_BT_MESH_MODEL_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_mesh_solicitation);
-
+#define LOG_LEVEL CONFIG_EMBT_LOG_LEVEL
 #if CONFIG_BT_MESH_OD_PRIV_PROXY_SRV
 static struct srpl_entry {
 	uint32_t sseq;
 	uint16_t ssrc;
 } sol_pdu_rpl[CONFIG_BT_MESH_PROXY_SRPL_SIZE];
 
-static ATOMIC_DEFINE(store, CONFIG_BT_MESH_PROXY_SRPL_SIZE);
-static atomic_t clear;
+static BT_ATOMIC_DEFINE(store, CONFIG_BT_MESH_PROXY_SRPL_SIZE);
+static bt_atomic_t clear;
 #endif
 #if CONFIG_BT_MESH_PROXY_SOLICITATION
 static uint32_t sseq_out;
@@ -85,7 +86,7 @@ static int srpl_entry_save(struct bt_mesh_subnet *sub, uint32_t sseq, uint16_t s
 	LOG_DBG("Added: SSRC %d SSEQ %d to SRPL", entry->ssrc, entry->sseq);
 
 	if (IS_ENABLED(CONFIG_BT_SETTINGS)) {
-		atomic_set_bit(store, entry - &sol_pdu_rpl[0]);
+		bt_atomic_set_bit(store, entry - &sol_pdu_rpl[0]);
 		bt_mesh_settings_store_schedule(BT_MESH_SETTINGS_SRPL_PENDING);
 	}
 
@@ -411,7 +412,7 @@ static void srpl_entry_clear(int i)
 	sol_pdu_rpl[i].ssrc = 0;
 	sol_pdu_rpl[i].sseq = 0;
 
-	atomic_clear_bit(store, i);
+	bt_atomic_clear_bit(store, i);
 
 	if (IS_ENABLED(CONFIG_BT_SETTINGS)) {
 		char path[18];
@@ -445,14 +446,14 @@ void bt_mesh_srpl_pending_store(void)
 #if CONFIG_BT_MESH_OD_PRIV_PROXY_SRV
 	bool clr;
 
-	clr = atomic_cas(&clear, 1, 0);
+	clr = bt_atomic_cas(&clear, 1, 0);
 
 	for (int i = 0; i < ARRAY_SIZE(sol_pdu_rpl); i++) {
 		LOG_DBG("src 0x%04x seq 0x%06x", sol_pdu_rpl[i].ssrc, sol_pdu_rpl[i].sseq);
 
 		if (clr) {
 			srpl_entry_clear(i);
-		} else if (atomic_test_and_clear_bit(store, i)) {
+		} else if (bt_atomic_test_and_clear_bit(store, i)) {
 			srpl_store(&sol_pdu_rpl[i]);
 		}
 	}
@@ -490,7 +491,7 @@ void bt_mesh_sol_reset(void)
 
 #if CONFIG_BT_MESH_OD_PRIV_PROXY_SRV
 	if (IS_ENABLED(CONFIG_BT_SETTINGS)) {
-		(void)atomic_cas(&clear, 0, 1);
+		(void)bt_atomic_cas(&clear, 0, 1);
 
 		bt_mesh_settings_store_schedule(BT_MESH_SETTINGS_SRPL_PENDING);
 	}

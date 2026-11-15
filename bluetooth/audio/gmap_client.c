@@ -4,13 +4,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#undef LOG_TAG
+#define LOG_TAG "bt_gmap_client"
+#include <base/log.h>
 #include <errno.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
 
-#include <zephyr/autoconf.h>
+#include <embt/autoconf.h>
 #include <zephyr/bluetooth/att.h>
 #include <zephyr/bluetooth/audio/gmap.h>
 #include <zephyr/bluetooth/conn.h>
@@ -18,12 +21,10 @@
 #include <zephyr/bluetooth/uuid.h>
 #include <zephyr/net_buf.h>
 #include <zephyr/sys/__assert.h>
-#include <zephyr/sys/atomic.h>
+#include <base/bt_atomic.h>
 #include <zephyr/toolchain.h>
 
 #include "audio_internal.h"
-
-LOG_MODULE_REGISTER(bt_gmap_client, CONFIG_BT_GMAP_LOG_LEVEL);
 
 static const struct bt_uuid *gmas_uuid = BT_UUID_GMAS;
 static const struct bt_uuid *gmap_role_uuid = BT_UUID_GMAP_ROLE;
@@ -57,7 +58,7 @@ static struct bt_gmap_client {
 		struct bt_gatt_discover_params discover;
 	} params;
 
-	ATOMIC_DEFINE(flags, GMAP_CLIENT_FLAG_NUM_FLAGS);
+	BT_ATOMIC_DEFINE(flags, GMAP_CLIENT_FLAG_NUM_FLAGS);
 } gmap_insts[CONFIG_BT_MAX_CONN];
 
 static void gmap_reset(struct bt_gmap_client *gmap_cli)
@@ -106,7 +107,7 @@ static void discover_complete(struct bt_gmap_client *gmap_cli)
 {
 	LOG_DBG("conn %p", (void *)gmap_cli->conn);
 
-	atomic_clear_bit(gmap_cli->flags, GMAP_CLIENT_FLAG_BUSY);
+	bt_atomic_clear_bit(gmap_cli->flags, GMAP_CLIENT_FLAG_BUSY);
 
 	if (gmap_cb != NULL && gmap_cb->discover != NULL) {
 		gmap_cb->discover(gmap_cli->conn, 0, gmap_cli->role, gmap_cli->feat);
@@ -121,7 +122,7 @@ static void discover_failed(struct bt_gmap_client *gmap_cli, int err)
 
 	LOG_DBG("conn %p err %d", (void *)conn, err);
 
-	atomic_clear_bit(gmap_cli->flags, GMAP_CLIENT_FLAG_BUSY);
+	bt_atomic_clear_bit(gmap_cli->flags, GMAP_CLIENT_FLAG_BUSY);
 
 	if (gmap_cb != NULL && gmap_cb->discover != NULL) {
 		gmap_cb->discover(conn, err, 0, (struct bt_gmap_feat){0});
@@ -667,7 +668,7 @@ int bt_gmap_discover(struct bt_conn *conn)
 
 	gmap_cli = &gmap_insts[bt_conn_index(conn)];
 
-	if (atomic_test_and_set_bit(gmap_cli->flags, GMAP_CLIENT_FLAG_BUSY)) {
+	if (bt_atomic_test_and_set_bit(gmap_cli->flags, GMAP_CLIENT_FLAG_BUSY)) {
 		LOG_DBG("Busy");
 
 		return -EBUSY;
@@ -700,7 +701,7 @@ int bt_gmap_discover(struct bt_conn *conn)
 	return 0;
 
 cleanup:
-	atomic_clear_bit(gmap_cli->flags, GMAP_CLIENT_FLAG_BUSY);
+	bt_atomic_clear_bit(gmap_cli->flags, GMAP_CLIENT_FLAG_BUSY);
 	return err;
 }
 

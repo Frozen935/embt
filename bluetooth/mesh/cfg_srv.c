@@ -4,6 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#undef LOG_TAG
+#define LOG_TAG "bt_mesh_cfg_srv"
+#include <base/log.h>
+#include <base/base.h>
 #include <string.h>
 #include <errno.h>
 #include <stdbool.h>
@@ -36,9 +40,7 @@
 #include "cfg.h"
 #include "va.h"
 
-#define LOG_LEVEL CONFIG_BT_MESH_MODEL_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_mesh_cfg_srv);
-
+#define LOG_LEVEL CONFIG_EMBT_LOG_LEVEL
 static void node_reset_pending_handler(struct k_work *work)
 {
 	bt_mesh_reset();
@@ -64,7 +66,7 @@ static int dev_comp_data_get(const struct bt_mesh_model *model,
 
 	net_buf_simple_add_u8(&sdu, page);
 
-	if (atomic_test_bit(bt_mesh.flags, BT_MESH_COMP_DIRTY) && page < 128) {
+	if (bt_atomic_test_bit(bt_mesh.flags, BT_MESH_COMP_DIRTY) && page < 128) {
 		sdu.size -= BT_MESH_MIC_SHORT;
 		err = bt_mesh_comp_read(&sdu, page);
 		sdu.size += BT_MESH_MIC_SHORT;

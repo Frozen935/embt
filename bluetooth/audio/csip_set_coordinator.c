@@ -18,6 +18,10 @@
  * 10) Unlock all members
  */
 
+#undef LOG_TAG
+#define LOG_TAG "bt_csip_set_coordinator"
+#include <base/log.h>
+#include <base/base.h>
 #include <errno.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -25,7 +29,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <zephyr/autoconf.h>
+#include <embt/autoconf.h>
 #include <zephyr/bluetooth/assigned_numbers.h>
 #include <zephyr/bluetooth/att.h>
 #include <zephyr/bluetooth/audio/csip.h>
@@ -37,7 +41,7 @@
 #include <zephyr/bluetooth/gatt.h>
 #include <zephyr/bluetooth/uuid.h>
 #include <zephyr/sys/__assert.h>
-#include <zephyr/sys/atomic.h>
+#include <base/bt_atomic.h>
 #include <zephyr/sys/byteorder.h>
 #include <zephyr/sys/slist.h>
 #include <zephyr/sys/util.h>
@@ -50,8 +54,6 @@
 #include "csip_internal.h"
 #include "host/conn_internal.h"
 #include "host/keys.h"
-
-LOG_MODULE_REGISTER(bt_csip_set_coordinator, CONFIG_BT_CSIP_SET_COORDINATOR_LOG_LEVEL);
 
 static struct active_members {
 	struct bt_csip_set_coordinator_set_member *members[CONFIG_BT_MAX_CONN];
@@ -83,7 +85,7 @@ struct bt_csip_set_coordinator_inst {
 	struct bt_gatt_read_params read_params;
 	struct bt_gatt_write_params write_params;
 
-	ATOMIC_DEFINE(flags, SET_COORDINATOR_FLAG_NUM_FLAGS);
+	BT_ATOMIC_DEFINE(flags, SET_COORDINATOR_FLAG_NUM_FLAGS);
 };
 
 static struct bt_uuid_16 uuid = BT_UUID_INIT_16(0);
@@ -110,7 +112,7 @@ static void active_members_reset(void)
 		struct bt_csip_set_coordinator_inst *client =
 			CONTAINER_OF(member, struct bt_csip_set_coordinator_inst, set_member);
 
-		atomic_clear_bit(client->flags, SET_COORDINATOR_FLAG_BUSY);
+		bt_atomic_clear_bit(client->flags, SET_COORDINATOR_FLAG_BUSY);
 	}
 
 	(void)memset(&active, 0, sizeof(active));
@@ -369,7 +371,7 @@ static void discover_complete(struct bt_csip_set_coordinator_inst *client,
 	struct bt_csip_set_coordinator_cb *listener;
 
 	client->cur_inst = NULL;
-	atomic_clear_bit(client->flags, SET_COORDINATOR_FLAG_BUSY);
+	bt_atomic_clear_bit(client->flags, SET_COORDINATOR_FLAG_BUSY);
 
 	SYS_SLIST_FOR_EACH_CONTAINER(&csip_set_coordinator_cbs, listener, _node) {
 		if (listener->discover) {
@@ -774,7 +776,7 @@ static uint8_t discover_func(struct bt_conn *conn,
 				sub_params->end_handle = client->cur_inst->end_handle;
 				sub_params->value_handle = chrc->value_handle;
 				sub_params->notify = notify_handler;
-				atomic_set_bit(sub_params->flags, BT_GATT_SUBSCRIBE_FLAG_VOLATILE);
+				bt_atomic_set_bit(sub_params->flags, BT_GATT_SUBSCRIBE_FLAG_VOLATILE);
 
 				err = bt_gatt_subscribe(conn, sub_params);
 				if (err != 0 && err != -EALREADY) {
@@ -1471,7 +1473,7 @@ int bt_csip_set_coordinator_discover(struct bt_conn *conn)
 	}
 
 	client = &client_insts[bt_conn_index(conn)];
-	if (atomic_test_and_set_bit(client->flags, SET_COORDINATOR_FLAG_BUSY)) {
+	if (bt_atomic_test_and_set_bit(client->flags, SET_COORDINATOR_FLAG_BUSY)) {
 		return -EBUSY;
 	}
 
@@ -1506,7 +1508,7 @@ int bt_csip_set_coordinator_discover(struct bt_conn *conn)
 	return 0;
 
 cleanup:
-	atomic_clear_bit(client->flags, SET_COORDINATOR_FLAG_BUSY);
+	bt_atomic_clear_bit(client->flags, SET_COORDINATOR_FLAG_BUSY);
 	return err;
 }
 
@@ -1592,7 +1594,7 @@ static bool check_and_set_members_busy(const struct bt_csip_set_coordinator_set_
 		struct bt_csip_set_coordinator_inst *client =
 			CONTAINER_OF(member, struct bt_csip_set_coordinator_inst, set_member);
 
-		if (atomic_test_and_set_bit(client->flags, SET_COORDINATOR_FLAG_BUSY)) {
+		if (bt_atomic_test_and_set_bit(client->flags, SET_COORDINATOR_FLAG_BUSY)) {
 			LOG_DBG("Member[%zu] (%p) is busy", num_free, member);
 			break;
 		}
@@ -1605,7 +1607,7 @@ static bool check_and_set_members_busy(const struct bt_csip_set_coordinator_set_
 			struct bt_csip_set_coordinator_inst *client = CONTAINER_OF(
 				member, struct bt_csip_set_coordinator_inst, set_member);
 
-			atomic_clear_bit(client->flags, SET_COORDINATOR_FLAG_BUSY);
+			bt_atomic_clear_bit(client->flags, SET_COORDINATOR_FLAG_BUSY);
 		}
 	}
 

@@ -5,6 +5,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#undef LOG_TAG
+#define LOG_TAG "bt_vocs"
+#include <base/log.h>
+#include <base/base.h>
 #include <errno.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -12,7 +16,7 @@
 #include <string.h>
 #include <sys/types.h>
 
-#include <zephyr/autoconf.h>
+#include <embt/autoconf.h>
 #include <zephyr/bluetooth/assigned_numbers.h>
 #include <zephyr/bluetooth/att.h>
 #include <zephyr/bluetooth/audio/audio.h>
@@ -21,7 +25,7 @@
 #include <zephyr/bluetooth/conn.h>
 #include <zephyr/bluetooth/gatt.h>
 #include <zephyr/bluetooth/uuid.h>
-#include <zephyr/sys/atomic.h>
+#include <base/bt_atomic.h>
 #include <zephyr/sys/byteorder.h>
 #include <zephyr/sys/util.h>
 #include <zephyr/sys/util_macro.h>
@@ -31,9 +35,7 @@
 #include "audio_internal.h"
 #include "vocs_internal.h"
 
-#define LOG_LEVEL CONFIG_BT_VOCS_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_vocs);
-
+#define LOG_LEVEL CONFIG_EMBT_LOG_LEVEL
 #define VALID_VOCS_OPCODE(opcode)	((opcode) == BT_VOCS_OPCODE_SET_OFFSET)
 
 #define BT_AUDIO_LOCATION_RFU (~BT_AUDIO_LOCATION_ANY)
@@ -82,7 +84,7 @@ static void notify_work_reschedule(struct bt_vocs_server *inst, enum bt_vocs_not
 {
 	int err;
 
-	atomic_set_bit(inst->notify, notify);
+	bt_atomic_set_bit(inst->notify, notify);
 
 	err = k_work_reschedule(&inst->notify_work, delay);
 	if (err < 0) {
@@ -109,16 +111,16 @@ static void notify_work_handler(struct k_work *work)
 	struct k_work_delayable *d_work = k_work_delayable_from_work(work);
 	struct bt_vocs_server *inst = CONTAINER_OF(d_work, struct bt_vocs_server, notify_work);
 
-	if (atomic_test_and_clear_bit(inst->notify, NOTIFY_STATE)) {
+	if (bt_atomic_test_and_clear_bit(inst->notify, NOTIFY_STATE)) {
 		notify(inst, NOTIFY_STATE, BT_UUID_VOCS_STATE, &inst->state, sizeof(inst->state));
 	}
 
-	if (atomic_test_and_clear_bit(inst->notify, NOTIFY_LOCATION)) {
+	if (bt_atomic_test_and_clear_bit(inst->notify, NOTIFY_LOCATION)) {
 		notify(inst, NOTIFY_LOCATION, BT_UUID_VOCS_LOCATION, &inst->location,
 		       sizeof(inst->location));
 	}
 
-	if (atomic_test_and_clear_bit(inst->notify, NOTIFY_OUTPUT_DESC)) {
+	if (bt_atomic_test_and_clear_bit(inst->notify, NOTIFY_OUTPUT_DESC)) {
 		notify(inst, NOTIFY_OUTPUT_DESC, BT_UUID_VOCS_DESCRIPTION, &inst->output_desc,
 		       strlen(inst->output_desc));
 	}
@@ -438,7 +440,7 @@ int bt_vocs_register(struct bt_vocs *vocs,
 	if (param->output_desc) {
 		(void)utf8_lcpy(inst->output_desc, param->output_desc,
 				sizeof(inst->output_desc));
-		if (IS_ENABLED(CONFIG_BT_VOCS_LOG_LEVEL_DBG) &&
+		if ((CONFIG_EMBT_LOG_LEVEL >= 4) &&
 		    strcmp(inst->output_desc, param->output_desc)) {
 			LOG_DBG("Output desc clipped to %s", inst->output_desc);
 		}
@@ -473,7 +475,7 @@ int bt_vocs_register(struct bt_vocs *vocs,
 		return err;
 	}
 
-	atomic_clear(inst->notify);
+	bt_atomic_clear(inst->notify);
 	k_work_init_delayable(&inst->notify_work, notify_work_handler);
 
 	inst->initialized = true;
