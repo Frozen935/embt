@@ -18,13 +18,14 @@
  * @{
  */
 
+#include <embt/storage.h>
 #include <errno.h>
 
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/uuid.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/l2cap.h>
-#include <zephyr/bluetooth/classic/goep.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/uuid.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/l2cap.h>
+#include <embt/bluetooth/classic/goep.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -869,7 +870,7 @@ struct bt_map_mce_mas {
 	const struct bt_map_mce_mas_cb *_cb;
 
 	/** @internal Transport state (atomic) */
-	atomic_t _transport_state;
+	long _transport_state;
 
 	/** @internal Connection ID */
 	uint32_t _conn_id;
@@ -878,7 +879,7 @@ struct bt_map_mce_mas {
 	struct bt_obex_client _client;
 
 	/** @internal Client state (atomic) */
-	atomic_t _state;
+	long _state;
 
 	/** @internal Pending response callback */
 	void (*_rsp_cb)(struct bt_map_mce_mas *mce_mas, uint8_t rsp_code, struct net_buf *buf);
@@ -1373,7 +1374,7 @@ struct bt_map_mce_mns {
 	const struct bt_map_mce_mns_cb *_cb;
 
 	/** @internal Transport state (atomic) */
-	atomic_t _transport_state;
+	long _transport_state;
 
 	/** @internal Connection ID */
 	uint32_t _conn_id;
@@ -1382,7 +1383,7 @@ struct bt_map_mce_mns {
 	struct bt_obex_server _server;
 
 	/** @internal Server state (atomic) */
-	atomic_t _state;
+	long _state;
 
 	/** @internal Pending request callback */
 	void (*_req_cb)(struct bt_map_mce_mns *mce_mns, bool final, struct net_buf *buf);
@@ -1830,7 +1831,7 @@ struct bt_map_mse_mas {
 	const struct bt_map_mse_mas_cb *_cb;
 
 	/** @internal Transport state (atomic) */
-	atomic_t _transport_state;
+	long _transport_state;
 
 	/** @internal Connection ID */
 	uint32_t _conn_id;
@@ -1839,7 +1840,7 @@ struct bt_map_mse_mas {
 	struct bt_obex_server _server;
 
 	/** @internal Server state (atomic) */
-	atomic_t _state;
+	long _state;
 
 	/** @internal Pending request callback */
 	void (*_req_cb)(struct bt_map_mse_mas *mse_mas, bool final, struct net_buf *buf);
@@ -2299,7 +2300,7 @@ struct bt_map_mse_mns {
 	const struct bt_map_mse_mns_cb *_cb;
 
 	/** @internal Transport state (atomic) */
-	atomic_t _transport_state;
+	long _transport_state;
 
 	/** @internal Connection ID */
 	uint32_t _conn_id;
@@ -2308,7 +2309,7 @@ struct bt_map_mse_mns {
 	struct bt_obex_client _client;
 
 	/** @internal Client state (atomic) */
-	atomic_t _state;
+	long _state;
 
 	/** @internal Pending response callback */
 	void (*_rsp_cb)(struct bt_map_mse_mns *mse_mns, uint8_t rsp_code, struct net_buf *buf);

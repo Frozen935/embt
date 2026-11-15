@@ -35,7 +35,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#include <zephyr/bluetooth/conn.h>
+#include <embt/bluetooth/conn.h>
 
 #ifdef __cplusplus
 extern "C" {

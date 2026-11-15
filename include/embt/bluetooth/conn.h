@@ -20,20 +20,20 @@
  * @{
  */
 
+#include <embt/storage.h>
 #include <stdbool.h>
 #include <stdint.h>
 
-#include <zephyr/bluetooth/addr.h>
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/direction.h>
-#include <zephyr/bluetooth/gap.h>
-#include <zephyr/bluetooth/hci_types.h>
-#include <zephyr/net_buf.h>
-#include <zephyr/sys/atomic.h>
-#include <zephyr/sys/iterable_sections.h>
-#include <zephyr/sys/slist.h>
-#include <zephyr/sys/util_macro.h>
-#include <zephyr/toolchain.h>
+#include <embt/bluetooth/addr.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/direction.h>
+#include <embt/bluetooth/gap.h>
+#include <embt/bluetooth/hci_types.h>
+#include <embt/net_buf.h>
+#include <embt/sys/iterable_sections.h>
+#include <embt/sys/slist.h>
+#include <embt/sys/util_macro.h>
+#include <embt/toolchain.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -1033,10 +1033,7 @@ void bt_conn_unref(struct bt_conn *conn);
  *  @return The connection originally pointed to by @p orig, which may be
  *          NULL.
  */
-static inline struct bt_conn *__must_check bt_conn_take(struct bt_conn **orig)
-{
-	return (struct bt_conn *)atomic_ptr_clear((atomic_ptr_t *)orig);
-}
+struct bt_conn *__must_check bt_conn_take(struct bt_conn **orig);
 
 /** @brief Drop a connection reference and clear the pointer.
  *
@@ -2692,14 +2689,11 @@ int bt_conn_cb_register(struct bt_conn_cb *cb);
 int bt_conn_cb_unregister(struct bt_conn_cb *cb);
 
 /**
- *  @brief Register a callback structure for connection events.
- *
- *  @param _name Name of callback structure.
+ * @brief Define callback storage for explicit registration.
+ * @param _name Name suffix of the callback object bt_conn_cb_ ## _name.
+ * @note Call bt_conn_cb_register() with the object before receiving connection events.
  */
-#define BT_CONN_CB_DEFINE(_name)					\
-	static const STRUCT_SECTION_ITERABLE(bt_conn_cb,		\
-						_CONCAT(bt_conn_cb_,	\
-							_name))
+#define BT_CONN_CB_DEFINE(_name) static struct bt_conn_cb bt_conn_cb_##_name
 
 /** Converts a security error to string.
  *

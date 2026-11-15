@@ -95,7 +95,7 @@
 #define ZRESTRICT restrict
 #endif
 
-#include <zephyr/toolchain/common.h>
+#include <embt/toolchain/common.h>
 #include <stdbool.h>
 
 #define ALIAS_OF(of) __attribute__((alias(#of)))
@@ -103,24 +103,13 @@
 #define FUNC_ALIAS(real_func, new_alias, return_type) \
 	__typeof__(real_func) new_alias ALIAS_OF(real_func)
 
-#if defined(CONFIG_ARCH_POSIX) && !defined(_ASMLANGUAGE)
-
-/*let's not segfault if this were to happen for some reason*/
-#define CODE_UNREACHABLE \
-{\
-	posix_print_error_and_exit("CODE_UNREACHABLE reached from %s:%d\n",\
-		__FILE__, __LINE__);\
-	__builtin_unreachable(); \
-}
-#else
 #define CODE_UNREACHABLE __builtin_unreachable()
-#endif
 #define FUNC_NORETURN    __attribute__((__noreturn__))
 
 /* The GNU assembler for Cortex-M3 uses # for immediate values, not
  * comments, so the @nobits# trick does not work.
  */
-#if defined(CONFIG_ARM) || defined(CONFIG_ARM64)
+#if defined(CONFIG_ARM) || defined(__aarch64__)
 #define _NODATA_SECTION(segment)  __attribute__((section(#segment)))
 #else
 #define _NODATA_SECTION(segment)				\
@@ -149,7 +138,7 @@ __extension__ ({							\
 #endif
 
 
-#if (__GNUC__ >= 7) && (defined(CONFIG_ARM) || defined(CONFIG_ARM64))
+#if (__GNUC__ >= 7) && (defined(CONFIG_ARM) || defined(__aarch64__))
 
 /* Version of UNALIGNED_PUT() which issues a compiler_barrier() after
  * the store. It is required to workaround an apparent optimization
@@ -426,7 +415,7 @@ do {                                                                    \
 #if defined(_ASMLANGUAGE)
 
 #if defined(CONFIG_ARM) || defined(CONFIG_RISCV) || defined(CONFIG_XTENSA) ||                      \
-	defined(CONFIG_ARM64) || defined(CONFIG_MIPS) || defined(CONFIG_RX) ||                     \
+	defined(__aarch64__) || defined(CONFIG_MIPS) || defined(CONFIG_RX) ||                     \
 	defined(CONFIG_OPENRISC) || defined(CONFIG_TRICORE)
 #define GTEXT(sym) .global sym; .type sym, %function
 #define GDATA(sym) .global sym; .type sym, %object
@@ -527,9 +516,9 @@ do {                                                                    \
 #else
 #define _ASM_FILE_PROLOGUE .text; .code 32
 #endif /* CONFIG_ASSEMBLER_ISA_THUMB2 */
-#elif defined(CONFIG_ARM64)
+#elif defined(__aarch64__)
 #define _ASM_FILE_PROLOGUE .text
-#endif /* CONFIG_ARM64 || CONFIG_ARM */
+#endif /* __aarch64__ || CONFIG_ARM */
 #endif /* _ASMLANGUAGE */
 
 /*
@@ -584,9 +573,9 @@ do {                                                                    \
 		"\n\t.equ\t" #name "," #value       \
 		"\n\t.type\t" #name ",%object")
 
-#elif defined(CONFIG_ARC) || defined(CONFIG_ARM64) \
+#elif defined(CONFIG_ARC) || defined(__aarch64__) \
 	|| defined(CONFIG_ARCH_POSIX) /*&& (__x86_64 or __i*86 or __aarch64__)*/ \
-	|| defined(CONFIG_X86)
+	|| defined(__i386__) || defined(__x86_64__)
 
 #define GEN_ABSOLUTE_SYM(name, value)               \
 	__asm__ __volatile__(".globl\t" #name "\n\t.equ\t" #name \

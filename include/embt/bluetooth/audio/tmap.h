@@ -26,10 +26,10 @@
  * to enable interoperability between devices for telephony and media audio.
  */
 
-#include <zephyr/autoconf.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/sys/util.h>
-#include <zephyr/sys/util_macro.h>
+#include <embt/autoconf.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/sys/util.h>
+#include <embt/sys/util_macro.h>
 
 /** @brief TMAP Role characteristic */
 enum bt_tmap_role {

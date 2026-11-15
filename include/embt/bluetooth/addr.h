@@ -13,7 +13,7 @@
 #include <stdint.h>
 #include <string.h>
 
-#include <zephyr/sys/printk.h>
+#include <embt/sys/printk.h>
 
 #ifdef __cplusplus
 extern "C" {

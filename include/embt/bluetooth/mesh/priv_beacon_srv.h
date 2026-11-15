@@ -13,7 +13,7 @@
 #ifndef ZEPHYR_INCLUDE_BLUETOOTH_MESH_PRIV_BEACON_SRV_H__
 #define ZEPHYR_INCLUDE_BLUETOOTH_MESH_PRIV_BEACON_SRV_H__
 
-#include <zephyr/bluetooth/mesh.h>
+#include <embt/bluetooth/mesh.h>
 
 #ifdef __cplusplus
 extern "C" {

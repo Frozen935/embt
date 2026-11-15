@@ -20,16 +20,16 @@
  * @{
  */
 
+#include <embt/storage.h>
 #include <stddef.h>
 #include <stdint.h>
 
-#include <zephyr/bluetooth/buf.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/hci.h>
-#include <zephyr/net_buf.h>
-#include <zephyr/sys/atomic.h>
-#include <zephyr/sys/slist.h>
-#include <zephyr/sys/util.h>
+#include <embt/bluetooth/buf.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/hci.h>
+#include <embt/net_buf.h>
+#include <embt/sys/slist.h>
+#include <embt/sys/util.h>
 #include <sys/types.h>
 
 #ifdef __cplusplus
@@ -224,8 +224,16 @@ struct bt_l2cap_chan {
 	sys_snode_t			node;
 	bt_l2cap_chan_destroy_t		destroy;
 
-	ATOMIC_DEFINE(status, BT_L2CAP_NUM_STATUS);
+	long status[((BT_L2CAP_NUM_STATUS) + sizeof(long) * CHAR_BIT - 1) / (sizeof(long) * CHAR_BIT)];
 };
+
+/**
+ * @brief Read a coherent snapshot of the channel status bits.
+ * @param[in] chan Live channel whose status is being queried.
+ * @return A bit mask with BIT(BT_L2CAP_STATUS_*) values.
+ * @pre The caller keeps the channel alive during the call. Do not read internal status storage.
+ */
+unsigned long bt_l2cap_chan_status_get(const struct bt_l2cap_chan *chan);
 
 /** @brief LE L2CAP Endpoint structure. */
 struct bt_l2cap_le_endpoint {
@@ -236,7 +244,7 @@ struct bt_l2cap_le_endpoint {
 	/** Endpoint Maximum PDU payload Size */
 	uint16_t				mps;
 	/** Endpoint credits */
-	atomic_t			credits;
+	long			credits;
 };
 
 /** @brief LE L2CAP Channel structure. */
@@ -396,19 +404,21 @@ struct bt_l2cap_fixed_chan {
 /**
  *  @brief Register a fixed L2CAP channel.
  *
- *  Define and register a fixed L2CAP channel of type @ref bt_l2cap_fixed_chan.
+ *  Define storage for a fixed L2CAP channel of type @ref bt_l2cap_fixed_chan.
  *
  *  @note Fixed L2CAP channels are according to the Core Specification (3.A.2.1 v6.0) reserved
  *        for the stack, but this allows the application to define their own, for instance if there
  *        are memory constraints and dynamic channels are not suitable. The application needs to
  *        make sure that the CID for the fixed channel is not already in use.
  *
- *  @param _name Name of the fixed L2CAP channel. The channels are sorted lexicographically, and
- *  will be initialized in the same order.
+ *  @param _name Name of the fixed L2CAP channel. Call bt_l2cap_fixed_chan_register() with the descriptor before enabling the stack.
  */
-#define BT_L2CAP_FIXED_CHANNEL_DEFINE(_name)                                                       \
-	static const STRUCT_SECTION_ITERABLE(bt_l2cap_fixed_chan,                                  \
-					     _CONCAT(bt_l2cap_fixed_chan, _name))
+#define BT_L2CAP_FIXED_CHANNEL_DEFINE(_name) \
+	static const struct bt_l2cap_fixed_chan bt_l2cap_fixed_chan##_name
+
+/** @brief Register a process-lifetime fixed channel before enabling the stack. */
+int bt_l2cap_fixed_chan_register(const struct bt_l2cap_fixed_chan *channel);
+
 
 /** L2CAP Endpoint Link Mode. Basic mode. */
 #define BT_L2CAP_BR_LINK_MODE_BASIC  0x00
@@ -529,7 +539,7 @@ struct bt_l2cap_br_chan {
 	/** Channel Transmission Endpoint */
 	struct bt_l2cap_br_endpoint     tx;
 	/** Channel flags, for internal use only */
-	ATOMIC_DEFINE(flags, 64);
+	long flags[((64) + sizeof(long) * CHAR_BIT - 1) / (sizeof(long) * CHAR_BIT)];
 
 	bt_l2cap_chan_state_t           state;
 	/** Remote PSM to be connected */
@@ -552,7 +562,7 @@ struct bt_l2cap_br_chan {
 	/** @internal To be used with @ref bt_conn.upper_data_ready */
 	sys_snode_t                     _pdu_ready;
 	/** @internal To be used with @ref bt_conn.upper_data_ready */
-	atomic_t                        _pdu_ready_lock;
+	long                        _pdu_ready_lock;
 	/** @internal List of net bufs not yet sent to lower layer */
 	sys_slist_t                     _pdu_tx_queue;
 
@@ -753,7 +763,7 @@ struct bt_l2cap_chan_ops {
 	 *  @param chan The channel which status changed
 	 *  @param status The channel status
 	 */
-	void (*status)(struct bt_l2cap_chan *chan, atomic_t *status);
+	void (*status)(struct bt_l2cap_chan *chan, long *status);
 
 	/* @brief Channel released callback
 	 *
@@ -891,7 +901,7 @@ struct bt_l2cap_server {
 	/* References held on this server: one while a connection request for
 	 * it is being handled, and one per channel it accepted.
 	 */
-	atomic_t _refs;
+	long _refs;
 #endif /* CONFIG_BT_L2CAP_DYNAMIC_CHANNEL */
 	/** @endcond */
 

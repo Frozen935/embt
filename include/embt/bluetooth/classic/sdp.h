@@ -22,8 +22,8 @@
 
 #include <sys/types.h>
 
-#include <zephyr/bluetooth/uuid.h>
-#include <zephyr/bluetooth/conn.h>
+#include <embt/bluetooth/uuid.h>
+#include <embt/bluetooth/conn.h>
 
 #ifdef __cplusplus
 extern "C" {

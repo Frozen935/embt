@@ -16,11 +16,12 @@
  * @{
  */
 
+#include <embt/storage.h>
 #include <string.h>
 #include <errno.h>
 #include <stdbool.h>
 
-#include <zephyr/bluetooth/uuid.h>
+#include <embt/bluetooth/uuid.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -515,13 +516,13 @@ struct bt_obex_server {
 	} tx;
 
 	/** @internal Saves the current state, @ref bt_obex_state */
-	atomic_t _state;
+	long _state;
 
 	/** @internal OBEX opcode */
-	atomic_t _opcode;
+	long _opcode;
 
 	/** @internal OBEX flags */
-	atomic_t _flags;
+	long _flags;
 
 	/** @internal Target of service */
 	union bt_obex_uuid _target;
@@ -558,16 +559,16 @@ struct bt_obex_client {
 	} tx;
 
 	/** @internal Saves the current state, @ref bt_obex_state */
-	atomic_t _state;
+	long _state;
 
 	/** @internal OBEX opcode */
-	atomic_t _opcode;
+	long _opcode;
 
 	/** @internal OBEX previous opcode */
-	atomic_t _pre_opcode;
+	long _pre_opcode;
 
 	/** @internal OBEX flags */
-	atomic_t _flags;
+	long _flags;
 
 	/** @internal target of the conn req */
 	union bt_obex_uuid _target;
@@ -597,13 +598,13 @@ struct bt_obex {
 	const struct bt_obex_transport_ops *_transport_ops;
 
 	/** @internal OBEX executing client */
-	atomic_ptr_t _active_client;
+	void * _active_client;
 
 	/** @internal OBEX last executed client */
-	atomic_ptr_t _last_client;
+	void * _last_client;
 
 	/** @internal OBEX executing client */
-	atomic_ptr_t _active_server;
+	void * _active_server;
 
 	/** @internal OBEX clients */
 	sys_slist_t _clients;

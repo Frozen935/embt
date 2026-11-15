@@ -16,11 +16,11 @@
 #ifndef ZEPHYR_INCLUDE_SYS_CRC_H_
 #define ZEPHYR_INCLUDE_SYS_CRC_H_
 
-#include <zephyr/types.h>
+#include <embt/types.h>
 #include <stdbool.h>
 #include <stddef.h>
 
-#include <zephyr/sys/__assert.h>
+#include <embt/sys/__assert.h>
 
 #ifdef __cplusplus
 extern "C" {

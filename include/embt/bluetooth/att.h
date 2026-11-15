@@ -22,9 +22,9 @@
 #include <stdint.h>
 #include <stddef.h>
 
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/sys/slist.h>
-#include <zephyr/sys/util_macro.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/sys/slist.h>
+#include <embt/sys/util_macro.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -124,7 +124,7 @@ extern "C" {
 #if defined(CONFIG_BT_ATT_ERR_TO_STR)
 const char *bt_att_err_to_str(uint8_t att_err);
 #else
-#include <zephyr/toolchain.h>
+#include <embt/toolchain.h>
 
 static inline const char *bt_att_err_to_str(uint8_t att_err)
 {

@@ -11,6 +11,9 @@
 #ifndef ZEPHYR_INCLUDE_BLUETOOTH_CLASSIC_AVDTP_H_
 #define ZEPHYR_INCLUDE_BLUETOOTH_CLASSIC_AVDTP_H_
 
+#include <stdint.h>
+#include <embt/bluetooth/l2cap.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif

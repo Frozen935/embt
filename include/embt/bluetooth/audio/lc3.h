@@ -23,9 +23,9 @@
  * @{
  */
 
-#include <zephyr/sys/util_macro.h>
-#include <zephyr/bluetooth/byteorder.h>
-#include <zephyr/bluetooth/hci_types.h>
+#include <embt/sys/util_macro.h>
+#include <embt/bluetooth/byteorder.h>
+#include <embt/bluetooth/hci_types.h>
 
 #ifdef __cplusplus
 extern "C" {

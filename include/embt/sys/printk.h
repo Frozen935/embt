@@ -8,13 +8,10 @@
 #ifndef ZEPHYR_INCLUDE_SYS_PRINTK_H_
 #define ZEPHYR_INCLUDE_SYS_PRINTK_H_
 
-#include <zephyr/toolchain.h>
+#include <embt/toolchain.h>
 #include <stddef.h>
 #include <stdarg.h>
 #include <inttypes.h>
-
-#ifdef CONFIG_LOG_PRINTK_STATIC
-#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -47,15 +44,7 @@ extern "C" {
  */
 #if defined(CONFIG_PRINTK) || defined(__DOXYGEN__)
 
-#ifdef CONFIG_LOG_PRINTK_STATIC
-/* If printk is redirected to the logging use the macro which allow build time
- * logging message creation which is faster and allows format string stripping in
- * case of dictionary based logging.
- */
-#define printk(...) Z_LOG_PRINTK(0, __VA_ARGS__)
-#else
 __printf_like(1, 2) void printk(const char *fmt, ...);
-#endif /* CONFIG_LOG_PRINTK_STATIC */
 
 /**
  * @brief Print kernel debugging message, va_list version

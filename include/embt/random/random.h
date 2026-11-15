@@ -21,7 +21,7 @@
 #ifndef ZEPHYR_INCLUDE_RANDOM_RANDOM_H_
 #define ZEPHYR_INCLUDE_RANDOM_RANDOM_H_
 
-#include <zephyr/types.h>
+#include <embt/types.h>
 #include <stddef.h>
 
 /**
@@ -49,7 +49,7 @@ extern "C" {
  * @param len size of the destination buffer.
  *
  */
-__syscall void sys_rand_get(void *dst, size_t len);
+void sys_rand_get(void *dst, size_t len);
 
 /**
  * @brief Fill the destination buffer with cryptographically secure
@@ -64,7 +64,7 @@ __syscall void sys_rand_get(void *dst, size_t len);
  * @return 0 if success, -EIO if entropy reseed error
  *
  */
-__syscall int sys_csrand_get(void *dst, size_t len);
+int sys_csrand_get(void *dst, size_t len);
 
 /**
  * @brief Return a 8-bit random value that should pass general

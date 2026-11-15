@@ -12,7 +12,7 @@
 #ifndef ZEPHYR_INCLUDE_BLUETOOTH_TESTING_H_
 #define ZEPHYR_INCLUDE_BLUETOOTH_TESTING_H_
 
-#include <zephyr/net_buf.h>
+#include <embt/net_buf.h>
 
 /** @brief Hook for `acl_in_pool.destroy`
  *

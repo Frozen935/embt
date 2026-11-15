@@ -20,16 +20,18 @@
  * @{
  */
 
+#include <embt/storage.h>
 #include <stddef.h>
 #include <stdint.h>
 
-#include <zephyr/autoconf.h>
-#include <zephyr/bluetooth/hci.h>
-#include <zephyr/bluetooth/hci_types.h>
-#include <zephyr/net_buf.h>
-#include <zephyr/sys/util.h>
-#include <zephyr/sys/util_macro.h>
-#include <zephyr/toolchain.h>
+#include <embt/autoconf.h>
+#include <embt/bluetooth/hci.h>
+#include <embt/bluetooth/hci_types.h>
+#include <embt/net_buf.h>
+#include <embt/sys/util.h>
+#include <embt/sys/util_macro.h>
+#include <embt/storage.h>
+#include <embt/toolchain.h>
 
 #ifdef __cplusplus
 extern "C" {

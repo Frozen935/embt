@@ -4,14 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <zephyr/sys/uuid.h>
+#include <base/base.h>
+#include <embt/sys/uuid.h>
 
 #include <ctype.h>
 #include <string.h>
 #include <stdio.h>
 
 #if defined(CONFIG_UUID_V4)
-#include <zephyr/random/random.h>
+#include <embt/random/random.h>
 #endif
 
 #if defined(CONFIG_UUID_V5)
@@ -19,7 +20,7 @@
 #endif
 
 #if defined(CONFIG_UUID_BASE64)
-#include <zephyr/sys/base64.h>
+#include <embt/sys/base64.h>
 #endif
 
 #define UUID_STR_POSITION_FIRST_HYPHEN  (8U)

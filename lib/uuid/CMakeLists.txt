@@ -1,7 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 
-zephyr_sources_ifdef(CONFIG_UUID uuid.c)
+embt_library(embt_uuid)
+embt_library_link_libraries_ifdef(CONFIG_UUID_V5 EmBT::psa)
 
-if(CONFIG_UUID_V5)
-  zephyr_library_link_libraries_ifdef(CONFIG_MBEDTLS_BUILTIN mbedtls_iface)
-endif()
+embt_library_sources_ifdef(CONFIG_UUID uuid.c)

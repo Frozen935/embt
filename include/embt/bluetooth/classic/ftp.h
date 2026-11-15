@@ -21,14 +21,15 @@
  * @{
  */
 
+#include <embt/storage.h>
 #include <errno.h>
 #include <stdbool.h>
 
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/uuid.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/l2cap.h>
-#include <zephyr/bluetooth/classic/goep.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/uuid.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/l2cap.h>
+#include <embt/bluetooth/classic/goep.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -305,7 +306,7 @@ struct bt_ftp_client {
 	void (*_rsp_cb)(struct bt_ftp_client *client, uint8_t rsp_code, struct net_buf *buf);
 
 	/** @internal Current request function type */
-	atomic_t _optype;
+	long _optype;
 };
 
 /** @brief Connect FTP client over RFCOMM (GOEP v1.1).
@@ -943,7 +944,7 @@ struct bt_ftp_server {
 	void (*_req_cb)(struct bt_ftp_server *server, bool final, struct net_buf *buf);
 
 	/** @internal Current request function type */
-	atomic_t _optype;
+	long _optype;
 };
 
 /** @brief FTP server RFCOMM registration structure. */

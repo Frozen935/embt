@@ -29,13 +29,13 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include <zephyr/bluetooth/audio/audio.h>
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/data.h>
-#include <zephyr/bluetooth/uuid.h>
-#include <zephyr/net_buf.h>
-#include <zephyr/sys/util.h>
-#include <zephyr/sys/util_macro.h>
+#include <embt/bluetooth/audio/audio.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/data.h>
+#include <embt/bluetooth/uuid.h>
+#include <embt/net_buf.h>
+#include <embt/sys/util.h>
+#include <embt/sys/util_macro.h>
 
 #ifdef __cplusplus
 extern "C" {

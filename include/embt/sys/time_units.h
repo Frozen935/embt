@@ -7,9 +7,9 @@
 #ifndef ZEPHYR_INCLUDE_SYS_TIME_UNITS_H_
 #define ZEPHYR_INCLUDE_SYS_TIME_UNITS_H_
 
-#include <zephyr/toolchain.h>
-#include <zephyr/sys/div64.h>
-#include <zephyr/sys/util.h>
+#include <embt/toolchain.h>
+#include <embt/sys/div64.h>
+#include <embt/sys/util.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -384,7 +384,7 @@ static inline unsigned int z_impl_sys_clock_hw_cycles_per_sec_runtime_get(void)
 #define Z_HZ_us 1000000
 #define Z_HZ_ns 1000000000
 #define Z_HZ_cyc sys_clock_hw_cycles_per_sec()
-#define Z_HZ_ticks CONFIG_SYS_CLOCK_TICKS_PER_SEC
+#define Z_HZ_ticks 1000
 #define Z_CCYC (!IS_ENABLED(CONFIG_TIMER_READS_ITS_FREQUENCY_AT_RUNTIME) && \
 		!IS_ENABLED(CONFIG_SYSTEM_CLOCK_HW_CYCLES_PER_SEC_RUNTIME_UPDATE))
 

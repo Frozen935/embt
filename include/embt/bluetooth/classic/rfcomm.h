@@ -19,10 +19,10 @@
  * @{
  */
 
-#include <zephyr/bluetooth/buf.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/l2cap.h>
-#include <zephyr/sys/slist.h>
+#include <embt/bluetooth/buf.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/l2cap.h>
+#include <embt/sys/slist.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -272,10 +272,10 @@ struct bt_rfcomm_dlc {
 	 *  - MSC with FC=1 (pause) is sent only when the count is changing from 0 to 1
 	 *  - MSC with FC=0 (resume) is sent only when the count is changing from 1 to 0
 	 */
-	atomic_t rx_credit_inprogress;
+	long rx_credit_inprogress;
 
 	/** DLC flags */
-	atomic_t flags;
+	long flags;
 
 	/** @endcond */
 };

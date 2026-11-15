@@ -15,8 +15,8 @@
 
 #include <sys/types.h>
 
-#include <zephyr/bluetooth/mesh/access.h>
-#include <zephyr/bluetooth/mesh/blob.h>
+#include <embt/bluetooth/mesh/access.h>
+#include <embt/bluetooth/mesh/blob.h>
 
 #ifdef __cplusplus
 extern "C" {

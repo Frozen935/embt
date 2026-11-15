@@ -24,12 +24,12 @@
 
 #include <sys/types.h>
 
-#include <zephyr/sys/byteorder.h>
-#include <zephyr/sys/util.h>
-#include <zephyr/sys/crc.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/uuid.h>
-#include <zephyr/bluetooth/gatt.h>
+#include <embt/sys/byteorder.h>
+#include <embt/sys/util.h>
+#include <embt/sys/crc.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/uuid.h>
+#include <embt/bluetooth/gatt.h>
 
 #ifdef __cplusplus
 extern "C" {

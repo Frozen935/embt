@@ -29,10 +29,10 @@
 
 #include <stdint.h>
 
-#include <zephyr/bluetooth/audio/aics.h>
-#include <zephyr/bluetooth/audio/vocs.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/sys/slist.h>
+#include <embt/bluetooth/audio/aics.h>
+#include <embt/bluetooth/audio/vocs.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/sys/slist.h>
 
 #ifdef __cplusplus
 extern "C" {

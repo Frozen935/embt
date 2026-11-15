@@ -13,9 +13,9 @@
 #include <stdint.h>
 #include <string.h>
 
-#include <zephyr/sys/util.h>
-#include <zephyr/toolchain.h>
-#include <zephyr/sys/__assert.h>
+#include <embt/sys/util.h>
+#include <embt/toolchain.h>
+#include <embt/sys/__assert.h>
 
 #ifdef __cplusplus
 extern "C" {

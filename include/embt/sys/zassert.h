@@ -20,8 +20,8 @@
 #include <stdarg.h>
 #include <stddef.h>
 
-#include <zephyr/sys/util_macro.h>
-#include <zephyr/toolchain.h>
+#include <embt/sys/util_macro.h>
+#include <embt/toolchain.h>
 
 /**
  * @defgroup zassert Module based assert handling
