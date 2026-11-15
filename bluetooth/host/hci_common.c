@@ -4,7 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <base/base.h>
+#include <common/assert.h>
+#include <embt/base/time.h>
+#include <string.h>
+#include <embt/base/assert.h>
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -12,16 +15,15 @@
 #include <embt/bluetooth/hci_types.h>
 #include <embt/drivers/bluetooth.h>
 #include <embt/net_buf.h>
-#include <embt/sys/byteorder.h>
+#include <embt/base/byteorder.h>
 
-#include "common/assert.h"
 
 struct net_buf *bt_hci_evt_create(uint8_t evt, uint8_t len)
 {
 	struct bt_hci_evt_hdr *hdr;
 	struct net_buf *buf;
 
-	buf = bt_buf_get_evt(evt, false, K_FOREVER);
+	buf = bt_buf_get_evt(evt, false, BT_FOREVER);
 
 	BT_ASSERT(buf);
 

@@ -3,24 +3,25 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
+#include <embt/base/time.h>
 #include <errno.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
 
-#include <zephyr/autoconf.h>
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/direction.h>
-#include <zephyr/bluetooth/hci.h>
-#include <zephyr/bluetooth/hci_types.h>
-#include <zephyr/bluetooth/hci_vs.h>
-#include <zephyr/bluetooth/l2cap.h>
+#include <embt/autoconf.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/direction.h>
+#include <embt/bluetooth/hci.h>
+#include <embt/bluetooth/hci_types.h>
+#include <embt/bluetooth/hci_vs.h>
+#include <embt/bluetooth/l2cap.h>
 #include <embt/base/log.h>
-#include <zephyr/net_buf.h>
-#include <zephyr/sys/__assert.h>
-#include <zephyr/sys/atomic.h>
-#include <zephyr/sys/byteorder.h>
+#include <embt/net_buf.h>
+#include <embt/base/assert.h>
+#include <embt/base/atomic.h>
+#include <embt/base/byteorder.h>
 
 #include "hci_core.h"
 #include "conn_internal.h"
@@ -108,7 +109,7 @@ static int hci_df_set_cl_cte_tx_params(const struct bt_le_ext_adv *adv,
 		return -EINVAL;
 	}
 
-	buf = bt_hci_cmd_alloc(K_FOREVER);
+	buf = bt_hci_cmd_alloc(BT_FOREVER);
 	if (!buf) {
 		return -ENOBUFS;
 	}
@@ -194,7 +195,7 @@ static int hci_df_set_adv_cte_tx_enable(struct bt_le_ext_adv *adv,
 	struct bt_hci_cmd_state_set state;
 	struct net_buf *buf;
 
-	buf = bt_hci_cmd_alloc(K_FOREVER);
+	buf = bt_hci_cmd_alloc(BT_FOREVER);
 	if (!buf) {
 		return -ENOBUFS;
 	}
@@ -274,7 +275,7 @@ prepare_cl_cte_rx_enable_cmd_params(struct net_buf **buf, struct bt_le_per_adv_s
 	/* If CTE Rx is enabled, command parameters total length must include
 	 * antenna ids, so command size if extended by num_and_ids.
 	 */
-	*buf = bt_hci_cmd_alloc(K_FOREVER);
+	*buf = bt_hci_cmd_alloc(BT_FOREVER);
 	if (!(*buf)) {
 		return -ENOBUFS;
 	}
@@ -372,7 +373,7 @@ int hci_df_prepare_connectionless_iq_report(struct net_buf *buf,
 		return -EINVAL;
 	}
 
-	if (!atomic_test_bit(per_adv_sync->flags, BT_PER_ADV_SYNC_CTE_ENABLED)) {
+	if (!bt_atomic_test_bit(per_adv_sync->flags, BT_PER_ADV_SYNC_CTE_ENABLED)) {
 		LOG_ERR("Received PA CTE report when CTE receive disabled");
 		return -EINVAL;
 	}
@@ -420,7 +421,7 @@ int hci_df_vs_prepare_connectionless_iq_report(struct net_buf *buf,
 		return -EINVAL;
 	}
 
-	if (!atomic_test_bit(per_adv_sync->flags, BT_PER_ADV_SYNC_CTE_ENABLED)) {
+	if (!bt_atomic_test_bit(per_adv_sync->flags, BT_PER_ADV_SYNC_CTE_ENABLED)) {
 		LOG_ERR("Received PA CTE report when CTE receive disabled");
 		return -EINVAL;
 	}
@@ -512,7 +513,7 @@ static int hci_df_set_conn_cte_tx_param(struct bt_conn *conn,
 		return -EINVAL;
 	}
 
-	buf = bt_hci_cmd_alloc(K_FOREVER);
+	buf = bt_hci_cmd_alloc(BT_FOREVER);
 	if (!buf) {
 		return -ENOBUFS;
 	}
@@ -557,7 +558,7 @@ static int prepare_conn_cte_rx_enable_cmd_params(struct net_buf **buf, struct bt
 	/* If CTE Rx is enabled, command parameters total length must include
 	 * antenna ids, so command size if extended by num_and_ids.
 	 */
-	*buf = bt_hci_cmd_alloc(K_FOREVER);
+	*buf = bt_hci_cmd_alloc(BT_FOREVER);
 	if (!(*buf)) {
 		return -ENOBUFS;
 	}
@@ -631,7 +632,7 @@ static int hci_df_set_conn_cte_rx_enable(struct bt_conn *conn, bool enable,
 		 * params must be set at least once for connection object to successfully execute
 		 * CTE REQ procedure.
 		 */
-		atomic_set_bit(conn->flags, BT_CONN_CTE_RX_PARAMS_SET);
+		bt_atomic_set_bit(conn->flags, BT_CONN_CTE_RX_PARAMS_SET);
 	}
 
 	net_buf_unref(rsp);
@@ -660,7 +661,7 @@ int hci_df_prepare_connection_iq_report(struct net_buf *buf,
 		return -EINVAL;
 	}
 
-	if (!atomic_test_bit(conn->flags, BT_CONN_CTE_RX_ENABLED)) {
+	if (!bt_atomic_test_bit(conn->flags, BT_CONN_CTE_RX_ENABLED)) {
 		LOG_ERR("Received conn CTE report when CTE receive disabled");
 		bt_conn_unref(conn);
 		return -EINVAL;
@@ -712,7 +713,7 @@ int hci_df_vs_prepare_connection_iq_report(struct net_buf *buf,
 		return -EINVAL;
 	}
 
-	if (!atomic_test_bit(conn->flags, BT_CONN_CTE_RX_ENABLED)) {
+	if (!bt_atomic_test_bit(conn->flags, BT_CONN_CTE_RX_ENABLED)) {
 		LOG_ERR("Received conn CTE report when CTE receive disabled");
 		bt_conn_unref(conn);
 		return -EINVAL;
@@ -790,7 +791,7 @@ static int hci_df_set_conn_cte_req_enable(struct bt_conn *conn, bool enable,
 		return -EINVAL;
 	}
 
-	buf = bt_hci_cmd_alloc(K_FOREVER);
+	buf = bt_hci_cmd_alloc(BT_FOREVER);
 	if (!buf) {
 		return -ENOBUFS;
 	}
@@ -835,7 +836,7 @@ int hci_df_prepare_conn_cte_req_failed(struct net_buf *buf,
 		return -EINVAL;
 	}
 
-	if (!atomic_test_bit(conn->flags, BT_CONN_CTE_REQ_ENABLED)) {
+	if (!bt_atomic_test_bit(conn->flags, BT_CONN_CTE_REQ_ENABLED)) {
 		LOG_ERR("Received conn CTE request notification when CTE REQ disabled");
 		bt_conn_unref(conn);
 		return -EINVAL;
@@ -875,7 +876,7 @@ static int hci_df_set_conn_cte_rsp_enable(struct bt_conn *conn, bool enable)
 	struct net_buf *buf, *rsp;
 	int err;
 
-	buf = bt_hci_cmd_alloc(K_FOREVER);
+	buf = bt_hci_cmd_alloc(BT_FOREVER);
 	if (!buf) {
 		return -ENOBUFS;
 	}
@@ -942,11 +943,11 @@ int bt_df_set_adv_cte_tx_param(struct bt_le_ext_adv *adv,
 	/* Check if BT_ADV_PARAMS_SET is set, because it implies the set
 	 * has already been created.
 	 */
-	if (!atomic_test_bit(adv->flags, BT_ADV_PARAMS_SET)) {
+	if (!bt_atomic_test_bit(adv->flags, BT_ADV_PARAMS_SET)) {
 		return -EINVAL;
 	}
 
-	if (atomic_test_bit(adv->flags, BT_PER_ADV_CTE_ENABLED)) {
+	if (bt_atomic_test_bit(adv->flags, BT_PER_ADV_CTE_ENABLED)) {
 		return -EINVAL;
 	}
 
@@ -955,22 +956,22 @@ int bt_df_set_adv_cte_tx_param(struct bt_le_ext_adv *adv,
 		return err;
 	}
 
-	atomic_set_bit(adv->flags, BT_PER_ADV_CTE_PARAMS_SET);
+	bt_atomic_set_bit(adv->flags, BT_PER_ADV_CTE_PARAMS_SET);
 
 	return 0;
 }
 
 static int bt_df_set_adv_cte_tx_enabled(struct bt_le_ext_adv *adv, bool enable)
 {
-	if (!atomic_test_bit(adv->flags, BT_PER_ADV_PARAMS_SET)) {
+	if (!bt_atomic_test_bit(adv->flags, BT_PER_ADV_PARAMS_SET)) {
 		return -EINVAL;
 	}
 
-	if (!atomic_test_bit(adv->flags, BT_PER_ADV_CTE_PARAMS_SET)) {
+	if (!bt_atomic_test_bit(adv->flags, BT_PER_ADV_CTE_PARAMS_SET)) {
 		return -EINVAL;
 	}
 
-	if (enable == atomic_test_bit(adv->flags, BT_PER_ADV_CTE_ENABLED)) {
+	if (enable == bt_atomic_test_bit(adv->flags, BT_PER_ADV_CTE_ENABLED)) {
 		return -EALREADY;
 	}
 
@@ -998,12 +999,12 @@ bt_df_set_per_adv_sync_cte_rx_enable(struct bt_le_per_adv_sync *sync, bool enabl
 		return -ENOTSUP;
 	}
 
-	if (!atomic_test_bit(sync->flags, BT_PER_ADV_SYNC_SYNCED)) {
+	if (!bt_atomic_test_bit(sync->flags, BT_PER_ADV_SYNC_SYNCED)) {
 		return -EINVAL;
 	}
 
 	if (!enable &&
-	    !atomic_test_bit(sync->flags, BT_PER_ADV_SYNC_CTE_ENABLED)) {
+	    !bt_atomic_test_bit(sync->flags, BT_PER_ADV_SYNC_CTE_ENABLED)) {
 		return -EALREADY;
 	}
 
@@ -1089,7 +1090,7 @@ int bt_df_set_conn_cte_tx_param(struct bt_conn *conn, const struct bt_df_conn_ct
 		return -ENOTCONN;
 	}
 
-	if (atomic_test_bit(conn->flags, BT_CONN_CTE_RSP_ENABLED)) {
+	if (bt_atomic_test_bit(conn->flags, BT_CONN_CTE_RSP_ENABLED)) {
 		LOG_WRN("CTE response procedure is enabled");
 		return -EINVAL;
 	}
@@ -1112,7 +1113,7 @@ static int bt_df_set_conn_cte_req_enable(struct bt_conn *conn, bool enable,
 		return -ENOTCONN;
 	}
 
-	if (!atomic_test_bit(conn->flags, BT_CONN_CTE_RX_PARAMS_SET)) {
+	if (!bt_atomic_test_bit(conn->flags, BT_CONN_CTE_RX_PARAMS_SET)) {
 		LOG_ERR("Can't start CTE request procedure before CTE RX params setup");
 		return -EINVAL;
 	}
@@ -1160,7 +1161,7 @@ static int bt_df_set_conn_cte_rsp_enable(struct bt_conn *conn, bool enable)
 		return -ENOTCONN;
 	}
 
-	if (!atomic_test_bit(conn->flags, BT_CONN_CTE_TX_PARAMS_SET)) {
+	if (!bt_atomic_test_bit(conn->flags, BT_CONN_CTE_TX_PARAMS_SET)) {
 		LOG_ERR("Can't start CTE response procedure before CTE TX params setup");
 		return -EINVAL;
 	}

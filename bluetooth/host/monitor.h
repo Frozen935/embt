@@ -8,7 +8,9 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-#include <base/base.h>
+#include <string.h>
+#include <embt/base/assert.h>
+#include <embt/base/util_macro.h>
 #include <stdint.h>
 
 #include <embt/net_buf.h>
@@ -110,6 +112,14 @@ static inline uint8_t bt_monitor_opcode(uint8_t type, enum bt_monitor_dir dir)
 }
 
 /* TODO: Remove guard and replace with IS_ENABLED(CONFIG_BT_MONITOR) */
+struct bt_monitor_data;
+/** @brief Emit a complete monitor record to the selected platform sink. */
+typedef int (*bt_monitor_sink_t)(const struct bt_monitor_data *frags, size_t count, void *context);
+/** @brief Install a persistent sink during serialized lifecycle setup. */
+int bt_monitor_init(bt_monitor_sink_t sink, void *context);
+/** @brief Feed text explicitly; no process-wide stdout hooks are installed. */
+int bt_monitor_console_out(int c);
+
 #if defined(CONFIG_BT_MONITOR)
 
 void bt_monitor_send(uint16_t opcode, const void *data, size_t len);

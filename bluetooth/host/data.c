@@ -4,7 +4,7 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-#include <base/base.h>
+#include <embt/base/assert.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>

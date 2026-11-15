@@ -7,16 +7,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <stdio.h>
+#include <embt/base/base.h>
 #include <errno.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
 
-#include <zephyr/bluetooth/uuid.h>
-#include <zephyr/sys/__assert.h>
-#include <zephyr/sys/byteorder.h>
-#include <zephyr/sys/printk.h>
-#include <zephyr/sys/uuid.h>
+#include <embt/bluetooth/uuid.h>
+#include <embt/base/assert.h>
+#include <embt/base/byteorder.h>
+#include <embt/base/uuid.h>
 
 #define BT_UUID_STR_LEN_16  4U
 #define BT_UUID_STR_LEN_32  8U
@@ -141,12 +142,12 @@ void bt_uuid_to_str(const struct bt_uuid *uuid, char *str, size_t len)
 
 	switch (uuid->type) {
 	case BT_UUID_TYPE_16:
-		err = snprintk(str, len, "%04x", BT_UUID_16(uuid)->val);
+		err = snprintf(str, len, "%04x", BT_UUID_16(uuid)->val);
 		__ASSERT(err == BT_UUID_STR_LEN_16,
 			 "Unexpected snprintk result: %d", err);
 		break;
 	case BT_UUID_TYPE_32:
-		err = snprintk(str, len, "%08x", BT_UUID_32(uuid)->val);
+		err = snprintf(str, len, "%08x", BT_UUID_32(uuid)->val);
 		__ASSERT(err == BT_UUID_STR_LEN_32,
 			 "Unexpected snprintk result: %d", err);
 		break;
@@ -160,7 +161,7 @@ void bt_uuid_to_str(const struct bt_uuid *uuid, char *str, size_t len)
 			return;
 		}
 
-		err = snprintk(str, len, "%s", full);
+		err = snprintf(str, len, "%s", full);
 		__ASSERT(err == BT_UUID_STR_LEN_128,
 			 "Unexpected snprintk result: %d", err);
 		break;

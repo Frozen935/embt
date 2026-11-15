@@ -12,9 +12,9 @@
 #include <stdint.h>
 #include <string.h>
 
-#include <zephyr/sys/barrier.h>
-#include <zephyr/sys/ring_buffer.h>
-#include <zephyr/sys/util.h>
+#include <embt/base/atomic.h>
+#include <embt/base/ring_buffer.h>
+#include <embt/base/util.h>
 
 struct bt_monitor_data {
 	const void *data;
@@ -49,7 +49,7 @@ static inline bool bt_monitor_ring_buf_put(struct ring_buf *buf,
 	 * have been freed by a consumer on another CPU, whose data reads must
 	 * complete before the writes below reuse it.
 	 */
-	barrier_dmem_fence_full();
+	__atomic_thread_fence(__ATOMIC_SEQ_CST);
 
 	/* The space check guarantees that the writes below always fit, and
 	 * the single commit makes the complete record visible to the
@@ -74,7 +74,7 @@ static inline bool bt_monitor_ring_buf_put(struct ring_buf *buf,
 	/* Make the record bytes visible before the commit publishes them
 	 * (pairs with bt_monitor_ring_buf_get_ptr()).
 	 */
-	barrier_dmem_fence_full();
+	__atomic_thread_fence(__ATOMIC_SEQ_CST);
 	ring_buf_commit(buf, total);
 
 	return true;
@@ -89,7 +89,7 @@ static inline uint32_t bt_monitor_ring_buf_get_ptr(struct ring_buf *buf, uint8_t
 	uint32_t len = ring_buf_get_ptr(buf, data, 0);
 
 	/* Order the index load against the data reads that follow */
-	barrier_dmem_fence_full();
+	__atomic_thread_fence(__ATOMIC_SEQ_CST);
 
 	return len;
 }
@@ -97,7 +97,7 @@ static inline uint32_t bt_monitor_ring_buf_get_ptr(struct ring_buf *buf, uint8_t
 static inline void bt_monitor_ring_buf_consume(struct ring_buf *buf, uint32_t size)
 {
 	/* Order the data reads against the space becoming reusable */
-	barrier_dmem_fence_full();
+	__atomic_thread_fence(__ATOMIC_SEQ_CST);
 	ring_buf_consume(buf, size);
 }
 

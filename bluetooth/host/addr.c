@@ -5,13 +5,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <embt/base/assert.h>
 #include <errno.h>
 #include <stdbool.h>
 #include <string.h>
 
-#include <zephyr/bluetooth/addr.h>
-#include <zephyr/bluetooth/crypto.h>
-#include <zephyr/sys/util.h>
+#include <embt/bluetooth/addr.h>
+#include <embt/bluetooth/crypto.h>
+#include <embt/base/util.h>
 
 #include "keys.h"
 

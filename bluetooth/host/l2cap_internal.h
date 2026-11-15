@@ -7,15 +7,16 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
+#include <embt/base/time.h>
+#include <string.h>
+#include <embt/base/assert.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/l2cap.h>
-#include <zephyr/net_buf.h>
-#include <zephyr/sys/iterable_sections.h>
-
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/l2cap.h>
+#include <embt/net_buf.h>
 #include "host/classic/l2cap_br_interface.h"
 /* TODO: we should include conn_internal.h for bt_conn_tx_cb_t but that causes redefinitions */
 
@@ -180,10 +181,10 @@ void bt_l2cap_security_changed(struct bt_conn *conn, uint8_t hci_status);
 /* Prepare an L2CAP PDU to be sent over a connection */
 struct net_buf *bt_l2cap_create_pdu_timeout(struct net_buf_pool *pool,
 					    size_t reserve,
-					    k_timeout_t timeout);
+					    bt_timeout_t timeout);
 
 #define bt_l2cap_create_pdu(_pool, _reserve) \
-	bt_l2cap_create_pdu_timeout(_pool, _reserve, K_FOREVER)
+	bt_l2cap_create_pdu_timeout(_pool, _reserve, BT_FOREVER)
 
 /* Send L2CAP PDU over a connection
  *

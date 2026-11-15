@@ -7,13 +7,20 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <common/assert.h>
+#include <base/base.h>
+#include <base/work.h>
+#include <base/fifo.h>
+#include <embt/types/timeout.h>
+#include <base/assert.h>
+#include <embt/sys/util_macro.h>
 #include <errno.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
 
-#include <zephyr/autoconf.h>
+#include <embt/autoconf.h>
 #include <zephyr/bluetooth/buf.h>
 #include <zephyr/bluetooth/gap.h>
 #include <zephyr/bluetooth/hci.h>
@@ -23,15 +30,14 @@
 #include <zephyr/bluetooth/iso.h>
 #include <embt/base/log.h>
 #include <zephyr/net_buf.h>
-#include <zephyr/sys/__assert.h>
-#include <zephyr/sys/atomic.h>
+#include <base/assert.h>
+#include <base/atomic.h>
 #include <zephyr/sys/byteorder.h>
 #include <zephyr/sys/slist.h>
 #include <zephyr/sys/util.h>
 #include <zephyr/sys/util_macro.h>
-#include <zephyr/toolchain.h>
+#include <embt/compiler.h>
 
-#include "common/assert.h"
 #include "host/buf_view.h"
 #include "host/hci_core.h"
 #include "host/conn_internal.h"
@@ -48,13 +54,13 @@ LOG_MODULE_REGISTER(bt_iso, CONFIG_BT_ISO_LOG_LEVEL);
 #define iso_chan(_iso) ((_iso)->iso.chan);
 
 #if defined(CONFIG_BT_ISO_RX)
-static atomic_ptr_t buf_rx_freed_cb;
+static bt_atomic_ptr_t buf_rx_freed_cb;
 
 static void iso_rx_buf_destroy(struct net_buf *buf)
 {
 	bt_iso_buf_rx_freed_cb_t cb;
 
-	cb = (bt_iso_buf_rx_freed_cb_t)atomic_ptr_get(&buf_rx_freed_cb);
+	cb = (bt_iso_buf_rx_freed_cb_t)bt_atomic_ptr_get(&buf_rx_freed_cb);
 
 	net_buf_destroy(buf);
 
@@ -227,7 +233,7 @@ static int hci_le_setup_iso_data_path(const struct bt_conn *iso, uint8_t dir,
 	uint8_t *cc;
 	int err;
 
-	buf = bt_hci_cmd_alloc(K_FOREVER);
+	buf = bt_hci_cmd_alloc(BT_FOREVER);
 	if (!buf) {
 		return -ENOBUFS;
 	}
@@ -266,7 +272,7 @@ static void bt_iso_chan_add(struct bt_conn *iso, struct bt_iso_chan *chan)
 	chan->iso = iso;
 	iso->iso.chan = chan;
 #if defined(CONFIG_BT_ISO_TX)
-	k_fifo_init(&iso->iso.txq);
+	bt_fifo_init(&iso->iso.txq);
 #endif /* CONFIG_BT_ISO_TX */
 
 	LOG_DBG("iso %p chan %p", iso, chan);
@@ -376,7 +382,7 @@ static int hci_le_remove_iso_data_path(struct bt_conn *iso, uint8_t dir)
 	struct net_buf *buf, *rsp;
 	int err;
 
-	buf = bt_hci_cmd_alloc(K_FOREVER);
+	buf = bt_hci_cmd_alloc(BT_FOREVER);
 	if (!buf) {
 		return -ENOBUFS;
 	}
@@ -500,13 +506,17 @@ static void bt_iso_chan_disconnected(struct bt_iso_chan *chan, uint8_t reason)
 	struct net_buf *buf;
 
 	/* What is still queued has not been sent in full */
-	while ((buf = k_fifo_get(&chan->iso->iso.txq, K_NO_WAIT))) {
+	while ((buf = bt_fifo_get(&chan->iso->iso.txq, BT_NO_WAIT))) {
 		__ASSERT_NO_MSG(!bt_buf_has_view(buf));
 		net_buf_unref(buf);
 
 		if (chan->ops->send_failed != NULL) {
 			chan->ops->send_failed(chan, -ESHUTDOWN);
 		}
+	}
+	/* A configured central CIS keeps its queue across reconnects. */
+	if (chan->iso->iso.info.type != BT_ISO_CHAN_TYPE_CENTRAL) {
+		bt_base_require(bt_fifo_deinit(&chan->iso->iso.txq));
 	}
 #endif /* CONFIG_BT_ISO_TX */
 
@@ -666,7 +676,7 @@ int bt_iso_chan_get_info(const struct bt_iso_chan *chan, struct bt_iso_info *inf
 }
 
 #if defined(CONFIG_BT_ISO_RX)
-struct net_buf *bt_iso_get_rx(k_timeout_t timeout)
+struct net_buf *bt_iso_get_rx(bt_timeout_t timeout)
 {
 	struct net_buf *buf = net_buf_alloc(&iso_rx_pool, timeout);
 
@@ -679,7 +689,7 @@ struct net_buf *bt_iso_get_rx(k_timeout_t timeout)
 
 void bt_iso_buf_rx_freed_cb_set(bt_iso_buf_rx_freed_cb_t cb)
 {
-	atomic_ptr_set(&buf_rx_freed_cb, (void *)cb);
+	bt_atomic_ptr_set(&buf_rx_freed_cb, (void *)cb);
 }
 
 void bt_iso_recv(struct bt_conn *iso, struct net_buf *buf, uint8_t flags)
@@ -861,7 +871,7 @@ static bool iso_has_data(struct bt_conn *conn)
 {
 #if defined(CONFIG_BT_ISO_TX)
 	return ((conn->iso.chan->state == BT_ISO_STATE_CONNECTED) &&
-		!k_fifo_is_empty(&conn->iso.txq));
+		!bt_fifo_is_empty(&conn->iso.txq));
 #else  /* !CONFIG_BT_ISO_TX */
 	return false;
 #endif /* CONFIG_BT_ISO_TX */
@@ -875,7 +885,7 @@ static struct net_buf *iso_data_pull(struct bt_conn *conn, size_t amount, size_t
 	/* Leave the PDU buffer in the queue until we have sent all its
 	 * fragments.
 	 */
-	struct net_buf *q_frag = k_fifo_peek_head(&conn->iso.txq);
+	struct net_buf *q_frag = bt_fifo_peek_head(&conn->iso.txq);
 
 	if (!q_frag) {
 		BT_ISO_DATA_DBG("signaled ready but no frag available");
@@ -908,7 +918,7 @@ static struct net_buf *iso_data_pull(struct bt_conn *conn, size_t amount, size_t
 	bool last_frag = amount >= frag->len;
 
 	if (last_frag) {
-		q_frag = k_fifo_get(&conn->iso.txq, K_NO_WAIT);
+		q_frag = bt_fifo_get(&conn->iso.txq, BT_NO_WAIT);
 
 		BT_ISO_DATA_DBG("last frag, pop buf");
 		__ASSERT_NO_MSG(q_frag == frag);
@@ -953,7 +963,7 @@ int conn_iso_send(struct bt_conn *conn, struct net_buf *buf, enum bt_iso_timesta
 		return -EINVAL;
 	}
 
-	k_fifo_put(&conn->iso.txq, buf);
+	bt_fifo_put(&conn->iso.txq, buf);
 	BT_ISO_DATA_DBG("%p put on list", buf);
 
 	/* only one ISO channel per conn-object */
@@ -1137,7 +1147,7 @@ int bt_iso_chan_get_tx_sync(const struct bt_iso_chan *chan, struct bt_iso_tx_inf
 		return -ENOTCONN;
 	}
 
-	buf = bt_hci_cmd_alloc(K_FOREVER);
+	buf = bt_hci_cmd_alloc(BT_FOREVER);
 	if (!buf) {
 		return -ENOMEM;
 	}
@@ -1242,7 +1252,7 @@ void bt_iso_cleanup_acl(struct bt_conn *iso)
 			LOG_DBG("Trigger disconnect work for ACL %p", acl);
 
 			__maybe_unused const int err =
-				bt_work_schedule(&acl->deferred_work, K_NO_WAIT);
+				bt_host_work_schedule(&acl->deferred_work, BT_NO_WAIT);
 
 			__ASSERT(err >= 0, "Failed to retrigger conn->deferred_work for %p", acl);
 		}
@@ -1612,7 +1622,7 @@ static int hci_le_reject_cis(uint16_t handle, uint8_t reason)
 	struct net_buf *buf;
 	int err;
 
-	buf = bt_hci_cmd_alloc(K_FOREVER);
+	buf = bt_hci_cmd_alloc(BT_FOREVER);
 	if (!buf) {
 		return -ENOBUFS;
 	}
@@ -1635,7 +1645,7 @@ static int hci_le_accept_cis(uint16_t handle)
 	struct net_buf *buf;
 	int err;
 
-	buf = bt_hci_cmd_alloc(K_FOREVER);
+	buf = bt_hci_cmd_alloc(BT_FOREVER);
 	if (!buf) {
 		return -ENOBUFS;
 	}
@@ -1717,6 +1727,9 @@ void hci_le_cis_req(struct net_buf *buf)
 	err = hci_le_accept_cis(cis_handle);
 	if (err) {
 		bt_iso_cleanup_acl(iso);
+#if defined(CONFIG_BT_ISO_TX)
+		bt_base_require(bt_fifo_deinit(&iso->iso.txq));
+#endif
 		bt_conn_unref(iso);
 		hci_le_reject_cis(cis_handle, BT_HCI_ERR_INSUFFICIENT_RESOURCES);
 		return;
@@ -1771,7 +1784,7 @@ static int hci_le_remove_cig(uint8_t cig_id)
 	struct bt_hci_cp_le_remove_cig *req;
 	struct net_buf *buf;
 
-	buf = bt_hci_cmd_alloc(K_FOREVER);
+	buf = bt_hci_cmd_alloc(BT_FOREVER);
 	if (!buf) {
 		return -ENOBUFS;
 	}
@@ -1794,7 +1807,7 @@ static struct net_buf *hci_le_set_cig_params(const struct bt_iso_cig *cig,
 	struct net_buf *rsp;
 	int i, err;
 
-	buf = bt_hci_cmd_alloc(K_FOREVER);
+	buf = bt_hci_cmd_alloc(BT_FOREVER);
 	if (!buf) {
 		return NULL;
 	}
@@ -1882,7 +1895,7 @@ static struct net_buf *hci_le_set_cig_test_params(const struct bt_iso_cig *cig,
 	struct net_buf *rsp;
 	int err;
 
-	buf = bt_hci_cmd_alloc(K_FOREVER);
+	buf = bt_hci_cmd_alloc(BT_FOREVER);
 	if (!buf) {
 		return NULL;
 	}
@@ -2070,6 +2083,11 @@ static void cleanup_cig(struct bt_iso_cig *cig)
 	struct bt_iso_chan *cis, *tmp;
 
 	SYS_SLIST_FOR_EACH_CONTAINER_SAFE(&cig->cis_channels, cis, tmp, node) {
+#if defined(CONFIG_BT_ISO_TX)
+		if (cis->iso) {
+			bt_base_require(bt_fifo_deinit(&cis->iso->iso.txq));
+		}
+#endif
 		bt_conn_drop(&cis->iso);
 
 		sys_slist_remove(&cig->cis_channels, NULL, &cis->node);
@@ -2312,6 +2330,11 @@ static void restore_cig(struct bt_iso_cig *cig, uint8_t existing_num_cis)
 		 * bt_iso_cig_reconfigure was called
 		 */
 		if (cis->iso != NULL && cis->iso->iso.info.unicast.cis_id >= existing_num_cis) {
+#if defined(CONFIG_BT_ISO_TX)
+			if (cis->iso) {
+				bt_base_require(bt_fifo_deinit(&cis->iso->iso.txq));
+			}
+#endif
 			bt_conn_drop(&cis->iso);
 
 			sys_slist_remove(&cig->cis_channels, NULL, &cis->node);
@@ -2441,7 +2464,7 @@ static int hci_le_create_cis(const struct bt_iso_connect_param *param, size_t co
 	struct bt_hci_cp_le_create_cis *req;
 	struct net_buf *buf;
 
-	buf = bt_hci_cmd_alloc(K_FOREVER);
+	buf = bt_hci_cmd_alloc(BT_FOREVER);
 	if (!buf) {
 		return -ENOBUFS;
 	}
@@ -2578,7 +2601,7 @@ static struct bt_iso_big *get_free_big(void)
 	 */
 
 	for (size_t i = 0; i < ARRAY_SIZE(bigs); i++) {
-		if (!atomic_test_and_set_bit(bigs[i].flags, BT_BIG_INITIALIZED)) {
+		if (!bt_atomic_test_and_set_bit(bigs[i].flags, BT_BIG_INITIALIZED)) {
 			bigs[i].handle = i;
 			sys_slist_init(&bigs[i].bis_channels);
 			return &bigs[i];
@@ -2593,7 +2616,7 @@ static struct bt_iso_big *get_free_big(void)
 static struct bt_iso_big *big_lookup_flag(int bit)
 {
 	for (size_t i = 0; i < ARRAY_SIZE(bigs); i++) {
-		if (atomic_test_bit(bigs[i].flags, bit)) {
+		if (bt_atomic_test_bit(bigs[i].flags, bit)) {
 			return &bigs[i];
 		}
 	}
@@ -2608,6 +2631,11 @@ static void cleanup_big(struct bt_iso_big *big)
 	struct bt_iso_chan *bis, *tmp;
 
 	SYS_SLIST_FOR_EACH_CONTAINER_SAFE(&big->bis_channels, bis, tmp, node) {
+#if defined(CONFIG_BT_ISO_TX)
+		if (bis->iso) {
+			bt_base_require(bt_fifo_deinit(&bis->iso->iso.txq));
+		}
+#endif
 		bt_conn_drop(&bis->iso);
 
 		sys_slist_remove(&big->bis_channels, NULL, &bis->node);
@@ -2620,7 +2648,7 @@ static void big_disconnect(struct bt_iso_big *big, uint8_t reason)
 {
 	struct bt_iso_chan *bis;
 
-	atomic_set_bit(big->flags, BT_BIG_BUSY);
+	bt_atomic_set_bit(big->flags, BT_BIG_BUSY);
 
 	SYS_SLIST_FOR_EACH_CONTAINER(&big->bis_channels, bis, node) {
 		bis->iso->err = reason;
@@ -2709,7 +2737,7 @@ static int hci_le_create_big(struct bt_le_ext_adv *padv, struct bt_iso_big *big,
 	int err;
 	struct bt_iso_chan *bis;
 
-	buf = bt_hci_cmd_alloc(K_FOREVER);
+	buf = bt_hci_cmd_alloc(BT_FOREVER);
 
 	if (!buf) {
 		return -ENOBUFS;
@@ -2769,7 +2797,7 @@ static int hci_le_create_big_test(const struct bt_le_ext_adv *padv, struct bt_is
 	struct net_buf *buf;
 	int err;
 
-	buf = bt_hci_cmd_alloc(K_FOREVER);
+	buf = bt_hci_cmd_alloc(BT_FOREVER);
 
 	if (!buf) {
 		return -ENOBUFS;
@@ -2974,7 +3002,7 @@ int bt_iso_big_create(struct bt_le_ext_adv *padv, struct bt_iso_big_create_param
 		return -EINVAL;
 	}
 
-	if (!atomic_test_bit(padv->flags, BT_PER_ADV_PARAMS_SET)) {
+	if (!bt_atomic_test_bit(padv->flags, BT_PER_ADV_PARAMS_SET)) {
 		LOG_DBG("PA params not set; invalid adv object");
 		return -EINVAL;
 	}
@@ -3084,7 +3112,7 @@ void hci_le_big_complete(struct net_buf *buf)
 	}
 
 	big = lookup_big_by_handle(evt->big_handle);
-	atomic_clear_bit(big->flags, BT_BIG_PENDING);
+	bt_atomic_clear_bit(big->flags, BT_BIG_PENDING);
 
 	LOG_DBG("BIG[%u] %p completed, status 0x%02x %s", big->handle, big, evt->status,
 		bt_hci_err_to_str(evt->status));
@@ -3098,7 +3126,7 @@ void hci_le_big_complete(struct net_buf *buf)
 		return;
 	}
 
-	atomic_set_bit(big->flags, BT_BIG_BUSY);
+	bt_atomic_set_bit(big->flags, BT_BIG_BUSY);
 	i = 0;
 	SYS_SLIST_FOR_EACH_CONTAINER(&big->bis_channels, bis, node) {
 		const uint16_t handle = evt->handle[i++];
@@ -3109,7 +3137,7 @@ void hci_le_big_complete(struct net_buf *buf)
 		bt_conn_set_state(iso_conn, BT_CONN_CONNECTED);
 	}
 
-	atomic_clear_bit(big->flags, BT_BIG_BUSY);
+	bt_atomic_clear_bit(big->flags, BT_BIG_BUSY);
 
 	if (!sys_slist_is_empty(&iso_big_cbs)) {
 		struct bt_iso_big_cb *listener;
@@ -3145,7 +3173,7 @@ static int hci_le_terminate_big(struct bt_iso_big *big)
 	struct bt_hci_cp_le_terminate_big *req;
 	struct net_buf *buf;
 
-	buf = bt_hci_cmd_alloc(K_FOREVER);
+	buf = bt_hci_cmd_alloc(BT_FOREVER);
 	if (!buf) {
 		return -ENOBUFS;
 	}
@@ -3165,7 +3193,7 @@ static int hci_le_big_sync_term(struct bt_iso_big *big)
 	struct net_buf *rsp;
 	int err;
 
-	buf = bt_hci_cmd_alloc(K_FOREVER);
+	buf = bt_hci_cmd_alloc(BT_FOREVER);
 	if (!buf) {
 		return -ENOBUFS;
 	}
@@ -3197,12 +3225,12 @@ int bt_iso_big_terminate(struct bt_iso_big *big)
 		return -EINVAL;
 	}
 
-	if (!atomic_test_bit(big->flags, BT_BIG_INITIALIZED) || !big->num_bis) {
+	if (!bt_atomic_test_bit(big->flags, BT_BIG_INITIALIZED) || !big->num_bis) {
 		LOG_DBG("BIG not initialized");
 		return -EINVAL;
 	}
 
-	if (atomic_test_bit(big->flags, BT_BIG_BUSY)) {
+	if (bt_atomic_test_bit(big->flags, BT_BIG_BUSY)) {
 		LOG_DBG("BIG %p is busy", big);
 		return -EBUSY;
 	}
@@ -3291,7 +3319,7 @@ void hci_le_big_sync_established(struct net_buf *buf)
 	}
 
 	big = lookup_big_by_handle(evt->big_handle);
-	atomic_clear_bit(big->flags, BT_BIG_SYNCING);
+	bt_atomic_clear_bit(big->flags, BT_BIG_SYNCING);
 
 	LOG_DBG("BIG[%u] %p sync established, status 0x%02x %s", big->handle, big, evt->status,
 		bt_hci_err_to_str(evt->status));
@@ -3305,7 +3333,7 @@ void hci_le_big_sync_established(struct net_buf *buf)
 		return;
 	}
 
-	atomic_set_bit(big->flags, BT_BIG_BUSY);
+	bt_atomic_set_bit(big->flags, BT_BIG_BUSY);
 	i = 0;
 	SYS_SLIST_FOR_EACH_CONTAINER(&big->bis_channels, bis, node) {
 		const uint16_t handle = evt->handle[i++];
@@ -3316,7 +3344,7 @@ void hci_le_big_sync_established(struct net_buf *buf)
 		bt_conn_set_state(iso_conn, BT_CONN_CONNECTED);
 	}
 
-	atomic_clear_bit(big->flags, BT_BIG_BUSY);
+	bt_atomic_clear_bit(big->flags, BT_BIG_BUSY);
 
 	if (!sys_slist_is_empty(&iso_big_cbs)) {
 		struct bt_iso_big_cb *listener;
@@ -3355,7 +3383,7 @@ static int hci_le_big_create_sync(const struct bt_le_per_adv_sync *sync, struct 
 	int err;
 	uint8_t bit_idx = 0;
 
-	buf = bt_hci_cmd_alloc(K_FOREVER);
+	buf = bt_hci_cmd_alloc(BT_FOREVER);
 	if (!buf) {
 		return -ENOBUFS;
 	}
@@ -3419,7 +3447,7 @@ int bt_iso_big_sync(struct bt_le_per_adv_sync *sync, struct bt_iso_big_sync_para
 		return -EINVAL;
 	}
 
-	if (!atomic_test_bit(sync->flags, BT_PER_ADV_SYNC_SYNCED)) {
+	if (!bt_atomic_test_bit(sync->flags, BT_PER_ADV_SYNC_SYNCED)) {
 		LOG_DBG("PA sync not synced");
 		return -EINVAL;
 	}
@@ -3483,7 +3511,7 @@ int bt_iso_big_sync(struct bt_le_per_adv_sync *sync, struct bt_iso_big_sync_para
 	bitfield_copy = param->bis_bitfield;
 	bis_channels = param->bis_channels;
 	for (uint8_t i = 0; i < param->num_bis; i++) {
-		const uint8_t bis_number = find_lsb_set(bitfield_copy);
+		const uint8_t bis_number = __builtin_ffs((int)bitfield_copy);
 
 		/* pop the least significant bit from the bitfield */
 		bitfield_copy &= ~BIT(bis_number - 1U);
@@ -3491,7 +3519,7 @@ int bt_iso_big_sync(struct bt_le_per_adv_sync *sync, struct bt_iso_big_sync_para
 		/* The least significant bit will be the bis_number, so that if the bitfield is
 		 * 0b0101 then the first pop will be 1 and the bitfield_copy will be 0b0100 and
 		 * then the second pop will be 3 and the bitfield_copy will be 0b0000
-		 * Since find_lsb_set returns the index starting from 1 we can use the result
+		 * Since __builtin_ffs returns the index starting from 1 we can use the result
 		 * directly as the bis_numbers also start from 1.
 		 */
 		err = big_init_bis(big, bis_channels[i], bis_number, false);
@@ -3549,4 +3577,11 @@ void bt_iso_reset(void)
 		big_disconnect(big, BT_HCI_ERR_UNSPECIFIED);
 	}
 #endif /* CONFIG_BT_ISO_BROADCAST */
+}
+
+void bt_iso_init(void)
+{
+#if defined(CONFIG_BT_ISO_RX)
+	net_buf_pool_init(&iso_rx_pool);
+#endif
 }

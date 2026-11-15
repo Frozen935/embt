@@ -1,14 +1,17 @@
 /* att_internal.h - Attribute protocol handling */
 
+#include <embt/base/time.h>
+#include <string.h>
+#include <embt/base/assert.h>
 #include <stdint.h>
 #include <stddef.h>
 
-#include <zephyr/bluetooth/att.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/l2cap.h>
-#include <zephyr/net_buf.h>
-#include <zephyr/sys/slist.h>
-#include <zephyr/sys/util.h>
+#include <embt/bluetooth/att.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/l2cap.h>
+#include <embt/net_buf.h>
+#include <embt/base/slist.h>
+#include <embt/base/util.h>
 
 /*
  * Copyright (c) 2015-2016 Intel Corporation
@@ -19,7 +22,7 @@
 #define BT_EATT_PSM		0x27
 #define BT_ATT_DEFAULT_LE_MTU	23
 #define BT_ATT_TIMEOUT_SEC	30
-#define BT_ATT_TIMEOUT		K_SECONDS(BT_ATT_TIMEOUT_SEC)
+#define BT_ATT_TIMEOUT		BT_SECONDS(BT_ATT_TIMEOUT_SEC)
 
 /* Local ATT Rx MTU
  *
@@ -307,7 +310,7 @@ struct net_buf *bt_att_create_pdu(struct bt_conn *conn, uint8_t op,
 				  size_t len);
 
 /* Allocate a new request */
-struct bt_att_req *bt_att_req_alloc(k_timeout_t timeout);
+struct bt_att_req *bt_att_req_alloc(bt_timeout_t timeout);
 
 /* Free a request */
 void bt_att_req_free(struct bt_att_req *req);

@@ -10,18 +10,25 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <embt/base/fifo.h>
+#include <embt/base/work.h>
+#include <embt/base/spinlock.h>
+#include <embt/base/time.h>
+#include <embt/base/atomic.h>
+#include <embt/osi/sync.h>
+#include <string.h>
+#include <embt/base/assert.h>
 #include <stddef.h>
 #include <stdint.h>
 
-#include <zephyr/bluetooth/addr.h>
-#include <zephyr/bluetooth/buf.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/iso.h>
-#include <zephyr/net_buf.h>
-#include <zephyr/sys/atomic.h>
-#include <zephyr/sys/slist.h>
-#include <zephyr/sys/util_macro.h>
-#include <zephyr/toolchain.h>
+#include <embt/bluetooth/addr.h>
+#include <embt/bluetooth/buf.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/iso.h>
+#include <embt/net_buf.h>
+#include <embt/base/slist.h>
+#include <embt/base/util_macro.h>
+#include <embt/compiler.h>
 
 typedef enum __packed {
 	BT_CONN_DISCONNECTED,         /* Disconnected, conn is completely down */
@@ -122,7 +129,7 @@ struct bt_conn_le {
 
 	/** @brief Remote LE features
 	 *
-	 * Available after `atomic_test_bit(conn->flags, BT_CONN_LE_FEATURES_EXCHANGED)`.
+	 * Available after `bt_atomic_test_bit(conn->flags, BT_CONN_LE_FEATURES_EXCHANGED)`.
 	 * Signaled by bt_conn_cb.remote_info_available().
 	 */
 	uint8_t features[8];
@@ -195,7 +202,7 @@ struct bt_conn_iso {
 
 #if defined(CONFIG_BT_ISO_TX)
 	/** Queue from which conn will pull data */
-	struct k_fifo                   txq;
+	struct bt_fifo                   txq;
 #endif /* CONFIG_BT_ISO_TX */
 };
 
@@ -217,11 +224,12 @@ struct bt_conn_rx {
 };
 
 struct bt_conn {
+	struct bt_spinlock tx_complete_lock;
 	uint16_t			handle;
 	enum bt_conn_type	type;
 	uint8_t			role;
 
-	ATOMIC_DEFINE(flags, BT_CONN_NUM_FLAGS);
+	BT_ATOMIC_DEFINE(flags, BT_CONN_NUM_FLAGS);
 
 	/* Which local identity address this connection uses */
 	uint8_t                    id;
@@ -253,7 +261,7 @@ struct bt_conn {
 	/* Completed TX for which we need to call the callback */
 	sys_slist_t		tx_complete;
 #if defined(CONFIG_BT_CONN_TX)
-	struct k_work           tx_complete_work;
+	struct bt_work           tx_complete_work;
 #endif /* CONFIG_BT_CONN_TX */
 
 	/* Active L2CAP channels */
@@ -264,7 +272,7 @@ struct bt_conn {
 	 * - Initiator connect create cancel.
 	 * - Connection cleanup.
 	 */
-	struct k_work_delayable	deferred_work;
+	struct bt_work_delayable	deferred_work;
 
 	union {
 		struct bt_conn_le	le;
@@ -336,7 +344,7 @@ struct bt_conn {
 	 * to maximize throughput/latency.
 	 * It's an optimization so we don't chase `tx_pending` all the time.
 	 */
-	atomic_t		in_ll;
+	bt_atomic_t		in_ll;
 
 	/* Next buffer should be an ACL/ISO HCI fragment */
 	bool			next_is_frag;
@@ -344,7 +352,7 @@ struct bt_conn {
 	/* Must be at the end so that everything else in the structure can be
 	 * memset to zero without affecting the ref.
 	 */
-	atomic_t		ref;
+	bt_atomic_t		ref;
 };
 
 /* Holds the callback and a user-data field for the upper layer. This callback
@@ -569,10 +577,10 @@ void bt_conn_notify_mode_changed(struct bt_conn *conn, uint8_t mode, uint16_t in
 
 /* Prepare a PDU to be sent over a connection */
 struct net_buf *bt_conn_create_pdu_timeout(struct net_buf_pool *pool,
-					   size_t reserve, k_timeout_t timeout);
+					   size_t reserve, bt_timeout_t timeout);
 
 #define bt_conn_create_pdu(_pool, _reserve) \
-	bt_conn_create_pdu_timeout(_pool, _reserve, K_FOREVER)
+	bt_conn_create_pdu_timeout(_pool, _reserve, BT_FOREVER)
 
 /* Initialize connection management */
 int bt_conn_init(void);
@@ -581,7 +589,7 @@ int bt_conn_init(void);
 void bt_conn_cleanup_all(void);
 
 /* Selects based on connection type right semaphore for ACL packets */
-struct k_sem *bt_conn_get_pkts(struct bt_conn *conn);
+os_sem_t *bt_conn_get_pkts(struct bt_conn *conn);
 
 void bt_conn_tx_processor(void);
 
@@ -595,3 +603,6 @@ void bt_conn_tx_processor(void);
  * - unref the conn when popping the conn from the slist
  */
 void bt_conn_data_ready(struct bt_conn *conn);
+
+/** @brief Initialize the Classic ACL view pool before accepting traffic. */
+void bt_conn_br_init(void);

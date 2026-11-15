@@ -9,13 +9,13 @@
 #include <stdint.h>
 #include <string.h>
 
-#include <zephyr/autoconf.h>
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/crypto.h>
-#include <zephyr/bluetooth/hci.h>
+#include <embt/autoconf.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/crypto.h>
+#include <embt/bluetooth/hci.h>
 #include <embt/base/log.h>
-#include <zephyr/sys/byteorder.h>
+#include <embt/base/byteorder.h>
 #include <psa/crypto.h>
 #include <psa/crypto_struct.h>
 #include <psa/crypto_types.h>
@@ -40,6 +40,10 @@ int bt_crypto_init(void)
 #if defined(CONFIG_BT_HOST_CRYPTO_PRNG)
 int bt_rand(void *buf, size_t len)
 {
+	if (buf == NULL || len == 0) {
+		return -EINVAL;
+	}
+
 	psa_status_t status = psa_generate_random(buf, len);
 
 	if (status == PSA_SUCCESS) {

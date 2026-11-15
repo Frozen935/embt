@@ -5,9 +5,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <string.h>
+#include <embt/base/assert.h>
+#include <embt/base/util_macro.h>
 #include <stdbool.h>
 
-#include <zephyr/bluetooth/bluetooth.h>
+#include <embt/bluetooth/bluetooth.h>
 
 struct bt_le_ext_adv *bt_le_adv_lookup_legacy(void);
 

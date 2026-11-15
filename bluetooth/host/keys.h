@@ -9,15 +9,17 @@
 #ifndef ZEPHYR_SUBSYS_BLUETOOTH_HOST_KEYS_H_
 #define ZEPHYR_SUBSYS_BLUETOOTH_HOST_KEYS_H_
 
+#include <string.h>
+#include <embt/base/assert.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
-#include <zephyr/bluetooth/addr.h>
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/sys/util.h>
-#include <zephyr/sys/util_macro.h>
-#include <zephyr/toolchain.h>
+#include <embt/bluetooth/addr.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/base/util.h>
+#include <embt/base/util_macro.h>
+#include <embt/compiler.h>
 
 /** @cond INTERNAL_HIDDEN */
 

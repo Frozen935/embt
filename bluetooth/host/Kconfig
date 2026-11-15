@@ -252,16 +252,16 @@ config BT_SETTINGS_CF_STORE_ON_WRITE
 	  Store Client Supported Features value right after it has been updated.
 	  If the option is disabled, the CF is only stored on disconnection.
 
-config BT_SETTINGS_USE_PRINTK
-	bool "Use snprintk to encode Bluetooth settings key strings"
-	depends on SETTINGS && PRINTK
+config BT_SETTINGS_USE_SNPRINTF
+	bool "Use snprintf to encode Bluetooth settings key strings"
+	depends on SETTINGS
 	default y
 	help
-	  When selected, Bluetooth settings will use snprintk to encode
+	  When selected, Bluetooth settings will use snprintf to encode
 	  key strings.
 	  When not selected, Bluetooth settings will use a faster builtin
 	  function to encode the key string. The drawback is that if
-	  printk is enabled then the program memory footprint will be larger.
+	  the standard formatter is linked then the program footprint may be larger.
 
 config BT_SETTINGS_CCC_STORE_MAX
 	int "Max number of Client Characteristic Configuration (CCC)"

@@ -8,8 +8,8 @@
 #include <errno.h>
 #include <stdint.h>
 
-#include <zephyr/autoconf.h>
-#include <zephyr/bluetooth/crypto.h>
+#include <embt/autoconf.h>
+#include <embt/bluetooth/crypto.h>
 #include <embt/base/log.h>
 #include <psa/crypto.h>
 #include <psa/crypto_struct.h>

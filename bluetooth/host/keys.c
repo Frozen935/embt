@@ -11,18 +11,17 @@
 #include <stdint.h>
 #include <string.h>
 
-#include <zephyr/bluetooth/addr.h>
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/buf.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/hci.h>
+#include <embt/bluetooth/addr.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/buf.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/hci.h>
 #include <embt/base/log.h>
-#include <zephyr/settings/settings.h>
-#include <zephyr/sys/__assert.h>
-#include <zephyr/sys/atomic.h>
-#include <zephyr/sys/util.h>
-#include <zephyr/sys/byteorder.h>
-#include <zephyr/sys/util_macro.h>
+#include <embt/settings/settings.h>
+#include <embt/base/assert.h>
+#include <embt/base/util.h>
+#include <embt/base/byteorder.h>
+#include <embt/base/util_macro.h>
 
 #include "common/bt_str.h"
 #include "conn_internal.h"
@@ -609,7 +608,8 @@ void bt_keys_update_usage(uint8_t id, const bt_addr_le_t *addr)
 
 #endif  /* CONFIG_BT_KEYS_OVERWRITE_OLDEST */
 
-#if defined(CONFIG_BT_LOG_SNIFFER_INFO)
+
+#if defined(CONFIG_EMBT_LOG_SNIFFER_INFO)
 void bt_keys_show_sniffer_info(struct bt_keys *keys, void *data)
 {
 	uint8_t ltk[16];
@@ -633,7 +633,7 @@ void bt_keys_show_sniffer_info(struct bt_keys *keys, void *data)
 		LOG_INF("Legacy LTK: 0x%s (central)", bt_hex(ltk, keys->enc_size));
 	}
 }
-#endif /* defined(CONFIG_BT_LOG_SNIFFER_INFO) */
+#endif
 
 #ifdef ZTEST_UNITTEST
 struct bt_keys *bt_keys_get_key_pool(void)

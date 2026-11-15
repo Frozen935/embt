@@ -5,23 +5,25 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
+#include <embt/base/time.h>
+#include <embt/base/assert.h>
 #include <errno.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
 
-#include <zephyr/autoconf.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/cs.h>
-#include <zephyr/bluetooth/hci.h>
-#include <zephyr/bluetooth/hci_types.h>
+#include <embt/autoconf.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/cs.h>
+#include <embt/bluetooth/hci.h>
+#include <embt/bluetooth/hci_types.h>
 #include <embt/base/log.h>
-#include <zephyr/net_buf.h>
-#include <zephyr/sys/byteorder.h>
-#include <zephyr/sys/slist.h>
-#include <zephyr/sys/util.h>
-#include <zephyr/sys/util_macro.h>
+#include <embt/net_buf.h>
+#include <embt/base/byteorder.h>
+#include <embt/base/slist.h>
+#include <embt/base/util.h>
+#include <embt/base/util_macro.h>
 
 #include "conn_internal.h"
 
@@ -55,7 +57,7 @@ struct bt_conn_le_cs_subevent_result reassembled_result;
  */
 static struct net_buf *alloc_reassembly_buf(uint16_t conn_handle)
 {
-	struct net_buf *buf = net_buf_alloc(&reassembly_buf_pool, K_NO_WAIT);
+	struct net_buf *buf = net_buf_alloc(&reassembly_buf_pool, BT_NO_WAIT);
 
 	if (!buf) {
 		LOG_ERR("Failed to allocate new reassembly buffer");
@@ -291,7 +293,7 @@ int bt_le_cs_read_remote_supported_capabilities(struct bt_conn *conn)
 	struct bt_hci_cp_le_read_remote_supported_capabilities *cp;
 	struct net_buf *buf;
 
-	buf = bt_hci_cmd_alloc(K_FOREVER);
+	buf = bt_hci_cmd_alloc(BT_FOREVER);
 	if (!buf) {
 		return -ENOBUFS;
 	}
@@ -575,7 +577,7 @@ int bt_le_cs_set_default_settings(struct bt_conn *conn,
 	struct bt_hci_cp_le_cs_set_default_settings *cp;
 	struct net_buf *buf;
 
-	buf = bt_hci_cmd_alloc(K_FOREVER);
+	buf = bt_hci_cmd_alloc(BT_FOREVER);
 	if (!buf) {
 		return -ENOBUFS;
 	}
@@ -602,7 +604,7 @@ int bt_le_cs_read_remote_fae_table(struct bt_conn *conn)
 	struct bt_hci_cp_le_read_remote_fae_table *cp;
 	struct net_buf *buf;
 
-	buf = bt_hci_cmd_alloc(K_FOREVER);
+	buf = bt_hci_cmd_alloc(BT_FOREVER);
 	if (!buf) {
 		return -ENOBUFS;
 	}
@@ -658,7 +660,7 @@ int bt_le_cs_start_test(const struct bt_le_cs_test_param *params)
 	struct bt_hci_op_le_cs_test *cp;
 	struct net_buf *buf;
 
-	buf = bt_hci_cmd_alloc(K_FOREVER);
+	buf = bt_hci_cmd_alloc(BT_FOREVER);
 	if (!buf) {
 		return -ENOBUFS;
 	}
@@ -1019,7 +1021,7 @@ int bt_le_cs_create_config(struct bt_conn *conn, struct bt_le_cs_create_config_p
 	struct bt_hci_cp_le_cs_create_config *cp;
 	struct net_buf *buf;
 
-	buf = bt_hci_cmd_alloc(K_FOREVER);
+	buf = bt_hci_cmd_alloc(BT_FOREVER);
 	if (!buf) {
 		return -ENOBUFS;
 	}
@@ -1060,7 +1062,7 @@ int bt_le_cs_remove_config(struct bt_conn *conn, uint8_t config_id)
 	struct bt_hci_cp_le_cs_remove_config *cp;
 	struct net_buf *buf;
 
-	buf = bt_hci_cmd_alloc(K_FOREVER);
+	buf = bt_hci_cmd_alloc(BT_FOREVER);
 	if (!buf) {
 		return -ENOBUFS;
 	}
@@ -1077,7 +1079,7 @@ int bt_le_cs_security_enable(struct bt_conn *conn)
 	struct bt_hci_cp_le_security_enable *cp;
 	struct net_buf *buf;
 
-	buf = bt_hci_cmd_alloc(K_FOREVER);
+	buf = bt_hci_cmd_alloc(BT_FOREVER);
 	if (!buf) {
 		return -ENOBUFS;
 	}
@@ -1094,7 +1096,7 @@ int bt_le_cs_procedure_enable(struct bt_conn *conn,
 	struct bt_hci_cp_le_procedure_enable *cp;
 	struct net_buf *buf;
 
-	buf = bt_hci_cmd_alloc(K_FOREVER);
+	buf = bt_hci_cmd_alloc(BT_FOREVER);
 	if (!buf) {
 		return -ENOBUFS;
 	}
@@ -1113,7 +1115,7 @@ int bt_le_cs_set_procedure_parameters(struct bt_conn *conn,
 	struct bt_hci_cp_le_set_procedure_parameters *cp;
 	struct net_buf *buf;
 
-	buf = bt_hci_cmd_alloc(K_FOREVER);
+	buf = bt_hci_cmd_alloc(BT_FOREVER);
 	if (!buf) {
 		return -ENOBUFS;
 	}
@@ -1142,7 +1144,7 @@ int bt_le_cs_set_channel_classification(uint8_t channel_classification[10])
 	uint8_t *cp;
 	struct net_buf *buf;
 
-	buf = bt_hci_cmd_alloc(K_FOREVER);
+	buf = bt_hci_cmd_alloc(BT_FOREVER);
 	if (!buf) {
 		return -ENOBUFS;
 	}
@@ -1359,7 +1361,7 @@ int bt_le_cs_write_cached_remote_supported_capabilities(struct bt_conn *conn,
 	struct bt_hci_cp_le_write_cached_remote_supported_capabilities *cp;
 	struct net_buf *buf;
 
-	buf = bt_hci_cmd_alloc(K_FOREVER);
+	buf = bt_hci_cmd_alloc(BT_FOREVER);
 	if (!buf) {
 		return -ENOBUFS;
 	}
@@ -1457,7 +1459,7 @@ int bt_le_cs_write_cached_remote_supported_capabilities_v2(struct bt_conn *conn,
 	struct bt_hci_cp_le_write_cached_remote_supported_capabilities_v2 *cp;
 	struct net_buf *buf;
 
-	buf = bt_hci_cmd_alloc(K_FOREVER);
+	buf = bt_hci_cmd_alloc(BT_FOREVER);
 	if (!buf) {
 		return -ENOBUFS;
 	}
@@ -1562,7 +1564,7 @@ int bt_le_cs_write_cached_remote_fae_table(struct bt_conn *conn, int8_t remote_f
 	struct bt_hci_cp_le_write_cached_remote_fae_table *cp;
 	struct net_buf *buf;
 
-	buf = bt_hci_cmd_alloc(K_FOREVER);
+	buf = bt_hci_cmd_alloc(BT_FOREVER);
 	if (!buf) {
 		return -ENOBUFS;
 	}
@@ -1660,7 +1662,7 @@ int bt_le_cs_stop_test(void)
 {
 	struct net_buf *buf;
 
-	buf = bt_hci_cmd_alloc(K_FOREVER);
+	buf = bt_hci_cmd_alloc(BT_FOREVER);
 	if (!buf) {
 		return -ENOBUFS;
 	}
@@ -1825,4 +1827,11 @@ int bt_le_cs_get_antenna_path(uint8_t n_ap,
 	default:
 		return -EINVAL;
 	}
+}
+
+/** @brief Initialize module-owned storage before protocol operations. */
+void bt_host_cs_storage_init(void)
+{
+	net_buf_pool_init(&reassembly_buf_pool);
+	BT_ASSERT_CHECK(bt_conn_cb_register(&bt_conn_cb_cs_conn_callbacks) == 0);
 }

@@ -6,10 +6,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <string.h>
+#include <embt/base/assert.h>
 #include <errno.h>
 
-#include <zephyr/bluetooth/gatt.h>
-#include <zephyr/bluetooth/uuid.h>
+#include <embt/bluetooth/gatt.h>
+#include <embt/bluetooth/uuid.h>
 #include <embt/base/log.h>
 
 LOG_MODULE_DECLARE(bt_gatt, CONFIG_BT_GATT_LOG_LEVEL);

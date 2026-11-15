@@ -6,7 +6,7 @@ embt_library_link_libraries_ifdef(CONFIG_PSA_CRYPTO EmBT::psa)
 embt_add_subdirectory_ifdef(CONFIG_BT_CLASSIC classic)
 embt_add_subdirectory_ifdef(CONFIG_BT_SHELL shell)
 
-embt_library_sources_ifdef(CONFIG_BT_HCI_RAW          hci_raw.c hci_common.c)
+embt_library_sources_ifdef(CONFIG_BT_HCI_RAW          hci_raw.c hci_common.c uuid.c)
 embt_library_sources_ifdef(CONFIG_BT_MONITOR          monitor.c)
 embt_library_sources_ifdef(CONFIG_BT_SETTINGS         settings.c)
 embt_library_sources_ifdef(CONFIG_BT_HOST_CCM         aes_ccm.c)

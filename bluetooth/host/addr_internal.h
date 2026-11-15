@@ -7,7 +7,9 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-#include <zephyr/bluetooth/addr.h>
+#include <string.h>
+#include <embt/base/assert.h>
+#include <embt/bluetooth/addr.h>
 
 void bt_addr_le_copy_resolved(bt_addr_le_t *dst, const bt_addr_le_t *src);
 

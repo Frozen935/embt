@@ -9,15 +9,18 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <embt/base/time.h>
+#include <embt/base/atomic.h>
+#include <string.h>
+#include <embt/base/assert.h>
 #include <embt/base/log.h>
 #include <stdint.h>
 
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/buf.h>
-#include <zephyr/bluetooth/iso.h>
-#include <zephyr/net_buf.h>
-#include <zephyr/sys/atomic.h>
-#include <zephyr/sys/slist.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/buf.h>
+#include <embt/bluetooth/iso.h>
+#include <embt/net_buf.h>
+#include <embt/base/slist.h>
 
 enum bt_iso_cig_state {
 	BT_ISO_CIG_STATE_IDLE,
@@ -69,7 +72,7 @@ struct bt_iso_big {
 	/** The BIG handle */
 	uint8_t handle;
 
-	ATOMIC_DEFINE(flags, BT_BIG_NUM_FLAGS);
+	BT_ATOMIC_DEFINE(flags, BT_BIG_NUM_FLAGS);
 };
 
 #define iso(buf) ((struct bt_conn_rx *)net_buf_user_data(buf))
@@ -78,7 +81,7 @@ struct bt_iso_big {
 void hci_iso(struct net_buf *buf);
 
 /* Allocates RX buffer */
-struct net_buf *bt_iso_get_rx(k_timeout_t timeout);
+struct net_buf *bt_iso_get_rx(bt_timeout_t timeout);
 
 /** A callback used to notify about freed buffer in the iso rx pool. */
 typedef void (*bt_iso_buf_rx_freed_cb_t)(void);
@@ -135,3 +138,6 @@ enum bt_iso_timestamp {
 	BT_ISO_TS_ABSENT = 0,
 	BT_ISO_TS_PRESENT,
 };
+
+/** @brief Initialize the ISO receive pool before enabling ISO channels. */
+void bt_iso_init(void);
