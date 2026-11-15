@@ -8,11 +8,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <base/base.h>
 #include <stdbool.h>
 #include <stdint.h>
 
-#include <zephyr/bluetooth/addr.h>
-#include <zephyr/bluetooth/conn.h>
+#include <embt/bluetooth/addr.h>
+#include <embt/bluetooth/conn.h>
 
 #define BT_GATT_PERM_READ_MASK			(BT_GATT_PERM_READ | \
 						BT_GATT_PERM_READ_ENCRYPT | \

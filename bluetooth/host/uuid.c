@@ -7,16 +7,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <base/base.h>
 #include <errno.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
 
-#include <zephyr/bluetooth/uuid.h>
-#include <zephyr/sys/__assert.h>
-#include <zephyr/sys/byteorder.h>
-#include <zephyr/sys/printk.h>
-#include <zephyr/sys/uuid.h>
+#include <embt/bluetooth/uuid.h>
+#include <embt/sys/__assert.h>
+#include <embt/sys/byteorder.h>
+#include <embt/sys/printk.h>
+#include <embt/sys/uuid.h>
 
 #define BT_UUID_STR_LEN_16  4U
 #define BT_UUID_STR_LEN_32  8U

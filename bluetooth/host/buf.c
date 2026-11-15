@@ -5,19 +5,23 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#undef LOG_TAG
+#define LOG_TAG "bt_buf"
+#include <base/log.h>
+#include <base/base.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
 
-#include <zephyr/autoconf.h>
-#include <zephyr/bluetooth/hci.h>
-#include <zephyr/bluetooth/buf.h>
-#include <zephyr/bluetooth/hci_types.h>
-#include <zephyr/bluetooth/l2cap.h>
-#include <zephyr/net_buf.h>
-#include <zephyr/sys/__assert.h>
-#include <zephyr/sys/atomic.h>
-#include <zephyr/sys/util_macro.h>
+#include <embt/autoconf.h>
+#include <embt/bluetooth/hci.h>
+#include <embt/bluetooth/buf.h>
+#include <embt/bluetooth/hci_types.h>
+#include <embt/bluetooth/l2cap.h>
+#include <embt/net_buf.h>
+#include <embt/sys/__assert.h>
+#include <embt/sys/util_macro.h>
+#include <embt/storage.h>
 
 #include "buf_view.h"
 #include "common/hci_common_internal.h"
@@ -42,7 +46,7 @@
  */
 #define SYNC_EVT_SIZE (BT_BUF_RESERVE + BT_HCI_EVT_HDR_SIZE + 255)
 
-static atomic_ptr_t buf_rx_freed_cb;
+static bt_atomic_ptr_t buf_rx_freed_cb;
 
 static void buf_rx_freed_notify(enum bt_buf_type mask)
 {
@@ -53,7 +57,7 @@ static void buf_rx_freed_notify(enum bt_buf_type mask)
 		k_sched_lock();
 	}
 
-	cb = (bt_buf_rx_freed_cb_t)atomic_ptr_get(&buf_rx_freed_cb);
+	cb = (bt_buf_rx_freed_cb_t)bt_atomic_ptr_get(&buf_rx_freed_cb);
 
 	if (cb != NULL) {
 		cb(mask);
@@ -158,7 +162,7 @@ struct net_buf *bt_buf_get_rx(enum bt_buf_type type, k_timeout_t timeout)
 
 void bt_buf_rx_freed_cb_set(bt_buf_rx_freed_cb_t cb)
 {
-	atomic_ptr_set(&buf_rx_freed_cb, (void *)cb);
+	bt_atomic_ptr_set(&buf_rx_freed_cb, (void *)cb);
 
 #if defined(CONFIG_BT_ISO_RX)
 	bt_iso_buf_rx_freed_cb_set(cb != NULL ? iso_rx_freed_cb : NULL);

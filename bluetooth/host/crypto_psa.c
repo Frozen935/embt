@@ -5,16 +5,19 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#undef LOG_TAG
+#define LOG_TAG "bt_host_crypto"
+#include <base/log.h>
 #include <errno.h>
 #include <stdint.h>
 #include <string.h>
 
-#include <zephyr/autoconf.h>
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/crypto.h>
-#include <zephyr/bluetooth/hci.h>
-#include <zephyr/sys/byteorder.h>
+#include <embt/autoconf.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/crypto.h>
+#include <embt/bluetooth/hci.h>
+#include <embt/sys/byteorder.h>
 #include <psa/crypto.h>
 #include <psa/crypto_struct.h>
 #include <psa/crypto_types.h>

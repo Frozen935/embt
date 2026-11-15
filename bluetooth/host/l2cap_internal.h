@@ -7,14 +7,16 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
+#include <base/base.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/l2cap.h>
-#include <zephyr/net_buf.h>
-#include <zephyr/sys/iterable_sections.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/l2cap.h>
+#include <embt/net_buf.h>
+#include <embt/sys/iterable_sections.h>
+#include <embt/storage.h>
 
 #include "host/classic/l2cap_br_interface.h"
 /* TODO: we should include conn_internal.h for bt_conn_tx_cb_t but that causes redefinitions */

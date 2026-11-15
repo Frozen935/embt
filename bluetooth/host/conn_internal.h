@@ -10,18 +10,19 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <base/base.h>
 #include <stddef.h>
 #include <stdint.h>
 
-#include <zephyr/bluetooth/addr.h>
-#include <zephyr/bluetooth/buf.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/iso.h>
-#include <zephyr/net_buf.h>
-#include <zephyr/sys/atomic.h>
-#include <zephyr/sys/slist.h>
-#include <zephyr/sys/util_macro.h>
-#include <zephyr/toolchain.h>
+#include <embt/bluetooth/addr.h>
+#include <embt/bluetooth/buf.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/iso.h>
+#include <embt/net_buf.h>
+#include <embt/sys/slist.h>
+#include <embt/sys/util_macro.h>
+#include <embt/storage.h>
+#include <embt/toolchain.h>
 
 typedef enum __packed {
 	BT_CONN_DISCONNECTED,         /* Disconnected, conn is completely down */
@@ -122,7 +123,7 @@ struct bt_conn_le {
 
 	/** @brief Remote LE features
 	 *
-	 * Available after `atomic_test_bit(conn->flags, BT_CONN_LE_FEATURES_EXCHANGED)`.
+	 * Available after `bt_atomic_test_bit(conn->flags, BT_CONN_LE_FEATURES_EXCHANGED)`.
 	 * Signaled by bt_conn_cb.remote_info_available().
 	 */
 	uint8_t features[8];
@@ -217,11 +218,12 @@ struct bt_conn_rx {
 };
 
 struct bt_conn {
+	struct k_spinlock tx_complete_lock;
 	uint16_t			handle;
 	enum bt_conn_type	type;
 	uint8_t			role;
 
-	ATOMIC_DEFINE(flags, BT_CONN_NUM_FLAGS);
+	BT_ATOMIC_DEFINE(flags, BT_CONN_NUM_FLAGS);
 
 	/* Which local identity address this connection uses */
 	uint8_t                    id;
@@ -336,7 +338,7 @@ struct bt_conn {
 	 * to maximize throughput/latency.
 	 * It's an optimization so we don't chase `tx_pending` all the time.
 	 */
-	atomic_t		in_ll;
+	bt_atomic_t		in_ll;
 
 	/* Next buffer should be an ACL/ISO HCI fragment */
 	bool			next_is_frag;
@@ -344,7 +346,7 @@ struct bt_conn {
 	/* Must be at the end so that everything else in the structure can be
 	 * memset to zero without affecting the ref.
 	 */
-	atomic_t		ref;
+	bt_atomic_t		ref;
 };
 
 /* Holds the callback and a user-data field for the upper layer. This callback

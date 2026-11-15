@@ -5,19 +5,22 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#undef LOG_TAG
+#define LOG_TAG "bt_ecc"
+#include <base/log.h>
+#include <base/base.h>
 #include <errno.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
 
-#include <zephyr/autoconf.h>
-#include <zephyr/bluetooth/hci_types.h>
-#include <zephyr/sys/__assert.h>
-#include <zephyr/sys/atomic.h>
-#include <zephyr/sys/byteorder.h>
-#include <zephyr/bluetooth/hci.h>
-#include <zephyr/sys/slist.h>
-#include <zephyr/sys/util_macro.h>
+#include <embt/autoconf.h>
+#include <embt/bluetooth/hci_types.h>
+#include <embt/sys/__assert.h>
+#include <embt/sys/byteorder.h>
+#include <embt/bluetooth/hci.h>
+#include <embt/sys/slist.h>
+#include <embt/sys/util_macro.h>
 #include <psa/crypto.h>
 #include <psa/crypto_struct.h>
 #include <psa/crypto_types.h>
@@ -46,7 +49,7 @@ enum {
 	NUM_FLAGS,
 };
 
-static ATOMIC_DEFINE(flags, NUM_FLAGS);
+static BT_ATOMIC_DEFINE(flags, NUM_FLAGS);
 
 static struct {
 	uint8_t private_key_be[BT_PRIV_KEY_LEN];
@@ -197,12 +200,12 @@ done:
 		sys_memcpy_swap(pub_key, ecc.public_key_be, BT_PUB_KEY_COORD_LEN);
 		sys_memcpy_swap(&pub_key[BT_PUB_KEY_COORD_LEN],
 				&ecc.public_key_be[BT_PUB_KEY_COORD_LEN], BT_PUB_KEY_COORD_LEN);
-		atomic_set_bit(bt_dev.flags, BT_DEV_HAS_PUB_KEY);
+		bt_atomic_set_bit(bt_dev.flags, BT_DEV_HAS_PUB_KEY);
 	}
 
 	cbs = pub_key_cb_slist;
 	sys_slist_init(&pub_key_cb_slist);
-	atomic_clear_bit(flags, PENDING_PUB_KEY);
+	bt_atomic_clear_bit(flags, PENDING_PUB_KEY);
 	bt_dev_unlock();
 
 	SYS_SLIST_FOR_EACH_CONTAINER_SAFE(&cbs, cb, next, node) {
@@ -270,7 +273,7 @@ exit:
 	if (err == 0) {
 		sys_memcpy_swap(dhkey, ecc.dhkey_be, sizeof(ecc.dhkey_be));
 	}
-	atomic_clear_bit(flags, PENDING_DHKEY);
+	bt_atomic_clear_bit(flags, PENDING_DHKEY);
 	bt_dev_unlock();
 
 	if (cb != NULL) {
@@ -285,7 +288,7 @@ int bt_pub_key_gen(struct bt_pub_key_cb *new_cb)
 	struct bt_pub_key_cb *cb;
 
 	if (IS_ENABLED(CONFIG_BT_USE_DEBUG_KEYS)) {
-		atomic_set_bit(bt_dev.flags, BT_DEV_HAS_PUB_KEY);
+		bt_atomic_set_bit(bt_dev.flags, BT_DEV_HAS_PUB_KEY);
 		__ASSERT_NO_MSG(new_cb->func != NULL);
 		new_cb->func(debug_public_key);
 		return 0;
@@ -308,7 +311,7 @@ int bt_pub_key_gen(struct bt_pub_key_cb *new_cb)
 		}
 	}
 
-	if (atomic_test_bit(flags, PENDING_DHKEY)) {
+	if (bt_atomic_test_bit(flags, PENDING_DHKEY)) {
 		bt_dev_unlock();
 		LOG_WRN("Busy performing another ECDH operation");
 		return -EBUSY;
@@ -316,12 +319,12 @@ int bt_pub_key_gen(struct bt_pub_key_cb *new_cb)
 
 	sys_slist_prepend(&pub_key_cb_slist, &new_cb->node);
 
-	if (atomic_test_and_set_bit(flags, PENDING_PUB_KEY)) {
+	if (bt_atomic_test_and_set_bit(flags, PENDING_PUB_KEY)) {
 		bt_dev_unlock();
 		return 0;
 	}
 
-	atomic_clear_bit(bt_dev.flags, BT_DEV_HAS_PUB_KEY);
+	bt_atomic_clear_bit(bt_dev.flags, BT_DEV_HAS_PUB_KEY);
 
 	bt_dev_unlock();
 
@@ -343,7 +346,7 @@ void bt_pub_key_hci_disrupted(void)
 	pub_key_disruptions++;
 	cbs = pub_key_cb_slist;
 	sys_slist_init(&pub_key_cb_slist);
-	atomic_clear_bit(flags, PENDING_PUB_KEY);
+	bt_atomic_clear_bit(flags, PENDING_PUB_KEY);
 	bt_dev_unlock();
 
 	SYS_SLIST_FOR_EACH_CONTAINER_SAFE(&cbs, cb, next, node) {
@@ -359,7 +362,7 @@ const uint8_t *bt_pub_key_get(void)
 		return debug_public_key;
 	}
 
-	if (atomic_test_bit(bt_dev.flags, BT_DEV_HAS_PUB_KEY)) {
+	if (bt_atomic_test_bit(bt_dev.flags, BT_DEV_HAS_PUB_KEY)) {
 		return pub_key;
 	}
 
@@ -380,14 +383,14 @@ int bt_dh_key_gen(const uint8_t remote_pk[BT_PUB_KEY_LEN], bt_dh_key_cb_t cb)
 		return -EALREADY;
 	}
 
-	if (!atomic_test_bit(bt_dev.flags, BT_DEV_HAS_PUB_KEY)) {
+	if (!bt_atomic_test_bit(bt_dev.flags, BT_DEV_HAS_PUB_KEY)) {
 		bt_dev_unlock();
 		return -EADDRNOTAVAIL;
 	}
 
 	if (dh_key_cb ||
-	    atomic_test_bit(flags, PENDING_PUB_KEY) ||
-	    atomic_test_and_set_bit(flags, PENDING_DHKEY)) {
+	    bt_atomic_test_bit(flags, PENDING_PUB_KEY) ||
+	    bt_atomic_test_and_set_bit(flags, PENDING_DHKEY)) {
 		bt_dev_unlock();
 		return -EBUSY;
 	}
