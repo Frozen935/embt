@@ -29,10 +29,9 @@
 #include "gatt.h"
 #include "proxy_msg.h"
 #include "crypto.h"
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 
-#define LOG_LEVEL CONFIG_BT_MESH_PROXY_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_mesh_gatt);
+LOG_MODULE_REGISTER(bt_mesh_gatt, CONFIG_BT_MESH_PROXY_LOG_LEVEL);
 
 /* Interval to update random value in (10 minutes).
  *

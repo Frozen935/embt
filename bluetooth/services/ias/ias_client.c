@@ -6,13 +6,13 @@
 
 #include <errno.h>
 #include <stdint.h>
-#include <zephyr/logging/log.h>
-
-LOG_MODULE_REGISTER(bt_ias_client, CONFIG_BT_IAS_CLIENT_LOG_LEVEL);
 
 #include <zephyr/bluetooth/gatt.h>
 #include <zephyr/bluetooth/conn.h>
 #include <zephyr/bluetooth/services/ias.h>
+
+#include <embt/base/log.h>
+LOG_MODULE_REGISTER(bt_ias_client, CONFIG_BT_IAS_CLIENT_LOG_LEVEL);
 
 enum {
 	IAS_DISCOVER_IN_PROGRESS,

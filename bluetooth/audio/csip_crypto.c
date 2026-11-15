@@ -16,7 +16,7 @@
 #include <zephyr/autoconf.h>
 #include <zephyr/bluetooth/audio/csip.h>
 #include <zephyr/bluetooth/crypto.h>
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 #include <zephyr/sys/byteorder.h>
 #include <zephyr/sys/util.h>
 #include <zephyr/sys/util_macro.h>

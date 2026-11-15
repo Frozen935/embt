@@ -31,10 +31,9 @@
 #include "brg_cfg.h"
 #include "solicitation.h"
 #include "va.h"
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 
-#define LOG_LEVEL CONFIG_BT_MESH_SETTINGS_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_mesh_settings);
+LOG_MODULE_REGISTER(bt_mesh_settings, CONFIG_BT_MESH_SETTINGS_LOG_LEVEL);
 
 #ifdef CONFIG_BT_MESH_RPL_STORE_TIMEOUT
 #define RPL_STORE_TIMEOUT CONFIG_BT_MESH_RPL_STORE_TIMEOUT

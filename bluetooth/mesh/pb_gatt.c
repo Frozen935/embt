@@ -17,10 +17,9 @@
 #include <zephyr/bluetooth/hci.h>
 
 #include "common/bt_str.h"
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 
-#define LOG_LEVEL CONFIG_BT_MESH_PROV_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_mesh_pb_gatt);
+LOG_MODULE_REGISTER(bt_mesh_pb_gatt, CONFIG_BT_MESH_PROV_LOG_LEVEL);
 
 struct prov_bearer_send_cb {
 	prov_bearer_send_complete_t cb;

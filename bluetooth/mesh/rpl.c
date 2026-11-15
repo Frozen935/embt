@@ -22,10 +22,9 @@
 #include "net.h"
 #include "rpl.h"
 #include "settings.h"
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 
-#define LOG_LEVEL CONFIG_BT_MESH_RPL_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_mesh_rpl);
+LOG_MODULE_REGISTER(bt_mesh_rpl, CONFIG_BT_MESH_RPL_LOG_LEVEL);
 
 /* Replay Protection List information for persistent storage. */
 struct rpl_val {

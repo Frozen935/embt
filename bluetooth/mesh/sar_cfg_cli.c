@@ -14,10 +14,9 @@
 #include "foundation.h"
 #include "mesh.h"
 #include "sar_cfg_internal.h"
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 
-#define LOG_LEVEL CONFIG_BT_MESH_MODEL_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_mesh_sar_cfg_cli);
+LOG_MODULE_REGISTER(bt_mesh_sar_cfg_cli, CONFIG_BT_MESH_MODEL_LOG_LEVEL);
 
 static struct bt_mesh_sar_cfg_cli *cli;
 

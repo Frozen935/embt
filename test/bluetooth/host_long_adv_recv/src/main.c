@@ -26,7 +26,7 @@
 #define DT_DRV_COMPAT zephyr_bt_hci_test
 
 #define LOG_LEVEL CONFIG_BT_LOG_LEVEL
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 LOG_MODULE_REGISTER(host_test_app);
 
 DEFINE_FFF_GLOBALS;

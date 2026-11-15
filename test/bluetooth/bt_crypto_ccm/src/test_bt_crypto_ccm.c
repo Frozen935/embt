@@ -9,7 +9,7 @@
 #include <zephyr/ztest.h>
 #include <zephyr/ztest_assert.h>
 
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 #include <zephyr/bluetooth/crypto.h>
 
 #include "common/bt_str.h"

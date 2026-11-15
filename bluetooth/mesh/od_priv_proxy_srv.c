@@ -10,10 +10,9 @@
 #include "cfg.h"
 #include "foundation.h"
 #include "settings.h"
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 
-#define LOG_LEVEL CONFIG_BT_MESH_MODEL_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_mesh_od_priv_proxy_srv);
+LOG_MODULE_REGISTER(bt_mesh_od_priv_proxy_srv, CONFIG_BT_MESH_MODEL_LOG_LEVEL);
 
 static const struct bt_mesh_model *od_priv_proxy_srv;
 static uint8_t on_demand_state;

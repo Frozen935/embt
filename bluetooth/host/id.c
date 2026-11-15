@@ -40,10 +40,9 @@
 #include "scan.h"
 #include "settings.h"
 #include "smp.h"
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 
-#define LOG_LEVEL CONFIG_BT_HCI_CORE_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_id);
+LOG_MODULE_REGISTER(bt_id, CONFIG_BT_HCI_CORE_LOG_LEVEL);
 
 struct bt_adv_id_check_data {
 	uint8_t id;

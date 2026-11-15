@@ -14,10 +14,9 @@
 #include "msg.h"
 #include "access.h"
 #include "net.h"
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 
-#define LOG_LEVEL CONFIG_BT_MESH_ACCESS_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_mesh_delayable_msg);
+LOG_MODULE_REGISTER(bt_mesh_delayable_msg, CONFIG_BT_MESH_ACCESS_LOG_LEVEL);
 
 static void delayable_msg_handler(struct k_work *w);
 static bool push_msg_from_delayable_msgs(void);

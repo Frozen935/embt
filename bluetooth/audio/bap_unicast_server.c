@@ -18,7 +18,7 @@
 #include <zephyr/bluetooth/audio/bap.h>
 #include <zephyr/bluetooth/conn.h>
 #include <zephyr/bluetooth/iso.h>
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 
 #include "ascs_internal.h"
 #include "bap_iso.h"

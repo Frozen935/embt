@@ -32,10 +32,9 @@
 #include "rpl.h"
 #include "settings.h"
 #include "prov.h"
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 
-#define LOG_LEVEL CONFIG_BT_MESH_KEYS_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_mesh_net_keys);
+LOG_MODULE_REGISTER(bt_mesh_net_keys, CONFIG_BT_MESH_KEYS_LOG_LEVEL);
 
 /* Tracking of what storage changes are pending for Net Keys. We track this in
  * a separate array here instead of within the respective bt_mesh_subnet

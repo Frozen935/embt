@@ -8,6 +8,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <embt/base/log.h>
 #include <zephyr/bluetooth/l2cap.h>
 #include <zephyr/sys/iterable_sections.h>
 #include <zephyr/sys/util.h>
@@ -402,7 +403,7 @@ void bt_l2cap_br_chan_del(struct bt_l2cap_chan *chan);
 
 const char *bt_l2cap_chan_state_str(bt_l2cap_chan_state_t state);
 
-#if defined(CONFIG_BT_L2CAP_LOG_LEVEL_DBG)
+#if BT_LOG_LEVEL_ENABLED(BT_L2CAP, DBG)
 void bt_l2cap_br_chan_set_state_debug(struct bt_l2cap_chan *chan,
 				   bt_l2cap_chan_state_t state,
 				   const char *func, int line);
@@ -411,7 +412,7 @@ void bt_l2cap_br_chan_set_state_debug(struct bt_l2cap_chan *chan,
 #else
 void bt_l2cap_br_chan_set_state(struct bt_l2cap_chan *chan,
 			     bt_l2cap_chan_state_t state);
-#endif /* CONFIG_BT_L2CAP_LOG_LEVEL_DBG */
+#endif /* BT_LOG_LEVEL_ENABLED(BT_L2CAP, DBG) */
 
 /* Prepare an L2CAP PDU to be sent over a connection */
 struct net_buf *bt_l2cap_create_pdu_timeout(struct net_buf_pool *pool,

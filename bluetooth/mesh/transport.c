@@ -33,10 +33,9 @@
 #include "testing.h"
 #include "transport.h"
 #include "va.h"
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 
-#define LOG_LEVEL CONFIG_BT_MESH_TRANS_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_mesh_transport);
+LOG_MODULE_REGISTER(bt_mesh_transport, CONFIG_BT_MESH_TRANS_LOG_LEVEL);
 
 #define AID_MASK                    ((uint8_t)(BIT_MASK(6)))
 

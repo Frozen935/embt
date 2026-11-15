@@ -36,10 +36,9 @@
 #include "statistic.h"
 #include "sar_cfg_internal.h"
 #include "brg_cfg.h"
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 
-#define LOG_LEVEL CONFIG_BT_MESH_NET_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_mesh_net);
+LOG_MODULE_REGISTER(bt_mesh_net, CONFIG_BT_MESH_NET_LOG_LEVEL);
 
 #define LOOPBACK_MAX_PDU_LEN (BT_MESH_NET_HDR_LEN + 16)
 

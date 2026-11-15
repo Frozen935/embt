@@ -19,10 +19,9 @@
 #include "rpl.h"
 #include "settings.h"
 #include "keys.h"
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 
-#define LOG_LEVEL CONFIG_BT_MESH_CDB_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_mesh_cdb);
+LOG_MODULE_REGISTER(bt_mesh_cdb, CONFIG_BT_MESH_CDB_LOG_LEVEL);
 
 /* Tracking of what storage changes are pending for App and Net Keys. We
  * track this in a separate array here instead of within the respective

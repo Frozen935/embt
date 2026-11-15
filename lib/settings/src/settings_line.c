@@ -11,8 +11,6 @@
 #include <zephyr/settings/settings.h>
 #include "settings_priv.h"
 
-LOG_MODULE_DECLARE(settings, CONFIG_SETTINGS_LOG_LEVEL);
-
 struct settings_io_cb_s {
 	int (*read_cb)(void *ctx, off_t off, char *buf, size_t *len);
 	int (*write_cb)(void *ctx, off_t off, char const *buf, size_t len);

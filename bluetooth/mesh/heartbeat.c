@@ -15,10 +15,9 @@
 #include "transport.h"
 #include "heartbeat.h"
 #include "foundation.h"
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 
-#define LOG_LEVEL CONFIG_BT_MESH_TRANS_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_mesh_hb);
+LOG_MODULE_REGISTER(bt_mesh_hb, CONFIG_BT_MESH_TRANS_LOG_LEVEL);
 
 /* Heartbeat Publication information for persistent storage. */
 struct hb_pub_val {

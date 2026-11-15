@@ -22,10 +22,9 @@
 #include <host/hci_core.h>
 #include <host/conn_internal.h>
 #include "l2cap_br_internal.h"
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 
-#define LOG_LEVEL CONFIG_BT_HCI_CORE_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_ssp);
+LOG_MODULE_REGISTER(bt_ssp, CONFIG_BT_HCI_CORE_LOG_LEVEL);
 
 enum pairing_method {
 	LEGACY,			/* Legacy (pre-SSP) pairing */

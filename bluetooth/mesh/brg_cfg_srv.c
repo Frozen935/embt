@@ -10,10 +10,9 @@
 #include "brg_cfg.h"
 #include "foundation.h"
 #include "subnet.h"
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 
-#define LOG_LEVEL CONFIG_BT_MESH_MODEL_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_mesh_brg_cfg_srv);
+LOG_MODULE_REGISTER(bt_mesh_brg_cfg_srv, CONFIG_BT_MESH_MODEL_LOG_LEVEL);
 
 static void bridge_status_send(const struct bt_mesh_model *model, struct bt_mesh_msg_ctx *ctx)
 {

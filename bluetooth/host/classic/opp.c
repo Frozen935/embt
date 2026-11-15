@@ -20,10 +20,9 @@
 #include <zephyr/bluetooth/classic/opp.h>
 
 #include "opp_internal.h"
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 
-#define LOG_LEVEL CONFIG_BT_OPP_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_opp);
+LOG_MODULE_REGISTER(bt_opp, CONFIG_BT_OPP_LOG_LEVEL);
 
 /* Buffer pool: two buffers per ACL connection (one for operation, one for response). */
 #define OPP_POOL_BUF_SIZE BT_RFCOMM_BUF_SIZE(CONFIG_BT_GOEP_RFCOMM_MTU)

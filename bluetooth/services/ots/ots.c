@@ -21,7 +21,7 @@
 #include "ots_internal.h"
 #include "ots_obj_manager_internal.h"
 #include "ots_dir_list_internal.h"
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 
 LOG_MODULE_REGISTER(bt_ots, CONFIG_BT_OTS_LOG_LEVEL);
 

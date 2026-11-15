@@ -11,10 +11,9 @@
 #include <stdio.h>
 #include <zephyr/sys/util.h>
 #include <common/bt_str.h>
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 
-#define LOG_LEVEL CONFIG_BT_MESH_DFU_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_mesh_dfu_slot);
+LOG_MODULE_REGISTER(bt_mesh_dfu_slot, CONFIG_BT_MESH_DFU_LOG_LEVEL);
 
 #define SLOT_ENTRY_BUFLEN 25
 

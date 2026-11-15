@@ -28,7 +28,7 @@
 #include <zephyr/bluetooth/l2cap.h>
 #include <zephyr/bluetooth/buf.h>
 #include <zephyr/bluetooth/uuid.h>
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 #include <zephyr/net_buf.h>
 #include <zephyr/settings/settings.h>
 #include <zephyr/sys/__assert.h>
@@ -40,7 +40,7 @@
 
 LOG_MODULE_REGISTER(bt_bap_scan_delegator, CONFIG_BT_BAP_SCAN_DELEGATOR_LOG_LEVEL);
 
-#if !defined(CONFIG_ARCH_POSIX) && defined(CONFIG_BT_BAP_SCAN_DELEGATOR_LOG_LEVEL_DBG) &&          \
+#if !defined(CONFIG_ARCH_POSIX) && BT_LOG_LEVEL_ENABLED(BT_BAP_SCAN_DELEGATOR, DBG) &&          \
 	defined(CONFIG_LOG) && !defined(CONFIG_LOG_MODE_DEFERRED)
 #warning Logging when non-deferred log mode is selected is not fully supported. \
 	 Use the CONFIG_LOG_MODE_DEFERRED Kconfig option when this feature is enabled.
@@ -286,7 +286,7 @@ static void net_buf_put_recv_state(const struct bass_recv_state_internal *intern
 static void receive_state_updated(struct bt_conn *conn,
 				  struct bass_recv_state_internal *internal_state)
 {
-	if (IS_ENABLED(CONFIG_BT_BAP_SCAN_DELEGATOR_LOG_LEVEL_DBG)) {
+	if (BT_LOG_LEVEL_ENABLED(BT_BAP_SCAN_DELEGATOR, DBG)) {
 		bt_debug_dump_recv_state(internal_state);
 	}
 
@@ -1639,7 +1639,7 @@ static ssize_t read_recv_state(struct bt_conn *conn,
 	__maybe_unused int err;
 	ssize_t ret_val;
 
-	if (IS_ENABLED(CONFIG_BT_BAP_SCAN_DELEGATOR_LOG_LEVEL_DBG)) {
+	if (BT_LOG_LEVEL_ENABLED(BT_BAP_SCAN_DELEGATOR, DBG)) {
 		bt_debug_dump_recv_state(internal_state);
 	}
 

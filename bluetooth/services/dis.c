@@ -25,10 +25,9 @@
 
 #include <zephyr/sys/byteorder.h>
 #include <zephyr/bluetooth/byteorder.h>
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 
-#define LOG_LEVEL CONFIG_BT_SERVICE_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_dis);
+LOG_MODULE_REGISTER(bt_dis, CONFIG_BT_SERVICE_LOG_LEVEL);
 
 #if CONFIG_BT_DIS_PNP
 struct dis_pnp {

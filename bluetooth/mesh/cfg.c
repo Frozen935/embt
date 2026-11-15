@@ -17,10 +17,9 @@
 #include "cfg.h"
 #include "od_priv_proxy.h"
 #include "priv_beacon.h"
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 
-#define LOG_LEVEL CONFIG_BT_MESH_CFG_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_mesh_cfg);
+LOG_MODULE_REGISTER(bt_mesh_cfg, CONFIG_BT_MESH_CFG_LOG_LEVEL);
 
 /* Miscellaneous configuration server model states */
 struct cfg_val {

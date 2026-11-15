@@ -22,10 +22,9 @@
 #include "access.h"
 #include "foundation.h"
 #include "prov.h"
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 
-#define LOG_LEVEL CONFIG_BT_MESH_PROV_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_mesh_prov);
+LOG_MODULE_REGISTER(bt_mesh_prov, CONFIG_BT_MESH_PROV_LOG_LEVEL);
 
 /* 10 power 32 represents 14 bytes maximum in little-endian format */
 #define MAX_NUMERIC_OOB_BYTES 14

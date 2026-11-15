@@ -14,7 +14,7 @@
 #include <zephyr/bluetooth/gatt.h>
 #include <zephyr/bluetooth/uuid.h>
 #include <zephyr/bluetooth/services/ets.h>
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 
 LOG_MODULE_REGISTER(bt_ets, CONFIG_BT_ETS_LOG_LEVEL);
 

@@ -11,14 +11,13 @@
 #include <errno.h>
 #include <stdint.h>
 #include <zephyr/net_buf.h>
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 #include <zephyr/bluetooth/gatt.h>
 #include <zephyr/bluetooth/conn.h>
 #include <zephyr/bluetooth/services/ias.h>
 #include <zephyr/sys/iterable_sections.h>
 
-#define LOG_LEVEL CONFIG_BT_IAS_LOG_LEVEL
-LOG_MODULE_REGISTER(ias);
+LOG_MODULE_REGISTER(ias, CONFIG_BT_IAS_LOG_LEVEL);
 
 #define BT_IAS_ALERT_LVL_LEN 1
 

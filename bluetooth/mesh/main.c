@@ -12,7 +12,7 @@
 #include <zephyr/bluetooth/conn.h>
 #include <zephyr/bluetooth/uuid.h>
 #include <zephyr/bluetooth/mesh.h>
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 
 #include <common/bt_str.h>
 

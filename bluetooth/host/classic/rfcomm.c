@@ -26,10 +26,9 @@
 #include <host/conn_internal.h>
 #include "l2cap_br_internal.h"
 #include "rfcomm_internal.h"
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 
-#define LOG_LEVEL CONFIG_BT_RFCOMM_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_rfcomm);
+LOG_MODULE_REGISTER(bt_rfcomm, CONFIG_BT_RFCOMM_LOG_LEVEL);
 
 #define RFCOMM_CHANNEL_START	0x01
 #define RFCOMM_CHANNEL_END	0x1e

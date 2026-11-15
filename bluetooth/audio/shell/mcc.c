@@ -22,7 +22,7 @@
 #include <zephyr/bluetooth/bluetooth.h>
 #include <zephyr/bluetooth/conn.h>
 #include <zephyr/bluetooth/services/ots.h>
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 #include <zephyr/net_buf.h>
 #include <zephyr/shell/shell.h>
 #include <zephyr/shell/shell_string_conv.h>
@@ -1847,7 +1847,7 @@ static int cmd_mcc_send_search_ioptest(const struct shell *sh, size_t argc,
 	return result;
 }
 
-#if defined(CONFIG_BT_MCC_LOG_LEVEL_DBG) && defined(CONFIG_BT_TESTING)
+#if BT_LOG_LEVEL_ENABLED(BT_MCC, DBG) && defined(CONFIG_BT_TESTING)
 static int cmd_mcc_test_send_search_iop_invalid_type(const struct shell *sh,
 						     size_t argc, char *argv[])
 {
@@ -1900,7 +1900,7 @@ static int cmd_mcc_test_send_search_invalid_sci_len(const struct shell *sh,
 
 	return result;
 }
-#endif /* CONFIG_BT_MCC_LOG_LEVEL_DBG && CONFIG_BT_TESTING */
+#endif /* BT_LOG_LEVEL_ENABLED(BT_MCC, DBG) && CONFIG_BT_TESTING */
 
 static int cmd_mcc_read_search_results_obj_id(const struct shell *sh,
 					      size_t argc, char *argv[])
@@ -2334,14 +2334,14 @@ SHELL_STATIC_SUBCMD_SET_CREATE(mcc_cmds,
 	SHELL_CMD_ARG(send_search_scp_ioptest, NULL,
 		      "Send search - IOP test round as input <round number>",
 		      cmd_mcc_send_search_ioptest, 2, 0),
-#if defined(CONFIG_BT_MCC_LOG_LEVEL_DBG) && defined(CONFIG_BT_TESTING)
+#if BT_LOG_LEVEL_ENABLED(BT_MCC, DBG) && defined(CONFIG_BT_TESTING)
 	SHELL_CMD_ARG(test_send_search_iop_invalid_type, NULL,
 		      "Send search - IOP test, invalid type value (test)",
 		      cmd_mcc_test_send_search_iop_invalid_type, 1, 0),
 	SHELL_CMD_ARG(test_send_Search_invalid_sci_len, NULL,
 		      "Send search - invalid sci length (test)",
 		      cmd_mcc_test_send_search_invalid_sci_len, 1, 0),
-#endif /* CONFIG_BT_MCC_LOG_LEVEL_DBG && CONFIG_BT_TESTING */
+#endif /* BT_LOG_LEVEL_ENABLED(BT_MCC, DBG) && CONFIG_BT_TESTING */
 	SHELL_CMD_ARG(read_search_results_obj_id, NULL,
 		      "Read Search Results Object ID",
 		      cmd_mcc_read_search_results_obj_id, 1, 0),

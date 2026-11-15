@@ -18,10 +18,9 @@
 #include <host/keys.h>
 #include "br.h"
 #include "sco_internal.h"
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 
-#define LOG_LEVEL CONFIG_BT_HCI_CORE_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_br);
+LOG_MODULE_REGISTER(bt_br, CONFIG_BT_HCI_CORE_LOG_LEVEL);
 
 #define RSSI_INVALID 127
 

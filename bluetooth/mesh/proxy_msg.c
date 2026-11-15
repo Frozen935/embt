@@ -29,10 +29,9 @@
 #include "access.h"
 #include "proxy.h"
 #include "proxy_msg.h"
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 
-#define LOG_LEVEL CONFIG_BT_MESH_PROXY_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_mesh_proxy);
+LOG_MODULE_REGISTER(bt_mesh_proxy, CONFIG_BT_MESH_PROXY_LOG_LEVEL);
 
 #define PDU_SAR(data)      (data[0] >> 6)
 

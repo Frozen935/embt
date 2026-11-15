@@ -26,10 +26,9 @@
 #include "at.h"
 #include "sco_internal.h"
 #include "hfp_hf_internal.h"
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 
-#define LOG_LEVEL CONFIG_BT_HFP_HF_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_hfp_hf);
+LOG_MODULE_REGISTER(bt_hfp_hf, CONFIG_BT_HFP_HF_LOG_LEVEL);
 
 #define MAX_IND_STR_LEN 17
 

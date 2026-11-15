@@ -9,6 +9,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <embt/base/log.h>
 #include <stdint.h>
 
 #include <zephyr/bluetooth/conn.h>
@@ -114,7 +115,7 @@ void bt_iso_connected(struct bt_conn *iso);
 /* Notify ISO channels of a disconnect event */
 void bt_iso_disconnected(struct bt_conn *iso);
 
-#if defined(CONFIG_BT_ISO_LOG_LEVEL_DBG)
+#if BT_LOG_LEVEL_ENABLED(BT_ISO, DBG)
 void bt_iso_chan_set_state_debug(struct bt_iso_chan *chan,
 				 enum bt_iso_state state,
 				 const char *func, int line);
@@ -122,7 +123,7 @@ void bt_iso_chan_set_state_debug(struct bt_iso_chan *chan,
 	bt_iso_chan_set_state_debug(_chan, _state, __func__, __LINE__)
 #else
 void bt_iso_chan_set_state(struct bt_iso_chan *chan, enum bt_iso_state state);
-#endif /* CONFIG_BT_ISO_LOG_LEVEL_DBG */
+#endif /* BT_LOG_LEVEL_ENABLED(BT_ISO, DBG) */
 
 /* Process incoming data for a connection */
 void bt_iso_recv(struct bt_conn *iso, struct net_buf *buf, uint8_t flags);

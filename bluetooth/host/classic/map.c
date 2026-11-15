@@ -21,10 +21,9 @@
 #include <host/conn_internal.h>
 #include "l2cap_br_internal.h"
 #include "obex_internal.h"
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 
-#define LOG_LEVEL CONFIG_BT_MAP_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_map);
+LOG_MODULE_REGISTER(bt_map, CONFIG_BT_MAP_LOG_LEVEL);
 
 #define MAP_TRANSPORT_TYPE_RFCOMM (0x00U)
 #define MAP_TRANSPORT_TYPE_L2CAP  (0x01U)

@@ -18,7 +18,7 @@
 #include <zephyr/bluetooth/gap.h>
 #include <zephyr/bluetooth/hci.h>
 #include <zephyr/bluetooth/hci_types.h>
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 #include <zephyr/net_buf.h>
 #include <zephyr/sys/__assert.h>
 #include <zephyr/sys/atomic.h>
@@ -35,8 +35,7 @@
 #include "scan.h"
 #include "adv.h"
 
-#define LOG_LEVEL CONFIG_BT_HCI_CORE_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_adv);
+LOG_MODULE_REGISTER(bt_adv, CONFIG_BT_HCI_CORE_LOG_LEVEL);
 
 struct bt_ad {
 	/* Pointer to an LTV structure */

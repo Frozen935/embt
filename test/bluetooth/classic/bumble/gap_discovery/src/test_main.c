@@ -11,14 +11,14 @@
 #include <zephyr/bluetooth/classic/classic.h>
 #include <zephyr/bluetooth/conn.h>
 #include <zephyr/bluetooth/hci.h>
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 #include <zephyr/ztest.h>
 
 #include "nsi_main.h"
 #include "soc.h"
 #include "cmdline.h"
 
-LOG_MODULE_REGISTER(test_gap_discovery, CONFIG_TEST_GAP_DISCOVERY_LOG_LEVEL);
+LOG_MODULE_REGISTER(test_gap_discovery, LOG_LEVEL_DBG);
 
 static bt_addr_t peer_addr;
 static atomic_t peer_cod;

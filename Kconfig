@@ -75,6 +75,7 @@ endmenu
 
 rsource "osdep/Kconfig"
 rsource "base/Kconfig"
+rsource "Kconfig.log"
 
 menu "Runtime interface requirements"
 

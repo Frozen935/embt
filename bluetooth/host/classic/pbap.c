@@ -27,10 +27,9 @@
 #include "rfcomm_internal.h"
 #include "obex_internal.h"
 #include "pbap_internal.h"
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 
-#define LOG_LEVEL CONFIG_BT_PBAP_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_pbap);
+LOG_MODULE_REGISTER(bt_pbap, CONFIG_BT_PBAP_LOG_LEVEL);
 
 #define PBAP_PWD_MAX_LENGTH 16U
 #define PBAP_POOL_BUF_SIZE                                                                         \

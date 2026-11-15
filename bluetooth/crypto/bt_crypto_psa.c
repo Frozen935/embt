@@ -11,10 +11,9 @@
 
 #include "common/bt_str.h"
 #include "bt_crypto.h"
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 
-#define LOG_LEVEL CONFIG_BT_CRYPTO_LOG_LEVEL
-LOG_MODULE_DECLARE(bt_crypto);
+LOG_MODULE_DECLARE(bt_crypto, CONFIG_BT_CRYPTO_LOG_LEVEL);
 
 int bt_crypto_aes_cmac(const uint8_t *key, const uint8_t *in, size_t len, uint8_t *out)
 {

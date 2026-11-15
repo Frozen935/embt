@@ -10,10 +10,9 @@
 #include "access.h"
 #include "prov.h"
 #include "rpr.h"
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 
-#define LOG_LEVEL CONFIG_BT_MESH_MODEL_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_mesh_rpr_cli);
+LOG_MODULE_REGISTER(bt_mesh_rpr_cli, CONFIG_BT_MESH_MODEL_LOG_LEVEL);
 
 #define LINK_TIMEOUT_SECONDS_DEFAULT 10
 
@@ -298,7 +297,7 @@ static int handle_scan_report(const struct bt_mesh_model *mod, struct bt_mesh_ms
 		return -EINVAL;
 	}
 
-	if (IS_ENABLED(CONFIG_BT_MESH_MODEL_LOG_LEVEL_DBG)) {
+	if (BT_LOG_LEVEL_ENABLED(BT_MESH_MODEL, DBG)) {
 		struct bt_uuid_128 uuid_repr = { .uuid = { BT_UUID_TYPE_128 } };
 
 		memcpy(uuid_repr.val, dev.uuid, 16);

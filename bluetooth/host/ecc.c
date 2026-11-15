@@ -16,7 +16,7 @@
 #include <zephyr/sys/atomic.h>
 #include <zephyr/sys/byteorder.h>
 #include <zephyr/bluetooth/hci.h>
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 #include <zephyr/sys/slist.h>
 #include <zephyr/sys/util_macro.h>
 #include <psa/crypto.h>
@@ -28,8 +28,7 @@
 #include "ecc.h"
 #include "hci_core.h"
 
-#define LOG_LEVEL CONFIG_BT_HCI_CORE_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_ecc);
+LOG_MODULE_REGISTER(bt_ecc, CONFIG_BT_HCI_CORE_LOG_LEVEL);
 
 static uint8_t pub_key[BT_PUB_KEY_LEN];
 static sys_slist_t pub_key_cb_slist;

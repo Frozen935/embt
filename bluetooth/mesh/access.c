@@ -27,10 +27,9 @@
 #include "settings.h"
 #include "va.h"
 #include "delayable_msg.h"
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 
-#define LOG_LEVEL CONFIG_BT_MESH_ACCESS_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_mesh_access);
+LOG_MODULE_REGISTER(bt_mesh_access, CONFIG_BT_MESH_ACCESS_LOG_LEVEL);
 
 /* 20 - 50ms */
 #define RANDOM_DELAY_SHORT 30

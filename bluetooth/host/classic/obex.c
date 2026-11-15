@@ -27,10 +27,9 @@
 #endif /* CONFIG_BT_OBEX_AUTH */
 
 #include "obex_internal.h"
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 
-#define LOG_LEVEL CONFIG_BT_GOEP_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_obex);
+LOG_MODULE_REGISTER(bt_obex, CONFIG_BT_GOEP_LOG_LEVEL);
 
 #define OBEX_SERVER(node) CONTAINER_OF(node, struct bt_obex_server, _node)
 

@@ -8,14 +8,13 @@
 
 #include <zephyr/bluetooth/mesh.h>
 #include <zephyr/psa/key_ids.h>
-#include <zephyr/logging/log.h>
-
-#define LOG_LEVEL CONFIG_BT_MESH_CRYPTO_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_mesh_crypto_psa);
 
 #include "mesh.h"
 #include "crypto.h"
 #include "prov.h"
+
+#include <embt/base/log.h>
+LOG_MODULE_REGISTER(bt_mesh_crypto_psa, CONFIG_BT_MESH_CRYPTO_LOG_LEVEL);
 
 /* Mesh requires to keep in persistent memory network keys (2 keys per subnetwork),
  * application keys (2 real keys per 1 configured) and device key + device key candidate.

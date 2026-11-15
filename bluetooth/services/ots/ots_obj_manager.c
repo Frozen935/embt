@@ -13,7 +13,7 @@
 
 #include <zephyr/bluetooth/services/ots.h>
 #include "ots_internal.h"
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 
 LOG_MODULE_DECLARE(bt_ots, CONFIG_BT_OTS_LOG_LEVEL);
 

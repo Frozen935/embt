@@ -11,11 +11,10 @@
 
 #include <zephyr/autoconf.h>
 #include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 #include <zephyr/net_buf.h>
 
-#define LOG_LEVEL CONFIG_BT_HCI_CORE_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_data);
+LOG_MODULE_REGISTER(bt_data, CONFIG_BT_HCI_CORE_LOG_LEVEL);
 
 void bt_data_parse(struct net_buf_simple *ad,
 		   bool (*func)(struct bt_data *data, void *user_data),

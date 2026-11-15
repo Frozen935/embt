@@ -25,7 +25,7 @@
 #include <zephyr/sys/util.h>
 #include <zephyr/ztest.h>
 
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 LOG_MODULE_REGISTER(bt_adv_dir_timeout_test, CONFIG_BT_LOG_LEVEL);
 
 #define DT_DRV_COMPAT zephyr_bt_hci_test

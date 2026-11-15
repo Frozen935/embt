@@ -16,7 +16,7 @@
 #include <zephyr/bluetooth/buf.h>
 #include <zephyr/bluetooth/conn.h>
 #include <zephyr/bluetooth/hci.h>
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 #include <zephyr/settings/settings.h>
 #include <zephyr/sys/__assert.h>
 #include <zephyr/sys/atomic.h>
@@ -34,8 +34,7 @@
 #include "smp.h"
 #include "sys/types.h"
 
-#define LOG_LEVEL CONFIG_BT_KEYS_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_keys);
+LOG_MODULE_REGISTER(bt_keys, CONFIG_BT_KEYS_LOG_LEVEL);
 
 static struct bt_keys key_pool[CONFIG_BT_MAX_PAIRED];
 

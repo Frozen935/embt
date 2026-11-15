@@ -21,10 +21,9 @@
 #include "mesh.h"
 #include "sar_cfg_internal.h"
 #include "settings.h"
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 
-#define LOG_LEVEL CONFIG_BT_MESH_MODEL_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_mesh_sar_cfg_srv);
+LOG_MODULE_REGISTER(bt_mesh_sar_cfg_srv, CONFIG_BT_MESH_MODEL_LOG_LEVEL);
 
 static int sar_rx_store(const struct bt_mesh_model *model, bool delete)
 {

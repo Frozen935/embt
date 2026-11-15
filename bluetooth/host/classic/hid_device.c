@@ -23,7 +23,7 @@
 #include <host/l2cap_internal.h>
 
 #include "hid_internal.h"
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 
 LOG_MODULE_REGISTER(bt_hid_device);
 

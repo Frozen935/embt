@@ -37,10 +37,9 @@
 #include <host/smp.h>
 #include "ssp.h"
 #include "sco_internal.h"
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 
-#define LOG_LEVEL CONFIG_BT_CONN_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_conn_br);
+LOG_MODULE_REGISTER(bt_conn_br, CONFIG_BT_CONN_LOG_LEVEL);
 
 void bt_sco_cleanup(struct bt_conn *sco_conn)
 {

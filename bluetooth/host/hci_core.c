@@ -29,7 +29,7 @@
 #include <zephyr/bluetooth/testing.h>
 #include <zephyr/devicetree.h>
 #include <zephyr/drivers/bluetooth.h>
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 #include <zephyr/net_buf.h>
 #include <zephyr/settings/settings.h>
 #include <zephyr/sys/atomic.h>
@@ -65,8 +65,7 @@
 #include "direction_internal.h"
 #endif /* CONFIG_BT_DF */
 
-#define LOG_LEVEL CONFIG_BT_HCI_CORE_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_hci_core);
+LOG_MODULE_REGISTER(bt_hci_core, CONFIG_BT_HCI_CORE_LOG_LEVEL);
 
 #if DT_HAS_CHOSEN(zephyr_bt_hci)
 #define BT_HCI_NODE   DT_CHOSEN(zephyr_bt_hci)

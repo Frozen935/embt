@@ -21,7 +21,7 @@
 #include <zephyr/bluetooth/conn.h>
 #include <zephyr/bluetooth/gatt.h>
 #include <zephyr/bluetooth/uuid.h>
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 #include <zephyr/sys/atomic.h>
 #include <zephyr/sys/byteorder.h>
 #include <zephyr/sys/util.h>
@@ -32,8 +32,7 @@
 #include "audio_internal.h"
 #include "vocs_internal.h"
 
-#define LOG_LEVEL CONFIG_BT_VOCS_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_vocs);
+LOG_MODULE_REGISTER(bt_vocs, CONFIG_BT_VOCS_LOG_LEVEL);
 
 #define VALID_VOCS_OPCODE(opcode)	((opcode) == BT_VOCS_OPCODE_SET_OFFSET)
 
@@ -439,7 +438,7 @@ int bt_vocs_register(struct bt_vocs *vocs,
 	if (param->output_desc) {
 		(void)utf8_lcpy(inst->output_desc, param->output_desc,
 				sizeof(inst->output_desc));
-		if (IS_ENABLED(CONFIG_BT_VOCS_LOG_LEVEL_DBG) &&
+		if (BT_LOG_LEVEL_ENABLED(BT_VOCS, DBG) &&
 		    strcmp(inst->output_desc, param->output_desc)) {
 			LOG_DBG("Output desc clipped to %s", inst->output_desc);
 		}

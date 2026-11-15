@@ -26,10 +26,9 @@
 #include <host/hci_core.h>
 #include <host/conn_internal.h>
 #include "l2cap_br_internal.h"
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 
-#define LOG_LEVEL CONFIG_BT_AVCTP_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_avctp);
+LOG_MODULE_REGISTER(bt_avctp, CONFIG_BT_AVCTP_LOG_LEVEL);
 
 /** @brief AVCTP Header Sizes for different packet types */
 #define BT_AVCTP_HDR_SIZE_SINGLE        (sizeof(struct bt_avctp_header_single))

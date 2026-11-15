@@ -23,9 +23,8 @@
 #include <zephyr/bluetooth/uuid.h>
 #include <zephyr/bluetooth/services/bas.h>
 #include "bas_internal.h"
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 
-#define LOG_LEVEL CONFIG_BT_BAS_LOG_LEVEL
 LOG_MODULE_REGISTER(bas, CONFIG_BT_BAS_LOG_LEVEL);
 
 static uint8_t battery_level = 100U;

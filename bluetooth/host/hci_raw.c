@@ -19,7 +19,7 @@
 #include <zephyr/bluetooth/iso.h>
 #include <zephyr/devicetree.h>
 #include <zephyr/drivers/bluetooth.h>
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 #include <zephyr/net_buf.h>
 #include <zephyr/sys/atomic.h>
 #include <zephyr/sys/byteorder.h>
@@ -30,8 +30,7 @@
 #include "hci_raw_internal.h"
 #include "monitor.h"
 
-#define LOG_LEVEL CONFIG_BT_HCI_CORE_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_hci_raw);
+LOG_MODULE_REGISTER(bt_hci_raw, CONFIG_BT_HCI_CORE_LOG_LEVEL);
 
 static struct k_fifo *raw_rx;
 

@@ -26,7 +26,7 @@
 #include <zephyr/bluetooth/hci_vs.h>
 #include <zephyr/bluetooth/iso.h>
 #include <zephyr/bluetooth/l2cap.h>
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 #include <zephyr/net_buf.h>
 #include <zephyr/sys/atomic.h>
 #include <zephyr/sys/byteorder.h>
@@ -57,8 +57,7 @@
 #include "scan.h"
 #include "smp.h"
 
-#define LOG_LEVEL CONFIG_BT_CONN_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_conn);
+LOG_MODULE_REGISTER(bt_conn, CONFIG_BT_CONN_LOG_LEVEL);
 
 K_FIFO_DEFINE(free_tx);
 
@@ -1874,7 +1873,7 @@ struct net_buf *bt_conn_create_pdu_timeout(struct net_buf_pool *pool,
 #endif /* CONFIG_BT_CONN */
 	}
 
-	if (IS_ENABLED(CONFIG_BT_CONN_LOG_LEVEL_DBG)) {
+	if (BT_LOG_LEVEL_ENABLED(BT_CONN, DBG)) {
 		buf = net_buf_alloc(pool, K_NO_WAIT);
 		if (!buf) {
 			LOG_WRN("Unable to allocate buffer with K_NO_WAIT");

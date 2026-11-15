@@ -8,7 +8,7 @@
 #include <zephyr/bluetooth/bluetooth.h>
 #include <zephyr/bluetooth/conn.h>
 #include <zephyr/bluetooth/classic/classic.h>
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 #include <zephyr/ztest.h>
 
 #include "nsi_main.h"

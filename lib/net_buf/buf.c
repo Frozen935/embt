@@ -5,34 +5,33 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-#include <zephyr/logging/log.h>
 
-#define LOG_MODULE_NAME net_buf
-#define LOG_LEVEL CONFIG_NET_BUF_LOG_LEVEL
-LOG_MODULE_REGISTER(LOG_MODULE_NAME);
 
 #define NET_BUF_DBG(...) LOG_DBG(__VA_ARGS__)
 #define NET_BUF_ERR(...) LOG_ERR(__VA_ARGS__)
 #define NET_BUF_WARN(...) LOG_WRN(__VA_ARGS__)
 #define NET_BUF_INFO(...) LOG_INF(__VA_ARGS__)
-#include <base/base.h>
-#include <base/fifo.h>
-#include <base/lifo.h>
-#include <base/spinlock.h>
-#include <base/time.h>
-#include <embt/types/timeout.h>
-#include <base/atomic.h>
-#include <osi/memory.h>
-#include <osi/io.h>
-#include <base/assert.h>
+#include <embt/base/base.h>
+#include <embt/base/fifo.h>
+#include <embt/base/lifo.h>
+#include <embt/base/spinlock.h>
+#include <embt/base/time.h>
+#include <embt/base/time.h>
+#include <embt/base/atomic.h>
+#include <embt/osi/memory.h>
+#include <embt/osi/io.h>
+#include <embt/base/assert.h>
 #include <stdio.h>
 #include <errno.h>
 #include <stddef.h>
 #include <string.h>
-#include <embt/sys/byteorder.h>
-#include <embt/sys/minmax.h>
+#include <embt/base/byteorder.h>
+#include <embt/base/minmax.h>
 
 #include <embt/net_buf.h>
+
+#include <embt/base/log.h>
+LOG_MODULE_REGISTER(net_buf, CONFIG_NET_BUF_LOG_LEVEL);
 
 /* The struct net_buf::ref_word layout assumes bt_atomic_t is `long` -- the
  * conditional padding in the byte-struct view (see net_buf.h) keys off

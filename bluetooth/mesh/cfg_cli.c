@@ -21,10 +21,9 @@
 #include "net.h"
 #include "foundation.h"
 #include "msg.h"
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 
-#define LOG_LEVEL CONFIG_BT_MESH_MODEL_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_mesh_cfg_cli);
+LOG_MODULE_REGISTER(bt_mesh_cfg_cli, CONFIG_BT_MESH_MODEL_LOG_LEVEL);
 
 #define CID_NVAL 0xffff
 

@@ -25,6 +25,9 @@
 #include <zephyr/bluetooth/buf.h>
 #include <zephyr/bluetooth/hci.h>
 #include <zephyr/drivers/bluetooth.h>
+#include <embt/base/log.h>
+
+LOG_MODULE_REGISTER(bt_driver, CONFIG_BT_HCI_DRIVER_LOG_LEVEL);
 
 #define DT_DRV_COMPAT zephyr_bt_hci_userchan
 

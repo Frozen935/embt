@@ -5,24 +5,25 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-#include <zephyr/logging/log.h>
 
-LOG_MODULE_REGISTER(net_buf_simple, CONFIG_NET_BUF_LOG_LEVEL);
 
 #define NET_BUF_SIMPLE_DBG(...) LOG_DBG(__VA_ARGS__)
 #define NET_BUF_SIMPLE_ERR(...) LOG_ERR(__VA_ARGS__)
 #define NET_BUF_SIMPLE_WARN(...) LOG_WRN(__VA_ARGS__)
 #define NET_BUF_SIMPLE_INFO(...) LOG_INF(__VA_ARGS__)
-#include <base/assert.h>
-#include <embt/sys/unaligned.h>
-#include <embt/sys/util_macro.h>
+#include <embt/base/assert.h>
+#include <embt/base/unaligned.h>
+#include <embt/base/util_macro.h>
 #include <stdio.h>
 #include <inttypes.h>
 #include <stddef.h>
 #include <string.h>
-#include <embt/sys/byteorder.h>
+#include <embt/base/byteorder.h>
 
 #include <embt/net_buf.h>
+
+#include <embt/base/log.h>
+LOG_MODULE_REGISTER(net_buf_simple, CONFIG_NET_BUF_LOG_LEVEL);
 
 #if defined(CONFIG_NET_BUF_HARDENING)
 /* Fail-closed check for the mutating primitives. If the buffer's metadata is

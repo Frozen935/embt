@@ -25,10 +25,9 @@
 #include "gatt_cli.h"
 #include "proxy_msg.h"
 #include "crypto.h"
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 
-#define LOG_LEVEL CONFIG_BT_MESH_PROXY_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_mesh_proxy_client);
+LOG_MODULE_REGISTER(bt_mesh_proxy_client, CONFIG_BT_MESH_PROXY_LOG_LEVEL);
 
 static struct bt_mesh_proxy_server {
 	struct bt_mesh_proxy_role *role;

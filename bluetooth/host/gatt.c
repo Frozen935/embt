@@ -24,7 +24,7 @@
 #include <zephyr/bluetooth/hci_types.h>
 #include <zephyr/bluetooth/uuid.h>
 #include <zephyr/bluetooth/gatt.h>
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 #include <zephyr/net_buf.h>
 #include <zephyr/settings/settings.h>
 #include <zephyr/sys/__assert.h>
@@ -54,8 +54,7 @@
 #include "settings.h"
 #include "smp.h"
 
-#define LOG_LEVEL CONFIG_BT_GATT_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_gatt);
+LOG_MODULE_REGISTER(bt_gatt, CONFIG_BT_GATT_LOG_LEVEL);
 
 #define SC_TIMEOUT	K_MSEC(10)
 #define DB_HASH_TIMEOUT	K_MSEC(10)

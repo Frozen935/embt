@@ -16,10 +16,9 @@
 #include <zephyr/bluetooth/gatt.h>
 #include <zephyr/bluetooth/uuid.h>
 #include <zephyr/bluetooth/hci.h>
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 
-#define LOG_LEVEL CONFIG_BT_TPS_LOG_LEVEL
-LOG_MODULE_REGISTER(tps);
+LOG_MODULE_REGISTER(tps, CONFIG_BT_TPS_LOG_LEVEL);
 
 static ssize_t read_tx_power_level(struct bt_conn *conn,
 				   const struct bt_gatt_attr *attr, void *buf,

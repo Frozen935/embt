@@ -20,10 +20,9 @@
 #include "net.h"
 #include "foundation.h"
 #include "msg.h"
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 
-#define LOG_LEVEL CONFIG_BT_MESH_MODEL_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_mesh_health_cli);
+LOG_MODULE_REGISTER(bt_mesh_health_cli, CONFIG_BT_MESH_MODEL_LOG_LEVEL);
 
 static int32_t msg_timeout;
 

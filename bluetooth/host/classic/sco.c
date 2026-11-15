@@ -23,10 +23,9 @@
 #include "br.h"
 #include <host/conn_internal.h>
 #include "sco_internal.h"
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 
-#define LOG_LEVEL CONFIG_BT_CONN_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_sco);
+LOG_MODULE_REGISTER(bt_sco, CONFIG_BT_CONN_LOG_LEVEL);
 
 struct bt_sco_server *sco_server;
 
@@ -213,7 +212,7 @@ static uint8_t sco_server_check_security(struct bt_conn *conn)
 	return BT_HCI_ERR_INSUFFICIENT_SECURITY;
 }
 
-#if defined(CONFIG_BT_CONN_LOG_LEVEL_DBG)
+#if BT_LOG_LEVEL_ENABLED(BT_CONN, DBG)
 const char *bt_sco_chan_state_str(uint8_t state)
 {
 	switch (state) {
@@ -274,7 +273,7 @@ void bt_sco_chan_set_state(struct bt_sco_chan *chan, enum bt_sco_state state)
 {
 	chan->state = state;
 }
-#endif /* CONFIG_BT_CONN_LOG_LEVEL_DBG */
+#endif /* BT_LOG_LEVEL_ENABLED(BT_CONN, DBG) */
 
 
 static void bt_sco_chan_add(struct bt_conn *sco, struct bt_sco_chan *chan)

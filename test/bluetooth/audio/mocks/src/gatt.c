@@ -34,7 +34,7 @@
 #include "common/bt_str.h"
 
 #define LOG_LEVEL CONFIG_BT_GATT_LOG_LEVEL
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 LOG_MODULE_REGISTER(bt_gatt);
 
 /* List of fakes used by this unit tester */

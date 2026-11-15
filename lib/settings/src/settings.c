@@ -15,7 +15,7 @@
 #include "settings_priv.h"
 #include <zephyr/types.h>
 #include <zephyr/sys/iterable_sections.h>
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 
 LOG_MODULE_REGISTER(settings, CONFIG_SETTINGS_LOG_LEVEL);
 

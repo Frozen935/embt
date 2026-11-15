@@ -15,10 +15,9 @@
 #include "settings.h"
 #include "brg_cfg.h"
 #include "foundation.h"
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 
-#define LOG_LEVEL CONFIG_BT_MESH_BRG_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_mesh_brg_cfg);
+LOG_MODULE_REGISTER(bt_mesh_brg_cfg, CONFIG_BT_MESH_BRG_LOG_LEVEL);
 
 /* Bridging table state and counter */
 static struct bt_mesh_brg_cfg_row brg_tbl[CONFIG_BT_MESH_BRG_TABLE_ITEMS_MAX];

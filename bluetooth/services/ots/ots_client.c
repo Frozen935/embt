@@ -24,10 +24,9 @@
 #include "ots_dir_list_internal.h"
 #include "ots_oacp_internal.h"
 #include "ots_olcp_internal.h"
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 
-#define LOG_LEVEL CONFIG_BT_OTS_CLIENT_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_otc);
+LOG_MODULE_REGISTER(bt_otc, CONFIG_BT_OTS_CLIENT_LOG_LEVEL);
 
 /* TODO: KConfig options */
 #define OTS_CLIENT_INST_COUNT     1
@@ -1621,7 +1620,7 @@ static int decode_record(struct net_buf_simple *buf,
 
 	rec->metadata.id = net_buf_simple_pull_le48(buf);
 
-	if (IS_ENABLED(CONFIG_BT_OTS_CLIENT_LOG_LEVEL_DBG)) {
+	if (BT_LOG_LEVEL_ENABLED(BT_OTS_CLIENT, DBG)) {
 		char t[BT_OTS_OBJ_ID_STR_LEN];
 
 		(void)bt_ots_obj_id_to_str(rec->metadata.id, t, sizeof(t));

@@ -20,10 +20,9 @@
 #include "crypto.h"
 #include "beacon.h"
 #include "cfg.h"
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 
-#define LOG_LEVEL CONFIG_BT_MESH_BEACON_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_mesh_beacon);
+LOG_MODULE_REGISTER(bt_mesh_beacon, CONFIG_BT_MESH_BEACON_LOG_LEVEL);
 
 #define PROVISIONED_INTERVAL       K_SECONDS(10)
 

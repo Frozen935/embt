@@ -19,7 +19,7 @@
 #include <zephyr/bluetooth/bluetooth.h>
 #include <zephyr/bluetooth/conn.h>
 #include <zephyr/bluetooth/l2cap.h>
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 #include <zephyr/sys/__assert.h>
 #include <zephyr/sys/atomic.h>
 #include <zephyr/sys/iterable_sections.h>
@@ -37,7 +37,7 @@
 #include "conn_internal.h"
 #include "l2cap_internal.h"
 
-#define LOG_DBG_ENABLED IS_ENABLED(CONFIG_BT_L2CAP_LOG_LEVEL_DBG)
+#define LOG_DBG_ENABLED BT_LOG_LEVEL_ENABLED(BT_L2CAP, DBG)
 
 LOG_MODULE_REGISTER(bt_l2cap, CONFIG_BT_L2CAP_LOG_LEVEL);
 
@@ -235,7 +235,7 @@ const char *bt_l2cap_chan_state_str(bt_l2cap_chan_state_t state)
 }
 
 #if defined(CONFIG_BT_L2CAP_DYNAMIC_CHANNEL)
-#if defined(CONFIG_BT_L2CAP_LOG_LEVEL_DBG)
+#if BT_LOG_LEVEL_ENABLED(BT_L2CAP, DBG)
 #define l2cap_chan_set_state(_chan, _state) \
 	l2cap_chan_set_state_debug(_chan, _state, __func__, __LINE__)
 
@@ -286,7 +286,7 @@ static void l2cap_chan_set_state(struct bt_l2cap_chan *chan, bt_l2cap_chan_state
 {
 	BT_L2CAP_LE_CHAN(chan)->state = state;
 }
-#endif /* CONFIG_BT_L2CAP_LOG_LEVEL_DBG */
+#endif /* BT_LOG_LEVEL_ENABLED(BT_L2CAP, DBG) */
 
 static void l2cap_server_release(struct bt_l2cap_server *server)
 {

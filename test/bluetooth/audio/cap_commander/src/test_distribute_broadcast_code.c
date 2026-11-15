@@ -24,7 +24,7 @@
 #include "cap_mocks.h"
 #include "test_common.h"
 
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 #include <zephyr/sys/util.h>
 
 LOG_MODULE_REGISTER(bt_distribute_broadcast_code, CONFIG_BT_CAP_COMMANDER_LOG_LEVEL);

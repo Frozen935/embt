@@ -19,10 +19,9 @@
 #include "transport.h"
 #include "access.h"
 #include "foundation.h"
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 
-#define LOG_LEVEL CONFIG_BT_MESH_MODEL_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_mesh_health_srv);
+LOG_MODULE_REGISTER(bt_mesh_health_srv, CONFIG_BT_MESH_MODEL_LOG_LEVEL);
 
 #define HEALTH_TEST_STANDARD 0x00
 

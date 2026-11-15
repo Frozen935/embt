@@ -34,10 +34,9 @@
 
 /* Timeout for receiving the link open response */
 #define LINK_ESTABLISHMENT_TIMEOUT 60
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 
-#define LOG_LEVEL CONFIG_BT_MESH_PROVISIONER_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_mesh_provisioner);
+LOG_MODULE_REGISTER(bt_mesh_provisioner, CONFIG_BT_MESH_PROVISIONER_LOG_LEVEL);
 
 static struct {
 	struct bt_mesh_cdb_node *node;

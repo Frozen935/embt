@@ -22,7 +22,7 @@
 #include <zephyr/bluetooth/data.h>
 #include <zephyr/bluetooth/services/ots.h>
 #include <zephyr/bluetooth/uuid.h>
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 #include <zephyr/net_buf.h>
 #include <zephyr/sys/__assert.h>
 #include <zephyr/sys/atomic.h>
@@ -826,7 +826,7 @@ static ssize_t on_object_send(struct bt_ots *ots, struct bt_conn *conn,
 		return -EBUSY;
 	}
 
-	if (IS_ENABLED(CONFIG_BT_MCP_MEDIA_CONTROL_SERVER_LOG_LEVEL_DBG)) {
+	if (BT_LOG_LEVEL_ENABLED(BT_MCP_MEDIA_CONTROL_SERVER, DBG)) {
 		char t[BT_OTS_OBJ_ID_STR_LEN];
 		(void)bt_ots_obj_id_to_str(id, t, sizeof(t));
 		LOG_DBG("Object Id %s, offset %lu, length %zu", t, (long)offset, len);
@@ -850,7 +850,7 @@ static ssize_t on_object_send(struct bt_ots *ots, struct bt_conn *conn,
 		return -EINVAL;
 	}
 
-	if (IS_ENABLED(CONFIG_BT_MCP_MEDIA_CONTROL_SERVER_LOG_LEVEL_DBG)) {
+	if (BT_LOG_LEVEL_ENABLED(BT_MCP_MEDIA_CONTROL_SERVER, DBG)) {
 		if (len > obj.content->len - offset) {
 			LOG_DBG("Requested len too large");
 		}
@@ -1354,7 +1354,7 @@ static uint8_t inactive_state_command_handler(const struct bt_mcs_cmd *command)
 	uint8_t result_code = BT_MCS_OPC_NTF_SUCCESS;
 
 	LOG_DBG("Command opcode: %d", command->opcode);
-	if (IS_ENABLED(CONFIG_BT_MCP_MEDIA_CONTROL_SERVER_LOG_LEVEL_DBG)) {
+	if (BT_LOG_LEVEL_ENABLED(BT_MCP_MEDIA_CONTROL_SERVER, DBG)) {
 		if (command->use_param) {
 			LOG_DBG("Command parameter: %d", command->param);
 		}
@@ -1430,7 +1430,7 @@ static uint8_t playing_state_command_handler(const struct bt_mcs_cmd *command)
 	uint8_t result_code = BT_MCS_OPC_NTF_SUCCESS;
 
 	LOG_DBG("Command opcode: %d", command->opcode);
-	if (IS_ENABLED(CONFIG_BT_MCP_MEDIA_CONTROL_SERVER_LOG_LEVEL_DBG)) {
+	if (BT_LOG_LEVEL_ENABLED(BT_MCP_MEDIA_CONTROL_SERVER, DBG)) {
 		if (command->use_param) {
 			LOG_DBG("Command parameter: %d", command->param);
 		}
@@ -1554,7 +1554,7 @@ static uint8_t paused_state_command_handler(const struct bt_mcs_cmd *command)
 	uint8_t result_code = BT_MCS_OPC_NTF_SUCCESS;
 
 	LOG_DBG("Command opcode: %d", command->opcode);
-	if (IS_ENABLED(CONFIG_BT_MCP_MEDIA_CONTROL_SERVER_LOG_LEVEL_DBG)) {
+	if (BT_LOG_LEVEL_ENABLED(BT_MCP_MEDIA_CONTROL_SERVER, DBG)) {
 		if (command->use_param) {
 			LOG_DBG("Command parameter: %d", command->param);
 		}
@@ -1702,7 +1702,7 @@ static uint8_t seeking_state_command_handler(const struct bt_mcs_cmd *command)
 	uint8_t result_code = BT_MCS_OPC_NTF_SUCCESS;
 
 	LOG_DBG("Command opcode: %d", command->opcode);
-	if (IS_ENABLED(CONFIG_BT_MCP_MEDIA_CONTROL_SERVER_LOG_LEVEL_DBG)) {
+	if (BT_LOG_LEVEL_ENABLED(BT_MCP_MEDIA_CONTROL_SERVER, DBG)) {
 		if (command->use_param) {
 			LOG_DBG("Command parameter: %d", command->param);
 		}
@@ -3135,7 +3135,7 @@ int bt_mcp_media_control_server_register(void)
 	return 0;
 }
 
-#if CONFIG_BT_MCP_MEDIA_CONTROL_SERVER_LOG_LEVEL_DBG /* Special commands for debugging */
+#if BT_LOG_LEVEL_ENABLED(BT_MCP_MEDIA_CONTROL_SERVER, DBG) /* Special commands for debugging */
 
 void bt_mcp_debug_dump_state(void)
 {
@@ -3224,7 +3224,7 @@ void bt_mcp_debug_dump_state(void)
 	}
 #endif /* CONFIG_BT_MCP_MEDIA_CONTROL_SERVER_OBJECTS */
 }
-#endif /* CONFIG_BT_MCP_MEDIA_CONTROL_SERVER_LOG_LEVEL_DBG */
+#endif /* BT_LOG_LEVEL_ENABLED(BT_MCP_MEDIA_CONTROL_SERVER, DBG) */
 
 #if defined(CONFIG_BT_TESTING) /* Special commands for testing */
 

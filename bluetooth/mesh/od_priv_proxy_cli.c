@@ -10,10 +10,9 @@
 #include "access.h"
 #include "foundation.h"
 #include "msg.h"
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 
-#define LOG_LEVEL CONFIG_BT_MESH_MODEL_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_mesh_od_priv_proxy_cli);
+LOG_MODULE_REGISTER(bt_mesh_od_priv_proxy_cli, CONFIG_BT_MESH_MODEL_LOG_LEVEL);
 
 /** On-Demand Private Proxy Client Model Context */
 static struct bt_mesh_od_priv_proxy_cli *cli;

@@ -26,10 +26,9 @@
 #include "proxy.h"
 #include "gatt_cli.h"
 #include "proxy_msg.h"
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 
-#define LOG_LEVEL CONFIG_BT_MESH_PROV_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_mesh_pb_gatt_client);
+LOG_MODULE_REGISTER(bt_mesh_pb_gatt_client, CONFIG_BT_MESH_PROV_LOG_LEVEL);
 
 static struct {
 	bool target_set;

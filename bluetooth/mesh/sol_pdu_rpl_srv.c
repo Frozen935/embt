@@ -9,10 +9,9 @@
 #include "foundation.h"
 #include "subnet.h"
 #include "solicitation.h"
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 
-#define LOG_LEVEL CONFIG_BT_MESH_MODEL_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_mesh_sol_pdu_rpl_srv);
+LOG_MODULE_REGISTER(bt_mesh_sol_pdu_rpl_srv, CONFIG_BT_MESH_MODEL_LOG_LEVEL);
 
 static void sol_rpl_status_rsp(const struct bt_mesh_model *mod,
 			       struct bt_mesh_msg_ctx *ctx,

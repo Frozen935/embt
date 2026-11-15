@@ -22,10 +22,9 @@
 #include "net.h"
 #include "crypto.h"
 #include "settings.h"
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 
-#define LOG_LEVEL CONFIG_BT_MESH_TRANS_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_mesh_va);
+LOG_MODULE_REGISTER(bt_mesh_va, CONFIG_BT_MESH_TRANS_LOG_LEVEL);
 
 static struct bt_mesh_va virtual_addrs[CONFIG_BT_MESH_LABEL_COUNT];
 

@@ -16,10 +16,9 @@
 #include <zephyr/bluetooth/classic/sdp.h>
 #include <zephyr/bluetooth/classic/goep.h>
 #include <zephyr/bluetooth/classic/ftp.h>
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 
-#define LOG_LEVEL CONFIG_BT_FTP_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_ftp);
+LOG_MODULE_REGISTER(bt_ftp, CONFIG_BT_FTP_LOG_LEVEL);
 
 typedef void (*ftp_client_cb)(struct bt_ftp_client *client, uint8_t rsp_code, struct net_buf *buf);
 typedef void (*ftp_server_cb)(struct bt_ftp_server *server, bool final, struct net_buf *buf);

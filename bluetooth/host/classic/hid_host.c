@@ -25,10 +25,9 @@
 #include "host/l2cap_internal.h"
 
 #include "hid_internal.h"
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 
-#define LOG_LEVEL CONFIG_BT_HID_HOST_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_hid_host);
+LOG_MODULE_REGISTER(bt_hid_host, CONFIG_BT_HID_HOST_LOG_LEVEL);
 
 /* Get the HID host from CTRL L2CAP channel */
 #define HID_HOST_BY_CTRL_CHAN(ch) \
@@ -81,7 +80,7 @@ static const char *hid_state_str(uint8_t state)
 	}
 }
 
-#if defined(CONFIG_BT_HID_HOST_LOG_LEVEL_DBG)
+#if BT_LOG_LEVEL_ENABLED(BT_HID_HOST, DBG)
 /* Single mutation point for the connection state. The transition is logged and
  * checked only in debug builds, and an unexpected one is reported but still
  * applied so a peer that deviates cannot wedge the state machine. HID spec
@@ -143,7 +142,7 @@ static void hid_set_state(struct bt_hid_host *hid, enum bt_hid_state state)
 {
 	hid->state = state;
 }
-#endif /* CONFIG_BT_HID_HOST_LOG_LEVEL_DBG */
+#endif /* BT_LOG_LEVEL_ENABLED(BT_HID_HOST, DBG) */
 
 static struct bt_hid_host *hid_allocate(const struct bt_conn *conn)
 {

@@ -31,6 +31,14 @@ foreach(case atomic queue queue_cancel semaphore slab netbuf work work_cancel
   set_tests_properties("bringup.base.${case}" PROPERTIES LABELS bringup TIMEOUT 10)
 endforeach()
 
+add_executable(test_log test_log.c log_module_debug.c log_module_declare.c
+  log_module_warn.c log_module_off.c)
+target_link_libraries(test_log PRIVATE EmBT::embt EmBT::cmocka embt_internal)
+target_compile_options(test_log PRIVATE -Werror)
+embt_test_instrument(test_log)
+add_test(NAME bringup.base.logging COMMAND test_log)
+set_tests_properties(bringup.base.logging PROPERTIES LABELS bringup TIMEOUT 10)
+
 add_executable(test_compiler test_compiler.c)
 target_link_libraries(test_compiler PRIVATE EmBT::embt EmBT::cmocka embt_internal)
 target_compile_options(test_compiler PRIVATE -Werror)
@@ -64,6 +72,14 @@ target_compile_options(test_work_semantics PRIVATE -Werror)
 embt_test_instrument(test_work_semantics)
 add_test(NAME bringup.base.work_semantics COMMAND test_work_semantics)
 set_tests_properties(bringup.base.work_semantics PROPERTIES LABELS bringup TIMEOUT 15)
+
+add_executable(test_diagnostics test_diagnostics.c)
+target_link_libraries(test_diagnostics PRIVATE EmBT::embt EmBT::cmocka embt_internal)
+target_link_options(test_diagnostics PRIVATE "-Wl,--wrap=osi_vprint" "-Wl,--wrap=osi_malloc")
+target_compile_options(test_diagnostics PRIVATE -Werror)
+embt_test_instrument(test_diagnostics)
+add_test(NAME bringup.base.diagnostics COMMAND test_diagnostics)
+set_tests_properties(bringup.base.diagnostics PROPERTIES LABELS bringup TIMEOUT 15)
 
 foreach(variant normal ndebug)
   add_executable(test_public_assert_${variant} test_public_assert.c)

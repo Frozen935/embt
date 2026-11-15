@@ -20,10 +20,9 @@
 #include "foundation.h"
 #include "friend.h"
 #include "va.h"
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 
-#define LOG_LEVEL CONFIG_BT_MESH_FRIEND_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_mesh_friend);
+LOG_MODULE_REGISTER(bt_mesh_friend, CONFIG_BT_MESH_FRIEND_LOG_LEVEL);
 
 /**
  * Log modes other than the deferred may cause unintended delays during processing of log messages.
@@ -31,7 +30,7 @@ LOG_MODULE_REGISTER(bt_mesh_friend);
  */
 #if !defined(CONFIG_TEST) && !defined(CONFIG_ARCH_POSIX) && \
 	defined(CONFIG_LOG) && !defined(CONFIG_LOG_MODE_DEFERRED) && \
-	(LOG_LEVEL >= LOG_LEVEL_INF)
+	(BT_LOG_LEVEL_ENABLED(BT_MESH_FRIEND, INF))
 #warning Frienship feature may work unstable when non-deferred log mode is selected. Use the \
 	 CONFIG_LOG_MODE_DEFERRED Kconfig option when Friend feature is enabled.
 #endif

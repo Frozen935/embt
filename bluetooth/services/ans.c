@@ -16,7 +16,7 @@
 #include <zephyr/bluetooth/gatt.h>
 #include <zephyr/bluetooth/uuid.h>
 #include <zephyr/bluetooth/services/ans.h>
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 #include <zephyr/sys/util_utf8.h>
 
 LOG_MODULE_REGISTER(bt_ans, CONFIG_BT_ANS_LOG_LEVEL);

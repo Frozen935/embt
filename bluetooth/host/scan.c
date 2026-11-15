@@ -40,10 +40,9 @@
 #include "hci_core.h"
 #include "id.h"
 #include "scan.h"
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 
-#define LOG_LEVEL CONFIG_BT_HCI_CORE_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_scan);
+LOG_MODULE_REGISTER(bt_scan, CONFIG_BT_HCI_CORE_LOG_LEVEL);
 
 struct scanner_state {
 	ATOMIC_DEFINE(scan_flags, BT_LE_SCAN_USER_NUM_FLAGS);

@@ -16,10 +16,9 @@
 #include <zephyr/bluetooth/mesh.h>
 
 #include <common/bt_str.h>
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 
-#define LOG_LEVEL CONFIG_BT_MESH_MODEL_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_mesh_large_comp_data_srv);
+LOG_MODULE_REGISTER(bt_mesh_large_comp_data_srv, CONFIG_BT_MESH_MODEL_LOG_LEVEL);
 
 #include "access.h"
 #include "cfg.h"

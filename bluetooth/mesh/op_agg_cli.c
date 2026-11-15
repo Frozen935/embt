@@ -13,10 +13,9 @@
 #include "net.h"
 #include "mesh.h"
 #include "op_agg.h"
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 
-#define LOG_LEVEL CONFIG_BT_MESH_MODEL_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_mesh_op_agg_cli);
+LOG_MODULE_REGISTER(bt_mesh_op_agg_cli, CONFIG_BT_MESH_MODEL_LOG_LEVEL);
 
 NET_BUF_SIMPLE_DEFINE_STATIC(srcs, BT_MESH_TX_SDU_MAX);
 NET_BUF_SIMPLE_DEFINE_STATIC(sdu, BT_MESH_TX_SDU_MAX);

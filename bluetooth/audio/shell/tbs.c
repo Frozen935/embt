@@ -8,6 +8,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <embt/base/log.h>
 #include <errno.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -743,7 +744,7 @@ static int cmd_tbs_print_calls(const struct shell *sh, size_t argc,
 	ARG_UNUSED(argc);
 	ARG_UNUSED(argv);
 
-	if (IS_ENABLED(CONFIG_BT_TBS_LOG_LEVEL_DBG)) {
+	if (BT_LOG_LEVEL_ENABLED(BT_TBS, DBG)) {
 		bt_tbs_dbg_print_calls();
 		return 0;
 	}

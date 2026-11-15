@@ -35,10 +35,9 @@
 #include "settings.h"
 #include "cfg.h"
 #include "va.h"
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 
-#define LOG_LEVEL CONFIG_BT_MESH_MODEL_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_mesh_cfg_srv);
+LOG_MODULE_REGISTER(bt_mesh_cfg_srv, CONFIG_BT_MESH_MODEL_LOG_LEVEL);
 
 static void node_reset_pending_handler(struct k_work *work)
 {

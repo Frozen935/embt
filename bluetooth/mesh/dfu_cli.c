@@ -12,10 +12,9 @@
 #include "dfu.h"
 #include "blob.h"
 #include <common/bt_str.h>
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 
-#define LOG_LEVEL CONFIG_BT_MESH_DFU_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_mesh_dfu_cli);
+LOG_MODULE_REGISTER(bt_mesh_dfu_cli, CONFIG_BT_MESH_DFU_LOG_LEVEL);
 
 #define TARGETS_FOR_EACH(cli, target)                                          \
 	SYS_SLIST_FOR_EACH_CONTAINER(                                          \

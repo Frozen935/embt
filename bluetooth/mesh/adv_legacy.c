@@ -22,10 +22,9 @@
 #include "beacon.h"
 #include "prov.h"
 #include "solicitation.h"
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 
-#define LOG_LEVEL CONFIG_BT_MESH_ADV_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_mesh_adv_legacy);
+LOG_MODULE_REGISTER(bt_mesh_adv_legacy, CONFIG_BT_MESH_ADV_LOG_LEVEL);
 
 /* Pre-5.0 controllers enforce a minimum interval of 100ms
  * whereas 5.0+ controllers can go down to 20ms.

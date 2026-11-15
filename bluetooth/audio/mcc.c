@@ -22,7 +22,7 @@
 #include <zephyr/bluetooth/gatt.h>
 #include <zephyr/bluetooth/services/ots.h>
 #include <zephyr/bluetooth/uuid.h>
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 #include <zephyr/net_buf.h>
 #include <zephyr/sys/__assert.h>
 #include <zephyr/sys/atomic.h>
@@ -3380,7 +3380,7 @@ int on_icon_content(struct bt_ots_client *otc_inst, struct bt_conn *conn,
 	return BT_OTS_CONTINUE;
 }
 
-#if CONFIG_BT_MCC_LOG_LEVEL_DBG
+#if BT_LOG_LEVEL_ENABLED(BT_MCC, DBG)
 struct track_seg_t {
 	uint8_t            name_len;
 	char               name[CONFIG_BT_MCC_SEGMENT_NAME_MAX];
@@ -3430,7 +3430,7 @@ static void decode_track_segments(struct net_buf_simple *buff,
 		track_segs->segs[i].pos = (int32_t)net_buf_simple_pull_le32(&tmp_buf);
 	}
 }
-#endif /* CONFIG_BT_MCC_LOG_LEVEL_DBG */
+#endif /* BT_LOG_LEVEL_ENABLED(BT_MCC, DBG) */
 
 int on_track_segments_content(struct bt_ots_client *otc_inst,
 			      struct bt_conn *conn, uint32_t offset,
@@ -3460,7 +3460,7 @@ int on_track_segments_content(struct bt_ots_client *otc_inst,
 			atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
 		}
 
-#if CONFIG_BT_MCC_LOG_LEVEL_DBG
+#if BT_LOG_LEVEL_ENABLED(BT_MCC, DBG)
 		struct track_segs_t track_segments;
 
 		track_segments.cnt = 0U;
@@ -3471,7 +3471,7 @@ int on_track_segments_content(struct bt_ots_client *otc_inst,
 			       track_segments.segs[i].name);
 			LOG_DBG("\t-Position\t:%d", track_segments.segs[i].pos);
 		}
-#endif /* CONFIG_BT_MCC_LOG_LEVEL_DBG */
+#endif /* BT_LOG_LEVEL_ENABLED(BT_MCC, DBG) */
 
 		if (mcc_cb && mcc_cb->otc_track_segments_object) {
 			mcc_cb->otc_track_segments_object(conn,
@@ -3565,7 +3565,7 @@ int on_next_track_content(struct bt_ots_client *otc_inst,
 }
 
 
-#if CONFIG_BT_MCC_LOG_LEVEL_DBG
+#if BT_LOG_LEVEL_ENABLED(BT_MCC, DBG)
 struct id_list_elem_t {
 	uint8_t  type;
 	uint64_t id;
@@ -3590,7 +3590,7 @@ static void decode_group(struct net_buf_simple *buff,
 		ids->cnt++;
 	}
 }
-#endif /* CONFIG_BT_MCC_LOG_LEVEL_DBG */
+#endif /* BT_LOG_LEVEL_ENABLED(BT_MCC, DBG) */
 
 int on_parent_group_content(struct bt_ots_client *otc_inst,
 			    struct bt_conn *conn, uint32_t offset,
@@ -3622,7 +3622,7 @@ int on_parent_group_content(struct bt_ots_client *otc_inst,
 			atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
 		}
 
-#if CONFIG_BT_MCC_LOG_LEVEL_DBG
+#if BT_LOG_LEVEL_ENABLED(BT_MCC, DBG)
 		struct id_list_t group = {0};
 
 		decode_group(&otc_obj_buf, &group);
@@ -3634,7 +3634,7 @@ int on_parent_group_content(struct bt_ots_client *otc_inst,
 			LOG_DBG("Object type: %d, object  ID: %s",
 			       group.ids[i].type, t);
 		}
-#endif /* CONFIG_BT_MCC_LOG_LEVEL_DBG */
+#endif /* BT_LOG_LEVEL_ENABLED(BT_MCC, DBG) */
 
 		if (mcc_cb && mcc_cb->otc_parent_group_object) {
 			mcc_cb->otc_parent_group_object(conn, cb_err, &otc_obj_buf);
@@ -3676,7 +3676,7 @@ int on_current_group_content(struct bt_ots_client *otc_inst,
 			atomic_clear_bit(mcs_inst->flags, MCC_FLAG_BUSY);
 		}
 
-#if CONFIG_BT_MCC_LOG_LEVEL_DBG
+#if BT_LOG_LEVEL_ENABLED(BT_MCC, DBG)
 		struct id_list_t group = {0};
 
 		decode_group(&otc_obj_buf, &group);
@@ -3688,7 +3688,7 @@ int on_current_group_content(struct bt_ots_client *otc_inst,
 			LOG_DBG("Object type: %d, object  ID: %s",
 			       group.ids[i].type, t);
 		}
-#endif /* CONFIG_BT_MCC_LOG_LEVEL_DBG */
+#endif /* BT_LOG_LEVEL_ENABLED(BT_MCC, DBG) */
 
 		if (mcc_cb && mcc_cb->otc_current_group_object) {
 			mcc_cb->otc_current_group_object(conn, cb_err, &otc_obj_buf);

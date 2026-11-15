@@ -13,7 +13,7 @@
 #include <zephyr/autoconf.h>
 #include <zephyr/bluetooth/services/ots.h>
 #include <zephyr/bluetooth/uuid.h>
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 #include <zephyr/net_buf.h>
 #include <zephyr/sys/__assert.h>
 #include <zephyr/sys/dlist.h>

@@ -27,10 +27,9 @@
 #include "hci_core.h"
 #include "settings.h"
 #include "sys/types.h"
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 
-#define LOG_LEVEL CONFIG_BT_SETTINGS_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_settings);
+LOG_MODULE_REGISTER(bt_settings, CONFIG_BT_SETTINGS_LOG_LEVEL);
 
 #if defined(CONFIG_BT_SETTINGS_USE_PRINTK)
 int bt_settings_encode_key(char *path, size_t path_size, const char *subsys,

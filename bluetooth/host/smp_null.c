@@ -16,7 +16,7 @@
 #include <zephyr/bluetooth/conn.h>
 #include <zephyr/bluetooth/buf.h>
 #include <zephyr/bluetooth/l2cap.h>
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 #include <zephyr/net_buf.h>
 #include <zephyr/sys/atomic.h>
 #include <zephyr/sys/util.h>
@@ -27,8 +27,7 @@
 #include "l2cap_internal.h"
 #include "smp.h"
 
-#define LOG_LEVEL CONFIG_BT_HCI_CORE_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_smp);
+LOG_MODULE_REGISTER(bt_smp, CONFIG_BT_HCI_CORE_LOG_LEVEL);
 
 static struct bt_l2cap_le_chan bt_smp_pool[CONFIG_BT_MAX_CONN];
 

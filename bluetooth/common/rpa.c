@@ -18,10 +18,9 @@
 
 #include <zephyr/bluetooth/addr.h>
 #include <zephyr/bluetooth/crypto.h>
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 
-#define LOG_LEVEL CONFIG_BT_RPA_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_rpa);
+LOG_MODULE_REGISTER(bt_rpa, CONFIG_BT_RPA_LOG_LEVEL);
 
 static int ah(const uint8_t irk[16], const uint8_t r[3], uint8_t out[3])
 {

@@ -18,10 +18,9 @@
 #include "crypto.h"
 #include "rpr.h"
 #include "net.h"
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 
-#define LOG_LEVEL CONFIG_BT_MESH_MODEL_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_mesh_rpr_srv);
+LOG_MODULE_REGISTER(bt_mesh_rpr_srv, CONFIG_BT_MESH_MODEL_LOG_LEVEL);
 
 #define LINK_OPEN_TIMEOUT_DEFAULT 10
 
@@ -703,7 +702,7 @@ static int handle_extended_scan_start(const struct bt_mesh_model *mod, struct bt
 	uuid = net_buf_simple_pull_mem(buf, 16);
 	timeout = net_buf_simple_pull_u8(buf);
 
-	if (IS_ENABLED(CONFIG_BT_MESH_MODEL_LOG_LEVEL_DBG)) {
+	if (BT_LOG_LEVEL_ENABLED(BT_MESH_MODEL, DBG)) {
 		struct bt_uuid_128 uuid_repr = { .uuid = { BT_UUID_TYPE_128 } };
 
 		memcpy(uuid_repr.val, uuid, 16);
@@ -1178,7 +1177,7 @@ static void adv_handle_ext_scan(const struct bt_le_scan_recv_info *info,
 	srv.scan.addr = *info->addr;
 	atomic_set_bit(srv.flags, SCAN_EXT_HAS_ADDR);
 
-	if (IS_ENABLED(CONFIG_BT_MESH_MODEL_LOG_LEVEL_DBG)) {
+	if (BT_LOG_LEVEL_ENABLED(BT_MESH_MODEL, DBG)) {
 		struct bt_uuid_128 uuid_repr = { .uuid = { BT_UUID_TYPE_128 } };
 
 		memcpy(uuid_repr.val, dev->uuid, 16);

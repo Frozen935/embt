@@ -24,7 +24,7 @@
 #include <zephyr/bluetooth/conn.h>
 #include <zephyr/bluetooth/gatt.h>
 #include <zephyr/bluetooth/uuid.h>
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 #include <zephyr/net_buf.h>
 #include <zephyr/sys/__assert.h>
 #include <zephyr/sys/atomic.h>
@@ -3369,7 +3369,7 @@ void bt_tbs_register_cb(struct bt_tbs_cb *cbs)
 	tbs_cbs = cbs;
 }
 
-#if defined(CONFIG_BT_TBS_LOG_LEVEL_DBG)
+#if BT_LOG_LEVEL_ENABLED(BT_TBS, DBG)
 void bt_tbs_dbg_print_calls(void)
 {
 	for (size_t i = 0U; i < ARRAY_SIZE(svc_insts); i++) {
@@ -3388,4 +3388,4 @@ void bt_tbs_dbg_print_calls(void)
 		}
 	}
 }
-#endif /* defined(CONFIG_BT_TBS_LOG_LEVEL_DBG) */
+#endif /* BT_LOG_LEVEL_ENABLED(BT_TBS, DBG) */

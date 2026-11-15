@@ -16,7 +16,7 @@
 #include <zephyr/bluetooth/cs.h>
 #include <zephyr/bluetooth/hci.h>
 #include <zephyr/bluetooth/hci_types.h>
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 #include <zephyr/net_buf.h>
 #include <zephyr/sys/byteorder.h>
 #include <zephyr/sys/slist.h>
@@ -25,8 +25,7 @@
 
 #include "conn_internal.h"
 
-#define LOG_LEVEL CONFIG_BT_HCI_CORE_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_cs);
+LOG_MODULE_REGISTER(bt_cs, CONFIG_BT_HCI_CORE_LOG_LEVEL);
 
 #if defined(CONFIG_BT_CHANNEL_SOUNDING_TEST)
 static struct bt_le_cs_test_cb cs_test_callbacks;

@@ -8,7 +8,7 @@
 #include <zephyr/bluetooth/classic/sdp.h>
 
 #include "did_internal.h"
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 
 LOG_MODULE_REGISTER(bt_did);
 

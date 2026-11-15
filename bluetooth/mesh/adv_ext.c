@@ -19,10 +19,9 @@
 #include "net.h"
 #include "proxy.h"
 #include "solicitation.h"
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 
-#define LOG_LEVEL CONFIG_BT_MESH_ADV_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_mesh_adv_ext);
+LOG_MODULE_REGISTER(bt_mesh_adv_ext, CONFIG_BT_MESH_ADV_LOG_LEVEL);
 
 /* Convert from ms to 0.625ms units */
 #define ADV_INT_FAST_MS    20

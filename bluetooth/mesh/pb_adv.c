@@ -16,10 +16,9 @@
 #include "prov.h"
 
 #include "common/bt_str.h"
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 
-#define LOG_LEVEL CONFIG_BT_MESH_PROV_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_mesh_pb_adv);
+LOG_MODULE_REGISTER(bt_mesh_pb_adv, CONFIG_BT_MESH_PROV_LOG_LEVEL);
 
 #define GPCF(gpc)           (gpc & 0x03)
 #define GPC_START(last_seg) (((last_seg) << 2) | 0x00)

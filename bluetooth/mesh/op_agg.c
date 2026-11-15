@@ -8,10 +8,9 @@
 
 #include "foundation.h"
 #include "op_agg.h"
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 
-#define LOG_LEVEL CONFIG_BT_MESH_MODEL_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_mesh_op_agg);
+LOG_MODULE_REGISTER(bt_mesh_op_agg, CONFIG_BT_MESH_MODEL_LOG_LEVEL);
 
 #define IS_LENGTH_LONG(buf) ((buf)->data[0] & 1)
 #define LENGTH_SHORT_MAX BIT_MASK(7)

@@ -23,10 +23,9 @@
 #include "access.h"
 
 #include "common/bt_str.h"
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 
-#define LOG_LEVEL CONFIG_BT_MESH_KEYS_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_mesh_app_keys);
+LOG_MODULE_REGISTER(bt_mesh_app_keys, CONFIG_BT_MESH_KEYS_LOG_LEVEL);
 
 /* Tracking of what storage changes are pending for App Keys. We track this in
  * a separate array here instead of within the respective bt_mesh_app_key

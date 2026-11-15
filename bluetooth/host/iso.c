@@ -21,7 +21,7 @@
 #include <zephyr/bluetooth/conn.h>
 #include <zephyr/bluetooth/hci_types.h>
 #include <zephyr/bluetooth/iso.h>
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 #include <zephyr/net_buf.h>
 #include <zephyr/sys/__assert.h>
 #include <zephyr/sys/atomic.h>
@@ -600,7 +600,7 @@ const char *bt_iso_chan_state_str(enum bt_iso_state state)
 	}
 }
 
-#if defined(CONFIG_BT_ISO_LOG_LEVEL_DBG)
+#if BT_LOG_LEVEL_ENABLED(BT_ISO, DBG)
 
 void bt_iso_chan_set_state_debug(struct bt_iso_chan *chan, enum bt_iso_state state,
 				 const char *func, int line)
@@ -641,7 +641,7 @@ void bt_iso_chan_set_state(struct bt_iso_chan *chan, enum bt_iso_state state)
 {
 	chan->state = state;
 }
-#endif /* CONFIG_BT_ISO_LOG_LEVEL_DBG */
+#endif /* BT_LOG_LEVEL_ENABLED(BT_ISO, DBG) */
 
 int bt_iso_chan_get_info(const struct bt_iso_chan *chan, struct bt_iso_info *info)
 {

@@ -20,10 +20,9 @@
 #include "foundation.h"
 #include "lpn.h"
 #include "statistic.h"
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 
-#define LOG_LEVEL CONFIG_BT_MESH_LOW_POWER_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_mesh_lpn);
+LOG_MODULE_REGISTER(bt_mesh_lpn, CONFIG_BT_MESH_LOW_POWER_LOG_LEVEL);
 
 /**
  * Log modes other than the deferred may cause unintended delays during processing of log messages.
@@ -31,7 +30,7 @@ LOG_MODULE_REGISTER(bt_mesh_lpn);
  */
 #if !defined(CONFIG_TEST) && !defined(CONFIG_ARCH_POSIX) && \
 	defined(CONFIG_LOG) && !defined(CONFIG_LOG_MODE_DEFERRED) && \
-	(LOG_LEVEL >= LOG_LEVEL_INF)
+	(BT_LOG_LEVEL_ENABLED(BT_MESH_LOW_POWER, INF))
 #warning Frienship feature may work unstable when non-deferred log mode is selected. Use the \
 	 CONFIG_LOG_MODE_DEFERRED Kconfig option when Low Power node feature is enabled.
 #endif
@@ -89,7 +88,7 @@ LOG_MODULE_REGISTER(bt_mesh_lpn);
 /* 1 transmission, 20ms interval */
 #define POLL_XMIT BT_MESH_TRANSMIT(0, 20)
 
-#if defined(CONFIG_BT_MESH_LOW_POWER_LOG_LEVEL_DBG)
+#if BT_LOG_LEVEL_ENABLED(BT_MESH_LOW_POWER, DBG)
 static const char *state2str(int state)
 {
 	switch (state) {
@@ -115,7 +114,7 @@ static const char *state2str(int state)
 		return "(unknown)";
 	}
 }
-#endif /* CONFIG_BT_MESH_LOW_POWER_LOG_LEVEL_DBG */
+#endif /* BT_LOG_LEVEL_ENABLED(BT_MESH_LOW_POWER, DBG) */
 
 static int32_t poll_timeout(struct bt_mesh_lpn *lpn)
 {
@@ -138,7 +137,7 @@ static int32_t poll_timeout(struct bt_mesh_lpn *lpn)
 
 static inline void lpn_set_state(int state)
 {
-#if defined(CONFIG_BT_MESH_LOW_POWER_LOG_LEVEL_DBG)
+#if BT_LOG_LEVEL_ENABLED(BT_MESH_LOW_POWER, DBG)
 	LOG_DBG("%s -> %s", state2str(bt_mesh.lpn.state), state2str(state));
 #endif
 	bt_mesh.lpn.state = state;
@@ -406,7 +405,7 @@ static void req_send_end(int err, void *user_data)
 
 	lpn->adv_duration = k_uptime_get_32() - lpn->adv_start_time;
 
-#if defined(CONFIG_BT_MESH_LOW_POWER_LOG_LEVEL_DBG)
+#if BT_LOG_LEVEL_ENABLED(BT_MESH_LOW_POWER, DBG)
 	LOG_DBG("req 0x%02x duration %u err %d state %s", lpn->sent_req, lpn->adv_duration, err,
 		state2str(lpn->state));
 #endif
@@ -894,7 +893,7 @@ static void lpn_timeout(struct k_work *work)
 {
 	struct bt_mesh_lpn *lpn = &bt_mesh.lpn;
 
-#if defined(CONFIG_BT_MESH_LOW_POWER_LOG_LEVEL_DBG)
+#if BT_LOG_LEVEL_ENABLED(BT_MESH_LOW_POWER, DBG)
 	LOG_DBG("state: %s", state2str(lpn->state));
 #endif
 

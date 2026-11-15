@@ -16,15 +16,9 @@
 #include <zephyr/drivers/bluetooth/hci_lockstep.h>
 #include <zephyr/net_buf.h>
 #include <zephyr/sys/util.h>
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 
-/* The log level symbol exists only in builds with the Bluetooth Kconfig
- * tree; the helper also builds without it (see tests/bluetooth/hci_pkt).
- */
-#if defined(CONFIG_BT_HCI_DRIVER_LOG_LEVEL)
-#define LOG_LEVEL CONFIG_BT_HCI_DRIVER_LOG_LEVEL
-#endif
-LOG_MODULE_REGISTER(bt_hci_lockstep);
+LOG_MODULE_REGISTER(bt_hci_lockstep, CONFIG_BT_HCI_DRIVER_LOG_LEVEL);
 
 /* The Bluetooth Host's own command timeout */
 #define LOCKSTEP_CMD_TIMEOUT K_SECONDS(10)

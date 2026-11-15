@@ -42,10 +42,9 @@
 #include "keys.h"
 #include "l2cap_internal.h"
 #include "smp.h"
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 
-#define LOG_LEVEL CONFIG_BT_SMP_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_smp);
+LOG_MODULE_REGISTER(bt_smp, CONFIG_BT_SMP_LOG_LEVEL);
 
 #define SMP_TIMEOUT K_SECONDS(30)
 

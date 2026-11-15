@@ -18,7 +18,7 @@
 #include <zephyr/bluetooth/conn.h>
 #include <zephyr/bluetooth/gatt.h>
 #include <zephyr/bluetooth/uuid.h>
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 #include <zephyr/sys/byteorder.h>
 #include <zephyr/sys/util_macro.h>
 #include <zephyr/toolchain.h>

@@ -23,10 +23,9 @@
 #include <host/conn_internal.h>
 #include "l2cap_br_internal.h"
 #include "avdtp_internal.h"
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 
-#define LOG_LEVEL CONFIG_BT_AVDTP_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_avdtp);
+LOG_MODULE_REGISTER(bt_avdtp, CONFIG_BT_AVDTP_LOG_LEVEL);
 
 #define AVDTP_MSG_MASK GENMASK(1, 0)
 #define AVDTP_PKT_MASK GENMASK(3, 2)

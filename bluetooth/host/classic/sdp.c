@@ -24,10 +24,9 @@
 #include <host/conn_internal.h>
 #include "l2cap_br_internal.h"
 #include "sdp_internal.h"
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 
-#define LOG_LEVEL CONFIG_BT_SDP_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_sdp);
+LOG_MODULE_REGISTER(bt_sdp, CONFIG_BT_SDP_LOG_LEVEL);
 
 #define SDP_PSM 0x0001
 

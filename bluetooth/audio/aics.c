@@ -28,10 +28,9 @@
 
 #include "aics_internal.h"
 #include "audio_internal.h"
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 
-#define LOG_LEVEL CONFIG_BT_AICS_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_aics);
+LOG_MODULE_REGISTER(bt_aics, CONFIG_BT_AICS_LOG_LEVEL);
 
 #define VALID_AICS_OPCODE(opcode)                                              \
 	((opcode) >= BT_AICS_OPCODE_SET_GAIN && (opcode) <= BT_AICS_OPCODE_SET_AUTO)
@@ -603,7 +602,7 @@ int bt_aics_register(struct bt_aics *aics, struct bt_aics_register_param *param)
 	if (param->description) {
 		(void)utf8_lcpy(aics->srv.description, param->description,
 				sizeof(aics->srv.description));
-		if (IS_ENABLED(CONFIG_BT_AICS_LOG_LEVEL_DBG) &&
+		if (BT_LOG_LEVEL_ENABLED(BT_AICS, DBG) &&
 		    strcmp(aics->srv.description, param->description)) {
 			LOG_DBG("Input desc clipped to %s", aics->srv.description);
 		}

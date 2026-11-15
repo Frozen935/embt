@@ -21,10 +21,9 @@
 #include <host/conn_internal.h>
 #include "l2cap_br_internal.h"
 #include "obex_internal.h"
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 
-#define LOG_LEVEL CONFIG_BT_BIP_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_bip);
+LOG_MODULE_REGISTER(bt_bip, CONFIG_BT_BIP_LOG_LEVEL);
 
 typedef void (*bt_bip_server_cb_t)(struct bt_bip_server *server, bool final, struct net_buf *buf);
 typedef void (*bt_bip_client_cb_t)(struct bt_bip_client *client, uint8_t rsp_code,

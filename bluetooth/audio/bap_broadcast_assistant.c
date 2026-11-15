@@ -40,7 +40,7 @@
 #include <zephyr/types.h>
 
 #include <sys/errno.h>
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 
 LOG_MODULE_REGISTER(bt_bap_broadcast_assistant, CONFIG_BT_BAP_BROADCAST_ASSISTANT_LOG_LEVEL);
 

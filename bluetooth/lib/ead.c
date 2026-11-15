@@ -9,7 +9,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 
 /** nonce size in bytes */
 #define BT_EAD_NONCE_SIZE 13

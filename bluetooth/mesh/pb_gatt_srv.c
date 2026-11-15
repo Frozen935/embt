@@ -28,10 +28,9 @@
 #include "gatt.h"
 #include "proxy_msg.h"
 #include "pb_gatt_srv.h"
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 
-#define LOG_LEVEL CONFIG_BT_MESH_PROV_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_mesh_pb_gatt_srv);
+LOG_MODULE_REGISTER(bt_mesh_pb_gatt_srv, CONFIG_BT_MESH_PROV_LOG_LEVEL);
 
 #define ADV_OPT_PROV                                                           \
 	(BT_LE_ADV_OPT_CONN | BT_LE_ADV_OPT_SCANNABLE | ADV_OPT_USE_IDENTITY)

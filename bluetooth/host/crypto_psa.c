@@ -14,7 +14,7 @@
 #include <zephyr/bluetooth/conn.h>
 #include <zephyr/bluetooth/crypto.h>
 #include <zephyr/bluetooth/hci.h>
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 #include <zephyr/sys/byteorder.h>
 #include <psa/crypto.h>
 #include <psa/crypto_struct.h>
@@ -24,8 +24,7 @@
 #include "common/bt_str.h"
 #include "hci_core.h"
 
-#define LOG_LEVEL CONFIG_BT_HCI_CORE_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_host_crypto);
+LOG_MODULE_REGISTER(bt_host_crypto, CONFIG_BT_HCI_CORE_LOG_LEVEL);
 
 int bt_crypto_init(void)
 {

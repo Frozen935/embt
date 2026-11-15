@@ -10,7 +10,7 @@
 
 #include <zephyr/autoconf.h>
 #include <zephyr/bluetooth/crypto.h>
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 #include <psa/crypto.h>
 #include <psa/crypto_struct.h>
 #include <psa/crypto_types.h>
@@ -18,8 +18,7 @@
 
 #include "common/bt_str.h"
 
-#define LOG_LEVEL CONFIG_BT_HCI_CORE_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_aes_ccm);
+LOG_MODULE_REGISTER(bt_aes_ccm, CONFIG_BT_HCI_CORE_LOG_LEVEL);
 
 static int psa_status_to_errno(psa_status_t status)
 {

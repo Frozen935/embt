@@ -9,10 +9,9 @@
 #include "blob.h"
 #include "access.h"
 #include "dfd_srv_internal.h"
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 
-#define LOG_LEVEL CONFIG_BT_MESH_DFU_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_mesh_dfu_srv);
+LOG_MODULE_REGISTER(bt_mesh_dfu_srv, CONFIG_BT_MESH_DFU_LOG_LEVEL);
 
 #define UPDATE_IDX_NONE 0xff
 

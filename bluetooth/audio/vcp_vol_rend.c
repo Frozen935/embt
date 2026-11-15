@@ -23,7 +23,7 @@
 #include <zephyr/bluetooth/conn.h>
 #include <zephyr/bluetooth/gatt.h>
 #include <zephyr/bluetooth/uuid.h>
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 #include <zephyr/sys/__assert.h>
 #include <zephyr/sys/atomic.h>
 #include <zephyr/sys/byteorder.h>
@@ -35,8 +35,7 @@
 #include "audio_internal.h"
 #include "vcp_internal.h"
 
-#define LOG_LEVEL CONFIG_BT_VCP_VOL_REND_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_vcp_vol_rend);
+LOG_MODULE_REGISTER(bt_vcp_vol_rend, CONFIG_BT_VCP_VOL_REND_LOG_LEVEL);
 
 #define VOLUME_DOWN(current_vol) \
 	((uint8_t)MAX(0, (int)current_vol - vol_rend.volume_step))

@@ -17,4 +17,4 @@
 
 embt_library(embt_base)
 embt_library_sources(init.c)
-embt_library_sources(core.c time.c spinlock.c queue.c fifo.c lifo.c mem_slab.c work.c assert.c)
+embt_library_sources(core.c time.c spinlock.c queue.c fifo.c lifo.c mem_slab.c work.c assert.c log.c)

@@ -14,10 +14,9 @@
 #include "net.h"
 #include "transport.h"
 #include "access.h"
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 
-#define LOG_LEVEL CONFIG_BT_MESH_DFU_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_mesh_dfd_srv);
+LOG_MODULE_REGISTER(bt_mesh_dfd_srv, CONFIG_BT_MESH_DFU_LOG_LEVEL);
 
 #define ERASE_BLOCK_SIZE DT_PROP(DT_CHOSEN(zephyr_flash), erase_block_size)
 

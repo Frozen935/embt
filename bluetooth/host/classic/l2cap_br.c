@@ -33,7 +33,7 @@
 #include "did_internal.h"
 #include "rfcomm_internal.h"
 #include "sdp_internal.h"
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 
 LOG_MODULE_REGISTER(bt_l2cap_br, CONFIG_BT_L2CAP_LOG_LEVEL);
 
@@ -2921,7 +2921,7 @@ static void l2cap_br_conn_req_reply(struct bt_l2cap_br *l2cap, struct bt_l2cap_c
 	BR_CHAN(chan)->ident = 0U;
 }
 
-#if defined(CONFIG_BT_L2CAP_DYNAMIC_CHANNEL) && defined(CONFIG_BT_L2CAP_LOG_LEVEL_DBG)
+#if defined(CONFIG_BT_L2CAP_DYNAMIC_CHANNEL) && BT_LOG_LEVEL_ENABLED(BT_L2CAP, DBG)
 void bt_l2cap_br_chan_set_state_debug(struct bt_l2cap_chan *chan, bt_l2cap_chan_state_t state,
 				      const char *func, int line)
 {
@@ -2971,7 +2971,7 @@ void bt_l2cap_br_chan_set_state(struct bt_l2cap_chan *chan, bt_l2cap_chan_state_
 {
 	BR_CHAN(chan)->state = state;
 }
-#endif /* CONFIG_BT_L2CAP_LOG_LEVEL_DBG && CONFIG_BT_L2CAP_DYNAMIC_CHANNEL*/
+#endif /* BT_LOG_LEVEL_ENABLED(BT_L2CAP, DBG) && CONFIG_BT_L2CAP_DYNAMIC_CHANNEL*/
 
 void bt_l2cap_br_chan_del(struct bt_l2cap_chan *chan)
 {

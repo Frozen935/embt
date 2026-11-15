@@ -25,10 +25,9 @@
 #include "at.h"
 #include "sco_internal.h"
 #include "hfp_ag_internal.h"
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 
-#define LOG_LEVEL CONFIG_BT_HFP_AG_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_hfp_ag);
+LOG_MODULE_REGISTER(bt_hfp_ag, CONFIG_BT_HFP_AG_LOG_LEVEL);
 
 typedef int (*bt_hfp_ag_parse_command_t)(struct bt_hfp_ag *ag, struct net_buf *buf);
 
@@ -326,7 +325,7 @@ static struct bt_ag_tx *bt_ag_tx_alloc(void)
 		return k_fifo_get(&ag_tx_free, K_NO_WAIT);
 	}
 
-	if (IS_ENABLED(CONFIG_BT_HFP_AG_LOG_LEVEL_DBG)) {
+	if (BT_LOG_LEVEL_ENABLED(BT_HFP_AG, DBG)) {
 		struct bt_ag_tx *tx = k_fifo_get(&ag_tx_free, K_NO_WAIT);
 
 		if (tx) {

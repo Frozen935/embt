@@ -27,10 +27,9 @@
 #include <host/l2cap_internal.h>
 #include "avctp_internal.h"
 #include "avrcp_internal.h"
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 
-#define LOG_LEVEL CONFIG_BT_AVRCP_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_avrcp_cover_art);
+LOG_MODULE_REGISTER(bt_avrcp_cover_art, CONFIG_BT_AVRCP_LOG_LEVEL);
 
 /** @brief AVRCP Cover Art service UUID */
 #define BT_AVRCP_COVER_ART_UUID                                                                    \

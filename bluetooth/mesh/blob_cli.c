@@ -10,10 +10,9 @@
 #include "blob.h"
 #include "net.h"
 #include "transport.h"
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 
-#define LOG_LEVEL CONFIG_BT_MESH_MODEL_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_mesh_blob_cli);
+LOG_MODULE_REGISTER(bt_mesh_blob_cli, CONFIG_BT_MESH_MODEL_LOG_LEVEL);
 
 #define TARGETS_FOR_EACH(cli, target)                                          \
 	SYS_SLIST_FOR_EACH_CONTAINER((sys_slist_t *)&(cli)->inputs->targets,   \

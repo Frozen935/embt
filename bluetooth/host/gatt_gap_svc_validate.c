@@ -10,10 +10,9 @@
 
 #include <zephyr/bluetooth/gatt.h>
 #include <zephyr/bluetooth/uuid.h>
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 
-#define LOG_LEVEL CONFIG_BT_GATT_LOG_LEVEL
-LOG_MODULE_DECLARE(bt_gatt);
+LOG_MODULE_DECLARE(bt_gatt, CONFIG_BT_GATT_LOG_LEVEL);
 
 static uint8_t gap_service_check_cb(const struct bt_gatt_attr *attr,
 				    uint16_t handle,

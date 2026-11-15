@@ -23,10 +23,9 @@
 #include "pb_gatt_srv.h"
 #include "solicitation.h"
 #include "statistic.h"
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 
-#define LOG_LEVEL CONFIG_BT_MESH_ADV_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_mesh_adv);
+LOG_MODULE_REGISTER(bt_mesh_adv, CONFIG_BT_MESH_ADV_LOG_LEVEL);
 
 /* Window and Interval are equal for continuous scanning */
 #define MESH_SCAN_INTERVAL    BT_MESH_ADV_SCAN_UNIT(BT_MESH_SCAN_INTERVAL_MS)

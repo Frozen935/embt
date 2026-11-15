@@ -7,10 +7,9 @@
 #include <zephyr/bluetooth/mesh.h>
 
 #include "msg.h"
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 
-#define LOG_LEVEL CONFIG_BT_MESH_ACCESS_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_mesh_msg);
+LOG_MODULE_REGISTER(bt_mesh_msg, CONFIG_BT_MESH_ACCESS_LOG_LEVEL);
 
 void bt_mesh_model_msg_init(struct net_buf_simple *msg, uint32_t opcode)
 {

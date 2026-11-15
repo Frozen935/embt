@@ -44,10 +44,9 @@
 #include <host/conn_internal.h>
 #include <host/l2cap_internal.h>
 #include "avdtp_internal.h"
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 
-#define LOG_LEVEL CONFIG_BT_A2DP_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_a2dp);
+LOG_MODULE_REGISTER(bt_a2dp, CONFIG_BT_A2DP_LOG_LEVEL);
 
 #define A2DP_NO_SPACE (-1)
 

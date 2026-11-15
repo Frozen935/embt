@@ -20,10 +20,9 @@
 #include <host/hci_core.h>
 #include <host/settings.h>
 #include <host/keys.h>
-#include <zephyr/logging/log.h>
+#include <embt/base/log.h>
 
-#define LOG_LEVEL CONFIG_BT_KEYS_LOG_LEVEL
-LOG_MODULE_REGISTER(bt_keys_br);
+LOG_MODULE_REGISTER(bt_keys_br, CONFIG_BT_KEYS_LOG_LEVEL);
 
 static struct bt_keys_link_key key_pool[CONFIG_BT_MAX_PAIRED];
 
