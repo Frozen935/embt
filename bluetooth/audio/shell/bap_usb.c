@@ -9,13 +9,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#undef LOG_TAG
+#define LOG_TAG "bap_usb"
+#include <base/log.h>
+#include <base/base.h>
 #include <errno.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
 
-#include <zephyr/autoconf.h>
+#include <embt/autoconf.h>
 #include <zephyr/bluetooth/audio/audio.h>
 #include <zephyr/devicetree.h>
 #include <zephyr/drivers/usb/usb_buf.h>
@@ -39,8 +43,6 @@
 #endif /* CONFIG_SOC_NRF5340_CPUAPP */
 
 #include "audio.h"
-
-LOG_MODULE_REGISTER(bap_usb, CONFIG_BT_BAP_STREAM_LOG_LEVEL);
 
 #define USB_LOG_RATE           (30U * MSEC_PER_SEC) /* 30 seconds */
 #define USB_ENQUEUE_COUNT      30U /* 30ms */

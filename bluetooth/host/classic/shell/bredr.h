@@ -12,6 +12,7 @@
 
 #ifndef __BREDR_H
 #define __BREDR_H
+#include <shell/bt_shell.h>
 #include <stddef.h>
 #include <stdint.h>
 

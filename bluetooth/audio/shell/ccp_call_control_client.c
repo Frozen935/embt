@@ -12,7 +12,7 @@
 #include <stdint.h>
 #include <stdio.h>
 
-#include <zephyr/autoconf.h>
+#include <embt/autoconf.h>
 #include <zephyr/bluetooth/assigned_numbers.h>
 #include <zephyr/bluetooth/audio/tbs.h>
 #include <zephyr/bluetooth/audio/ccp.h>

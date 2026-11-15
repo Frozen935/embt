@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <base/base.h>
 #include <stdlib.h>
 #include <ctype.h>
 #include <zephyr/sys/printk.h>
@@ -1290,7 +1291,7 @@ static void cdb_print_nodes(const struct shell *sh)
 			continue;
 		}
 
-		configured = atomic_test_bit(node->flags,
+		configured = bt_atomic_test_bit(node->flags,
 					     BT_MESH_CDB_NODE_CONFIGURED);
 
 		total++;
@@ -1368,7 +1369,7 @@ static void cdb_print_app_keys(const struct shell *sh)
 static int cmd_cdb_show(const struct shell *sh, size_t argc,
 			char *argv[])
 {
-	if (!atomic_test_bit(bt_mesh_cdb.flags, BT_MESH_CDB_VALID)) {
+	if (!bt_atomic_test_bit(bt_mesh_cdb.flags, BT_MESH_CDB_VALID)) {
 		shell_print(sh, "No valid networks");
 		return 0;
 	}

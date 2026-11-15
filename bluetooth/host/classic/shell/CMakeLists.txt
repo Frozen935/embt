@@ -1,25 +1,25 @@
 # SPDX-License-Identifier: Apache-2.0
 
-zephyr_library()
-zephyr_library_sources(bredr.c)
-zephyr_library_sources_ifdef(CONFIG_BT_RFCOMM spp.c)
-zephyr_library_sources_ifdef(CONFIG_BT_A2DP a2dp.c)
-zephyr_library_sources_ifdef(CONFIG_BT_AVRCP avrcp.c)
+embt_library(embt_classic_shell)
+embt_library_sources(bredr.c)
+embt_library_sources_ifdef(CONFIG_BT_RFCOMM spp.c)
+embt_library_sources_ifdef(CONFIG_BT_A2DP a2dp.c)
+embt_library_sources_ifdef(CONFIG_BT_AVRCP avrcp.c)
 if(CONFIG_BT_HFP_HF OR CONFIG_BT_HFP_AG)
-  zephyr_library_sources(
+  embt_library_sources(
     hfp.c
     )
 endif()
 
-zephyr_library_sources_ifdef(CONFIG_BT_GOEP goep.c)
-zephyr_library_sources_ifdef(CONFIG_BT_BIP bip.c)
-zephyr_library_sources_ifdef(CONFIG_BT_HID_DEVICE hid_device.c)
-zephyr_library_sources_ifdef(CONFIG_BT_HID_HOST hid_host.c)
+embt_library_sources_ifdef(CONFIG_BT_GOEP goep.c)
+embt_library_sources_ifdef(CONFIG_BT_BIP bip.c)
+embt_library_sources_ifdef(CONFIG_BT_HID_DEVICE hid_device.c)
+embt_library_sources_ifdef(CONFIG_BT_HID_HOST hid_host.c)
 if(CONFIG_BT_AVRCP_TG_COVER_ART OR CONFIG_BT_AVRCP_CT_COVER_ART)
-  zephyr_library_sources(avrcp_cover_art.c)
+  embt_library_sources(avrcp_cover_art.c)
 endif()
 
-zephyr_library_sources_ifdef(CONFIG_BT_PBAP pbap.c)
-zephyr_library_sources_ifdef(CONFIG_BT_MAP map.c)
-zephyr_library_sources_ifdef(CONFIG_BT_FTP ftp.c)
-zephyr_library_sources_ifdef(CONFIG_BT_OPP opp.c)
+embt_library_sources_ifdef(CONFIG_BT_PBAP pbap.c)
+embt_library_sources_ifdef(CONFIG_BT_MAP map.c)
+embt_library_sources_ifdef(CONFIG_BT_FTP ftp.c)
+embt_library_sources_ifdef(CONFIG_BT_OPP opp.c)
