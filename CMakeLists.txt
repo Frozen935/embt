@@ -99,7 +99,6 @@ endif()
 
 add_library(embt_internal INTERFACE)
 target_include_directories(embt_internal INTERFACE "${EMBT_SOURCE_DIR}/include" "${EMBT_SOURCE_DIR}/bluetooth")
-target_include_directories(embt_internal INTERFACE "${EMBT_SOURCE_DIR}/base/include" "${EMBT_SOURCE_DIR}/osdep/include" "${EMBT_SOURCE_DIR}/osdep/posix/include")
 target_compile_options(embt_internal INTERFACE -Wall -Wextra -Werror=implicit-function-declaration -Werror=incompatible-pointer-types)
 if(CONFIG_NO_OPTIMIZATIONS)
   target_compile_options(embt_internal INTERFACE -O0)

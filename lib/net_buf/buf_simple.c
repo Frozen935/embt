@@ -9,25 +9,20 @@
 
 LOG_MODULE_REGISTER(net_buf_simple, CONFIG_NET_BUF_LOG_LEVEL);
 
+#define NET_BUF_SIMPLE_DBG(...) LOG_DBG(__VA_ARGS__)
+#define NET_BUF_SIMPLE_ERR(...) LOG_ERR(__VA_ARGS__)
+#define NET_BUF_SIMPLE_WARN(...) LOG_WRN(__VA_ARGS__)
+#define NET_BUF_SIMPLE_INFO(...) LOG_INF(__VA_ARGS__)
+#include <base/assert.h>
+#include <embt/sys/unaligned.h>
+#include <embt/sys/util_macro.h>
 #include <stdio.h>
+#include <inttypes.h>
 #include <stddef.h>
 #include <string.h>
-#include <zephyr/sys/byteorder.h>
+#include <embt/sys/byteorder.h>
 
-#include <zephyr/net_buf.h>
-
-#if defined(CONFIG_NET_BUF_SIMPLE_LOG)
-#define NET_BUF_SIMPLE_DBG(fmt, ...) LOG_DBG("(%p) " fmt, k_current_get(), \
-				      ##__VA_ARGS__)
-#define NET_BUF_SIMPLE_ERR(fmt, ...) LOG_ERR(fmt, ##__VA_ARGS__)
-#define NET_BUF_SIMPLE_WARN(fmt, ...) LOG_WRN(fmt, ##__VA_ARGS__)
-#define NET_BUF_SIMPLE_INFO(fmt, ...) LOG_INF(fmt, ##__VA_ARGS__)
-#else
-#define NET_BUF_SIMPLE_DBG(fmt, ...)
-#define NET_BUF_SIMPLE_ERR(fmt, ...)
-#define NET_BUF_SIMPLE_WARN(fmt, ...)
-#define NET_BUF_SIMPLE_INFO(fmt, ...)
-#endif /* CONFIG_NET_BUF_SIMPLE_LOG */
+#include <embt/net_buf.h>
 
 #if defined(CONFIG_NET_BUF_HARDENING)
 /* Fail-closed check for the mutating primitives. If the buffer's metadata is

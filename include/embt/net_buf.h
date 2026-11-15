@@ -10,11 +10,13 @@
 #ifndef ZEPHYR_INCLUDE_NET_BUF_H_
 #define ZEPHYR_INCLUDE_NET_BUF_H_
 
+#include <embt/base/fifo.h>
+#include <embt/base/lifo.h>
+#include <embt/base/spinlock.h>
+#include <embt/base/time.h>
 #include <stddef.h>
-#include <zephyr/types.h>
-#include <zephyr/sys/util.h>
-#include <zephyr/sys/iterable_sections.h>
-
+#include <stdint.h>
+#include <embt/base/util.h>
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -72,7 +74,7 @@ extern "C" {
  * @param _size Maximum data storage for the buffer.
  */
 #define NET_BUF_SIMPLE_DEFINE_STATIC(_name, _size)        \
-	static __noinit uint8_t net_buf_data_##_name[_size]; \
+	static uint8_t net_buf_data_##_name[_size]; \
 	static struct net_buf_simple _name = {            \
 		.data   = net_buf_data_##_name,           \
 		.len    = 0,                              \
@@ -1066,11 +1068,11 @@ struct net_buf {
 	struct net_buf *frags;
 
 	/** Reference count, packed alongside three adjacent uint8_t
-	 *  fields (`flags`, `pool_id`, `user_data_size`) in a single
-	 *  atomic_t-sized slot.
+	 *  fields (`flags`, `_reserved`, `user_data_size`) in a single
+	 *  long-sized slot.
 	 *
-	 * `ref_word` is the atomic_t view used by net_buf internals for
-	 * ref/unref; `ref`, `flags`, `pool_id` and `user_data_size` are
+	 * `ref_word` is the long view used by net_buf internals for
+	 * ref/unref; `ref`, `flags`, `_reserved` and `user_data_size` are
 	 * byte-level views into the same storage.
 	 *
 	 * Incrementing and decrementing ref_word adds or subtracts 1
@@ -1081,8 +1083,8 @@ struct net_buf {
 	 * only the ref byte changes -- the other three bytes are
 	 * untouched.
 	 *
-	 * On 32-bit architectures atomic_t is 4 bytes and the byte
-	 * struct fills the slot exactly. On 64-bit, atomic_t is 8 bytes;
+	 * On 32-bit architectures long is 4 bytes and the byte
+	 * struct fills the slot exactly. On 64-bit, long is 8 bytes;
 	 * the upper 4 bytes are alignment padding that struct net_buf
 	 * already required (the next field is an 8-byte-aligned
 	 * pointer), so this union does not grow struct net_buf there
@@ -1090,7 +1092,7 @@ struct net_buf {
 	 * 4 bytes of explicit padding so `ref` still sits at the LSB of
 	 * ref_word.
 	 *
-	 * `flags`, `pool_id` and `user_data_size` are written exactly
+	 * `flags`, `_reserved` and `user_data_size` are written exactly
 	 * once at allocation time on a single thread and are read-only
 	 * thereafter, so plain uint8_t reads from non-atomic call sites
 	 * remain safe. `flags` is also legally written from a context
@@ -1099,11 +1101,11 @@ struct net_buf {
 	 */
 	union {
 		/** @cond INTERNAL_HIDDEN */
-		atomic_t ref_word;
+		long ref_word;
 		/** @endcond */
 		struct {
-#if defined(CONFIG_BIG_ENDIAN)
-			/* atomic_t is typedef'd as long (BUILD_ASSERTed in
+#if defined(CONFIG_EMBT_BIG_ENDIAN)
+			/* long is typedef'd as long (BUILD_ASSERTed in
 			 * lib/net_buf/buf.c); on a 64-bit big-endian build
 			 * the byte struct needs 4 bytes of padding so that
 			 * `ref` lands on the least-significant byte of
@@ -1117,8 +1119,8 @@ struct net_buf {
 			/** Size of user data on this buffer */
 			uint8_t user_data_size;
 
-			/** Where the buffer should go when freed up. */
-			uint8_t pool_id;
+			/** Reserved byte; pool ownership is held by the pool pointer. */
+			uint8_t _reserved;
 
 			/** Bit-field of buffer flags. */
 			uint8_t flags;
@@ -1132,14 +1134,17 @@ struct net_buf {
 			/** Bit-field of buffer flags. */
 			uint8_t flags;
 
-			/** Where the buffer should go when freed up. */
-			uint8_t pool_id;
+			/** Reserved byte; pool ownership is held by the pool pointer. */
+			uint8_t _reserved;
 
 			/** Size of user data on this buffer */
 			uint8_t user_data_size;
 #endif
 		};
 	};
+
+	/** Owning pool; valid for the entire buffer lifetime. */
+	struct net_buf_pool *pool;
 
 	/** Union for convenience access to the net_buf_simple members, also
 	 * preserving the old API.
@@ -1175,8 +1180,7 @@ struct net_buf {
 /** @cond INTERNAL_HIDDEN */
 
 struct net_buf_data_cb {
-	uint8_t * __must_check (*alloc)(struct net_buf *buf, size_t *size,
-			   k_timeout_t timeout);
+	uint8_t * __must_check (*alloc)(struct net_buf *buf, size_t *size);
 	uint8_t * __must_check (*ref)(struct net_buf *buf, uint8_t *data);
 	void   (*unref)(struct net_buf *buf, uint8_t *data);
 };
@@ -1197,10 +1201,10 @@ struct net_buf_data_alloc {
  */
 struct net_buf_pool {
 	/** LIFO to place the buffer into when free */
-	struct k_lifo free;
+	struct bt_lifo free;
 
 	/** To prevent concurrent access/modifications */
-	struct k_spinlock lock;
+	struct bt_spinlock lock;
 
 	/** Number of buffers in pool */
 	const uint16_t buf_count;
@@ -1213,7 +1217,7 @@ struct net_buf_pool {
 
 #if defined(CONFIG_NET_BUF_POOL_USAGE)
 	/** Amount of available buffers in the pool. */
-	atomic_t avail_count;
+	long avail_count;
 
 	/** Total size of the pool. */
 	const uint16_t pool_size;
@@ -1235,16 +1239,22 @@ struct net_buf_pool {
 	struct net_buf * const __bufs;
 };
 
+/**
+ * @brief Initialize a buffer pool before allocating from it.
+ * @param[in,out] pool Pool declared with NET_BUF_POOL_*_DEFINE.
+ * @note The lifecycle owner serializes this call. Repeated calls keep existing
+ * buffers and the free queue intact; this is not a pool reset operation.
+ */
+void net_buf_pool_init(struct net_buf_pool *pool);
+
 /** @cond INTERNAL_HIDDEN */
 #define NET_BUF_POOL_USAGE_INIT(_pool, _count) \
-	IF_ENABLED(CONFIG_NET_BUF_POOL_USAGE, (.avail_count = ATOMIC_INIT(_count),)) \
+	IF_ENABLED(CONFIG_NET_BUF_POOL_USAGE, (.avail_count = (_count),)) \
 	IF_ENABLED(CONFIG_NET_BUF_POOL_USAGE, (.max_used = 0,)) \
 	IF_ENABLED(CONFIG_NET_BUF_POOL_USAGE, (.name = STRINGIFY(_pool),))
 
 #define NET_BUF_POOL_INITIALIZER(_pool, _alloc, _bufs, _count, _ud_size, _destroy) \
 	{                                                                          \
-		.free = Z_LIFO_INITIALIZER(_pool.free),                            \
-		.lock = { },                                                       \
 		.buf_count = _count,                                               \
 		.uninit_count = _count,                                            \
 		.user_data_size = _ud_size,                                        \
@@ -1265,9 +1275,10 @@ struct net_buf_pool {
 	BUILD_ASSERT(sizeof(struct _net_buf_##_name) ==					       \
 		     ROUND_UP(sizeof(struct net_buf) + _ud_size, __alignof__(struct net_buf)), \
 		     "Size cannot be determined");					       \
-	static struct _net_buf_##_name _net_buf_##_name[_count] __noinit
+	static struct _net_buf_##_name _net_buf_##_name[_count]
 
 extern const struct net_buf_data_alloc net_buf_heap_alloc;
+extern const struct net_buf_data_cb net_buf_heap_cb;
 /** @endcond */
 
 /**
@@ -1276,17 +1287,16 @@ extern const struct net_buf_data_alloc net_buf_heap_alloc;
  *
  * Defines a net_buf_pool struct and the necessary memory storage (array of
  * structs) for the needed amount of buffers. After this, the buffers can be
- * accessed from the pool through net_buf_alloc. The pool is defined as a
+ * accessed through net_buf_alloc after calling net_buf_pool_init. The pool is defined as a
  * static variable, so if it needs to be exported outside the current module
  * this needs to happen with the help of a separate pointer rather than an
  * extern declaration.
  *
  * The data payload of the buffers will be allocated from the heap using
- * k_malloc, so CONFIG_HEAP_MEM_POOL_SIZE must be set to a positive value.
- * This kind of pool does not support blocking on the data allocation, so
- * the timeout passed to net_buf_alloc will be always treated as K_NO_WAIT
- * when trying to allocate the data. This means that allocation failures,
- * i.e. NULL returns, must always be handled cleanly.
+ * the OSI allocator. Payload allocation has no timeout or retry: allocation
+ * failure is an assertion failure and terminates even if assertions are disabled.
+ * The timeout passed to net_buf_alloc only applies to waiting for a free
+ * net_buf object in the fixed-count descriptor pool.
  *
  * If provided with a custom destroy callback, this callback is
  * responsible for eventually calling net_buf_destroy() to complete the
@@ -1299,7 +1309,7 @@ extern const struct net_buf_data_alloc net_buf_heap_alloc;
  */
 #define NET_BUF_POOL_HEAP_DEFINE(_name, _count, _ud_size, _destroy)          \
 	_NET_BUF_ARRAY_DEFINE(_name, _count, _ud_size);                      \
-	static STRUCT_SECTION_ITERABLE(net_buf_pool, _name) =                \
+	static struct net_buf_pool _name =                \
 		NET_BUF_POOL_INITIALIZER(_name, &net_buf_heap_alloc,         \
 					 _net_buf_##_name, _count, _ud_size, \
 					 _destroy)
@@ -1320,7 +1330,7 @@ extern const struct net_buf_data_cb net_buf_fixed_cb;
  *
  * Defines a net_buf_pool struct and the necessary memory storage (array of
  * structs) for the needed amount of buffers. After this, the buffers can be
- * accessed from the pool through net_buf_alloc. The pool is defined as a
+ * accessed through net_buf_alloc after calling net_buf_pool_init. The pool is defined as a
  * static variable, so if it needs to be exported outside the current module
  * this needs to happen with the help of a separate pointer rather than an
  * extern declaration.
@@ -1328,7 +1338,7 @@ extern const struct net_buf_data_cb net_buf_fixed_cb;
  * The data payload of the buffers will be allocated from a byte array
  * of fixed sized chunks. This kind of pool does not support blocking on
  * the data allocation, so the timeout passed to net_buf_alloc will be
- * always treated as K_NO_WAIT when trying to allocate the data. This means
+ * always treated as BT_NO_WAIT when trying to allocate the data. This means
  * that allocation failures, i.e. NULL returns, must always be handled
  * cleanly.
  *
@@ -1344,7 +1354,7 @@ extern const struct net_buf_data_cb net_buf_fixed_cb;
  */
 #define NET_BUF_POOL_FIXED_DEFINE(_name, _count, _data_size, _ud_size, _destroy) \
 	_NET_BUF_ARRAY_DEFINE(_name, _count, _ud_size);                        \
-	static uint8_t __noinit net_buf_data_##_name[_count][_data_size] __net_buf_align; \
+	static uint8_t net_buf_data_##_name[_count][_data_size] __net_buf_align; \
 	static const struct net_buf_pool_fixed net_buf_fixed_##_name = {       \
 		.data_pool = (uint8_t *)net_buf_data_##_name,                  \
 	};                                                                     \
@@ -1353,96 +1363,33 @@ extern const struct net_buf_data_cb net_buf_fixed_cb;
 		.alloc_data = (void *)&net_buf_fixed_##_name,                  \
 		.max_alloc_size = _data_size,                                  \
 	};                                                                     \
-	static STRUCT_SECTION_ITERABLE(net_buf_pool, _name) =                  \
+	static struct net_buf_pool _name =                  \
 		NET_BUF_POOL_INITIALIZER(_name, &net_buf_fixed_alloc_##_name,  \
 					 _net_buf_##_name, _count, _ud_size,   \
 					 _destroy)
 
-/** @cond INTERNAL_HIDDEN */
-extern const struct net_buf_data_cb net_buf_var_cb;
-/** @endcond */
-
 /**
+ * @brief Define a dynamic-payload pool with explicit payload alignment.
  *
- * @brief Define a new pool for buffers with variable size payloads
+ * Payloads use the OSI aligned allocator and are freed after the last reference.
+ * Allocation does not wait; failure terminates. Only descriptor exhaustion uses
+ * the timeout passed to net_buf_alloc_len().
  *
- * Defines a net_buf_pool struct and the necessary memory storage (array of
- * structs) for the needed amount of buffers. After this, the buffers can be
- * accessed from the pool through net_buf_alloc. The pool is defined as a
- * static variable, so if it needs to be exported outside the current module
- * this needs to happen with the help of a separate pointer rather than an
- * extern declaration.
- *
- * The data payload of the buffers will be based on a memory pool from which
- * variable size payloads may be allocated.
- *
- * If provided with a custom destroy callback, this callback is
- * responsible for eventually calling net_buf_destroy() to complete the
- * process of returning the buffer to the pool.
- *
- * @param _name      Name of the pool variable.
- * @param _count     Number of buffers in the pool.
- * @param _data_size Total amount of memory available for data payloads.
- * @param _ud_size   User data space to reserve per buffer.
- * @param _destroy   Optional destroy callback when buffer is freed.
+ * @param _name Pool name.
+ * @param _count Number of net_buf descriptors.
+ * @param _ud_size User data size per descriptor.
+ * @param _destroy Optional descriptor destruction callback.
+ * @param _align Power-of-two payload alignment, at least sizeof(void *).
  */
-#define NET_BUF_POOL_VAR_DEFINE(_name, _count, _data_size, _ud_size, _destroy) \
-	_NET_BUF_ARRAY_DEFINE(_name, _count, _ud_size);                        \
-	K_HEAP_DEFINE(net_buf_mem_pool_##_name, _data_size);                   \
+#define NET_BUF_POOL_HEAP_ALIGN_DEFINE(_name, _count, _ud_size, _destroy, _align) \
+	BUILD_ASSERT((_align) >= sizeof(void *) && (((_align) & ((_align) - 1)) == 0)); \
+	_NET_BUF_ARRAY_DEFINE(_name, _count, _ud_size);                         \
 	static const struct net_buf_data_alloc net_buf_data_alloc_##_name = {  \
-		.cb = &net_buf_var_cb,                                         \
-		.alloc_data = &net_buf_mem_pool_##_name,                       \
-		.max_alloc_size = 0,                                           \
-	};                                                                     \
-	static STRUCT_SECTION_ITERABLE(net_buf_pool, _name) =                  \
-		NET_BUF_POOL_INITIALIZER(_name, &net_buf_data_alloc_##_name,   \
-					 _net_buf_##_name, _count, _ud_size,   \
-					 _destroy)
-
-/**
- *
- * @brief Define a new pool for buffers with variable size payloads. Align the
- *        length and start of the buffer to the specified alignment.
- *
- * Defines a net_buf_pool struct and the necessary memory storage (array of
- * structs) for the needed amount of buffers. After this, the buffers can be
- * accessed from the pool through net_buf_alloc. The pool is defined as a
- * static variable, so if it needs to be exported outside the current module
- * this needs to happen with the help of a separate pointer rather than an
- * extern declaration.
- *
- * The data payload of the buffers will be based on a memory pool from which
- * variable size payloads may be allocated.
- *
- * If provided with a custom destroy callback, this callback is
- * responsible for eventually calling net_buf_destroy() to complete the
- * process of returning the buffer to the pool.
- *
- * Both the length and start of the buffer will be aligned to the specified
- * alignment. The alignment must be a power of 2 and the size of the
- * alignment must be less than or equal to the size of the data payload.
- *
- * @param _name      Name of the pool variable.
- * @param _count     Number of buffers in the pool.
- * @param _data_size Total amount of memory available for data payloads.
- * @param _ud_size   User data space to reserve per buffer.
- * @param _destroy   Optional destroy callback when buffer is freed.
- * @param _align     Alignment of the length and start of the buffer.
- */
-#define NET_BUF_POOL_VAR_ALIGN_DEFINE(_name, _count, _data_size, _ud_size,     \
-				      _destroy, _align)			       \
-	_NET_BUF_ARRAY_DEFINE(_name, _count, _ud_size);                        \
-	K_HEAP_DEFINE(net_buf_mem_pool_##_name, _data_size);                   \
-	static const struct net_buf_data_alloc net_buf_data_alloc_##_name = {  \
-		.cb = &net_buf_var_cb,					       \
-		.alloc_data = &net_buf_mem_pool_##_name,                       \
-		.max_alloc_size = 0,                                           \
-		.alignment = _align,					       \
-	};                                                                     \
-	static STRUCT_SECTION_ITERABLE(net_buf_pool, _name) =                  \
-		NET_BUF_POOL_INITIALIZER(_name, &net_buf_data_alloc_##_name,   \
-					 _net_buf_##_name, _count, _ud_size,   \
-					 _destroy)
+		.cb = &net_buf_heap_cb, .alignment = (_align),                   \
+	};                                                                    \
+	static struct net_buf_pool _name =                                    \
+		NET_BUF_POOL_INITIALIZER(_name, &net_buf_data_alloc_##_name,      \
+					 _net_buf_##_name, _count, _ud_size, _destroy)
 
 /**
  *
@@ -1450,7 +1397,7 @@ extern const struct net_buf_data_cb net_buf_var_cb;
  *
  * Defines a net_buf_pool struct and the necessary memory storage (array of
  * structs) for the needed amount of buffers. After this,the buffers can be
- * accessed from the pool through net_buf_alloc. The pool is defined as a
+ * accessed through net_buf_alloc after calling net_buf_pool_init. The pool is defined as a
  * static variable, so if it needs to be exported outside the current module
  * this needs to happen with the help of a separate pointer rather than an
  * extern declaration.
@@ -1467,15 +1414,6 @@ extern const struct net_buf_data_cb net_buf_var_cb;
  */
 #define NET_BUF_POOL_DEFINE(_name, _count, _size, _ud_size, _destroy)        \
 	NET_BUF_POOL_FIXED_DEFINE(_name, _count, _size, _ud_size, _destroy)
-
-/**
- * @brief Looks up a pool based on its ID.
- *
- * @param id Pool ID (e.g. from buf->pool_id).
- *
- * @return Pointer to pool.
- */
-struct net_buf_pool *net_buf_pool_get(int id);
 
 /**
  * @brief Get a zero-based index for a buffer.
@@ -1505,10 +1443,7 @@ int net_buf_id(const struct net_buf *buf);
  *
  * @return Number of buffers currently available in the pool
  */
-static inline size_t net_buf_get_available(struct net_buf_pool *pool)
-{
-	return (size_t)atomic_get(&pool->avail_count);
-}
+size_t net_buf_get_available(struct net_buf_pool *pool);
 
 /**
  * @brief Get the maximum number of buffers simultaneously claimed from a pool.
@@ -1530,23 +1465,23 @@ static inline size_t net_buf_get_max_used(struct net_buf_pool *pool)
  *
  * @param pool Which pool to allocate the buffer from.
  * @param timeout Affects the action taken should the pool be empty.
- *        If K_NO_WAIT, then return immediately. If K_FOREVER, then
+ *        If BT_NO_WAIT, then return immediately. If BT_FOREVER, then
  *        wait as long as necessary. Otherwise, wait until the specified
  *        timeout. Note that some types of data allocators do not support
  *        blocking (such as the HEAP type). In this case it's still possible
  *        for net_buf_alloc() to fail (return NULL) even if it was given
- *        K_FOREVER.
+ *        BT_FOREVER.
  *
  * @return New buffer or NULL if out of buffers.
  */
 struct net_buf * __must_check net_buf_alloc_fixed(struct net_buf_pool *pool,
-						  k_timeout_t timeout);
+						  bt_timeout_t timeout);
 
 /**
  * @copydetails net_buf_alloc_fixed
  */
 static inline struct net_buf * __must_check net_buf_alloc(struct net_buf_pool *pool,
-							  k_timeout_t timeout)
+							  bt_timeout_t timeout)
 {
 	return net_buf_alloc_fixed(pool, timeout);
 }
@@ -1557,18 +1492,18 @@ static inline struct net_buf * __must_check net_buf_alloc(struct net_buf_pool *p
  * @param pool Which pool to allocate the buffer from.
  * @param size Amount of data the buffer must be able to fit.
  * @param timeout Affects the action taken should the pool be empty.
- *        If K_NO_WAIT, then return immediately. If K_FOREVER, then
+ *        If BT_NO_WAIT, then return immediately. If BT_FOREVER, then
  *        wait as long as necessary. Otherwise, wait until the specified
  *        timeout. Note that some types of data allocators do not support
  *        blocking (such as the HEAP type). In this case it's still possible
  *        for net_buf_alloc() to fail (return NULL) even if it was given
- *        K_FOREVER.
+ *        BT_FOREVER.
  *
  * @return New buffer or NULL if out of buffers.
  */
 struct net_buf * __must_check net_buf_alloc_len(struct net_buf_pool *pool,
 						size_t size,
-						k_timeout_t timeout);
+						bt_timeout_t timeout);
 
 /**
  * @brief Allocate a new buffer from a pool but with external data pointer.
@@ -1582,18 +1517,18 @@ struct net_buf * __must_check net_buf_alloc_len(struct net_buf_pool *pool,
  * @param data External data pointer
  * @param size Amount of data the pointed data buffer if able to fit.
  * @param timeout Affects the action taken should the pool be empty.
- *        If K_NO_WAIT, then return immediately. If K_FOREVER, then
+ *        If BT_NO_WAIT, then return immediately. If BT_FOREVER, then
  *        wait as long as necessary. Otherwise, wait until the specified
  *        timeout. Note that some types of data allocators do not support
  *        blocking (such as the HEAP type). In this case it's still possible
  *        for net_buf_alloc() to fail (return NULL) even if it was given
- *        K_FOREVER.
+ *        BT_FOREVER.
  *
  * @return New buffer or NULL if out of buffers.
  */
 struct net_buf * __must_check net_buf_alloc_with_data(struct net_buf_pool *pool,
 						      void *data, size_t size,
-						      k_timeout_t timeout);
+						      bt_timeout_t timeout);
 
 /**
  * @brief Destroy buffer from custom destroy callback
@@ -1604,19 +1539,7 @@ struct net_buf * __must_check net_buf_alloc_with_data(struct net_buf_pool *pool,
  *
  * @param buf Buffer to destroy.
  */
-static inline void net_buf_destroy(struct net_buf *buf)
-{
-	struct net_buf_pool *pool = net_buf_pool_get(buf->pool_id);
-
-	if (buf->__buf) {
-		if (!(buf->flags & NET_BUF_EXTERNAL_DATA)) {
-			pool->alloc->cb->unref(buf, buf->__buf);
-		}
-		buf->__buf = NULL;
-	}
-
-	k_lifo_put(&pool->free, buf);
-}
+void net_buf_destroy(struct net_buf *buf);
 
 /**
  * @brief Reset buffer
@@ -1680,7 +1603,7 @@ void net_buf_slist_purge(sys_slist_t *list);
  *
  * @param fifo Which FIFO to purge.
  */
-void net_buf_fifo_purge(struct k_fifo *fifo);
+void net_buf_fifo_purge(struct bt_fifo *fifo);
 
 /**
  * @brief Decrements the reference count of a buffer.
@@ -1720,7 +1643,7 @@ struct net_buf * __must_check net_buf_ref(struct net_buf *buf);
  * is left without a pointer to a buffer it no longer owns:
  *
  * @code{.c}
- * k_fifo_put(&tx_queue, net_buf_take(&buf));
+ * bt_fifo_put(&tx_queue, net_buf_take(&buf));
  * @endcode
  *
  * Passing `net_buf_take(&buf)` as an argument is only correct for calls that
@@ -1733,10 +1656,7 @@ struct net_buf * __must_check net_buf_ref(struct net_buf *buf);
  *
  * @return The buffer originally pointed to by @p orig
  */
-static inline struct net_buf *__must_check net_buf_take(struct net_buf **orig)
-{
-	return (struct net_buf *)atomic_ptr_clear((atomic_ptr_t *)orig);
-}
+struct net_buf *__must_check net_buf_take(struct net_buf **orig);
 
 /**
  * @brief Move a buffer pointer without an atomic exchange.
@@ -1748,7 +1668,7 @@ static inline struct net_buf *__must_check net_buf_take(struct net_buf **orig)
  * when the pointer is not read again, so the move costs no code:
  *
  * @code{.c}
- * k_fifo_put(&tx_queue, net_buf_take_plain(&buf));
+ * bt_fifo_put(&tx_queue, net_buf_take_plain(&buf));
  * @endcode
  *
  * As with net_buf_take(), passing `net_buf_take_plain(&buf)` as an argument
@@ -1792,14 +1712,14 @@ static inline void net_buf_drop(struct net_buf **orig)
  *
  * @param buf A valid pointer on a buffer
  * @param timeout Affects the action taken should the pool be empty.
- *        If K_NO_WAIT, then return immediately. If K_FOREVER, then
+ *        If BT_NO_WAIT, then return immediately. If BT_FOREVER, then
  *        wait as long as necessary. Otherwise, wait until the specified
  *        timeout.
  *
  * @return Cloned buffer or NULL if out of buffers.
  */
 struct net_buf * __must_check net_buf_clone(struct net_buf *buf,
-					    k_timeout_t timeout);
+					    bt_timeout_t timeout);
 
 /**
  * @brief Get a pointer to the user data of a buffer.
@@ -2875,13 +2795,13 @@ size_t net_buf_linearize(void *dst, size_t dst_len,
  * needs to allocate a new net_buf.
  *
  * @param timeout Affects the action taken should the net buf pool be empty.
- *        If K_NO_WAIT, then return immediately. If K_FOREVER, then
+ *        If BT_NO_WAIT, then return immediately. If BT_FOREVER, then
  *        wait as long as necessary. Otherwise, wait until the specified
  *        timeout.
  * @param user_data The user data given in net_buf_append_bytes call.
  * @return pointer to allocated net_buf or NULL on error.
  */
-typedef struct net_buf * __must_check (*net_buf_allocator_cb)(k_timeout_t timeout,
+typedef struct net_buf * __must_check (*net_buf_allocator_cb)(bt_timeout_t timeout,
 							      void *user_data);
 
 /**
@@ -2904,11 +2824,11 @@ typedef struct net_buf * __must_check (*net_buf_allocator_cb)(k_timeout_t timeou
  *
  * @return Length of data actually added. This is less than the input
  *         length if a new fragment could not be allocated. That can also
- *         happen with K_FOREVER, since some types of data allocators do not
+ *         happen with BT_FOREVER, since some types of data allocators do not
  *         wait (such as the HEAP type).
  */
 size_t net_buf_append_bytes(struct net_buf *buf, size_t len,
-			    const void *value, k_timeout_t timeout,
+			    const void *value, bt_timeout_t timeout,
 			    net_buf_allocator_cb allocate_cb, void *user_data);
 
 /**
