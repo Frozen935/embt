@@ -16,12 +16,15 @@
  * @{
  */
 
-#include <embt/storage.h>
+#include <embt/base/util_macro.h>
 #include <string.h>
 #include <errno.h>
 #include <stdbool.h>
 
 #include <embt/bluetooth/uuid.h>
+
+#include <embt/base/slist.h>
+#include <embt/net_buf.h>
 
 #ifdef __cplusplus
 extern "C" {

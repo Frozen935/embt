@@ -7,14 +7,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <embt/base/time.h>
+#include <string.h>
+#include <embt/base/assert.h>
 #include <errno.h>
 
-#include <zephyr/sys/atomic.h>
-#include <zephyr/sys/byteorder.h>
+#include <embt/base/byteorder.h>
 
-#include <zephyr/bluetooth/hci.h>
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/conn.h>
+#include <embt/bluetooth/hci.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/conn.h>
 
 #include <common/bt_str.h>
 
@@ -86,11 +88,6 @@ static void notify_connected(struct bt_conn *conn)
 		}
 	}
 
-	STRUCT_SECTION_FOREACH(bt_sco_conn_cb, cb) {
-		if (cb->connected) {
-			cb->connected(conn, conn->err);
-		}
-	}
 }
 
 static void notify_disconnected(struct bt_conn *conn)
@@ -100,12 +97,6 @@ static void notify_disconnected(struct bt_conn *conn)
 	SYS_SLIST_FOR_EACH_CONTAINER(&sco_conn_cbs, callback, _node) {
 		if (callback->disconnected) {
 			callback->disconnected(conn, conn->err);
-		}
-	}
-
-	STRUCT_SECTION_FOREACH(bt_sco_conn_cb, cb) {
-		if (cb->disconnected) {
-			cb->disconnected(conn, conn->err);
 		}
 	}
 }
@@ -120,11 +111,6 @@ static void notify_setup_sco_cmd(struct bt_conn *conn, struct bt_hci_cp_setup_sy
 		}
 	}
 
-	STRUCT_SECTION_FOREACH(bt_sco_hci_cb, cb) {
-		if (cb->setup != NULL) {
-			cb->setup(conn, cp);
-		}
-	}
 }
 
 static void notify_accept_sco_req_cmd(struct bt_hci_cp_accept_sync_conn_req *cp)
@@ -134,12 +120,6 @@ static void notify_accept_sco_req_cmd(struct bt_hci_cp_accept_sync_conn_req *cp)
 	SYS_SLIST_FOR_EACH_CONTAINER(&sco_hci_cbs, callback, _node) {
 		if (callback->accept != NULL) {
 			callback->accept(cp);
-		}
-	}
-
-	STRUCT_SECTION_FOREACH(bt_sco_hci_cb, cb) {
-		if (cb->accept != NULL) {
-			cb->accept(cp);
 		}
 	}
 }
@@ -330,7 +310,7 @@ static int accept_sco_conn(const bt_addr_t *bdaddr, struct bt_conn *sco_conn)
 		return err;
 	}
 
-	buf = bt_hci_cmd_alloc(K_FOREVER);
+	buf = bt_hci_cmd_alloc(BT_FOREVER);
 	if (!buf) {
 		return -ENOBUFS;
 	}
@@ -419,7 +399,7 @@ static int sco_setup_sync_conn(struct bt_conn *sco_conn)
 	struct bt_hci_cp_setup_sync_conn *cp;
 	int err;
 
-	buf = bt_hci_cmd_alloc(K_FOREVER);
+	buf = bt_hci_cmd_alloc(BT_FOREVER);
 	if (!buf) {
 		return -ENOBUFS;
 	}

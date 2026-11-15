@@ -21,6 +21,10 @@
 #ifndef ZEPHYR_INCLUDE_BLUETOOTH_CLASSIC_A2DP_CODEC_SBC_H_
 #define ZEPHYR_INCLUDE_BLUETOOTH_CLASSIC_A2DP_CODEC_SBC_H_
 
+#include <stdint.h>
+#include <embt/bluetooth/sbc.h>
+#include <embt/compiler.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif

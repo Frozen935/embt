@@ -11,6 +11,8 @@
 #ifndef ZEPHYR_INCLUDE_BLUETOOTH_CLASSIC_AVDTP_H_
 #define ZEPHYR_INCLUDE_BLUETOOTH_CLASSIC_AVDTP_H_
 
+#include <embt/osi/sync.h>
+#include <embt/base/work.h>
 #include <stdint.h>
 #include <embt/bluetooth/l2cap.h>
 
@@ -176,13 +178,13 @@ struct bt_avdtp_sep {
 	/** Media Transport Channel*/
 	struct bt_l2cap_br_chan chan;
 	/* semaphore for lock/unlock */
-	struct k_sem sem_lock;
+	os_sem_t sem_lock;
 	/** avdtp session */
 	struct bt_avdtp *session;
 	/** sep ops */
 	const struct bt_avdtp_sep_ops *ops;
 	/** delay worker for disconnecting l2cap media channel */
-	struct k_work_delayable _delay_work;
+	struct bt_work_delayable _delay_work;
 	/** delay_work_state */
 	uint8_t _delay_work_state;
 	/** SEP state */

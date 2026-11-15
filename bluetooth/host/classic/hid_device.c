@@ -6,17 +6,21 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <common/assert.h>
+#include <embt/base/work.h>
+#include <embt/base/time.h>
+#include <embt/base/atomic.h>
+#include <embt/base/assert.h>
 #include <string.h>
 #include <errno.h>
-#include <zephyr/sys/util.h>
+#include <embt/base/util.h>
 
-#include <common/assert.h>
 
-#include <zephyr/bluetooth/hci.h>
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/classic/hid_device.h>
-#include <zephyr/bluetooth/classic/classic.h>
-#include <zephyr/bluetooth/l2cap.h>
+#include <embt/bluetooth/hci.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/classic/hid_device.h>
+#include <embt/bluetooth/classic/classic.h>
+#include <embt/bluetooth/l2cap.h>
 
 #include <host/hci_core.h>
 #include <host/conn_internal.h>
@@ -43,14 +47,14 @@ LOG_MODULE_REGISTER(bt_hid_device);
 	(((ch) == NULL) ? BT_HID_CHANNEL_UNKNOWN : HID_SESSION_BY_CHAN((ch))->type)
 
 /* Timeout for INTR channel connection after CTRL is established (seconds) */
-#define HID_INTR_CONN_TIMEOUT K_SECONDS(30)
+#define HID_INTR_CONN_TIMEOUT BT_SECONDS(30)
 
 /* Fallback timeout after a device-initiated Virtual Cable Unplug PDU is sent.
  * After sending VC unplug the initiator waits for the remote to tear down the
  * L2CAP channels. This timer only fires as a safety net when the remote never
  * disconnects, so the local link is not left up forever.
  */
-#define HID_VCU_DISCONNECT_TIMEOUT K_SECONDS(5)
+#define HID_VCU_DISCONNECT_TIMEOUT BT_SECONDS(5)
 
 /* Dedicated buffer pool for HANDSHAKE responses.  HANDSHAKE is a mandatory
  * protocol response (HID spec v1.1.2 Section 3.2) that must not fail due to
@@ -357,9 +361,9 @@ static const struct {
 	{BT_HID_MSG_TYPE_SET_PROTOCOL, hid_set_protocol_handle},
 };
 
-static void hid_intr_timeout_handler(struct k_work *work)
+static void hid_intr_timeout_handler(struct bt_work *work)
 {
-	struct k_work_delayable *dwork = k_work_delayable_from_work(work);
+	struct bt_work_delayable *dwork = bt_work_delayable_from_work(work);
 	struct bt_hid_device *hid = CONTAINER_OF(dwork, struct bt_hid_device, intr_timeout);
 	struct bt_l2cap_chan *chan;
 	int err;
@@ -370,9 +374,9 @@ static void hid_intr_timeout_handler(struct k_work *work)
 	 * channel is still attached is the one to close; a released association has
 	 * neither and nothing is left to do.
 	 */
-	if (atomic_test_bit(&hid->flags, BT_HID_DEVICE_FLAG_INTR_ATTACHED)) {
+	if (bt_atomic_test_bit(&hid->flags, BT_HID_DEVICE_FLAG_INTR_ATTACHED)) {
 		chan = &hid->intr_session.br_chan.chan;
-	} else if (atomic_test_bit(&hid->flags, BT_HID_DEVICE_FLAG_CTRL_ATTACHED)) {
+	} else if (bt_atomic_test_bit(&hid->flags, BT_HID_DEVICE_FLAG_CTRL_ATTACHED)) {
 		chan = &hid->ctrl_session.br_chan.chan;
 	} else {
 		LOG_DBG("nothing left to close");
@@ -392,9 +396,9 @@ static void hid_intr_timeout_handler(struct k_work *work)
 
 }
 
-static void hid_vcu_disconnect_work(struct k_work *work)
+static void hid_vcu_disconnect_work(struct bt_work *work)
 {
-	struct k_work_delayable *dwork = k_work_delayable_from_work(work);
+	struct bt_work_delayable *dwork = bt_work_delayable_from_work(work);
 	struct bt_hid_device *hid = CONTAINER_OF(dwork, struct bt_hid_device, vcu_disconnect);
 	int err;
 
@@ -436,44 +440,44 @@ static void bt_hid_l2cap_ctrl_connected(struct bt_l2cap_chan *chan)
 		return;
 	}
 
-	atomic_set_bit(&hid->flags, BT_HID_DEVICE_FLAG_CTRL_CONNECTED);
+	bt_atomic_set_bit(&hid->flags, BT_HID_DEVICE_FLAG_CTRL_CONNECTED);
 
 	if ((hid->state == BT_HID_STATE_CTRL_CONNECTING) &&
-	    !atomic_test_bit(&hid->flags, BT_HID_DEVICE_FLAG_INTR_ATTACHED)) {
+	    !bt_atomic_test_bit(&hid->flags, BT_HID_DEVICE_FLAG_INTR_ATTACHED)) {
 		hid->state = BT_HID_STATE_CTRL_CONNECTED;
 	}
 
 	if (hid->role == BT_HID_ROLE_ACCEPTOR) {
-		if (atomic_test_bit(&hid->flags, BT_HID_DEVICE_FLAG_INTR_CONNECTED)) {
-			if (atomic_test_and_set_bit(&hid->flags,
+		if (bt_atomic_test_bit(&hid->flags, BT_HID_DEVICE_FLAG_INTR_CONNECTED)) {
+			if (bt_atomic_test_and_set_bit(&hid->flags,
 						    BT_HID_DEVICE_FLAG_CONNECTED_REPORTED)) {
 				return;
 			}
 
 			hid->state = BT_HID_STATE_CONNECTED;
-			k_work_cancel_delayable(&hid->intr_timeout);
+			bt_work_cancel_delayable(&hid->intr_timeout);
 
 			hid_device_connected(hid);
 			return;
 		}
 
 		LOG_DBG("wait for INTR connection");
-		bt_work_reschedule(&hid->intr_timeout, HID_INTR_CONN_TIMEOUT);
+		bt_host_work_reschedule(&hid->intr_timeout, HID_INTR_CONN_TIMEOUT);
 
-		if (atomic_test_bit(&hid->flags, BT_HID_DEVICE_FLAG_INTR_CONNECTED)) {
-			k_work_cancel_delayable(&hid->intr_timeout);
+		if (bt_atomic_test_bit(&hid->flags, BT_HID_DEVICE_FLAG_INTR_CONNECTED)) {
+			bt_work_cancel_delayable(&hid->intr_timeout);
 		}
 
 		return;
 	}
 
-	atomic_set_bit(&hid->flags, BT_HID_DEVICE_FLAG_INTR_ATTACHED);
+	bt_atomic_set_bit(&hid->flags, BT_HID_DEVICE_FLAG_INTR_ATTACHED);
 
 	err = bt_l2cap_chan_connect(hid->ctrl_session.br_chan.chan.conn,
 				    &hid->intr_session.br_chan.chan, BT_L2CAP_PSM_HID_INTR);
 	if (err != 0) {
 		LOG_ERR("INTR connect failed");
-		atomic_clear_bit(&hid->flags, BT_HID_DEVICE_FLAG_INTR_ATTACHED);
+		bt_atomic_clear_bit(&hid->flags, BT_HID_DEVICE_FLAG_INTR_ATTACHED);
 		hid->state = BT_HID_STATE_DISCONNECTING;
 		bt_l2cap_chan_disconnect(&hid->ctrl_session.br_chan.chan);
 		return;
@@ -498,18 +502,18 @@ static void bt_hid_l2cap_intr_connected(struct bt_l2cap_chan *chan)
 		bt_l2cap_chan_disconnect(chan);
 		return;
 	}
-	atomic_set_bit(&hid->flags, BT_HID_DEVICE_FLAG_INTR_CONNECTED);
+	bt_atomic_set_bit(&hid->flags, BT_HID_DEVICE_FLAG_INTR_CONNECTED);
 
-	if (!atomic_test_bit(&hid->flags, BT_HID_DEVICE_FLAG_CTRL_CONNECTED)) {
+	if (!bt_atomic_test_bit(&hid->flags, BT_HID_DEVICE_FLAG_CTRL_CONNECTED)) {
 		LOG_DBG("INTR connected while CTRL still configuring");
 		return;
 	}
 
-	if (atomic_test_and_set_bit(&hid->flags, BT_HID_DEVICE_FLAG_CONNECTED_REPORTED)) {
+	if (bt_atomic_test_and_set_bit(&hid->flags, BT_HID_DEVICE_FLAG_CONNECTED_REPORTED)) {
 		return;
 	}
 	hid->state = BT_HID_STATE_CONNECTED;
-	k_work_cancel_delayable(&hid->intr_timeout);
+	bt_work_cancel_delayable(&hid->intr_timeout);
 
 	hid_device_connected(hid);
 }
@@ -525,13 +529,13 @@ static void bt_hid_l2cap_ctrl_disconnected(struct bt_l2cap_chan *chan)
 
 	__ASSERT_NO_MSG(chtype == BT_HID_CHANNEL_CTRL);
 
-	atomic_clear_bit(&hid->flags, BT_HID_DEVICE_FLAG_CTRL_CONNECTED);
-	atomic_clear_bit(&hid->flags, BT_HID_DEVICE_FLAG_CTRL_ATTACHED);
+	bt_atomic_clear_bit(&hid->flags, BT_HID_DEVICE_FLAG_CTRL_CONNECTED);
+	bt_atomic_clear_bit(&hid->flags, BT_HID_DEVICE_FLAG_CTRL_ATTACHED);
 
 	/* HID spec v1.1.2 Section 5.2.2: INTR shall be disconnected before
 	 * CTRL. If remote disconnects CTRL first, clean up INTR.
 	 */
-	if (atomic_test_bit(&hid->flags, BT_HID_DEVICE_FLAG_INTR_CONNECTED)) {
+	if (bt_atomic_test_bit(&hid->flags, BT_HID_DEVICE_FLAG_INTR_CONNECTED)) {
 		int err = bt_l2cap_chan_disconnect(&hid->intr_session.br_chan.chan);
 
 		if ((err != 0) && (err != -EALREADY)) {
@@ -540,7 +544,7 @@ static void bt_hid_l2cap_ctrl_disconnected(struct bt_l2cap_chan *chan)
 		return;
 	}
 
-	if (atomic_test_bit(&hid->flags, BT_HID_DEVICE_FLAG_INTR_ATTACHED)) {
+	if (bt_atomic_test_bit(&hid->flags, BT_HID_DEVICE_FLAG_INTR_ATTACHED)) {
 		hid->state = BT_HID_STATE_DISCONNECTING;
 		return;
 	}
@@ -563,12 +567,12 @@ static void bt_hid_l2cap_intr_disconnected(struct bt_l2cap_chan *chan)
 
 	__ASSERT_NO_MSG(chtype == BT_HID_CHANNEL_INTR);
 
-	atomic_clear_bit(&hid->flags, BT_HID_DEVICE_FLAG_INTR_CONNECTED);
-	atomic_clear_bit(&hid->flags, BT_HID_DEVICE_FLAG_INTR_ATTACHED);
+	bt_atomic_clear_bit(&hid->flags, BT_HID_DEVICE_FLAG_INTR_CONNECTED);
+	bt_atomic_clear_bit(&hid->flags, BT_HID_DEVICE_FLAG_INTR_ATTACHED);
 
 	/* Local disconnect of INTR must be followed by disconnecting CTRL. */
 	if ((hid->state == BT_HID_STATE_DISCONNECTING) &&
-	    atomic_test_bit(&hid->flags, BT_HID_DEVICE_FLAG_CTRL_CONNECTED)) {
+	    bt_atomic_test_bit(&hid->flags, BT_HID_DEVICE_FLAG_CTRL_CONNECTED)) {
 		int err = bt_l2cap_chan_disconnect(&hid->ctrl_session.br_chan.chan);
 
 		if ((err != 0) && (err != -EALREADY)) {
@@ -579,17 +583,17 @@ static void bt_hid_l2cap_intr_disconnected(struct bt_l2cap_chan *chan)
 	}
 
 	/* Wait for remote to disconnect CTRL. */
-	if (atomic_test_bit(&hid->flags, BT_HID_DEVICE_FLAG_CTRL_CONNECTED)) {
+	if (bt_atomic_test_bit(&hid->flags, BT_HID_DEVICE_FLAG_CTRL_CONNECTED)) {
 		hid->state = BT_HID_STATE_CTRL_CONNECTED;
 
 		/* Allow a future INTR reconnection to report connected() again. */
-		atomic_clear_bit(&hid->flags, BT_HID_DEVICE_FLAG_CONNECTED_REPORTED);
+		bt_atomic_clear_bit(&hid->flags, BT_HID_DEVICE_FLAG_CONNECTED_REPORTED);
 
 		LOG_DBG("wait for remote CTRL disconnect");
 		return;
 	}
 
-	if (atomic_test_bit(&hid->flags, BT_HID_DEVICE_FLAG_CTRL_ATTACHED)) {
+	if (bt_atomic_test_bit(&hid->flags, BT_HID_DEVICE_FLAG_CTRL_ATTACHED)) {
 		int err = bt_l2cap_chan_disconnect(&hid->ctrl_session.br_chan.chan);
 
 		if ((err != 0) && (err != -EALREADY)) {
@@ -732,10 +736,10 @@ static void bt_hid_session_init(struct bt_hid_device *hid, enum bt_hid_role role
 	hid->role = role;
 	hid->boot_mode = false;
 
-	atomic_clear(&hid->flags);
+	bt_atomic_clear(&hid->flags);
 
-	k_work_init_delayable(&hid->intr_timeout, hid_intr_timeout_handler);
-	k_work_init_delayable(&hid->vcu_disconnect, hid_vcu_disconnect_work);
+	bt_work_init_delayable(&hid->intr_timeout, hid_intr_timeout_handler);
+	bt_work_init_delayable(&hid->vcu_disconnect, hid_vcu_disconnect_work);
 }
 
 static void bt_hid_device_cleanup(struct bt_hid_device *hid)
@@ -744,19 +748,19 @@ static void bt_hid_device_cleanup(struct bt_hid_device *hid)
 	 * to be done with both channels first: a callback for a channel of this
 	 * association would otherwise be dispatched to whatever is allocated next.
 	 */
-	__ASSERT(!atomic_test_bit(&hid->flags, BT_HID_DEVICE_FLAG_CTRL_ATTACHED) &&
-			 !atomic_test_bit(&hid->flags, BT_HID_DEVICE_FLAG_INTR_ATTACHED),
+	__ASSERT(!bt_atomic_test_bit(&hid->flags, BT_HID_DEVICE_FLAG_CTRL_ATTACHED) &&
+			 !bt_atomic_test_bit(&hid->flags, BT_HID_DEVICE_FLAG_INTR_ATTACHED),
 		 "release with channels still attached");
 
-	k_work_cancel_delayable(&hid->intr_timeout);
-	k_work_cancel_delayable(&hid->vcu_disconnect);
+	bt_work_cancel_delayable(&hid->intr_timeout);
+	bt_work_cancel_delayable(&hid->vcu_disconnect);
 
 	/* HID spec v1.1.2 Section 2.1.2: default protocol mode is Report
 	 * Protocol Mode. Reset on disconnect for next connection. The flags are
 	 * cleared as a whole so the next association starts unreported.
 	 */
 	hid->boot_mode = false;
-	atomic_clear(&hid->flags);
+	bt_atomic_clear(&hid->flags);
 	hid->state = BT_HID_STATE_DISCONNECTED;
 }
 
@@ -772,7 +776,7 @@ static int hid_l2cap_ctrl_accept(struct bt_conn *conn, struct bt_l2cap_server *s
 
 	bt_hid_session_init(hid, BT_HID_ROLE_ACCEPTOR);
 	hid->state = BT_HID_STATE_CTRL_CONNECTING;
-	atomic_set_bit(&hid->flags, BT_HID_DEVICE_FLAG_CTRL_ATTACHED);
+	bt_atomic_set_bit(&hid->flags, BT_HID_DEVICE_FLAG_CTRL_ATTACHED);
 
 	*chan = &hid->ctrl_session.br_chan.chan;
 	return 0;
@@ -800,14 +804,14 @@ static int hid_l2cap_intr_accept(struct bt_conn *conn, struct bt_l2cap_server *s
 		return -ENOTCONN;
 	}
 
-	if (atomic_test_and_set_bit(&hid->flags, BT_HID_DEVICE_FLAG_INTR_ATTACHED)) {
+	if (bt_atomic_test_and_set_bit(&hid->flags, BT_HID_DEVICE_FLAG_INTR_ATTACHED)) {
 		LOG_WRN("INTR channel already attached (state %d)", hid->state);
 		return -EBUSY;
 	}
 
 	hid->state = BT_HID_STATE_INTR_CONNECTING;
 
-	bt_work_reschedule(&hid->intr_timeout, HID_INTR_CONN_TIMEOUT);
+	bt_host_work_reschedule(&hid->intr_timeout, HID_INTR_CONN_TIMEOUT);
 
 	*chan = &hid->intr_session.br_chan.chan;
 	return 0;
@@ -934,7 +938,7 @@ int bt_hid_device_connect(struct bt_conn *conn, struct bt_hid_device **hid)
 	bt_hid_session_init(inst, BT_HID_ROLE_INITIATOR);
 
 	inst->state = BT_HID_STATE_CTRL_CONNECTING;
-	atomic_set_bit(&inst->flags, BT_HID_DEVICE_FLAG_CTRL_ATTACHED);
+	bt_atomic_set_bit(&inst->flags, BT_HID_DEVICE_FLAG_CTRL_ATTACHED);
 
 	err = bt_l2cap_chan_connect(conn, &inst->ctrl_session.br_chan.chan, BT_L2CAP_PSM_HID_CTRL);
 	if (err != 0) {
@@ -942,7 +946,7 @@ int bt_hid_device_connect(struct bt_conn *conn, struct bt_hid_device **hid)
 		/* L2CAP can fail through its own channel cleanup, which already ran the
 		 * disconnected callback and released the instance.
 		 */
-		atomic_clear_bit(&inst->flags, BT_HID_DEVICE_FLAG_CTRL_ATTACHED);
+		bt_atomic_clear_bit(&inst->flags, BT_HID_DEVICE_FLAG_CTRL_ATTACHED);
 		bt_hid_device_cleanup(inst);
 		return err;
 	}
@@ -967,9 +971,9 @@ int bt_hid_device_disconnect(struct bt_hid_device *hid)
 		return -ENOTCONN;
 	}
 
-	if (atomic_test_bit(&hid->flags, BT_HID_DEVICE_FLAG_INTR_CONNECTED)) {
+	if (bt_atomic_test_bit(&hid->flags, BT_HID_DEVICE_FLAG_INTR_CONNECTED)) {
 		err = bt_l2cap_chan_disconnect(&hid->intr_session.br_chan.chan);
-	} else if (atomic_test_bit(&hid->flags, BT_HID_DEVICE_FLAG_CTRL_CONNECTED)) {
+	} else if (bt_atomic_test_bit(&hid->flags, BT_HID_DEVICE_FLAG_CTRL_CONNECTED)) {
 		err = bt_l2cap_chan_disconnect(&hid->ctrl_session.br_chan.chan);
 	} else {
 		return -ENOTCONN;
@@ -1043,11 +1047,11 @@ static void virtual_cable_unplug_tx_cb(struct bt_conn *conn, void *user_data, in
 	 */
 	if (err != 0) {
 		LOG_WRN("VCU control message send failed (%d)", err);
-		bt_work_schedule(&hid->vcu_disconnect, K_NO_WAIT);
+		bt_host_work_schedule(&hid->vcu_disconnect, BT_NO_WAIT);
 		return;
 	}
 
-	bt_work_schedule(&hid->vcu_disconnect, HID_VCU_DISCONNECT_TIMEOUT);
+	bt_host_work_schedule(&hid->vcu_disconnect, HID_VCU_DISCONNECT_TIMEOUT);
 }
 
 int bt_hid_device_virtual_cable_unplug(struct bt_hid_device *hid)
@@ -1096,4 +1100,10 @@ int bt_hid_device_virtual_cable_unplug(struct bt_hid_device *hid)
 	 */
 
 	return 0;
+}
+
+/** @brief Initialize module-owned storage before protocol operations. */
+void bt_host_classic_hid_device_storage_init(void)
+{
+	net_buf_pool_init(&hid_hs_pool);
 }

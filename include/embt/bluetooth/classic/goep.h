@@ -16,7 +16,6 @@
  * @{
  */
 
-#include <embt/storage.h>
 #include <string.h>
 #include <errno.h>
 #include <stdbool.h>

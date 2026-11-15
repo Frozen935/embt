@@ -8,6 +8,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <embt/base/fifo.h>
+#include <embt/base/work.h>
+#include <embt/base/atomic.h>
 #include "hfp_internal.h"
 
 #if defined(CONFIG_BT_HFP_HF_CLI)
@@ -202,8 +205,8 @@ struct bt_hfp_hf_call {
 	struct bt_hfp_hf *hf;
 	uint8_t index;
 
-	ATOMIC_DEFINE(flags, BT_HFP_HF_CALL_NUM_FLAGS);
-	ATOMIC_DEFINE(state, BT_HFP_HF_CALL_STATE_NUM_FLAGS);
+	BT_ATOMIC_DEFINE(flags, BT_HFP_HF_CALL_NUM_FLAGS);
+	BT_ATOMIC_DEFINE(state, BT_HFP_HF_CALL_STATE_NUM_FLAGS);
 };
 
 struct bt_hfp_hf {
@@ -212,17 +215,17 @@ struct bt_hfp_hf {
 	struct bt_conn *acl;
 	/* AT command sending queue */
 	at_finish_cb_t backup_finish;
-	struct k_fifo tx_pending;
+	struct bt_fifo tx_pending;
 	/* SCO Channel */
 	struct bt_sco_chan chan;
 	/* SCO connect */
-	atomic_ptr_t sco_conn;
+	bt_atomic_ptr_t sco_conn;
 
 	/* SDP discover params */
 	struct bt_sdp_discover_params sdp_param;
 
 	/* SCL work */
-	struct k_work slc_work;
+	struct bt_work slc_work;
 
 	struct at_client at;
 	uint32_t hf_features;
@@ -249,12 +252,12 @@ struct bt_hfp_hf {
 	uint32_t chld_features;
 
 	/* Worker for pending TX */
-	struct k_work work;
+	struct bt_work work;
 
-	struct k_work_delayable deferred_work;
+	struct bt_work_delayable deferred_work;
 
 	/* calls */
 	struct bt_hfp_hf_call calls[CONFIG_BT_HFP_HF_MAX_CALLS];
 
-	ATOMIC_DEFINE(flags, BT_HFP_HF_NUM_FLAGS);
+	BT_ATOMIC_DEFINE(flags, BT_HFP_HF_NUM_FLAGS);
 };

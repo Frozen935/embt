@@ -10,7 +10,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <zephyr/bluetooth/classic/avrcp.h>
+#include <embt/base/atomic.h>
+#include <string.h>
+#include <embt/base/assert.h>
+#include <embt/bluetooth/classic/avrcp.h>
 
 #define AVCTP_VER_1_4 (0x0104u)
 #define AVRCP_VER_1_6 (0x0106u)
@@ -189,7 +192,7 @@ struct bt_avrcp_tg_vd_rsp_tx {
 	uint8_t pdu_id;
 	uint8_t rsp;
 
-	ATOMIC_DEFINE(flags, BT_AVRCP_TG_NUM_FLAGS);
+	BT_ATOMIC_DEFINE(flags, BT_AVRCP_TG_NUM_FLAGS);
 };
 
 struct bt_avrcp_ct_notify_registration {

@@ -19,6 +19,7 @@
  * @{
  */
 
+#include <embt/base/time.h>
 #include <stdint.h>
 
 #include <embt/bluetooth/bluetooth.h>
@@ -949,11 +950,11 @@ int bt_a2dp_stream_send(struct bt_a2dp_stream *stream, struct net_buf *buf, uint
  *
  * @param pool    The buffer pool to allocate from.
  * @param timeout Non-negative waiting period to obtain a buffer or one of
- *                the special values K_NO_WAIT and K_FOREVER.
+ *                the special values BT_NO_WAIT and BT_FOREVER.
  *
  * @return A newly allocated net_buf.
  */
-struct net_buf *bt_a2dp_stream_create_pdu(struct net_buf_pool *pool, k_timeout_t timeout);
+struct net_buf *bt_a2dp_stream_create_pdu(struct net_buf_pool *pool, bt_timeout_t timeout);
 
 /** @brief send delay report
  *

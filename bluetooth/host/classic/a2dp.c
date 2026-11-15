@@ -9,20 +9,22 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <common/assert.h>
+#include <embt/base/work.h>
+#include <embt/base/time.h>
+#include <embt/base/assert.h>
 #include <string.h>
 #include <errno.h>
-#include <zephyr/sys/atomic.h>
-#include <zephyr/sys/byteorder.h>
-#include <zephyr/sys/util.h>
-#include <zephyr/sys/printk.h>
+#include <embt/base/atomic.h>
+#include <embt/base/byteorder.h>
+#include <embt/base/util.h>
 
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/l2cap.h>
-#include <zephyr/bluetooth/classic/avdtp.h>
-#include <zephyr/bluetooth/classic/a2dp_codec_sbc.h>
-#include <zephyr/bluetooth/classic/a2dp.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/l2cap.h>
+#include <embt/bluetooth/classic/avdtp.h>
+#include <embt/bluetooth/classic/a2dp_codec_sbc.h>
+#include <embt/bluetooth/classic/a2dp.h>
 
-#include <common/assert.h>
 
 #define A2DP_SBC_PAYLOAD_TYPE (0x60U)
 
@@ -90,7 +92,11 @@ static struct bt_a2dp *a2dp_get_connection(struct bt_conn *conn)
 		 * a queued work item would corrupt the work queue, so
 		 * reject the object reuse until the work has completed.
 		 */
-		if (k_work_busy_get(&a2dp->session._release_work) != 0) {
+		if (bt_work_busy_get(&a2dp->session._release_work) != 0) {
+			return NULL;
+		}
+
+		if (bt_avdtp_session_deinit(&a2dp->session)) {
 			return NULL;
 		}
 
@@ -1333,7 +1339,7 @@ uint32_t bt_a2dp_get_mtu(struct bt_a2dp_stream *stream)
 }
 
 #if defined(CONFIG_BT_A2DP_SOURCE)
-struct net_buf *bt_a2dp_stream_create_pdu(struct net_buf_pool *pool, k_timeout_t timeout)
+struct net_buf *bt_a2dp_stream_create_pdu(struct net_buf_pool *pool, bt_timeout_t timeout)
 {
 	struct net_buf *buf;
 

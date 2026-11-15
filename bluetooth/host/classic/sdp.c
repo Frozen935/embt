@@ -9,16 +9,23 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <common/assert.h>
+#include <embt/base/queue.h>
+#include <embt/base/work.h>
+#include <embt/base/spinlock.h>
+#include <embt/base/time.h>
+#include <embt/base/atomic.h>
+#include <string.h>
+#include <embt/base/util_macro.h>
 #include <errno.h>
 #include <sys/types.h>
-#include <zephyr/sys/byteorder.h>
-#include <zephyr/sys/__assert.h>
+#include <embt/base/byteorder.h>
+#include <embt/base/assert.h>
 
-#include <zephyr/bluetooth/buf.h>
-#include <zephyr/bluetooth/classic/sdp.h>
+#include <embt/bluetooth/buf.h>
+#include <embt/bluetooth/classic/sdp.h>
 
 #include <common/bt_str.h>
-#include <common/assert.h>
 
 #include <host/hci_core.h>
 #include <host/conn_internal.h>
@@ -126,7 +133,7 @@ struct bt_sdp_client {
 	/* L2CAP channel for SDP client */
 	struct bt_l2cap_br_chan              chan;
 	/* list of waiting to be resolved UUID params */
-	struct k_queue                       reqs_pending;
+	struct bt_queue                       reqs_pending;
 	/* UUID params holder being now resolved */
 	const struct bt_sdp_discover_params *param;
 	/* required SDP transaction ID */
@@ -142,7 +149,7 @@ struct bt_sdp_client {
 	/* client state */
 	enum sdp_client_state                state;
 	/* flags */
-	atomic_t                             flags[1];
+	bt_atomic_t                             flags[1];
 };
 
 static struct bt_sdp_client bt_sdp_client_pool[CONFIG_BT_MAX_CONN];
@@ -249,7 +256,7 @@ static void bt_sdp_disconnected(struct bt_l2cap_chan *chan)
  */
 static struct net_buf *sdp_svc_create_pdu(void)
 {
-	return bt_l2cap_create_pdu_timeout(&sdp_pool, sizeof(struct bt_sdp_hdr), K_NO_WAIT);
+	return bt_l2cap_create_pdu_timeout(&sdp_pool, sizeof(struct bt_sdp_hdr), BT_NO_WAIT);
 }
 
 /* @brief Allocates a net buffer for SDP Client
@@ -262,7 +269,7 @@ static struct net_buf *sdp_svc_create_pdu(void)
  */
 static struct net_buf *sdp_client_create_pdu(void)
 {
-	return bt_l2cap_create_pdu_timeout(&sdp_pool, sizeof(struct bt_sdp_hdr), K_NO_WAIT);
+	return bt_l2cap_create_pdu_timeout(&sdp_pool, sizeof(struct bt_sdp_hdr), BT_NO_WAIT);
 }
 
 /* @brief Sends out an SDP PDU
@@ -1686,7 +1693,7 @@ static int bt_sdp_recv(struct bt_l2cap_chan *chan, struct net_buf *buf)
 	return 0;
 }
 
-static void sdp_svc_work_handler(struct k_work *work)
+static void sdp_svc_work_handler(struct bt_work *work)
 {
 	ARG_UNUSED(work);
 
@@ -1710,7 +1717,7 @@ static void sdp_svc_work_handler(struct k_work *work)
 	}
 }
 
-static K_WORK_DEFINE(sdp_svc_worker, sdp_svc_work_handler);
+static BT_WORK_DEFINE(sdp_svc_worker, sdp_svc_work_handler);
 
 /* @brief Callback for SDP connection accept
  *
@@ -1754,8 +1761,19 @@ static int bt_sdp_accept(struct bt_conn *conn, struct bt_l2cap_server *server,
 	return -ENOMEM;
 }
 
+static struct bt_conn_cb bt_conn_cb_sdp_client_conn_callbacks;
+
 void bt_sdp_init(void)
 {
+	net_buf_pool_init(&sdp_pool);
+
+	static bool registered;
+
+	if (!registered) {
+		bt_conn_cb_register(&bt_conn_cb_sdp_client_conn_callbacks);
+		registered = true;
+	}
+
 	__maybe_unused int err;
 
 	static bool initialized;
@@ -1776,7 +1794,7 @@ void bt_sdp_init(void)
 	}
 
 	ARRAY_FOR_EACH(bt_sdp_client_pool, i) {
-		k_queue_init(&bt_sdp_client_pool[i].reqs_pending);
+		bt_queue_init(&bt_sdp_client_pool[i].reqs_pending);
 	}
 
 	initialized = true;
@@ -1857,7 +1875,7 @@ static void sdp_client_req_cleanup(struct bt_sdp_client *session)
 	/* Clear received length */
 	session->recv_len = 0U;
 	/* Clear flags */
-	atomic_clear(session->flags);
+	bt_atomic_clear(session->flags);
 }
 
 static void sdp_client_cleanup(struct bt_sdp_client *session)
@@ -1899,7 +1917,7 @@ static void sdp_client_params_iterator(struct bt_sdp_client *session)
 	sdp_client_req_cleanup(session);
 
 	/* Check if there's valid next pending request */
-	if (k_queue_peek_head(&session->reqs_pending) != NULL) {
+	if (bt_queue_peek_head(&session->reqs_pending) != NULL) {
 		sdp_client_discover(session);
 		return;
 	}
@@ -2091,7 +2109,7 @@ static int sdp_client_notify_result(struct bt_conn *conn, struct bt_sdp_client *
 				 * discovery if the new buffer allocated. Otherwise, use the
 				 * current allocated to continue the SDP discovery.
 				 */
-				buf = net_buf_alloc(session->param->pool, K_NO_WAIT);
+				buf = net_buf_alloc(session->param->pool, BT_NO_WAIT);
 				if (buf != NULL) {
 					if (net_buf_tailroom(buf) < len) {
 						goto no_more_space;
@@ -2175,29 +2193,29 @@ static void sdp_client_req_not_resolved(struct bt_conn *conn, struct bt_sdp_clie
 	}
 }
 
-static struct k_spinlock sdp_client_lock;
+static struct bt_spinlock sdp_client_lock;
 
 static void sdp_client_reqs_pending_not_resolved(struct bt_conn *conn,
 						 struct bt_sdp_client *session)
 {
 	void *node;
-	k_spinlock_key_t key;
+	bt_spinlock_key_t key;
 
-	key = k_spin_lock(&sdp_client_lock);
-	node = k_queue_get(&session->reqs_pending, K_NO_WAIT);
+	key = bt_spin_lock(&sdp_client_lock);
+	node = bt_queue_get(&session->reqs_pending, BT_NO_WAIT);
 	while (node != NULL) {
 		session->param = GET_PARAM(node);
-		k_spin_unlock(&sdp_client_lock, key);
+		bt_spin_unlock(&sdp_client_lock, key);
 		sdp_client_req_not_resolved(conn, session);
 		bt_conn_unref(conn);
 
-		key = k_spin_lock(&sdp_client_lock);
-		node = k_queue_get(&session->reqs_pending, K_NO_WAIT);
+		key = bt_spin_lock(&sdp_client_lock);
+		node = bt_queue_get(&session->reqs_pending, BT_NO_WAIT);
 	}
-	k_spin_unlock(&sdp_client_lock, key);
+	bt_spin_unlock(&sdp_client_lock, key);
 }
 
-static void sdp_client_work_handler(struct k_work *work)
+static void sdp_client_work_handler(struct bt_work *work)
 {
 	ARG_UNUSED(work);
 
@@ -2235,13 +2253,13 @@ static void sdp_client_work_handler(struct k_work *work)
 
 		/* Retry the SDP discovery request */
 		if (session->state == SDP_CLIENT_CONNECTED &&
-		    atomic_test_and_clear_bit(session->flags, SDP_CLIENT_FLAG_WAIT_FOR_TX_BUF)) {
+		    bt_atomic_test_and_clear_bit(session->flags, SDP_CLIENT_FLAG_WAIT_FOR_TX_BUF)) {
 			sdp_client_discover(session);
 			bt_conn_unref(conn);
 			continue;
 		}
 
-		if (k_queue_peek_head(&session->reqs_pending) == NULL) {
+		if (bt_queue_peek_head(&session->reqs_pending) == NULL) {
 			bt_conn_unref(conn);
 			continue;
 		}
@@ -2265,14 +2283,14 @@ failed:
 	}
 }
 
-static K_WORK_DEFINE(sdp_client_worker, sdp_client_work_handler);
+static BT_WORK_DEFINE(sdp_client_worker, sdp_client_work_handler);
 
 static void sdp_destroy(struct net_buf *buf)
 {
 	net_buf_destroy(buf);
 
-	bt_work_submit(&sdp_svc_worker);
-	bt_work_submit(&sdp_client_worker);
+	bt_host_work_submit(&sdp_svc_worker);
+	bt_host_work_submit(&sdp_client_worker);
 }
 
 static void disconnected(struct bt_conn *conn, uint8_t reason)
@@ -2597,14 +2615,14 @@ static int sdp_client_ssa_search(struct bt_sdp_client *session,
 static void sdp_client_get_pending_req(struct bt_sdp_client *session)
 {
 	void *node;
-	k_spinlock_key_t key;
+	bt_spinlock_key_t key;
 
-	key = k_spin_lock(&sdp_client_lock);
-	node = k_queue_get(&session->reqs_pending, K_NO_WAIT);
+	key = bt_spin_lock(&sdp_client_lock);
+	node = bt_queue_get(&session->reqs_pending, BT_NO_WAIT);
 	if (node != NULL) {
 		session->param = GET_PARAM(node);
 	}
-	k_spin_unlock(&sdp_client_lock, key);
+	bt_spin_unlock(&sdp_client_lock, key);
 
 	if (node != NULL) {
 		bt_conn_unref(session->chan.chan.conn);
@@ -2631,7 +2649,7 @@ static int sdp_client_discover(struct bt_sdp_client *session)
 	}
 
 	if (session->rec_buf == NULL) {
-		session->rec_buf = net_buf_alloc(session->param->pool, K_NO_WAIT);
+		session->rec_buf = net_buf_alloc(session->param->pool, BT_NO_WAIT);
 	}
 
 	if (session->rec_buf == NULL) {
@@ -2642,7 +2660,7 @@ static int sdp_client_discover(struct bt_sdp_client *session)
 		/* Cleanup current SDP discovery state */
 		sdp_client_req_cleanup(session);
 		/* Trigger client worker to start the next SDP discovery procedure */
-		bt_work_submit(&sdp_client_worker);
+		bt_host_work_submit(&sdp_client_worker);
 		return 0;
 	}
 
@@ -2662,7 +2680,7 @@ static int sdp_client_discover(struct bt_sdp_client *session)
 	}
 
 	if (err == -ENOBUFS) {
-		atomic_set_bit(session->flags, SDP_CLIENT_FLAG_WAIT_FOR_TX_BUF);
+		bt_atomic_set_bit(session->flags, SDP_CLIENT_FLAG_WAIT_FOR_TX_BUF);
 		return 0;
 	}
 
@@ -2672,7 +2690,7 @@ static int sdp_client_discover(struct bt_sdp_client *session)
 		/* Cleanup current SDP discovery state */
 		sdp_client_req_cleanup(session);
 		/* Trigger client worker to start the next SDP discovery procedure */
-		bt_work_submit(&sdp_client_worker);
+		bt_host_work_submit(&sdp_client_worker);
 	}
 
 	return 0;
@@ -2839,7 +2857,11 @@ static int sdp_client_receive_ssa_sa(struct bt_sdp_client *session, struct net_b
 	 * valid and this is the first response frame as well.
 	 */
 	if (frame_len == 2U && cstate->length == 0U && session->cstate.length == 0U) {
-		LOG_WRN("Record for UUID 0x%s not found", bt_uuid_str(session->param->uuid));
+		if (session->param->type == BT_SDP_DISCOVER_SERVICE_ATTR) {
+			LOG_WRN("Record 0x%08x not found", session->param->handle);
+		} else {
+			LOG_WRN("Record for UUID 0x%s not found", bt_uuid_str(session->param->uuid));
+		}
 		return -EINVAL;
 	}
 
@@ -2907,7 +2929,11 @@ static int sdp_client_receive_ssa_sa(struct bt_sdp_client *session, struct net_b
 
 	net_buf_pull(buf, sizeof(cstate->length));
 
-	LOG_DBG("UUID 0x%s resolved", bt_uuid_str(session->param->uuid));
+	if (session->param->type == BT_SDP_DISCOVER_SERVICE_ATTR) {
+		LOG_DBG("Record 0x%08x resolved", session->param->handle);
+	} else {
+		LOG_DBG("UUID 0x%s resolved", bt_uuid_str(session->param->uuid));
+	}
 	sdp_client_notify_result(session->chan.chan.conn, session, UUID_RESOLVED);
 	/* Get next UUID and start resolving it */
 	sdp_client_params_iterator(session);
@@ -2992,10 +3018,13 @@ static void sdp_client_disconnected(struct bt_l2cap_chan *chan)
 	LOG_DBG("session %p chan %p disconnected", session, chan);
 
 	sdp_client_req_not_resolved(chan->conn, session);
+	if (session->state == SDP_CLIENT_CONNECTING) {
+		sdp_client_reqs_pending_not_resolved(chan->conn, session);
+	}
 	sdp_client_cleanup(session);
 
 	/* Check if there is any pending request in fifo */
-	bt_work_submit(&sdp_client_worker);
+	bt_host_work_submit(&sdp_client_worker);
 }
 
 static int sdp_client_chan_connect(struct bt_conn *conn, struct bt_sdp_client *session)
@@ -3076,9 +3105,9 @@ int bt_sdp_discover(struct bt_conn *conn, struct bt_sdp_discover_params *params)
 
 	session = &bt_sdp_client_pool[index];
 
-	k_queue_append(&session->reqs_pending, &params->_node);
+	bt_queue_append(&session->reqs_pending, &params->_node);
 
-	bt_work_submit(&sdp_client_worker);
+	bt_host_work_submit(&sdp_client_worker);
 	return 0;
 }
 
@@ -3087,7 +3116,7 @@ int bt_sdp_discover_cancel(struct bt_conn *conn,
 {
 	struct bt_sdp_client *session;
 	size_t index;
-	k_spinlock_key_t key;
+	bt_spinlock_key_t key;
 	bool found;
 
 	if (conn == NULL || params == NULL) {
@@ -3100,18 +3129,18 @@ int bt_sdp_discover_cancel(struct bt_conn *conn,
 
 	session = &bt_sdp_client_pool[index];
 
-	key = k_spin_lock(&sdp_client_lock);
+	key = bt_spin_lock(&sdp_client_lock);
 	if (session->param == params) {
 		/* The request is being resolved: a request PDU is out and its
 		 * response may already be under processing, so it is too late
 		 * to keep the callback from being called.
 		 */
-		k_spin_unlock(&sdp_client_lock, key);
+		bt_spin_unlock(&sdp_client_lock, key);
 		return -EINPROGRESS;
 	}
 
-	found = k_queue_remove(&session->reqs_pending, &params->_node);
-	k_spin_unlock(&sdp_client_lock, key);
+	found = bt_queue_remove(&session->reqs_pending, &params->_node);
+	bt_spin_unlock(&sdp_client_lock, key);
 
 	if (!found) {
 		return -ESRCH;

@@ -8,10 +8,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <embt/base/time.h>
+#include <string.h>
+#include <embt/base/assert.h>
 #include <embt/base/log.h>
-#include <zephyr/bluetooth/l2cap.h>
-#include <zephyr/sys/iterable_sections.h>
-#include <zephyr/sys/util.h>
+#include <embt/bluetooth/l2cap.h>
+#include <embt/base/util.h>
 #include "l2cap_br_interface.h"
 
 #define BT_L2CAP_CID_BR_SIG             0x0001
@@ -403,7 +405,20 @@ void bt_l2cap_br_chan_del(struct bt_l2cap_chan *chan);
 
 const char *bt_l2cap_chan_state_str(bt_l2cap_chan_state_t state);
 
-#if BT_LOG_LEVEL_ENABLED(BT_L2CAP, DBG)
+
+
+/* Prepare an L2CAP PDU to be sent over a connection */
+struct net_buf *bt_l2cap_create_pdu_timeout(struct net_buf_pool *pool,
+					    size_t reserve,
+					    bt_timeout_t timeout);
+
+#define bt_l2cap_create_pdu(_pool, _reserve) \
+	bt_l2cap_create_pdu_timeout(_pool, _reserve, BT_FOREVER)
+
+bt_security_t bt_l2cap_br_get_max_sec_level(void);
+
+#if defined(CONFIG_BT_L2CAP_DYNAMIC_CHANNEL) && \
+	BT_LOG_LEVEL_ENABLED(BT_L2CAP, DBG)
 void bt_l2cap_br_chan_set_state_debug(struct bt_l2cap_chan *chan,
 				   bt_l2cap_chan_state_t state,
 				   const char *func, int line);
@@ -413,13 +428,3 @@ void bt_l2cap_br_chan_set_state_debug(struct bt_l2cap_chan *chan,
 void bt_l2cap_br_chan_set_state(struct bt_l2cap_chan *chan,
 			     bt_l2cap_chan_state_t state);
 #endif /* BT_LOG_LEVEL_ENABLED(BT_L2CAP, DBG) */
-
-/* Prepare an L2CAP PDU to be sent over a connection */
-struct net_buf *bt_l2cap_create_pdu_timeout(struct net_buf_pool *pool,
-					    size_t reserve,
-					    k_timeout_t timeout);
-
-#define bt_l2cap_create_pdu(_pool, _reserve) \
-	bt_l2cap_create_pdu_timeout(_pool, _reserve, K_FOREVER)
-
-bt_security_t bt_l2cap_br_get_max_sec_level(void);

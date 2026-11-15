@@ -20,6 +20,11 @@
  * @{
  */
 
+#include <stdint.h>
+#include <stdbool.h>
+#include <stddef.h>
+#include <embt/compiler.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif

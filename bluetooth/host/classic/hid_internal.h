@@ -8,8 +8,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <zephyr/sys/atomic.h>
-#include <zephyr/bluetooth/l2cap.h>
+#include <embt/base/work.h>
+#include <embt/base/atomic.h>
+#include <embt/bluetooth/l2cap.h>
 
 /** @brief HID header size (1 byte). */
 #define BT_HID_HDR_SIZE 1U
@@ -143,10 +144,10 @@ struct bt_hid_device {
 	uint8_t state;
 
 	/** Per-connection state flags, see @ref bt_hid_device_flag. */
-	atomic_t flags;
+	bt_atomic_t flags;
 
-	struct k_work_delayable intr_timeout;
-	struct k_work_delayable vcu_disconnect;
+	struct bt_work_delayable intr_timeout;
+	struct bt_work_delayable vcu_disconnect;
 };
 
 /** @brief Type of a Control channel request the HID Host can issue.
@@ -249,7 +250,7 @@ struct bt_hid_host {
 	 *
 	 * Also carries the connection role, see @ref BT_HID_HOST_FLAG_INITIATOR.
 	 */
-	atomic_t flags;
+	bt_atomic_t flags;
 	/** Outstanding Control channel transaction.
 	 *
 	 * The contents are only valid while @ref BT_HID_HOST_FLAG_REQ_PENDING is
@@ -262,9 +263,9 @@ struct bt_hid_host {
 	 * both established as required and closing the peer channel when the association becomes
 	 * invalid or is disconnected.
 	 */
-	struct k_work_delayable close_work;
+	struct bt_work_delayable close_work;
 	/** Control channel transaction timeout. */
-	struct k_work_delayable trans_work;
+	struct bt_work_delayable trans_work;
 	/** Virtual Cable Unplug teardown.
 	 *
 	 * Runs immediately when the unplug was received, where HID spec v1.1.2
@@ -272,5 +273,5 @@ struct bt_hid_host {
 	 * delay when the unplug was sent, where it only covers a peer that never
 	 * acknowledges.
 	 */
-	struct k_work_delayable vcu_work;
+	struct bt_work_delayable vcu_work;
 };

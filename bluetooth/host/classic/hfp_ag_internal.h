@@ -9,6 +9,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <embt/base/work.h>
+#include <embt/base/atomic.h>
+#include <embt/osi/sync.h>
 #include "hfp_internal.h"
 
 #if defined(CONFIG_BT_HFP_AG_EXT_ERR)
@@ -241,15 +244,15 @@ struct bt_hfp_ag_call {
 	char number[CONFIG_BT_HFP_AG_PHONE_NUMBER_MAX_LEN + 1];
 	uint8_t type;
 
-	ATOMIC_DEFINE(flags, BT_HFP_AG_CALL_NUM_FLAGS);
+	BT_ATOMIC_DEFINE(flags, BT_HFP_AG_CALL_NUM_FLAGS);
 
 	/* HFP Call state */
 	bt_hfp_call_state_t call_state;
 
 	/* Calling Line Identification notification */
-	struct k_work_delayable ringing_work;
+	struct bt_work_delayable ringing_work;
 
-	struct k_work_delayable deferred_work;
+	struct bt_work_delayable deferred_work;
 };
 
 struct bt_hfp_ag {
@@ -262,7 +265,7 @@ struct bt_hfp_ag {
 	uint32_t hf_codec_ids;
 	uint8_t selected_codec_id;
 
-	ATOMIC_DEFINE(flags, BT_HFP_AG_NUM_FLAGS);
+	BT_ATOMIC_DEFINE(flags, BT_HFP_AG_NUM_FLAGS);
 
 	/* ACL Connection Object */
 	struct bt_conn *acl_conn;
@@ -294,19 +297,19 @@ struct bt_hfp_ag {
 	struct bt_hfp_ag_ongoing_call ongoing_calls[CONFIG_BT_HFP_AG_MAX_CALLS];
 	size_t ongoing_call_count;
 	/* ongoing calls work */
-	struct k_work_delayable ongoing_call_work;
+	struct bt_work_delayable ongoing_call_work;
 
 	/* SCO Connection Object */
 	struct bt_sco_chan sco_chan;
 
 	/* SCO connect */
-	atomic_ptr_t sco_conn;
+	bt_atomic_ptr_t sco_conn;
 
 	/* SDP discover params */
 	struct bt_sdp_discover_params sdp_param;
 
 	/* SCL work */
-	struct k_work slc_work;
+	struct bt_work slc_work;
 	int ack_err;
 
 	/* HFP TX pending */
@@ -314,8 +317,8 @@ struct bt_hfp_ag {
 	sys_slist_t tx_submit_pending;
 
 	/* Critical locker */
-	struct k_sem lock;
+	os_sem_t *lock;
 
 	/* TX work */
-	struct k_work_delayable tx_work;
+	struct bt_work_delayable tx_work;
 };

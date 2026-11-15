@@ -10,17 +10,21 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <embt/base/assert.h>
+#include <embt/base/work.h>
+#include <embt/base/time.h>
+#include <embt/osi/sync.h>
+#include <embt/base/util_macro.h>
 #include <string.h>
 #include <errno.h>
-#include <zephyr/sys/atomic.h>
-#include <zephyr/sys/byteorder.h>
-#include <zephyr/sys/util.h>
-#include <zephyr/sys/printk.h>
+#include <embt/base/atomic.h>
+#include <embt/base/byteorder.h>
+#include <embt/base/util.h>
 
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/classic/avrcp.h>
-#include <zephyr/bluetooth/classic/sdp.h>
-#include <zephyr/bluetooth/l2cap.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/classic/avrcp.h>
+#include <embt/bluetooth/classic/sdp.h>
+#include <embt/bluetooth/l2cap.h>
 
 #include <host/hci_core.h>
 #include <host/conn_internal.h>
@@ -54,10 +58,10 @@ struct bt_avrcp_tg {
 	sys_slist_t vd_rsp_tx_pending;
 
 	/* Critical locker */
-	struct k_sem lock;
+	os_sem_t lock;
 
 	/* AVRCP vendor dependent response TX work */
-	struct k_work_delayable vd_rsp_tx_work;
+	struct bt_work_delayable vd_rsp_tx_work;
 
 	struct bt_avrcp_tg_notify_state tg_notify[BT_AVRCP_EVT_VOLUME_CHANGED + 1];
 };
@@ -94,9 +98,11 @@ NET_BUF_POOL_FIXED_DEFINE(avctp_ctrl_tx_pool, CONFIG_BT_MAX_CONN,
 			  BT_L2CAP_BUF_SIZE(CONFIG_BT_L2CAP_TX_MTU),
 			  CONFIG_BT_CONN_TX_USER_DATA_SIZE, NULL);
 
+#if defined(CONFIG_BT_AVRCP_BROWSING)
 NET_BUF_POOL_DEFINE(avctp_browsing_rx_pool, BT_BUF_ACL_RX_COUNT,
 		    CONFIG_BT_AVRCP_BROWSING_L2CAP_MTU,
 		    CONFIG_BT_CONN_TX_USER_DATA_SIZE, NULL);
+#endif
 /*
  * This macros returns true if the CT/TG has been initialized, which
  * typically happens after the avrcp callback have been registered.
@@ -133,7 +139,7 @@ static void avrcp_tx_buf_destroy(struct net_buf *buf)
 		struct bt_avrcp_tg *tg = &bt_avrcp_tg_pool[i];
 
 		if ((tg->avrcp != NULL) && (tg->avrcp->acl_conn != NULL)) {
-			(void)k_work_reschedule(&tg->vd_rsp_tx_work, K_NO_WAIT);
+			(void)bt_work_reschedule(&tg->vd_rsp_tx_work, BT_NO_WAIT);
 		}
 	}
 
@@ -406,12 +412,12 @@ static struct bt_sdp_record avrcp_ct_rec = BT_SDP_RECORD(avrcp_ct_attrs);
 
 static void avrcp_tg_lock(struct bt_avrcp_tg *tg)
 {
-	k_sem_take(&tg->lock, K_FOREVER);
+	osi_sem_take(&tg->lock, BT_FOREVER);
 }
 
 static void avrcp_tg_unlock(struct bt_avrcp_tg *tg)
 {
-	k_sem_give(&tg->lock);
+	osi_sem_give(&tg->lock);
 }
 
 static struct bt_avrcp *avrcp_get_connection(struct bt_conn *conn)
@@ -543,7 +549,7 @@ static void avrcp_disconnected(struct bt_avctp *session)
 	 * leaves the TX machine stalled on the stale list head when the
 	 * object is reused for a new connection.
 	 */
-	k_work_cancel_delayable(&tg->vd_rsp_tx_work);
+	bt_work_cancel_delayable(&tg->vd_rsp_tx_work);
 
 	avrcp_tg_lock(tg);
 	node = sys_slist_get(&tg->vd_rsp_tx_pending);
@@ -767,7 +773,7 @@ static int init_fragmentation_context(struct bt_avrcp_ct *ct, uint8_t tid, uint8
 	}
 
 	/* Allocate reassembly buffer */
-	ct->reassembly_buf = net_buf_alloc(&avrcp_vd_rx_pool, K_NO_WAIT);
+	ct->reassembly_buf = net_buf_alloc(&avrcp_vd_rx_pool, BT_NO_WAIT);
 	if (ct->reassembly_buf == NULL) {
 		LOG_ERR("Failed to allocate reassembly buffer");
 		return -ENOBUFS;
@@ -980,12 +986,12 @@ static void bt_avrcp_tg_process_continuing_cmd(struct bt_avrcp_tg *tg, bool abor
 	pdu_id = net_buf_pull_u8(buf);
 
 	/* Clear TX_ONGOING and update TID */
-	atomic_clear_bit(tx->flags, BT_AVRCP_TG_FLAG_TX_ONGOING);
+	bt_atomic_clear_bit(tx->flags, BT_AVRCP_TG_FLAG_TX_ONGOING);
 	tx->tid = tid;
 
 	if (abort_continuing) {
 		/* ABORT_CONTINUING: set abort flag, clear sending flag */
-		atomic_set_bit(tx->flags, BT_AVRCP_TG_FLAG_ABORT_CONTINUING);
+		bt_atomic_set_bit(tx->flags, BT_AVRCP_TG_FLAG_ABORT_CONTINUING);
 
 		/* Same PDU is ACCEPTED; otherwise REJECTED */
 		tx->rsp = (pdu_id == tx->pdu_id) ? BT_AVRCP_RSP_ACCEPTED : BT_AVRCP_RSP_REJECTED;
@@ -1010,9 +1016,9 @@ static void avrcp_tg_tx_remove(struct bt_avrcp_tg *tg, struct net_buf *buf)
 	avrcp_tg_unlock(tg);
 }
 
-static void bt_avrcp_tg_vendor_tx_work(struct k_work *work)
+static void bt_avrcp_tg_vendor_tx_work(struct bt_work *work)
 {
-	struct k_work_delayable *dwork = k_work_delayable_from_work(work);
+	struct bt_work_delayable *dwork = bt_work_delayable_from_work(work);
 	struct bt_avrcp_tg *tg = CONTAINER_OF(dwork, struct bt_avrcp_tg, vd_rsp_tx_work);
 	sys_snode_t *node;
 	struct net_buf *buf;
@@ -1035,7 +1041,7 @@ static void bt_avrcp_tg_vendor_tx_work(struct k_work *work)
 	__ASSERT_NO_MSG(buf->user_data_size >= sizeof(*tx));
 	tx = net_buf_user_data(buf);
 
-	if (atomic_test_bit(tx->flags, BT_AVRCP_TG_FLAG_TX_ONGOING)) {
+	if (bt_atomic_test_bit(tx->flags, BT_AVRCP_TG_FLAG_TX_ONGOING)) {
 		return;
 	}
 	/* Calculate maximum payload size per fragment */
@@ -1053,14 +1059,14 @@ static void bt_avrcp_tg_vendor_tx_work(struct k_work *work)
 			LOG_ERR("Failed to send single len: %u", buf->len);
 			goto done;
 		}
-		k_work_reschedule(&tg->vd_rsp_tx_work, K_NO_WAIT);
+		bt_work_reschedule(&tg->vd_rsp_tx_work, BT_NO_WAIT);
 		return;
 	}
 	/* Multi-packet fragmented response */
 	bt_avrcp_pkt_type_t pkt_type = BT_AVRCP_PKT_TYPE_SINGLE;
 	uint16_t chunk_size = MIN(max_payload_size, buf->len);
 
-	if (atomic_test_and_clear_bit(tx->flags, BT_AVRCP_TG_FLAG_ABORT_CONTINUING) ||
+	if (bt_atomic_test_and_clear_bit(tx->flags, BT_AVRCP_TG_FLAG_ABORT_CONTINUING) ||
 	    (tx->rsp == BT_AVRCP_RSP_REJECTED)) {
 		LOG_WRN("Abort to continuing send OR REJECT");
 		struct net_buf *rsp_buf;
@@ -1105,14 +1111,14 @@ static void bt_avrcp_tg_vendor_tx_work(struct k_work *work)
 	if (err < 0) {
 		if (err == -ENOBUFS) {
 			LOG_WRN("Retry send fragment %p", buf);
-			k_work_reschedule(&tg->vd_rsp_tx_work, K_MSEC(AVRCP_TX_RETRY_DELAY_MS));
+			bt_work_reschedule(&tg->vd_rsp_tx_work, BT_MSEC(AVRCP_TX_RETRY_DELAY_MS));
 			return;
 		}
 		LOG_ERR("Failed to send fragment offset %u len: %u", tx->sent_len, chunk_size);
 		goto done;
 	}
 
-	atomic_set_bit(tx->flags, BT_AVRCP_TG_FLAG_TX_ONGOING);
+	bt_atomic_set_bit(tx->flags, BT_AVRCP_TG_FLAG_TX_ONGOING);
 	net_buf_pull_mem(buf, chunk_size);
 
 	tx->sent_len += chunk_size;
@@ -1128,7 +1134,7 @@ done:
 		net_buf_unref(buf);
 	}
 	/* restart the tx work */
-	k_work_reschedule(&tg->vd_rsp_tx_work, K_NO_WAIT);
+	bt_work_reschedule(&tg->vd_rsp_tx_work, BT_NO_WAIT);
 }
 
 static int bt_avrcp_tg_send_vendor_rsp(struct bt_avrcp_tg *tg, uint8_t tid, uint8_t pdu_id,
@@ -1148,15 +1154,15 @@ static int bt_avrcp_tg_send_vendor_rsp(struct bt_avrcp_tg *tg, uint8_t tid, uint
 	tx->rsp = result;
 	tx->pdu_id = pdu_id;
 	tx->sent_len = 0U;
-	atomic_clear_bit(tx->flags, BT_AVRCP_TG_FLAG_TX_ONGOING);
-	atomic_clear_bit(tx->flags, BT_AVRCP_TG_FLAG_ABORT_CONTINUING);
+	bt_atomic_clear_bit(tx->flags, BT_AVRCP_TG_FLAG_TX_ONGOING);
+	bt_atomic_clear_bit(tx->flags, BT_AVRCP_TG_FLAG_ABORT_CONTINUING);
 
 	LOG_DBG("Sending vendor dependent response: tid=%u, total_len=%u", tid, buf->len);
 	avrcp_tg_lock(tg);
 	sys_slist_append(&tg->vd_rsp_tx_pending, &buf->node);
 	avrcp_tg_unlock(tg);
 
-	k_work_reschedule(&tg->vd_rsp_tx_work, K_NO_WAIT);
+	bt_work_reschedule(&tg->vd_rsp_tx_work, BT_NO_WAIT);
 
 	return 0;
 }
@@ -2122,7 +2128,7 @@ static int handle_avrcp_continuing_rsp(struct bt_avrcp *avrcp, uint8_t tid, uint
 {
 	LOG_DBG("Received Continuing Response");
 	bt_avrcp_tg_process_continuing_cmd(get_avrcp_tg(avrcp), false, tid, buf);
-	k_work_reschedule(&get_avrcp_tg(avrcp)->vd_rsp_tx_work, K_NO_WAIT);
+	bt_work_reschedule(&get_avrcp_tg(avrcp)->vd_rsp_tx_work, BT_NO_WAIT);
 	return BT_AVRCP_STATUS_OPERATION_COMPLETED;
 }
 
@@ -2131,7 +2137,7 @@ static int handle_avrcp_abort_continuing_rsp(struct bt_avrcp *avrcp, uint8_t tid
 {
 	LOG_DBG("Received Abort Continuing Response");
 	bt_avrcp_tg_process_continuing_cmd(get_avrcp_tg(avrcp), true, tid, buf);
-	k_work_reschedule(&get_avrcp_tg(avrcp)->vd_rsp_tx_work, K_NO_WAIT);
+	bt_work_reschedule(&get_avrcp_tg(avrcp)->vd_rsp_tx_work, BT_NO_WAIT);
 	return BT_AVRCP_STATUS_OPERATION_COMPLETED;
 }
 
@@ -2932,7 +2938,7 @@ static struct net_buf *browsing_avrcp_l2cap_alloc_buf(struct bt_avctp *session)
 	 * releases these buffers once an SDU has been delivered, so waiting here
 	 * could never be satisfied.
 	 */
-	buf = net_buf_alloc(&avctp_browsing_rx_pool, K_NO_WAIT);
+	buf = net_buf_alloc(&avctp_browsing_rx_pool, BT_NO_WAIT);
 	if (buf == NULL) {
 		LOG_ERR("Failed to allocate buffer");
 	}
@@ -2993,11 +2999,11 @@ void bt_avrcp_init(void)
 
 		if (!initialized) {
 			/* Init delay work */
-			k_work_init_delayable(&bt_avrcp_tg_pool[i].vd_rsp_tx_work,
+			bt_work_init_delayable(&bt_avrcp_tg_pool[i].vd_rsp_tx_work,
 					      bt_avrcp_tg_vendor_tx_work);
 			sys_slist_init(&bt_avrcp_tg_pool[i].vd_rsp_tx_pending);
 
-			k_sem_init(&bt_avrcp_tg_pool[i].lock, 1, 1);
+			osi_sem_init(&bt_avrcp_tg_pool[i].lock, 1, 1);
 		}
 
 		memset(bt_avrcp_ct_pool[i].ct_notify, 0, sizeof(bt_avrcp_ct_pool[i].ct_notify));
@@ -5008,4 +5014,16 @@ struct bt_conn *bt_avrcp_ct_get_acl_conn(struct bt_avrcp_ct *ct)
 	}
 
 	return bt_conn_ref(ct->avrcp->acl_conn);
+}
+
+/** @brief Initialize module-owned storage before protocol operations. */
+void bt_host_classic_avrcp_storage_init(void)
+{
+	net_buf_pool_init(&avrcp_vd_rx_pool);
+	net_buf_pool_init(&avctp_ctrl_rx_pool);
+	net_buf_pool_init(&avctp_ctrl_tx_pool);
+#if (defined(CONFIG_BT_AVRCP_BROWSING))
+	net_buf_pool_init(&avctp_browsing_rx_pool);
+#endif
+	net_buf_pool_init(&avrcp_vd_tx_pool);
 }

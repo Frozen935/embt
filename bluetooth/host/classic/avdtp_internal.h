@@ -7,7 +7,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <zephyr/bluetooth/classic/avdtp.h>
+#include <embt/base/work.h>
+#include <embt/osi/sync.h>
+#include <embt/bluetooth/classic/avdtp.h>
 
 /* @brief A2DP ROLE's */
 #define A2DP_SRC_ROLE 0x00
@@ -66,7 +68,7 @@
 #define BT_AVDTP_MIN_SEID 0x01
 #define BT_AVDTP_MAX_SEID 0x3E
 
-#define BT_AVDTP_RTP_VERSION 2
+#define BT_AVDTP_RTP_VERSION CONFIG_BT_AVDTP_RTP_VERSION
 
 #define AVDTP_SEP_MEDIA_TYPE_MASK      GENMASK(7, 4)
 #define AVDTP_SEP_MEDIA_TYPE_PREP(val) FIELD_PREP(AVDTP_SEP_MEDIA_TYPE_MASK, val)
@@ -77,7 +79,7 @@ struct bt_avdtp_sep_info;
 
 /** @brief AVDTP SEID Information AVDTP_SPEC V13 Table 8.8 */
 struct bt_avdtp_sep_data {
-#ifdef CONFIG_LITTLE_ENDIAN
+#ifdef CONFIG_EMBT_LITTLE_ENDIAN
 	uint8_t rfa0: 1;
 	uint8_t inuse: 1;
 	uint8_t id: 6;
@@ -120,7 +122,7 @@ struct bt_avdtp_continue_end_sig_hdr {
 } __packed;
 
 struct bt_avdtp_media_hdr {
-#ifdef CONFIG_LITTLE_ENDIAN
+#ifdef CONFIG_EMBT_LITTLE_ENDIAN
 	uint8_t CSRC_count: 4;
 	uint8_t header_extension: 1;
 	uint8_t padding: 1;
@@ -201,7 +203,7 @@ struct bt_avdtp_content_protection_capabilities {
 } __packed;
 
 struct bt_avdtp_header_compression_capabilities {
-#ifdef CONFIG_LITTLE_ENDIAN
+#ifdef CONFIG_EMBT_LITTLE_ENDIAN
 	uint8_t reserved : 5;
 	uint8_t recovery : 1;
 	uint8_t media : 1;
@@ -211,7 +213,7 @@ struct bt_avdtp_header_compression_capabilities {
 	uint8_t media : 1;
 	uint8_t recovery : 1;
 	uint8_t reserved : 5;
-#endif /* CONFIG_LITTLE_ENDIAN */
+#endif /* CONFIG_EMBT_LITTLE_ENDIAN */
 } __packed;
 
 struct bt_avdtp_multiplexing_capabilities {
@@ -265,10 +267,11 @@ struct bt_avdtp {
 	struct bt_avdtp_req *req;
 	const struct bt_avdtp_ops_cb *ops;
 	struct bt_avdtp_sep *current_sep;
-	struct k_work_delayable timeout_work;
-	struct k_work _release_work;
+	struct bt_work_delayable timeout_work;
+	struct bt_work _release_work;
 	/* semaphore for lock/unlock */
-	struct k_sem sem_lock;
+	os_sem_t sem_lock;
+	bool sem_initialized;
 	struct net_buf *reasm_buf;
 	uint8_t num_of_signal_pkts;
 	uint8_t tid_sent;
@@ -338,3 +341,8 @@ int bt_avdtp_send_media_data(struct bt_avdtp_sep *sep, struct net_buf *buf);
 
 /* get media l2cap connection MTU */
 uint32_t bt_avdtp_get_media_mtu(struct bt_avdtp_sep *sep);
+
+/** @brief Initialize AVDTP synchronization and pools before use. */
+int bt_avdtp_base_init(void);
+/** @brief Release an inactive session semaphore before clearing its storage. */
+int bt_avdtp_session_deinit(struct bt_avdtp *session);

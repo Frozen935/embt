@@ -10,17 +10,21 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <embt/base/assert.h>
+#include <embt/base/work.h>
+#include <embt/base/time.h>
+#include <embt/osi/sync.h>
 #include <string.h>
 #include <strings.h>
 #include <errno.h>
-#include <zephyr/sys/atomic.h>
-#include <zephyr/sys/byteorder.h>
-#include <zephyr/sys/util.h>
+#include <embt/base/atomic.h>
+#include <embt/base/byteorder.h>
+#include <embt/base/util.h>
 
-#include <zephyr/bluetooth/hci.h>
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/l2cap.h>
-#include <zephyr/bluetooth/classic/sdp.h>
+#include <embt/bluetooth/hci.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/l2cap.h>
+#include <embt/bluetooth/classic/sdp.h>
 
 #include "avctp_internal.h"
 #include <host/hci_core.h>
@@ -40,11 +44,11 @@ LOG_MODULE_REGISTER(bt_avctp, CONFIG_BT_AVCTP_LOG_LEVEL);
 #define AVCTP_CHAN(_ch) CONTAINER_OF(_ch, struct bt_avctp, br_chan.chan)
 /* L2CAP Server list */
 static sys_slist_t avctp_l2cap_server = SYS_SLIST_STATIC_INIT(&avctp_l2cap_server);
-static struct k_sem avctp_lock;
+static os_sem_t avctp_lock;
 
 /* tx list for packets */
 static sys_slist_t avctp_tx_list = SYS_SLIST_STATIC_INIT(&avctp_tx_list);
-static struct k_work_delayable avctp_tx_work;
+static struct bt_work_delayable avctp_tx_work;
 
 struct avctp_buf_user_data {
 	struct bt_avctp *session;
@@ -63,7 +67,7 @@ static void avctp_tx_raise(int msec)
 		return;
 	}
 	LOG_DBG("kick TX");
-	bt_work_schedule(&avctp_tx_work, K_MSEC(msec));
+	bt_host_work_schedule(&avctp_tx_work, BT_MSEC(msec));
 }
 
 static void bt_avctp_clear_tx(struct bt_avctp *session)
@@ -122,9 +126,9 @@ static void avctp_l2cap_disconnected(struct bt_l2cap_chan *chan)
 
 	net_buf_drop(&session->reassembly_buf);
 
-	k_sem_take(&avctp_lock, K_FOREVER);
+	osi_sem_take(&avctp_lock, BT_FOREVER);
 	bt_avctp_clear_tx(session);
-	k_sem_give(&avctp_lock);
+	osi_sem_give(&avctp_lock);
 
 	if (session->ops && session->ops->disconnected) {
 		session->ops->disconnected(session);
@@ -169,9 +173,9 @@ static void avctp_tx_cb(struct bt_conn *conn, void *user_data, int err)
 
 static void avctp_tx_remove(struct net_buf *buf)
 {
-	k_sem_take(&avctp_lock, K_FOREVER);
+	osi_sem_take(&avctp_lock, BT_FOREVER);
 	sys_slist_find_and_remove(&avctp_tx_list, &buf->node);
-	k_sem_give(&avctp_lock);
+	osi_sem_give(&avctp_lock);
 }
 
 static int send_single_avctp(struct bt_avctp *avctp, uint8_t tid, bt_avctp_cr_t cr, uint8_t ipid,
@@ -287,7 +291,7 @@ static inline bool avctp_is_retryable_err(int err)
 	return (err == -ENOBUFS);
 }
 
-static void avctp_tx_processor(struct k_work *item)
+static void avctp_tx_processor(struct bt_work *item)
 {
 	struct bt_avctp *session;
 	struct avctp_buf_user_data *user_data;
@@ -298,14 +302,14 @@ static void avctp_tx_processor(struct k_work *item)
 	uint8_t pkt_type;
 	uint16_t max_payload_size;
 
-	k_sem_take(&avctp_lock, K_FOREVER);
+	osi_sem_take(&avctp_lock, BT_FOREVER);
 	node = sys_slist_peek_head(&avctp_tx_list);
 	if (node == NULL) {
-		k_sem_give(&avctp_lock);
+		osi_sem_give(&avctp_lock);
 		LOG_DBG("No pending tx");
 		return;
 	}
-	k_sem_give(&avctp_lock);
+	osi_sem_give(&avctp_lock);
 
 	buf = CONTAINER_OF(node, struct net_buf, node);
 
@@ -381,9 +385,9 @@ static int bt_avctp_send_common(struct bt_avctp *session, struct net_buf *buf,
 	user_data->num_packet = num_packet;
 	user_data->tid = tid;
 
-	k_sem_take(&avctp_lock, K_FOREVER);
+	osi_sem_take(&avctp_lock, BT_FOREVER);
 	sys_slist_append(&avctp_tx_list, &buf->node);
-	k_sem_give(&avctp_lock);
+	osi_sem_give(&avctp_lock);
 
 	avctp_tx_raise(0);
 	return 0;
@@ -454,7 +458,7 @@ static int avctp_recv_fragmented(struct bt_avctp *avctp, struct net_buf *buf)
 		 * never be satisfied. Drop the fragment instead and let the peer
 		 * time out.
 		 */
-		avctp->reassembly_buf = net_buf_alloc(avctp->rx_pool, K_NO_WAIT);
+		avctp->reassembly_buf = net_buf_alloc(avctp->rx_pool, BT_NO_WAIT);
 		if (avctp->reassembly_buf == NULL) {
 			LOG_ERR("Failed to allocate reassembly buffer (tid=%u, cr=%u)", tid, cr);
 			goto failed;
@@ -654,15 +658,15 @@ static int avctp_l2cap_accept(struct bt_conn *conn, struct bt_l2cap_server *serv
 
 	avctp_server = CONTAINER_OF(server, struct bt_avctp_server, l2cap);
 
-	k_sem_take(&avctp_lock, K_FOREVER);
+	osi_sem_take(&avctp_lock, BT_FOREVER);
 
 	if (!sys_slist_find(&avctp_l2cap_server, &avctp_server->node, NULL)) {
 		LOG_WRN("Invalid l2cap server");
-		k_sem_give(&avctp_lock);
+		osi_sem_give(&avctp_lock);
 		return -EINVAL;
 	}
 
-	k_sem_give(&avctp_lock);
+	osi_sem_give(&avctp_lock);
 
 	/* Get the AVCTP session from upper layer */
 	err = avctp_server->accept(conn, &session);
@@ -689,11 +693,11 @@ int bt_avctp_server_register(struct bt_avctp_server *server)
 		return -EINVAL;
 	}
 
-	k_sem_take(&avctp_lock, K_FOREVER);
+	osi_sem_take(&avctp_lock, BT_FOREVER);
 
 	if (sys_slist_find(&avctp_l2cap_server, &server->node, NULL)) {
 		LOG_WRN("L2CAP server has been registered");
-		k_sem_give(&avctp_lock);
+		osi_sem_give(&avctp_lock);
 		return -EEXIST;
 	}
 
@@ -701,14 +705,14 @@ int bt_avctp_server_register(struct bt_avctp_server *server)
 	err = bt_l2cap_br_server_register(&server->l2cap);
 	if (err < 0) {
 		LOG_ERR("AVCTP L2CAP registration failed %d", err);
-		k_sem_give(&avctp_lock);
+		osi_sem_give(&avctp_lock);
 		return err;
 	}
 
 	LOG_DBG("Register L2CAP server %p", server);
 	sys_slist_append(&avctp_l2cap_server, &server->node);
 
-	k_sem_give(&avctp_lock);
+	osi_sem_give(&avctp_lock);
 
 	return err;
 }
@@ -725,6 +729,6 @@ void bt_avctp_init(void)
 
 	LOG_DBG("Initializing AVCTP");
 	/* Locking semaphore initialized to 1 (unlocked) */
-	k_sem_init(&avctp_lock, 1, 1);
-	k_work_init_delayable(&avctp_tx_work, avctp_tx_processor);
+	osi_sem_init(&avctp_lock, 1, 1);
+	bt_work_init_delayable(&avctp_tx_work, avctp_tx_processor);
 }

@@ -19,10 +19,13 @@
  * @{
  */
 
+#include <embt/osi/sync.h>
+#include <embt/base/fifo.h>
+#include <embt/base/work.h>
 #include <embt/bluetooth/buf.h>
 #include <embt/bluetooth/conn.h>
 #include <embt/bluetooth/l2cap.h>
-#include <embt/sys/slist.h>
+#include <embt/base/slist.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -153,14 +156,14 @@ struct bt_rfcomm_dlc {
 	 *  Used to detect when a peer fails to respond to an RFCOMM command
 	 *  (e.g. SABM, DISC) within the allowed time window.
 	 */
-	struct k_work_delayable rtx_work;
+	struct bt_work_delayable rtx_work;
 
 	/** Queue for outgoing data.
 	 *
 	 *  Holds net_buf fragments waiting to be transmitted over this DLC.
 	 *  Frames are dequeued and sent by @p tx_work.
 	 */
-	struct k_fifo tx_queue;
+	struct bt_fifo tx_queue;
 
 	/** TX credits semaphore.
 	 *
@@ -169,7 +172,8 @@ struct bt_rfcomm_dlc {
 	 *  is not negotiated it is used as a binary semaphore to serialize
 	 *  transmissions under aggregate (MSC) flow control.
 	 */
-	struct k_sem tx_credits;
+	os_sem_t tx_credits;
+	bool tx_credits_initialized; /**< Internal native semaphore lifetime. */
 
 	/** Worker for RFCOMM TX.
 	 *
@@ -177,10 +181,10 @@ struct bt_rfcomm_dlc {
 	 *  @p tx_queue and credits are available, to drain the queue and push
 	 *  data to L2CAP.
 	 */
-	struct k_work_delayable tx_work;
+	struct bt_work_delayable tx_work;
 
 	/* Retry timeout expired timer */
-	struct k_work_delayable retry_timeout_work;
+	struct bt_work_delayable retry_timeout_work;
 
 	/** Pointer to the RFCOMM session this DLC belongs to. */
 	struct bt_rfcomm_session *session;

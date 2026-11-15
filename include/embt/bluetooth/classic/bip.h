@@ -16,7 +16,6 @@
  * @{
  */
 
-#include <embt/storage.h>
 #include <errno.h>
 
 #include <embt/bluetooth/bluetooth.h>

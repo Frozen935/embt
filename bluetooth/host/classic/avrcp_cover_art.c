@@ -8,19 +8,19 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <embt/base/assert.h>
 #include <string.h>
 #include <errno.h>
-#include <zephyr/sys/atomic.h>
-#include <zephyr/sys/byteorder.h>
-#include <zephyr/sys/util.h>
-#include <zephyr/sys/printk.h>
+#include <embt/base/atomic.h>
+#include <embt/base/byteorder.h>
+#include <embt/base/util.h>
 
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/l2cap.h>
-#include <zephyr/bluetooth/classic/avrcp.h>
-#include <zephyr/bluetooth/classic/sdp.h>
-#include <zephyr/bluetooth/classic/bip.h>
-#include <zephyr/bluetooth/classic/avrcp_cover_art.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/l2cap.h>
+#include <embt/bluetooth/classic/avrcp.h>
+#include <embt/bluetooth/classic/sdp.h>
+#include <embt/bluetooth/classic/bip.h>
+#include <embt/bluetooth/classic/avrcp_cover_art.h>
 
 #include <host/hci_core.h>
 #include <host/conn_internal.h>

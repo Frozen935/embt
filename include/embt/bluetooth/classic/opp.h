@@ -25,7 +25,6 @@
  */
 
 
-#include <embt/storage.h>
 #include <embt/bluetooth/classic/goep.h>
 #include <embt/bluetooth/classic/sdp.h>
 

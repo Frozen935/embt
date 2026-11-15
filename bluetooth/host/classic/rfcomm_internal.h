@@ -8,7 +8,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <zephyr/bluetooth/classic/rfcomm.h>
+#include <embt/base/work.h>
+#include <embt/base/atomic.h>
+#include <embt/osi/sync.h>
+#include <string.h>
+#include <embt/base/assert.h>
+#include <embt/bluetooth/classic/rfcomm.h>
 
 typedef enum {
 	BT_RFCOMM_CFC_UNKNOWN,
@@ -21,20 +26,20 @@ struct bt_rfcomm_session {
 	/* L2CAP channel this context is associated with */
 	struct bt_l2cap_br_chan br_chan;
 	/* Response Timeout eXpired (RTX) timer */
-	struct k_work_delayable rtx_work;
+	struct bt_work_delayable rtx_work;
 	/* Retry work */
-	struct k_work_delayable retry_work;
+	struct bt_work_delayable retry_work;
 	/* Retry timeout expired timer */
-	struct k_work_delayable retry_timeout_work;
+	struct bt_work_delayable retry_timeout_work;
 	/* Binary sem for aggregate fc */
-	struct k_sem fc;
+	os_sem_t fc;
 	/* DLC list */
 	sys_slist_t dlcs;
 	uint16_t mtu;
 	uint8_t state;
 	bt_rfcomm_role_t role;
 	bt_rfcomm_cfc_t cfc;
-	atomic_t flags;
+	bt_atomic_t flags;
 };
 
 enum {

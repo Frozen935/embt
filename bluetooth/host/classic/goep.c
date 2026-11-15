@@ -6,20 +6,23 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <embt/base/time.h>
+#include <embt/base/atomic.h>
+#include <embt/base/assert.h>
 #include <errno.h>
-#include <zephyr/types.h>
+#include <stdint.h>
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
-#include <zephyr/sys/byteorder.h>
+#include <embt/base/byteorder.h>
 
-#include <zephyr/bluetooth/hci.h>
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/l2cap.h>
-#include <zephyr/bluetooth/classic/rfcomm.h>
-#include <zephyr/bluetooth/classic/sdp.h>
-#include <zephyr/bluetooth/classic/goep.h>
+#include <embt/bluetooth/hci.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/l2cap.h>
+#include <embt/bluetooth/classic/rfcomm.h>
+#include <embt/bluetooth/classic/sdp.h>
+#include <embt/bluetooth/classic/goep.h>
 
 #include <host/conn_internal.h>
 #include "l2cap_br_internal.h"
@@ -66,7 +69,7 @@ static void goep_rfcomm_connected(struct bt_rfcomm_dlc *dlc)
 	goep->obex.rx.mtu = dlc->mtu;
 	goep->obex.tx.mtu = dlc->mtu;
 
-	atomic_set(&goep->_state, BT_GOEP_TRANSPORT_CONNECTED);
+	bt_atomic_set(&goep->_state, BT_GOEP_TRANSPORT_CONNECTED);
 
 	err = bt_obex_transport_connected(&goep->obex);
 	if (err != 0) {
@@ -88,7 +91,7 @@ static void goep_rfcomm_disconnected(struct bt_rfcomm_dlc *dlc)
 
 	LOG_DBG("RFCOMM %p disconnected", dlc);
 
-	atomic_set(&goep->_state, BT_GOEP_TRANSPORT_DISCONNECTED);
+	bt_atomic_set(&goep->_state, BT_GOEP_TRANSPORT_DISCONNECTED);
 
 	err = bt_obex_transport_disconnected(&goep->obex);
 	if (err != 0) {
@@ -222,7 +225,7 @@ static int goep_rfcomm_accept(struct bt_conn *conn, struct bt_rfcomm_server *ser
 
 	*dlc = &goep->v1->dlc;
 
-	atomic_set(&goep->_state, BT_GOEP_TRANSPORT_CONNECTING);
+	bt_atomic_set(&goep->_state, BT_GOEP_TRANSPORT_CONNECTING);
 
 	return 0;
 }
@@ -272,7 +275,7 @@ int bt_goep_transport_rfcomm_connect(struct bt_conn *conn, struct bt_goep *goep,
 		return err;
 	}
 
-	atomic_set(&goep->_state, BT_GOEP_TRANSPORT_CONNECTING);
+	bt_atomic_set(&goep->_state, BT_GOEP_TRANSPORT_CONNECTING);
 
 	return 0;
 }
@@ -287,7 +290,7 @@ int bt_goep_transport_rfcomm_disconnect(struct bt_goep *goep)
 		return -EINVAL;
 	}
 
-	state = atomic_get(&goep->_state);
+	state = bt_atomic_get(&goep->_state);
 	if (state != BT_GOEP_TRANSPORT_CONNECTED) {
 		LOG_DBG("Invalid stats %d", state);
 		return -ENOTCONN;
@@ -299,7 +302,7 @@ int bt_goep_transport_rfcomm_disconnect(struct bt_goep *goep)
 		return err;
 	}
 
-	atomic_set(&goep->_state, BT_GOEP_TRANSPORT_DISCONNECTING);
+	bt_atomic_set(&goep->_state, BT_GOEP_TRANSPORT_DISCONNECTING);
 
 	return 0;
 }
@@ -344,7 +347,7 @@ static void goep_l2cap_connected(struct bt_l2cap_chan *chan)
 	goep->obex.rx.mtu = goep_transport_v2->chan.rx.mtu;
 	goep->obex.tx.mtu = goep_transport_v2->chan.tx.mtu;
 
-	atomic_set(&goep->_state, BT_GOEP_TRANSPORT_CONNECTED);
+	bt_atomic_set(&goep->_state, BT_GOEP_TRANSPORT_CONNECTED);
 
 	err = bt_obex_transport_connected(&goep->obex);
 	if (err != 0) {
@@ -366,7 +369,7 @@ static void goep_l2cap_disconnected(struct bt_l2cap_chan *chan)
 
 	LOG_DBG("L2CAP channel %p disconnected", chan);
 
-	atomic_set(&goep->_state, BT_GOEP_TRANSPORT_DISCONNECTED);
+	bt_atomic_set(&goep->_state, BT_GOEP_TRANSPORT_DISCONNECTED);
 
 	err = bt_obex_transport_disconnected(&goep->obex);
 	if (err != 0) {
@@ -386,7 +389,7 @@ static struct net_buf *l2cap_alloc_buf(struct bt_l2cap_chan *chan)
 	 * releases these buffers once an SDU has been delivered, so waiting here
 	 * could never be satisfied.
 	 */
-	buf = net_buf_alloc(&goep_rx_pool, K_NO_WAIT);
+	buf = net_buf_alloc(&goep_rx_pool, BT_NO_WAIT);
 	if (buf == NULL) {
 		LOG_ERR("Failed to allocate buffer");
 	}
@@ -517,7 +520,7 @@ static int goep_l2cap_accept(struct bt_conn *conn, struct bt_l2cap_server *serve
 	goep_l2cap_init(conn, goep);
 
 	*chan = &goep->v2->chan.chan;
-	atomic_set(&goep->_state, BT_GOEP_TRANSPORT_CONNECTING);
+	bt_atomic_set(&goep->_state, BT_GOEP_TRANSPORT_CONNECTING);
 
 	return 0;
 }
@@ -560,7 +563,7 @@ int bt_goep_transport_l2cap_connect(struct bt_conn *conn, struct bt_goep *goep, 
 		return -EINVAL;
 	}
 
-	state = atomic_get(&goep->_state);
+	state = bt_atomic_get(&goep->_state);
 	if (state != BT_GOEP_TRANSPORT_DISCONNECTED) {
 		LOG_DBG("Invalid stats %d", state);
 		return -EBUSY;
@@ -574,7 +577,7 @@ int bt_goep_transport_l2cap_connect(struct bt_conn *conn, struct bt_goep *goep, 
 		return err;
 	}
 
-	atomic_set(&goep->_state, BT_GOEP_TRANSPORT_CONNECTING);
+	bt_atomic_set(&goep->_state, BT_GOEP_TRANSPORT_CONNECTING);
 
 	return 0;
 }
@@ -589,7 +592,7 @@ int bt_goep_transport_l2cap_disconnect(struct bt_goep *goep)
 		return -EINVAL;
 	}
 
-	state = atomic_get(&goep->_state);
+	state = bt_atomic_get(&goep->_state);
 	if (state != BT_GOEP_TRANSPORT_CONNECTED) {
 		LOG_DBG("Invalid stats %d", state);
 		return -ENOTCONN;
@@ -601,7 +604,7 @@ int bt_goep_transport_l2cap_disconnect(struct bt_goep *goep)
 		return err;
 	}
 
-	atomic_set(&goep->_state, BT_GOEP_TRANSPORT_DISCONNECTING);
+	bt_atomic_set(&goep->_state, BT_GOEP_TRANSPORT_DISCONNECTING);
 
 	return 0;
 }
@@ -628,4 +631,10 @@ struct net_buf *bt_goep_create_pdu(struct bt_goep *goep, struct net_buf_pool *po
 		net_buf_reserve(buf, len + BT_OBEX_SEND_BUF_RESERVE);
 	}
 	return buf;
+}
+
+/** @brief Initialize module-owned storage before protocol operations. */
+void bt_host_classic_goep_storage_init(void)
+{
+	net_buf_pool_init(&goep_rx_pool);
 }

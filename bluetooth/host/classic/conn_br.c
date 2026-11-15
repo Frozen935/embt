@@ -7,27 +7,27 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <zephyr/bluetooth/iso.h>
+#include <common/assert.h>
+#include <embt/base/time.h>
+#include <embt/base/atomic.h>
+#include <embt/bluetooth/iso.h>
 #include <string.h>
 #include <errno.h>
 #include <stdbool.h>
-#include <zephyr/sys/atomic.h>
-#include <zephyr/sys/byteorder.h>
-#include <zephyr/sys/iterable_sections.h>
-#include <zephyr/sys/math_extras.h>
-#include <zephyr/sys/util.h>
-#include <zephyr/sys/util_macro.h>
-#include <zephyr/sys/slist.h>
-#include <zephyr/sys/__assert.h>
+#include <embt/base/byteorder.h>
+#include <embt/base/math.h>
+#include <embt/base/util.h>
+#include <embt/base/util_macro.h>
+#include <embt/base/slist.h>
+#include <embt/base/assert.h>
 
-#include <zephyr/bluetooth/hci.h>
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/direction.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/hci_vs.h>
-#include <zephyr/bluetooth/att.h>
+#include <embt/bluetooth/hci.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/direction.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/hci_vs.h>
+#include <embt/bluetooth/att.h>
 
-#include <common/assert.h>
 #include <common/bt_str.h>
 
 #include <host/hci_core.h>
@@ -54,7 +54,7 @@ struct bt_conn *bt_conn_create_br(const bt_addr_t *peer,
 	struct bt_conn *conn;
 	struct net_buf *buf;
 
-	if (!atomic_test_bit(bt_dev.flags, BT_DEV_READY)) {
+	if (!bt_atomic_test_bit(bt_dev.flags, BT_DEV_READY)) {
 		return NULL;
 	}
 
@@ -75,7 +75,7 @@ struct bt_conn *bt_conn_create_br(const bt_addr_t *peer,
 		return NULL;
 	}
 
-	buf = bt_hci_cmd_alloc(K_FOREVER);
+	buf = bt_hci_cmd_alloc(BT_FOREVER);
 	if (!buf) {
 		bt_conn_unref(conn);
 		return NULL;
@@ -109,7 +109,7 @@ int bt_hci_connect_br_cancel(struct bt_conn *conn)
 	struct net_buf *buf, *rsp;
 	int err;
 
-	buf = bt_hci_cmd_alloc(K_FOREVER);
+	buf = bt_hci_cmd_alloc(BT_FOREVER);
 	if (!buf) {
 		return -ENOBUFS;
 	}
@@ -195,7 +195,7 @@ void bt_br_acl_recv(struct bt_conn *conn, struct net_buf *buf, bool complete)
 
 		LOG_DBG("Multiple L2CAP packet (%u > %u)", buf->len, acl_total_len);
 
-		view = net_buf_alloc_with_data(&acl_views, buf->data, acl_total_len, K_NO_WAIT);
+		view = net_buf_alloc_with_data(&acl_views, buf->data, acl_total_len, BT_NO_WAIT);
 		if (view == NULL) {
 			/* Dropping the PDU would lose data the peer has spent
 			 * flow control credits on, so share the cursor instead:
@@ -234,7 +234,7 @@ int bt_conn_br_switch_role(const struct bt_conn *conn, uint8_t role)
 		return -EINVAL;
 	}
 
-	buf = bt_hci_cmd_alloc(K_FOREVER);
+	buf = bt_hci_cmd_alloc(BT_FOREVER);
 	if (!buf) {
 		return -ENOBUFS;
 	}
@@ -255,7 +255,7 @@ static int bt_conn_br_read_link_policy_settings(const struct bt_conn *conn,
 	struct bt_hci_rp_read_link_policy_settings *rp;
 	struct net_buf *rsp;
 
-	buf = bt_hci_cmd_alloc(K_FOREVER);
+	buf = bt_hci_cmd_alloc(BT_FOREVER);
 	if (!buf) {
 		return -ENOBUFS;
 	}
@@ -278,7 +278,7 @@ static int bt_conn_br_write_link_policy_settings(const struct bt_conn *conn,
 	struct net_buf *buf;
 	struct bt_hci_cp_write_link_policy_settings *cp;
 
-	buf = bt_hci_cmd_alloc(K_FOREVER);
+	buf = bt_hci_cmd_alloc(BT_FOREVER);
 	if (!buf) {
 		return -ENOBUFS;
 	}
@@ -342,7 +342,7 @@ int bt_conn_br_get_supervision_timeout(struct bt_conn *conn, uint16_t *timeout)
 		return -EINVAL;
 	}
 
-	buf = bt_hci_cmd_alloc(K_FOREVER);
+	buf = bt_hci_cmd_alloc(BT_FOREVER);
 	if (buf == NULL) {
 		return -ENOBUFS;
 	}
@@ -382,7 +382,7 @@ int bt_conn_br_set_supervision_timeout(struct bt_conn *conn, uint16_t timeout)
 		return -EINVAL;
 	}
 
-	buf = bt_hci_cmd_alloc(K_FOREVER);
+	buf = bt_hci_cmd_alloc(BT_FOREVER);
 	if (buf == NULL) {
 		return -ENOBUFS;
 	}
@@ -419,7 +419,7 @@ int bt_conn_br_change_packet_type(const struct bt_conn *conn, uint16_t packet_ty
 		return -EINVAL;
 	}
 
-	buf = bt_hci_cmd_alloc(K_FOREVER);
+	buf = bt_hci_cmd_alloc(BT_FOREVER);
 	if (buf == NULL) {
 		return -ENOBUFS;
 	}
@@ -429,4 +429,9 @@ int bt_conn_br_change_packet_type(const struct bt_conn *conn, uint16_t packet_ty
 	cp->packet_type = sys_cpu_to_le16(packet_type);
 
 	return bt_hci_cmd_send_sync(BT_HCI_OP_CHANGE_CONN_PACKET_TYPE, buf, NULL);
+}
+
+void bt_conn_br_init(void)
+{
+	net_buf_pool_init(&acl_views);
 }

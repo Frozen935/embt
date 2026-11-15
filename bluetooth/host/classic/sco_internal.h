@@ -7,6 +7,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <embt/base/util_macro.h>
 #include <embt/base/log.h>
 
 /** @brief Life-span states of SCO channel. Used only by internal APIs
@@ -220,14 +221,6 @@ int bt_sco_conn_cb_register(struct bt_sco_conn_cb *cb);
 int bt_sco_conn_cb_unregister(struct bt_sco_conn_cb *cb);
 
 /**
- *  @brief Register a callback structure for connection events.
- *
- *  @param _name Name of callback structure.
- */
-#define BT_SCO_CONN_CB_DEFINE(_name)								\
-	static const STRUCT_SECTION_ITERABLE(bt_sco_conn_cb, _CONCAT(bt_sco_conn_cb_, _name))
-
-/**
  * @brief SCO HCI callback structure for handling SCO connection events
  *
  * This structure defines callback functions that are invoked during SCO
@@ -290,11 +283,3 @@ int bt_sco_hci_cb_register(struct bt_sco_hci_cb *cb);
  * @retval -ENOENT if @p cb was not registered.
  */
 int bt_sco_hci_cb_unregister(struct bt_sco_hci_cb *cb);
-
-/**
- *  @brief Register a callback structure for SCO HCI activity.
- *
- *  @param _name Name of callback structure.
- */
-#define BT_SCO_HCI_CB_DEFINE(_name) \
-	static const STRUCT_SECTION_ITERABLE(bt_sco_hci_cb, _CONCAT(bt_sco_hci_cb_, _name))

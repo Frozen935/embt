@@ -6,18 +6,20 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <embt/base/atomic.h>
+#include <embt/base/assert.h>
 #include <errno.h>
-#include <zephyr/types.h>
+#include <stdint.h>
 #include <stddef.h>
 #include <string.h>
 #include <strings.h>
 
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/l2cap.h>
-#include <zephyr/bluetooth/classic/rfcomm.h>
-#include <zephyr/bluetooth/classic/goep.h>
-#include <zephyr/bluetooth/classic/opp.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/l2cap.h>
+#include <embt/bluetooth/classic/rfcomm.h>
+#include <embt/bluetooth/classic/goep.h>
+#include <embt/bluetooth/classic/opp.h>
 
 #include "opp_internal.h"
 #include <embt/base/log.h>
@@ -168,7 +170,7 @@ static void opp_client_transport_connected(struct bt_conn *conn, struct bt_goep 
 {
 	struct bt_opp_client *client = CONTAINER_OF(goep, struct bt_opp_client, _goep);
 
-	atomic_set(&client->_transport_state, BT_OPP_TRANSPORT_STATE_CONNECTED);
+	bt_atomic_set(&client->_transport_state, BT_OPP_TRANSPORT_STATE_CONNECTED);
 
 	LOG_DBG("client %p transport connected", client);
 
@@ -179,9 +181,9 @@ static void opp_client_transport_disconnected(struct bt_goep *goep)
 {
 	struct bt_opp_client *client = CONTAINER_OF(goep, struct bt_opp_client, _goep);
 
-	atomic_set(&client->_transport_state, BT_OPP_TRANSPORT_STATE_DISCONNECTED);
-	atomic_clear(&client->_push_state);
-	atomic_clear(&client->_pull_state);
+	bt_atomic_set(&client->_transport_state, BT_OPP_TRANSPORT_STATE_DISCONNECTED);
+	bt_atomic_clear(&client->_push_state);
+	bt_atomic_clear(&client->_pull_state);
 
 	LOG_DBG("client %p transport disconnected", client);
 
@@ -212,8 +214,8 @@ static void opp_client_obex_disconnect_cb(struct bt_obex_client *obex_client, ui
 	int err;
 
 	if (rsp_code == BT_OBEX_RSP_CODE_SUCCESS) {
-		atomic_clear(&client->_push_state);
-		atomic_clear(&client->_pull_state);
+		bt_atomic_clear(&client->_push_state);
+		bt_atomic_clear(&client->_pull_state);
 	} else {
 		/*
 		 * IrOBEX 1.2 section 3.3.2: a disconnect may not be refused. The
@@ -244,7 +246,7 @@ static void opp_client_obex_put_cb(struct bt_obex_client *obex_client, uint8_t r
 
 	/* CONTINUE continues the push; any other response code ends it. */
 	if (rsp_code != BT_OBEX_RSP_CODE_CONTINUE) {
-		atomic_clear(&client->_push_state);
+		bt_atomic_clear(&client->_push_state);
 	}
 
 	client->cb->push(client, rsp_code, buf);
@@ -259,7 +261,7 @@ static void opp_client_obex_get_cb(struct bt_obex_client *obex_client, uint8_t r
 
 	/* CONTINUE continues the pull; any other response code ends it. */
 	if (rsp_code != BT_OBEX_RSP_CODE_CONTINUE) {
-		atomic_clear(&client->_pull_state);
+		bt_atomic_clear(&client->_pull_state);
 	}
 
 	if (client->cb->pull != NULL) {
@@ -278,8 +280,8 @@ static void opp_client_obex_abort_cb(struct bt_obex_client *obex_client, uint8_t
 	 * Only a SUCCESS abort response reaches this callback; any other code
 	 * makes the OBEX layer close the transport and reset the state.
 	 */
-	atomic_clear(&client->_push_state);
-	atomic_clear(&client->_pull_state);
+	bt_atomic_clear(&client->_push_state);
+	bt_atomic_clear(&client->_pull_state);
 
 	client->cb->abort(client, buf);
 }
@@ -313,14 +315,14 @@ int bt_opp_client_transport_connect(struct bt_conn *conn, struct bt_opp_client *
 		return -EINVAL;
 	}
 
-	if (!atomic_cas(&client->_transport_state, BT_OPP_TRANSPORT_STATE_DISCONNECTED,
+	if (!bt_atomic_cas(&client->_transport_state, BT_OPP_TRANSPORT_STATE_DISCONNECTED,
 			BT_OPP_TRANSPORT_STATE_CONNECTING)) {
 		return -EALREADY;
 	}
 
 	client->cb = cb;
-	atomic_clear(&client->_push_state);
-	atomic_clear(&client->_pull_state);
+	bt_atomic_clear(&client->_push_state);
+	bt_atomic_clear(&client->_pull_state);
 
 	BT_GOEP_INIT_V1(&client->_goep, &client->_transport);
 	client->_goep.transport_ops = &opp_client_goep_transport_ops;
@@ -329,7 +331,7 @@ int bt_opp_client_transport_connect(struct bt_conn *conn, struct bt_opp_client *
 
 	err = bt_goep_transport_rfcomm_connect(conn, &client->_goep, channel);
 	if (err != 0) {
-		atomic_set(&client->_transport_state, BT_OPP_TRANSPORT_STATE_DISCONNECTED);
+		bt_atomic_set(&client->_transport_state, BT_OPP_TRANSPORT_STATE_DISCONNECTED);
 	}
 
 	return err;
@@ -343,7 +345,7 @@ int bt_opp_client_transport_disconnect(struct bt_opp_client *client)
 		return -EINVAL;
 	}
 
-	if (!atomic_cas(&client->_transport_state, BT_OPP_TRANSPORT_STATE_CONNECTED,
+	if (!bt_atomic_cas(&client->_transport_state, BT_OPP_TRANSPORT_STATE_CONNECTED,
 			BT_OPP_TRANSPORT_STATE_DISCONNECTING)) {
 		return -ENOTCONN;
 	}
@@ -351,7 +353,7 @@ int bt_opp_client_transport_disconnect(struct bt_opp_client *client)
 	err = bt_goep_transport_rfcomm_disconnect(&client->_goep);
 	if (err != 0) {
 		/* The peer may have torn the transport down already. */
-		(void)atomic_cas(&client->_transport_state, BT_OPP_TRANSPORT_STATE_DISCONNECTING,
+		(void)bt_atomic_cas(&client->_transport_state, BT_OPP_TRANSPORT_STATE_DISCONNECTING,
 				 BT_OPP_TRANSPORT_STATE_CONNECTED);
 	}
 
@@ -373,7 +375,7 @@ int bt_opp_client_connect(struct bt_opp_client *client, uint16_t mopl, struct ne
 		return -EINVAL;
 	}
 
-	if (atomic_get(&client->_transport_state) != BT_OPP_TRANSPORT_STATE_CONNECTED) {
+	if (bt_atomic_get(&client->_transport_state) != BT_OPP_TRANSPORT_STATE_CONNECTED) {
 		return -ENOTCONN;
 	}
 
@@ -416,10 +418,10 @@ int bt_opp_client_push(struct bt_opp_client *client, bool final, struct net_buf 
 	 * before bt_obex_put() returns. This also tells the first PUT of a push
 	 * from a continuation.
 	 */
-	first = !atomic_test_and_set_bit(&client->_push_state, BT_OPP_PUSH_ONGOING);
+	first = !bt_atomic_test_and_set_bit(&client->_push_state, BT_OPP_PUSH_ONGOING);
 
 	if (first && opp_push_first_req_check(buf) != 0) {
-		atomic_clear_bit(&client->_push_state, BT_OPP_PUSH_ONGOING);
+		bt_atomic_clear_bit(&client->_push_state, BT_OPP_PUSH_ONGOING);
 		return -EINVAL;
 	}
 
@@ -431,7 +433,7 @@ int bt_opp_client_push(struct bt_opp_client *client, bool final, struct net_buf 
 	if (final && !bt_obex_has_header(buf, BT_OBEX_HEADER_ID_END_BODY)) {
 		LOG_ERR("OBEX header (End of Body) is missing");
 		if (first) {
-			atomic_clear_bit(&client->_push_state, BT_OPP_PUSH_ONGOING);
+			bt_atomic_clear_bit(&client->_push_state, BT_OPP_PUSH_ONGOING);
 		}
 
 		return -ENODATA;
@@ -440,7 +442,7 @@ int bt_opp_client_push(struct bt_opp_client *client, bool final, struct net_buf 
 	err = bt_obex_put(&client->_client, final, buf);
 	if (err != 0 && first) {
 		/* Undo the published operation if nothing was sent. */
-		atomic_clear_bit(&client->_push_state, BT_OPP_PUSH_ONGOING);
+		bt_atomic_clear_bit(&client->_push_state, BT_OPP_PUSH_ONGOING);
 	}
 
 	return err;
@@ -465,7 +467,7 @@ int bt_opp_client_pull(struct bt_opp_client *client, struct net_buf *buf)
 	}
 
 	/* Publish the state before sending, see bt_opp_client_push(). */
-	first = !atomic_test_and_set_bit(&client->_pull_state, BT_OPP_PULL_ONGOING);
+	first = !bt_atomic_test_and_set_bit(&client->_pull_state, BT_OPP_PULL_ONGOING);
 
 	/*
 	 * OPP spec section 5.6 and IrOBEX 1.2 section 8.4: the first request of
@@ -473,14 +475,14 @@ int bt_opp_client_pull(struct bt_opp_client *client, struct net_buf *buf)
 	 */
 	if (first && !bt_obex_has_header(buf, BT_OBEX_HEADER_ID_TYPE)) {
 		LOG_ERR("OBEX header (Type) is missing");
-		atomic_clear_bit(&client->_pull_state, BT_OPP_PULL_ONGOING);
+		bt_atomic_clear_bit(&client->_pull_state, BT_OPP_PULL_ONGOING);
 		return -ENODATA;
 	}
 
 	/* The Default Get Object is the only object a Push Server serves. */
 	if (opp_pull_req_check(buf) != 0) {
 		if (first) {
-			atomic_clear_bit(&client->_pull_state, BT_OPP_PULL_ONGOING);
+			bt_atomic_clear_bit(&client->_pull_state, BT_OPP_PULL_ONGOING);
 		}
 
 		return -EINVAL;
@@ -492,7 +494,7 @@ int bt_opp_client_pull(struct bt_opp_client *client, struct net_buf *buf)
 	 */
 	err = bt_obex_get(&client->_client, true, buf);
 	if (err != 0 && first) {
-		atomic_clear_bit(&client->_pull_state, BT_OPP_PULL_ONGOING);
+		bt_atomic_clear_bit(&client->_pull_state, BT_OPP_PULL_ONGOING);
 	}
 
 	return err;
@@ -569,7 +571,7 @@ static void opp_server_transport_connected(struct bt_conn *conn, struct bt_goep 
 {
 	struct bt_opp_server *server = CONTAINER_OF(goep, struct bt_opp_server, _goep);
 
-	atomic_set(&server->_transport_state, BT_OPP_TRANSPORT_STATE_CONNECTED);
+	bt_atomic_set(&server->_transport_state, BT_OPP_TRANSPORT_STATE_CONNECTED);
 
 	LOG_DBG("server %p transport connected", server);
 
@@ -582,9 +584,9 @@ static void opp_server_transport_disconnected(struct bt_goep *goep)
 {
 	struct bt_opp_server *server = CONTAINER_OF(goep, struct bt_opp_server, _goep);
 
-	atomic_set(&server->_transport_state, BT_OPP_TRANSPORT_STATE_DISCONNECTED);
-	atomic_clear(&server->_push_state);
-	atomic_clear(&server->_pull_state);
+	bt_atomic_set(&server->_transport_state, BT_OPP_TRANSPORT_STATE_DISCONNECTED);
+	bt_atomic_clear(&server->_push_state);
+	bt_atomic_clear(&server->_pull_state);
 
 	LOG_DBG("server %p transport disconnected", server);
 
@@ -648,7 +650,7 @@ static uint8_t opp_push_req_check(struct bt_opp_server *server, bool final, stru
 	}
 
 	if (named) {
-		atomic_set_bit(&server->_push_state, BT_OPP_PUSH_NAME);
+		bt_atomic_set_bit(&server->_push_state, BT_OPP_PUSH_NAME);
 	}
 
 	if (bt_obex_has_header(buf, BT_OBEX_HEADER_ID_BODY) ||
@@ -659,19 +661,19 @@ static uint8_t opp_push_req_check(struct bt_opp_server *server, bool final, stru
 		 * not enforced: section 2.2.4 makes it optional for a sender
 		 * that does not know the size, and End-of-Body marks the end.
 		 */
-		if (!atomic_test_bit(&server->_push_state, BT_OPP_PUSH_NAME)) {
+		if (!bt_atomic_test_bit(&server->_push_state, BT_OPP_PUSH_NAME)) {
 			LOG_WRN("PUT sends the object body before the OBEX header (Name)");
 			return BT_OPP_RSP_CODE_BAD_REQ;
 		}
 
-		atomic_set_bit(&server->_push_state, BT_OPP_PUSH_BODY);
+		bt_atomic_set_bit(&server->_push_state, BT_OPP_PUSH_BODY);
 	}
 
 	/*
 	 * IrOBEX 1.2 section 3.3.3.6: a final PUT without a body is a delete
 	 * request, which OPP has no feature for (OPP spec Table 4.1).
 	 */
-	if (final && !atomic_test_bit(&server->_push_state, BT_OPP_PUSH_BODY)) {
+	if (final && !bt_atomic_test_bit(&server->_push_state, BT_OPP_PUSH_BODY)) {
 		LOG_WRN("PUT carries no object body, which OPP does not support");
 		return BT_OPP_RSP_CODE_FORBIDDEN;
 	}
@@ -683,7 +685,7 @@ static void opp_server_obex_put_cb(struct bt_obex_server *obex_server, bool fina
 				   struct net_buf *buf)
 {
 	struct bt_opp_server *server = CONTAINER_OF(obex_server, struct bt_opp_server, _server);
-	bool ongoing = atomic_test_and_set_bit(&server->_push_state, BT_OPP_PUSH_ONGOING);
+	bool ongoing = bt_atomic_test_and_set_bit(&server->_push_state, BT_OPP_PUSH_ONGOING);
 	uint8_t rsp_code;
 	int err;
 
@@ -702,7 +704,7 @@ static void opp_server_obex_put_cb(struct bt_obex_server *obex_server, bool fina
 		 * the response.
 		 */
 		if (!ongoing) {
-			atomic_clear(&server->_push_state);
+			bt_atomic_clear(&server->_push_state);
 		}
 
 		if (ongoing) {
@@ -724,7 +726,7 @@ static void opp_server_obex_get_cb(struct bt_obex_server *obex_server, bool fina
 				   struct net_buf *buf)
 {
 	struct bt_opp_server *server = CONTAINER_OF(obex_server, struct bt_opp_server, _server);
-	bool ongoing = atomic_test_and_set_bit(&server->_pull_state, BT_OPP_PULL_ONGOING);
+	bool ongoing = bt_atomic_test_and_set_bit(&server->_pull_state, BT_OPP_PULL_ONGOING);
 	uint8_t rsp_code;
 	int err;
 
@@ -744,7 +746,7 @@ static void opp_server_obex_get_cb(struct bt_obex_server *obex_server, bool fina
 		 * the response.
 		 */
 		if (!ongoing) {
-			atomic_clear(&server->_pull_state);
+			bt_atomic_clear(&server->_pull_state);
 		}
 
 		if (ongoing) {
@@ -769,8 +771,8 @@ static void opp_server_obex_abort_cb(struct bt_obex_server *obex_server, struct 
 	LOG_DBG("server %p ABORT req", server);
 
 	/* The aborted operation is over, whatever the application answers. */
-	atomic_clear(&server->_push_state);
-	atomic_clear(&server->_pull_state);
+	bt_atomic_clear(&server->_push_state);
+	bt_atomic_clear(&server->_pull_state);
 
 	server->cb->abort(server, buf);
 }
@@ -811,7 +813,7 @@ static int opp_transport_goep_accept(struct bt_conn *conn,
 	/* Initialize GOEP v1 transport for this connection. */
 	BT_GOEP_INIT_V1(&opp_server->_goep, &opp_server->_transport);
 	opp_server->_goep.transport_ops = &opp_server_goep_transport_ops;
-	atomic_set(&opp_server->_transport_state, BT_OPP_TRANSPORT_STATE_CONNECTING);
+	bt_atomic_set(&opp_server->_transport_state, BT_OPP_TRANSPORT_STATE_CONNECTING);
 
 	*goep = &opp_server->_goep;
 
@@ -854,8 +856,8 @@ int bt_opp_server_register(struct bt_opp_server *server, const struct bt_opp_ser
 	}
 
 	server->cb = cb;
-	atomic_clear(&server->_push_state);
-	atomic_clear(&server->_pull_state);
+	bt_atomic_clear(&server->_push_state);
+	bt_atomic_clear(&server->_pull_state);
 	server->_server.obex = &server->_goep.obex;
 	server->_server.ops = &opp_server_obex_ops;
 
@@ -880,7 +882,7 @@ int bt_opp_server_unregister(struct bt_opp_server *server)
 		return -EALREADY;
 	}
 
-	if (atomic_get(&server->_transport_state) != BT_OPP_TRANSPORT_STATE_DISCONNECTED) {
+	if (bt_atomic_get(&server->_transport_state) != BT_OPP_TRANSPORT_STATE_DISCONNECTED) {
 		LOG_WRN("server %p is in use", server);
 		return -EINPROGRESS;
 	}
@@ -920,8 +922,8 @@ int bt_opp_server_connect(struct bt_opp_server *server, uint16_t mopl, uint8_t r
 
 int bt_opp_server_disconnect(struct bt_opp_server *server, struct net_buf *buf)
 {
-	atomic_val_t prev_push_state;
-	atomic_val_t prev_pull_state;
+	bt_atomic_val_t prev_push_state;
+	bt_atomic_val_t prev_pull_state;
 	int err;
 
 	if (server == NULL) {
@@ -939,13 +941,13 @@ int bt_opp_server_disconnect(struct bt_opp_server *server, struct net_buf *buf)
 	 * End the push or pull operation before sending the response. Restore it
 	 * only if the response was not sent and the state is still cleared.
 	 */
-	prev_push_state = atomic_clear(&server->_push_state);
-	prev_pull_state = atomic_clear(&server->_pull_state);
+	prev_push_state = bt_atomic_clear(&server->_push_state);
+	prev_pull_state = bt_atomic_clear(&server->_pull_state);
 
 	err = bt_obex_disconnect_rsp(&server->_server, BT_OPP_RSP_CODE_SUCCESS, buf);
 	if (err != 0) {
-		(void)atomic_cas(&server->_push_state, 0, prev_push_state);
-		(void)atomic_cas(&server->_pull_state, 0, prev_pull_state);
+		(void)bt_atomic_cas(&server->_push_state, 0, prev_push_state);
+		(void)bt_atomic_cas(&server->_pull_state, 0, prev_pull_state);
 	}
 
 	return err;
@@ -953,7 +955,7 @@ int bt_opp_server_disconnect(struct bt_opp_server *server, struct net_buf *buf)
 
 int bt_opp_server_push(struct bt_opp_server *server, uint8_t rsp_code, struct net_buf *buf)
 {
-	atomic_val_t prev = 0;
+	bt_atomic_val_t prev = 0;
 	bool ended;
 	int err;
 
@@ -972,14 +974,14 @@ int bt_opp_server_push(struct bt_opp_server *server, uint8_t rsp_code, struct ne
 	 */
 	ended = rsp_code != BT_OPP_RSP_CODE_CONTINUE;
 	if (ended) {
-		prev = atomic_clear(&server->_push_state);
+		prev = bt_atomic_clear(&server->_push_state);
 	}
 
 	err = bt_obex_put_rsp(&server->_server, rsp_code, buf);
 	if (err != 0) {
 		/* Nothing was sent, so the operation is still ongoing. */
 		if (ended) {
-			(void)atomic_cas(&server->_push_state, 0, prev);
+			(void)bt_atomic_cas(&server->_push_state, 0, prev);
 		}
 
 		return err;
@@ -990,7 +992,7 @@ int bt_opp_server_push(struct bt_opp_server *server, uint8_t rsp_code, struct ne
 
 int bt_opp_server_pull(struct bt_opp_server *server, uint8_t rsp_code, struct net_buf *buf)
 {
-	atomic_val_t prev = 0;
+	bt_atomic_val_t prev = 0;
 	bool ended;
 	int err;
 
@@ -1014,12 +1016,12 @@ int bt_opp_server_pull(struct bt_opp_server *server, uint8_t rsp_code, struct ne
 
 	ended = rsp_code != BT_OPP_RSP_CODE_CONTINUE;
 	if (ended) {
-		prev = atomic_clear(&server->_pull_state);
+		prev = bt_atomic_clear(&server->_pull_state);
 	}
 
 	err = bt_obex_get_rsp(&server->_server, rsp_code, buf);
 	if (err != 0 && ended) {
-		(void)atomic_cas(&server->_pull_state, 0, prev);
+		(void)bt_atomic_cas(&server->_pull_state, 0, prev);
 	}
 
 	return err;
@@ -1043,3 +1045,9 @@ int bt_opp_server_abort(struct bt_opp_server *server, struct net_buf *buf)
 }
 
 #endif /* CONFIG_BT_OPP_SERVER */
+
+/** @brief Initialize module-owned storage before protocol operations. */
+void bt_host_classic_opp_storage_init(void)
+{
+	net_buf_pool_init(&bt_opp_pool);
+}

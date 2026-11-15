@@ -6,7 +6,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <zephyr/bluetooth/classic/opp.h>
+#include <string.h>
+#include <embt/base/assert.h>
+#include <embt/bluetooth/classic/opp.h>
 
 /**
  * @brief OPP transport layer state enumeration.
