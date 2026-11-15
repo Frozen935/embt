@@ -6,6 +6,7 @@ menu "Random Number Generators"
 config PSA_CSPRNG_GENERATOR
 	bool "Use PSA CSPRNG"
 	depends on PSA_CRYPTO
+	select HAS_RANDOM_GENERATOR
 	help
 	  Enables a cryptographically secure random number generator
 	  that uses the PSA Crypto API. This CSPRNG implementation

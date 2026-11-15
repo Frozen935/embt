@@ -271,12 +271,6 @@ config BT_ASSERT_VERBOSE
 	  When CONFIG_BT_ASSERT is enabled, this option turns on printing the
 	  cause of the assert to the console using printk().
 
-config BT_ASSERT_PANIC
-	bool "Use k_panic() instead of k_oops()"
-	help
-	  When CONFIG_BT_ASSERT is enabled, this option makes the code call
-	  k_panic() instead of k_oops() when an assertion is triggered.
-
 endif # BT_ASSERT
 
 config BT_HCI_ERR_TO_STR
@@ -312,12 +306,12 @@ config BT_LONG_WQ_STACK_SIZE
 config BT_LONG_WQ_PRIO
 	int "Long workqueue priority. Should be preemptible."
 	default 10
-	range 0 NUM_PREEMPT_PRIORITIES
 
 config BT_LONG_WQ_INIT_PRIO
-	int "Long workqueue init priority"
+	int "Long workqueue initialization order"
+	range 0 999
 	default 50
 	help
-	  Init priority level to setup the long workqueue.
+	  Order within the worker initialization stage, not thread priority.
 
 endif # BT_LONG_WQ

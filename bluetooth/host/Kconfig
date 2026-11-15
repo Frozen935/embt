@@ -17,7 +17,7 @@ config BT_HCI_TX_STACK_SIZE
 	# changed if required by architecture
 	int
 	prompt "HCI Tx thread stack size" if BT_HCI_TX_STACK_SIZE_WITH_PROMPT
-	default 512 if BT_USERCHAN
+	default 512 if EMBT_HCI_SOCKET
 	# Even if no driver is selected the following default is still
 	# needed e.g. for unit tests. This default will also server as
 	# the worst-case stack size if an out-of-tree controller is used.
@@ -27,6 +27,11 @@ config BT_HCI_TX_STACK_SIZE
 	  NOTE: This is an advanced setting and should not be changed unless
 	  absolutely necessary.  To change this you must first select
 	  BT_HCI_TX_STACK_SIZE_WITH_PROMPT.
+
+config BT_RX_INIT_PRIO
+	int "Host RX workqueue initialization order"
+	range 0 999
+	default 50
 
 config BT_HCI_TX_STACK_SIZE_WITH_PROMPT
 	bool "Override HCI Tx thread stack size"
@@ -77,6 +82,11 @@ config BT_TX_PROCESSOR_THREAD_PRIO
 	int
 	default SYSTEM_WORKQUEUE_PRIORITY
 
+config BT_TX_PROCESSOR_INIT_PRIO
+	int "TX processor initialization order"
+	range 0 999
+	default 50
+
 config BT_TX_PROCESSOR_STACK_SIZE
 	int "TX processor thread stack size"
 	default 2048 if NO_OPTIMIZATIONS
@@ -110,10 +120,10 @@ config BT_CONN_TX_NOTIFY_WQ_PRIO
 config BT_CONN_TX_NOTIFY_WQ_INIT_PRIORITY
 	int "Init priority of workqueue for connection TX notify processing"
 	default 50
+	range 0 999
 	help
-	  The connection TX notify processing workqueue is initialized during
-	  system initialization (at POST_KERNEL level). The Kconfig option
-	  controls the initialization priority within level.
+	  Order within the worker initialization stage. Lower values run first.
+	  Equal values preserve declaration order; this is not thread priority.
 
 endif # BT_CONN_TX_NOTIFY_WQ
 

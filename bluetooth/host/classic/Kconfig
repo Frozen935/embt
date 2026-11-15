@@ -503,7 +503,7 @@ config BT_AVDTP
 config BT_A2DP
 	bool "Bluetooth A2DP Profile [EXPERIMENTAL]"
 	select BT_AVDTP
-	imply LIBSBC
+	select LIBSBC
 	select EXPERIMENTAL
 	help
 	  This option enables the A2DP profile
@@ -512,9 +512,11 @@ if BT_AVDTP
 
 config BT_AVDTP_RTP_VERSION
 	int "Bluetooth AVDTP RTP version"
+	range 0 3
 	default 2
 	help
-	  This option sets the AVDTP RTP protocol version
+	  RTP v2 is the standard playback default. Other two-bit values are
+	  available for explicit interoperability or malformed-packet testing.
 
 config BT_AVDTP_SIGNAL_SDU_MAX
 	int "Maximum size of AVDTP signaling SDU"
