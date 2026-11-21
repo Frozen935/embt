@@ -152,6 +152,9 @@ if(BUILD_TESTING)
 endif()
 
 embt_add_subdirectory_ifdef(CONFIG_BT_SHELL apps/btshell)
+if(BUILD_TESTING AND CONFIG_EMBT_AUDIO_DRIVER)
+  add_subdirectory(test/audio)
+endif()
 
 if(BUILD_TESTING AND CONFIG_SETTINGS_FILE)
   add_subdirectory(test/settings)
