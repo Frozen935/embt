@@ -1,0 +1,25 @@
+{
+  "runner": "cmocka",
+  "tags": [
+    "bluetooth",
+    "addr",
+    "cmocka",
+    "pure"
+  ],
+  "timeout_s": 45,
+  "execution": "case",
+  "scenarios": {
+    "default": {},
+    "bluetooth.addr.no_smp": {
+      "options": [
+        "CONFIG_BT_CENTRAL=n",
+        "CONFIG_BT_OBSERVER=y",
+        "CONFIG_BT_SMP=n",
+        "CONFIG_BT_PRIVACY=n"
+      ],
+      "required_cases": [
+        "bt_addr_le_is_resolved__test_identity_types_are_resolved"
+      ]
+    }
+  }
+}

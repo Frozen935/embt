@@ -1,0 +1,14 @@
+{
+  "runner": "hardware",
+  "target": "test_bt_adv",
+  "tags": [
+    "bluetooth",
+    "advertising",
+    "hardware"
+  ],
+  "timeout_s": 360,
+  "scenarios": {
+    "default": {}
+  },
+  "unsupported_reason": "Requires exclusive privileged access to Linux hci0 and a separate five-minute physical Controller invocation."
+}

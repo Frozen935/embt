@@ -145,6 +145,8 @@ if(CONFIG_EMBT_AUDIO_SHELL)
 endif()
 
 if(BUILD_TESTING)
+  find_package(Python3 REQUIRED COMPONENTS Interpreter)
+  add_subdirectory(test/framework)
   add_subdirectory(test/bringup)
   add_subdirectory(test/bluetooth)
 endif()

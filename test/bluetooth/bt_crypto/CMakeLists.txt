@@ -1,11 +1,30 @@
 # SPDX-License-Identifier: Apache-2.0
 
-cmake_minimum_required(VERSION 3.28.0)
-find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
-project(app)
+# /****************************************************************************
+#  *  Copyright (C) 2026 EmBT contributors
+#  *
+#  * Licensed under the Apache License, Version 2.0 (the "License");
+#  * you may not use this file except in compliance with the License.
+#  * You may obtain a copy of the License at
+#  *
+#  *      http://www.apache.org/licenses/LICENSE-2.0
+#  *
+#  * Unless required by applicable law or agreed to in writing, software
+#  * distributed under the License is distributed on an "AS IS" BASIS,
+#  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  * See the License for the specific language governing permissions and
+#  * limitations under the License.
+#  ***************************************************************************/
+#
 
-target_include_directories(app PRIVATE ${ZEPHYR_BASE}/subsys/bluetooth/crypto)
+embt_bt_cmocka_begin(bt_crypto)
 
-target_sources(app PRIVATE
+target_sources(test_bt_bt_crypto PRIVATE
   src/test_bt_crypto.c
 )
+
+set(test_suites
+  bt_crypto
+)
+
+embt_bt_cmocka_end(test_bt_bt_crypto ${test_suites})

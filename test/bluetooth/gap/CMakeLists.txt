@@ -1,12 +1,30 @@
 # SPDX-License-Identifier: Apache-2.0
 
-cmake_minimum_required(VERSION 3.28.0)
+# /****************************************************************************
+#  *  Copyright (C) 2026 EmBT contributors
+#  *
+#  * Licensed under the Apache License, Version 2.0 (the "License");
+#  * you may not use this file except in compliance with the License.
+#  * You may obtain a copy of the License at
+#  *
+#  *      http://www.apache.org/licenses/LICENSE-2.0
+#  *
+#  * Unless required by applicable law or agreed to in writing, software
+#  * distributed under the License is distributed on an "AS IS" BASIS,
+#  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  * See the License for the specific language governing permissions and
+#  * limitations under the License.
+#  ***************************************************************************/
+#
 
-find_package(Zephyr COMPONENTS unittest REQUIRED HINTS $ENV{ZEPHYR_BASE})
+embt_bt_cmocka_begin(gap)
 
-project(bt_gap)
-
-target_sources(testbinary
-  PRIVATE
-    src/main.c
+target_sources(test_bt_gap PRIVATE
+  src/main.c
 )
+
+set(test_suites
+  gap_test_suite
+)
+
+embt_bt_cmocka_end(test_bt_gap ${test_suites})

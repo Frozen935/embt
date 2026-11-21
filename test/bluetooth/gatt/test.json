@@ -1,0 +1,37 @@
+{
+  "runner": "cmocka",
+  "tags": [
+    "bluetooth",
+    "gatt",
+    "cmocka"
+  ],
+  "timeout_s": 60,
+  "execution": "suite",
+  "scenarios": {
+    "default": {},
+    "bluetooth.gatt.no_bt_conn_dynamic_callbacks": {
+      "options": [
+        "CONFIG_BT_CONN_DYNAMIC_CALLBACKS=n"
+      ],
+      "required_cases": [
+        "test_gatt__test_gatt_register"
+      ]
+    },
+    "bluetooth.gatt.psa_memory_leak": {
+      "options": [
+        "CONFIG_BT_TESTING=y",
+        "CONFIG_BT_GATT_CACHING=y",
+        "CONFIG_PSA_CRYPTO=y",
+        "CONFIG_PSA_WANT_KEY_TYPE_AES=y",
+        "CONFIG_PSA_WANT_ALG_CMAC=y",
+        "CONFIG_PSA_WANT_ALG_ECB_NO_PADDING=y",
+        "CONFIG_MBEDTLS_PSA_STATIC_KEY_SLOTS=y",
+        "CONFIG_MBEDTLS_PSA_KEY_SLOT_COUNT=2",
+        "CONFIG_EMBT_CRYPTO_SOURCE=y"
+      ],
+      "required_cases": [
+        "test_gatt__test_gatt_db_hash_psa_dynamic_register_no_leak"
+      ]
+    }
+  }
+}

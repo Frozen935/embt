@@ -1,10 +1,32 @@
 # SPDX-FileCopyrightText: Copyright The Zephyr Project Contributors
 # SPDX-License-Identifier: Apache-2.0
 
-cmake_minimum_required(VERSION 3.28.0)
+# /****************************************************************************
+#  *  Copyright (C) 2026 EmBT contributors
+#  *
+#  * Licensed under the Apache License, Version 2.0 (the "License");
+#  * you may not use this file except in compliance with the License.
+#  * You may obtain a copy of the License at
+#  *
+#  *      http://www.apache.org/licenses/LICENSE-2.0
+#  *
+#  * Unless required by applicable law or agreed to in writing, software
+#  * distributed under the License is distributed on an "AS IS" BASIS,
+#  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  * See the License for the specific language governing permissions and
+#  * limitations under the License.
+#  ***************************************************************************/
+#
 
-find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
-project(host_id)
+embt_bt_cmocka_begin(host_id)
 
-target_include_directories(app PRIVATE ${ZEPHYR_BASE}/subsys/bluetooth)
-target_sources(app PRIVATE src/main.c)
+target_sources(test_bt_host_id PRIVATE
+  src/main.c
+)
+
+set(test_suites
+  bt_hci_public_addr
+  bt_id_public_api
+)
+
+embt_bt_cmocka_end(test_bt_host_id ${test_suites})

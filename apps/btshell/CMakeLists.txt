@@ -27,5 +27,5 @@ embt_test_instrument(btshell)
 if(BUILD_TESTING)
   add_test(NAME btshell.cli
     COMMAND "${Python3_EXECUTABLE}" "${EMBT_SOURCE_DIR}/test/shell/smoke.py" "$<TARGET_FILE:btshell>")
-  set_tests_properties(btshell.cli PROPERTIES LABELS btshell TIMEOUT 45)
+  set_tests_properties(btshell.cli PROPERTIES LABELS "btshell;platform;linux" TIMEOUT 45)
 endif()

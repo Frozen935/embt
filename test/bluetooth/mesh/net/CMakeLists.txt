@@ -1,45 +1,35 @@
 # SPDX-License-Identifier: Apache-2.0
 
-cmake_minimum_required(VERSION 3.28.0)
-find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
-project(bluetooth_mesh_net)
+# /****************************************************************************
+#  *  Copyright (C) 2026 EmBT contributors
+#  *
+#  * Licensed under the Apache License, Version 2.0 (the "License");
+#  * you may not use this file except in compliance with the License.
+#  * You may obtain a copy of the License at
+#  *
+#  *      http://www.apache.org/licenses/LICENSE-2.0
+#  *
+#  * Unless required by applicable law or agreed to in writing, software
+#  * distributed under the License is distributed on an "AS IS" BASIS,
+#  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  * See the License for the specific language governing permissions and
+#  * limitations under the License.
+#  ***************************************************************************/
+#
 
-FILE(GLOB app_sources src/*.c)
-target_sources(app
-  PRIVATE
-  ${app_sources}
-  ${ZEPHYR_BASE}/subsys/bluetooth/mesh/net.c
+embt_bt_cmocka_begin(mesh/net ISOLATED)
+
+target_sources(test_bt_mesh_net PRIVATE
+  ${EMBT_SOURCE_DIR}/bluetooth/mesh/net.c
+  src/main.c
 )
 
-target_include_directories(app
-  PRIVATE
-  ${ZEPHYR_BASE}/subsys/bluetooth/mesh
-  ${ZEPHYR_BASE}/subsys/bluetooth
-  ${CONFIG_TF_PSA_CRYPTO_MODULE_DIR}/include
-  ${CONFIG_TF_PSA_CRYPTO_MODULE_DIR}/drivers/builtin/include/
-  ${CONFIG_TF_PSA_CRYPTO_MODULE_DIR}/dispatch/include/
+target_include_directories(test_bt_mesh_net BEFORE PRIVATE
+  ${EMBT_SOURCE_DIR}/bluetooth/mesh
 )
 
-target_compile_options(app
-  PRIVATE
-  -DCONFIG_BT_MESH_NET_STORE_TIMEOUT=1
-  -DCONFIG_BT_SETTINGS
-  -DCONFIG_PSA_CRYPTO_PROVIDER_MBEDTLS
-  -DCONFIG_BT_MESH_MSG_CACHE_SIZE=32
-  -DCONFIG_BT_MESH_LOOPBACK_BUFS=3
-  -DCONFIG_BT_MESH_SEQ_STORE_RATE=128
-  -DCONFIG_BT_MESH_IVU_DIVIDER=4
-  -DCONFIG_BT_MESH_IV_UPDATE_SEQ_LIMIT=0x800000
-  -DCONFIG_BT_MESH_SAR_TX_SEG_INT_STEP=0x05
-  -DCONFIG_BT_MESH_SAR_TX_UNICAST_RETRANS_COUNT=0x02
-  -DCONFIG_BT_MESH_SAR_TX_UNICAST_RETRANS_WITHOUT_PROG_COUNT=0x02
-  -DCONFIG_BT_MESH_SAR_TX_UNICAST_RETRANS_INT_STEP=0x07
-  -DCONFIG_BT_MESH_SAR_TX_UNICAST_RETRANS_INT_INC=0x01
-  -DCONFIG_BT_MESH_SAR_TX_MULTICAST_RETRANS_COUNT=0x02
-  -DCONFIG_BT_MESH_SAR_TX_MULTICAST_RETRANS_INT=0x09
-  -DCONFIG_BT_MESH_SAR_RX_SEG_THRESHOLD=0x03
-  -DCONFIG_BT_MESH_SAR_RX_ACK_DELAY_INC=0x01
-  -DCONFIG_BT_MESH_SAR_RX_DISCARD_TIMEOUT=0x01
-  -DCONFIG_BT_MESH_SAR_RX_SEG_INT_STEP=0x05
-  -DCONFIG_BT_MESH_SAR_RX_ACK_RETRANS_COUNT=0x00
+set(test_suites
+  bt_mesh_net_msg_cache
 )
+
+embt_bt_cmocka_end(test_bt_mesh_net ${test_suites})

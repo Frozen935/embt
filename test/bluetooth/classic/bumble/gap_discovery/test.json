@@ -1,0 +1,15 @@
+{
+  "runner": "linked",
+  "target": "test_bt_classic_gap",
+  "tags": [
+    "bluetooth",
+    "classic",
+    "linked"
+  ],
+  "timeout_s": 150,
+  "scenarios": {
+    "default": {}
+  },
+  "pytest": "classic/bumble/test_linked.py",
+  "selection": "gap_discovery"
+}

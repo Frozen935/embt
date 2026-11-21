@@ -1,26 +1,32 @@
 # SPDX-License-Identifier: Apache-2.0
 
-cmake_minimum_required(VERSION 3.28.0)
+# /****************************************************************************
+#  *  Copyright (C) 2026 EmBT contributors
+#  *
+#  * Licensed under the Apache License, Version 2.0 (the "License");
+#  * you may not use this file except in compliance with the License.
+#  * You may obtain a copy of the License at
+#  *
+#  *      http://www.apache.org/licenses/LICENSE-2.0
+#  *
+#  * Unless required by applicable law or agreed to in writing, software
+#  * distributed under the License is distributed on an "AS IS" BASIS,
+#  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  * See the License for the specific language governing permissions and
+#  * limitations under the License.
+#  ***************************************************************************/
+#
 
-find_package(Zephyr COMPONENTS unittest REQUIRED HINTS $ENV{ZEPHYR_BASE})
+embt_bt_cmocka_begin(host/cs/bt_le_cs_set_valid_chmap_bits)
 
-get_filename_component(project_name ${CMAKE_CURRENT_SOURCE_DIR} NAME)
-project(${project_name})
-
-include_directories(BEFORE
-    ${ZEPHYR_BASE}/tests/bluetooth/host/cs/mocks
+target_sources(test_bt_host_cs_bt_le_cs_set_valid_chmap_bits PRIVATE
+  src/main.c
 )
 
-add_subdirectory(${ZEPHYR_BASE}/tests/bluetooth/host host_mocks)
-add_subdirectory(${ZEPHYR_BASE}/tests/bluetooth/host/cs/mocks mocks)
+target_include_directories(test_bt_host_cs_bt_le_cs_set_valid_chmap_bits BEFORE PRIVATE "${BT_TEST_ROOT}/host/cs/mocks")
 
-target_link_libraries(testbinary PRIVATE mocks host_mocks)
-
-target_sources(testbinary
-    PRIVATE
-    src/main.c
-
-    ${ZEPHYR_BASE}/subsys/bluetooth/host/cs.c
-    ${ZEPHYR_BASE}/lib/net_buf/buf_simple.c
-    ${ZEPHYR_BASE}/subsys/logging/log_minimal.c
+set(test_suites
+  bt_le_cs_set_valid_chmap_bits
 )
+
+embt_bt_cmocka_end(test_bt_host_cs_bt_le_cs_set_valid_chmap_bits ${test_suites})

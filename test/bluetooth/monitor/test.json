@@ -1,0 +1,21 @@
+{
+  "runner": "cmocka",
+  "tags": [
+    "bluetooth",
+    "monitor",
+    "cmocka"
+  ],
+  "timeout_s": 45,
+  "execution": "case",
+  "scenarios": {
+    "default": {},
+    "bluetooth.monitor.classic": {
+      "options": [
+        "CONFIG_BT_CLASSIC=y"
+      ],
+      "required_cases": [
+        "bt_monitor__test_single_record"
+      ]
+    }
+  }
+}

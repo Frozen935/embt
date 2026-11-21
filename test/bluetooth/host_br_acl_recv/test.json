@@ -1,0 +1,30 @@
+{
+  "runner": "cmocka",
+  "tags": [
+    "bluetooth",
+    "host_br_acl_recv",
+    "cmocka",
+    "host"
+  ],
+  "timeout_s": 45,
+  "execution": "case",
+  "scenarios": {
+    "default": {},
+    "bluetooth.host_br_acl_recv": {
+      "options": [
+        "CONFIG_BT_HCI_ACL_FLOW_CONTROL=y"
+      ],
+      "required_cases": [
+        "br_acl_recv__test_single_pdu_kept"
+      ]
+    },
+    "bluetooth.host_br_acl_recv.no_acl_flow_control": {
+      "options": [
+        "CONFIG_BT_HCI_ACL_FLOW_CONTROL=n"
+      ],
+      "required_cases": [
+        "br_acl_recv__test_single_pdu_kept"
+      ]
+    }
+  }
+}

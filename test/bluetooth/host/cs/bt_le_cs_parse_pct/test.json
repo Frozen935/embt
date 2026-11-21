@@ -1,0 +1,14 @@
+{
+  "runner": "cmocka",
+  "tags": [
+    "bluetooth",
+    "host",
+    "cmocka",
+    "pure"
+  ],
+  "timeout_s": 45,
+  "execution": "case",
+  "scenarios": {
+    "default": {}
+  }
+}

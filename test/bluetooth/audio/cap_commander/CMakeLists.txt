@@ -1,20 +1,26 @@
 # SPDX-License-Identifier: Apache-2.0
 
-cmake_minimum_required(VERSION 3.28.0)
+# /****************************************************************************
+#  *  Copyright (C) 2026 EmBT contributors
+#  *
+#  * Licensed under the Apache License, Version 2.0 (the "License");
+#  * you may not use this file except in compliance with the License.
+#  * You may obtain a copy of the License at
+#  *
+#  *      http://www.apache.org/licenses/LICENSE-2.0
+#  *
+#  * Unless required by applicable law or agreed to in writing, software
+#  * distributed under the License is distributed on an "AS IS" BASIS,
+#  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  * See the License for the specific language governing permissions and
+#  * limitations under the License.
+#  ***************************************************************************/
+#
 
-find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
+embt_bt_cmocka_begin(audio/cap_commander ISOLATED)
 
-project(bluetooth_cap_commander)
-
-target_include_directories(app PRIVATE
-  ${ZEPHYR_BASE}/subsys/bluetooth/
-
-  ${ZEPHYR_BASE}/tests/bluetooth/audio/cap_commander/include
-  ${ZEPHYR_BASE}/tests/bluetooth/audio/mocks/include
-)
-
-target_sources(app PRIVATE
-  # Test source files
+target_sources(test_bt_audio_cap_commander PRIVATE
+  test_environment.c
   src/main.c
   src/test_common.c
   src/test_vcp.c
@@ -22,8 +28,6 @@ target_sources(app PRIVATE
   src/test_broadcast_reception.c
   src/test_distribute_broadcast_code.c
   src/test_cancel.c
-
-  # UUT files
   uut/bap_broadcast_assistant.c
   uut/aics.c
   uut/cap_commander.c
@@ -31,14 +35,24 @@ target_sources(app PRIVATE
   uut/micp.c
   uut/vcp.c
   uut/vocs.c
-
-  # Stack source file
-  ${ZEPHYR_BASE}/subsys/bluetooth/audio/audio.c
-  ${ZEPHYR_BASE}/subsys/bluetooth/audio/cap_commander.c
-  ${ZEPHYR_BASE}/subsys/bluetooth/audio/cap_common.c
-  ${ZEPHYR_BASE}/subsys/bluetooth/common/addr.c
-
-  # Mock files
-  ${ZEPHYR_BASE}/tests/bluetooth/audio/mocks/src/conn.c
-  ${ZEPHYR_BASE}/tests/bluetooth/audio/mocks/src/gatt.c
+  ${EMBT_SOURCE_DIR}/bluetooth/audio/audio.c
+  ${EMBT_SOURCE_DIR}/bluetooth/audio/cap_commander.c
+  ${EMBT_SOURCE_DIR}/bluetooth/audio/cap_common.c
+  ${EMBT_SOURCE_DIR}/bluetooth/common/addr.c
+  ${BT_TEST_ROOT}/audio/mocks/src/conn.c
+  ${BT_TEST_ROOT}/audio/mocks/src/gatt.c
+  ${EMBT_SOURCE_DIR}/bluetooth/host/uuid.c
 )
+
+target_include_directories(test_bt_audio_cap_commander BEFORE PRIVATE "${BT_TEST_ROOT}/audio/mocks/include")
+
+set(test_suites
+  cap_commander_test_suite
+  cap_commander_test_broadcast_reception
+  cap_commander_test_cancel
+  cap_commander_test_distribute_broadcast_code
+  cap_commander_test_micp
+  cap_commander_test_vcp
+)
+
+embt_bt_cmocka_end(test_bt_audio_cap_commander ${test_suites})

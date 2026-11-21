@@ -1,0 +1,37 @@
+{
+  "runner": "cmocka",
+  "tags": [
+    "bluetooth",
+    "buf",
+    "cmocka"
+  ],
+  "timeout_s": 45,
+  "execution": "case",
+  "scenarios": {
+    "default": {},
+    "bluetooth.buf": {
+      "options": [
+        "CONFIG_BT_HCI_ACL_FLOW_CONTROL=y"
+      ],
+      "required_cases": [
+        "test_buf_data_api__test_buf_freed_cb"
+      ]
+    },
+    "bluetooth.buf.no_acl_flow_control": {
+      "options": [
+        "CONFIG_BT_HCI_ACL_FLOW_CONTROL=n"
+      ],
+      "required_cases": [
+        "test_buf_data_api__test_buf_freed_cb"
+      ]
+    },
+    "bluetooth.buf.hci_raw": {
+      "options": [
+        "CONFIG_BT_HCI_RAW=y"
+      ],
+      "required_cases": [
+        "test_buf_data_api__test_buf_freed_cb"
+      ]
+    }
+  }
+}

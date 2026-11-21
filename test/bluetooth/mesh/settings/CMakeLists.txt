@@ -1,41 +1,35 @@
 # SPDX-License-Identifier: Apache-2.0
 
-cmake_minimum_required(VERSION 3.28.0)
-find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
-project(bluetooth_mesh_settings)
+# /****************************************************************************
+#  *  Copyright (C) 2026 EmBT contributors
+#  *
+#  * Licensed under the Apache License, Version 2.0 (the "License");
+#  * you may not use this file except in compliance with the License.
+#  * You may obtain a copy of the License at
+#  *
+#  *      http://www.apache.org/licenses/LICENSE-2.0
+#  *
+#  * Unless required by applicable law or agreed to in writing, software
+#  * distributed under the License is distributed on an "AS IS" BASIS,
+#  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  * See the License for the specific language governing permissions and
+#  * limitations under the License.
+#  ***************************************************************************/
+#
 
-file(GLOB app_sources src/*.c)
-target_sources(app
-  PRIVATE
-  ${app_sources}
-  ${ZEPHYR_BASE}/subsys/bluetooth/mesh/settings.c
+embt_bt_cmocka_begin(mesh/settings ISOLATED)
+
+target_sources(test_bt_mesh_settings PRIVATE
+  ${EMBT_SOURCE_DIR}/bluetooth/mesh/settings.c
+  src/main.c
 )
 
-target_include_directories(app
-  PRIVATE
-  ${ZEPHYR_BASE}/subsys/bluetooth/mesh
-  ${ZEPHYR_BASE}/subsys/bluetooth
-  ${CONFIG_TF_PSA_CRYPTO_MODULE_DIR}/include
-  ${CONFIG_TF_PSA_CRYPTO_MODULE_DIR}/drivers/builtin/include/
-  ${CONFIG_TF_PSA_CRYPTO_MODULE_DIR}/dispatch/include/
+target_include_directories(test_bt_mesh_settings BEFORE PRIVATE
+  ${EMBT_SOURCE_DIR}/bluetooth/mesh
 )
 
-# The two timeouts must differ, otherwise the deadlines the tests distinguish collapse.
-target_compile_options(app
-  PRIVATE
-  -DCONFIG_BT_MESH_STORE_TIMEOUT=2
-  -DCONFIG_BT_MESH_RPL_STORE_TIMEOUT=10
-  -DCONFIG_BT_MESH_RPL_STORAGE_MODE_SETTINGS=1
-  -DCONFIG_BT_MESH_CDB=1
-  -DCONFIG_BT_MESH_CDB_NODE_COUNT=1
-  -DCONFIG_BT_MESH_CDB_SUBNET_COUNT=1
-  -DCONFIG_BT_MESH_CDB_APP_KEY_COUNT=1
-  -DCONFIG_BT_MESH_OD_PRIV_PROXY_SRV=1
-  -DCONFIG_BT_MESH_PROXY_SOLICITATION=1
-  -DCONFIG_BT_MESH_BRG_CFG_SRV=1
-  -DCONFIG_PSA_CRYPTO_PROVIDER_MBEDTLS
+set(test_suites
+  bt_mesh_settings_store
 )
 
-if(NOT TEST_WITHOUT_BT_SETTINGS)
-  target_compile_options(app PRIVATE -DCONFIG_BT_SETTINGS=1)
-endif()
+embt_bt_cmocka_end(test_bt_mesh_settings ${test_suites})
