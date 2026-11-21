@@ -1,3 +1,4 @@
+#include "support/test_support.h"
 /*
  * Copyright (c) 2026 Silicon Laboratories Inc.
  *
@@ -7,28 +8,26 @@
 #include <stdint.h>
 #include <string.h>
 
-#include <zephyr/fff.h>
-#include <zephyr/sys/ring_buffer.h>
-#include <zephyr/ztest.h>
-
+#include <embt/base/ring_buffer.h>
 #include "monitor_buffer.h"
 
-DEFINE_FFF_GLOBALS;
 
-ZTEST_SUITE(bt_monitor_buffer, NULL, NULL, NULL, NULL, NULL);
+
+
 
 static void ring_put(struct ring_buf *buf, const uint8_t *data, size_t len)
 {
-	zassert_equal(ring_buf_put(buf, data, len), len);
+	assert_int_equal(ring_buf_put(buf, data, len), len);
 }
 
 static void ring_get(struct ring_buf *buf, uint8_t *data, size_t len)
 {
-	zassert_equal(ring_buf_get(buf, data, len), len);
+	assert_int_equal(ring_buf_get(buf, data, len), len);
 }
 
-ZTEST(bt_monitor_buffer, test_put_fragments)
+static void bt_monitor_buffer__test_put_fragments(void **cm_state)
 {
+	(void)cm_state;
 	uint8_t storage[16];
 	struct ring_buf buf;
 	static const uint8_t header[] = { 0x01, 0x02, 0x03 };
@@ -42,14 +41,15 @@ ZTEST(bt_monitor_buffer, test_put_fragments)
 
 	ring_buf_init(&buf, sizeof(storage), storage);
 
-	zassert_true(bt_monitor_ring_buf_put(&buf, frags, ARRAY_SIZE(frags)));
-	zassert_equal(ring_buf_size_get(&buf), sizeof(expected));
+	assert_true(bt_monitor_ring_buf_put(&buf, frags, ARRAY_SIZE(frags)));
+	assert_int_equal(ring_buf_size_get(&buf), sizeof(expected));
 	ring_get(&buf, output, sizeof(output));
-	zassert_mem_equal(output, expected, sizeof(expected));
+	assert_memory_equal(output, expected, sizeof(expected));
 }
 
-ZTEST(bt_monitor_buffer, test_put_fragments_across_wrap)
+static void bt_monitor_buffer__test_put_fragments_across_wrap(void **cm_state)
 {
+	(void)cm_state;
 	uint8_t storage[16];
 	struct ring_buf buf;
 	static const uint8_t initial[] = { 0x00, 0x01, 0x02, 0x03, 0x04,
@@ -69,13 +69,14 @@ ZTEST(bt_monitor_buffer, test_put_fragments_across_wrap)
 	ring_put(&buf, initial, sizeof(initial));
 	ring_get(&buf, discarded, sizeof(discarded));
 
-	zassert_true(bt_monitor_ring_buf_put(&buf, frags, ARRAY_SIZE(frags)));
+	assert_true(bt_monitor_ring_buf_put(&buf, frags, ARRAY_SIZE(frags)));
 	ring_get(&buf, output, sizeof(output));
-	zassert_mem_equal(output, expected, sizeof(expected));
+	assert_memory_equal(output, expected, sizeof(expected));
 }
 
-ZTEST(bt_monitor_buffer, test_insufficient_space_does_not_publish_partial_record)
+static void bt_monitor_buffer__test_insufficient_space_does_not_publish_partial_record(void **cm_state)
 {
+	(void)cm_state;
 	uint8_t storage[8];
 	struct ring_buf buf;
 	static const uint8_t initial[] = { 0xaa, 0xbb, 0xcc };
@@ -90,14 +91,15 @@ ZTEST(bt_monitor_buffer, test_insufficient_space_does_not_publish_partial_record
 	ring_buf_init(&buf, sizeof(storage), storage);
 	ring_put(&buf, initial, sizeof(initial));
 
-	zassert_false(bt_monitor_ring_buf_put(&buf, frags, ARRAY_SIZE(frags)));
-	zassert_equal(ring_buf_size_get(&buf), sizeof(initial));
+	assert_false(bt_monitor_ring_buf_put(&buf, frags, ARRAY_SIZE(frags)));
+	assert_int_equal(ring_buf_size_get(&buf), sizeof(initial));
 	ring_get(&buf, output, sizeof(output));
-	zassert_mem_equal(output, initial, sizeof(initial));
+	assert_memory_equal(output, initial, sizeof(initial));
 }
 
-ZTEST(bt_monitor_buffer, test_zero_length_fragment_with_null_data)
+static void bt_monitor_buffer__test_zero_length_fragment_with_null_data(void **cm_state)
 {
+	(void)cm_state;
 	uint8_t storage[8];
 	struct ring_buf buf;
 	static const uint8_t header[] = { 0x01, 0x02 };
@@ -109,14 +111,15 @@ ZTEST(bt_monitor_buffer, test_zero_length_fragment_with_null_data)
 
 	ring_buf_init(&buf, sizeof(storage), storage);
 
-	zassert_true(bt_monitor_ring_buf_put(&buf, frags, ARRAY_SIZE(frags)));
-	zassert_equal(ring_buf_size_get(&buf), sizeof(header));
+	assert_true(bt_monitor_ring_buf_put(&buf, frags, ARRAY_SIZE(frags)));
+	assert_int_equal(ring_buf_size_get(&buf), sizeof(header));
 	ring_get(&buf, output, sizeof(output));
-	zassert_mem_equal(output, header, sizeof(header));
+	assert_memory_equal(output, header, sizeof(header));
 }
 
-ZTEST(bt_monitor_buffer, test_size_max_fragment_is_rejected)
+static void bt_monitor_buffer__test_size_max_fragment_is_rejected(void **cm_state)
 {
+	(void)cm_state;
 	uint8_t storage[8];
 	struct ring_buf buf;
 	static const uint8_t header[] = { 0x01, 0x02 };
@@ -131,12 +134,13 @@ ZTEST(bt_monitor_buffer, test_size_max_fragment_is_rejected)
 
 	ring_buf_init(&buf, sizeof(storage), storage);
 
-	zassert_false(bt_monitor_ring_buf_put(&buf, frags, ARRAY_SIZE(frags)));
-	zassert_true(ring_buf_is_empty(&buf));
+	assert_false(bt_monitor_ring_buf_put(&buf, frags, ARRAY_SIZE(frags)));
+	assert_true(ring_buf_is_empty(&buf));
 }
 
-ZTEST(bt_monitor_buffer, test_fragment_larger_than_remaining_space)
+static void bt_monitor_buffer__test_fragment_larger_than_remaining_space(void **cm_state)
 {
+	(void)cm_state;
 	uint8_t storage[8];
 	struct ring_buf buf;
 	static const uint8_t header[] = { 0x01, 0x02, 0x03, 0x04, 0x05 };
@@ -151,12 +155,13 @@ ZTEST(bt_monitor_buffer, test_fragment_larger_than_remaining_space)
 	/* The first fragment fits on its own but the second exceeds what is
 	 * left after it; the whole record must be rejected.
 	 */
-	zassert_false(bt_monitor_ring_buf_put(&buf, frags, ARRAY_SIZE(frags)));
-	zassert_true(ring_buf_is_empty(&buf));
+	assert_false(bt_monitor_ring_buf_put(&buf, frags, ARRAY_SIZE(frags)));
+	assert_true(ring_buf_is_empty(&buf));
 }
 
-ZTEST(bt_monitor_buffer, test_record_exactly_filling_buffer)
+static void bt_monitor_buffer__test_record_exactly_filling_buffer(void **cm_state)
 {
+	(void)cm_state;
 	uint8_t storage[8];
 	struct ring_buf buf;
 	static const uint8_t header[] = { 0x01, 0x02, 0x03 };
@@ -170,9 +175,24 @@ ZTEST(bt_monitor_buffer, test_record_exactly_filling_buffer)
 
 	ring_buf_init(&buf, sizeof(storage), storage);
 
-	zassert_true(bt_monitor_ring_buf_put(&buf, frags, ARRAY_SIZE(frags)));
-	zassert_equal(ring_buf_size_get(&buf), sizeof(expected));
-	zassert_equal(ring_buf_space_get(&buf), 0);
+	assert_true(bt_monitor_ring_buf_put(&buf, frags, ARRAY_SIZE(frags)));
+	assert_int_equal(ring_buf_size_get(&buf), sizeof(expected));
+	assert_int_equal(ring_buf_space_get(&buf), 0);
 	ring_get(&buf, output, sizeof(output));
-	zassert_mem_equal(output, expected, sizeof(expected));
+	assert_memory_equal(output, expected, sizeof(expected));
 }
+
+
+
+
+
+static const struct CMUnitTest test_cases_bt_monitor_buffer[] = {
+	cmocka_unit_test(bt_monitor_buffer__test_put_fragments),
+	cmocka_unit_test(bt_monitor_buffer__test_put_fragments_across_wrap),
+	cmocka_unit_test(bt_monitor_buffer__test_insufficient_space_does_not_publish_partial_record),
+	cmocka_unit_test(bt_monitor_buffer__test_zero_length_fragment_with_null_data),
+	cmocka_unit_test(bt_monitor_buffer__test_size_max_fragment_is_rejected),
+	cmocka_unit_test(bt_monitor_buffer__test_fragment_larger_than_remaining_space),
+	cmocka_unit_test(bt_monitor_buffer__test_record_exactly_filling_buffer),
+};
+BT_TEST_SUITE(bt_monitor_buffer, test_cases_bt_monitor_buffer, bt_test_host_setup, NULL);

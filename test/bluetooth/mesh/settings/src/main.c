@@ -1,11 +1,10 @@
+#include "support/test_support.h"
 /*
  * Copyright (c) 2026 Nordic Semiconductor ASA
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-
-#include <zephyr/ztest.h>
-#include <zephyr/bluetooth/mesh.h>
+#include <embt/bluetooth/mesh.h>
 
 #include "mesh.h"
 #include "net.h"
@@ -133,22 +132,20 @@ static enum bt_mesh_settings_flag store_slot(enum bt_mesh_settings_flag flag)
 static void assert_only_stored(const enum bt_mesh_settings_flag *flags, size_t cnt)
 {
 	for (size_t i = 0; i < cnt; i++) {
-		zassert_equal(store_cnt[store_slot(flags[i])], 1, "flag %d stored %u times",
-			      flags[i], store_cnt[store_slot(flags[i])]);
+		assert_int_equal(store_cnt[store_slot(flags[i])], 1);
 	}
 
-	zassert_equal(total_stores(), cnt, "%u unexpected stores", total_stores() - cnt);
+	assert_int_equal(total_stores(), cnt);
 }
 
 static void assert_stored(enum bt_mesh_settings_flag flag)
 {
-	zassert_equal(store_cnt[store_slot(flag)], 1, "flag %d stored %u times", flag,
-		      store_cnt[store_slot(flag)]);
+	assert_int_equal(store_cnt[store_slot(flag)], 1);
 }
 
 static void assert_not_stored(enum bt_mesh_settings_flag flag)
 {
-	zassert_equal(store_cnt[store_slot(flag)], 0, "flag %d stored too early", flag);
+	assert_int_equal(store_cnt[store_slot(flag)], 0);
 }
 
 static void *suite_setup(void)
@@ -170,8 +167,9 @@ static void test_setup(void *f)
 /**** Tests ****/
 
 /** No-wait flags are stored without waiting for any deadline. */
-ZTEST(bt_mesh_settings_store, test_no_wait_stored_immediately)
+static void bt_mesh_settings_store__test_no_wait_stored_immediately(void **cm_state)
 {
+	(void)cm_state;
 	for (size_t i = 0; i < ARRAY_SIZE(no_wait_flags); i++) {
 		if (!IS_ENABLED(CONFIG_BT_SETTINGS) && is_flag_settings_only(no_wait_flags[i])) {
 			continue;
@@ -180,15 +178,16 @@ ZTEST(bt_mesh_settings_store, test_no_wait_stored_immediately)
 		memset(store_cnt, 0, sizeof(store_cnt));
 
 		bt_mesh_settings_store_schedule(no_wait_flags[i]);
-		k_sleep(K_MSEC(MARGIN_MS));
+		osi_sleep_ms(BT_MSEC(MARGIN_MS));
 
 		assert_only_stored(&no_wait_flags[i], 1);
 	}
 }
 
 /** Replay list flags are stored on CONFIG_BT_MESH_RPL_STORE_TIMEOUT, not before. */
-ZTEST(bt_mesh_settings_store, test_rpl_stored_on_rpl_timeout)
+static void bt_mesh_settings_store__test_rpl_stored_on_rpl_timeout(void **cm_state)
 {
+	(void)cm_state;
 	for (size_t i = 0; i < ARRAY_SIZE(rpl_flags); i++) {
 		if (!IS_ENABLED(CONFIG_BT_SETTINGS) && is_flag_settings_only(rpl_flags[i])) {
 			continue;
@@ -197,26 +196,27 @@ ZTEST(bt_mesh_settings_store, test_rpl_stored_on_rpl_timeout)
 		memset(store_cnt, 0, sizeof(store_cnt));
 
 		bt_mesh_settings_store_schedule(rpl_flags[i]);
-		k_sleep(K_MSEC(RPL_TIMEOUT_MS - MARGIN_MS));
+		osi_sleep_ms(BT_MSEC(RPL_TIMEOUT_MS - MARGIN_MS));
 		assert_not_stored(rpl_flags[i]);
 
-		k_sleep(K_MSEC(2 * MARGIN_MS));
+		osi_sleep_ms(BT_MSEC(2 * MARGIN_MS));
 		assert_only_stored(&rpl_flags[i], 1);
 	}
 }
 
 #if defined(CONFIG_BT_SETTINGS)
 /** Generic flags are stored on CONFIG_BT_MESH_STORE_TIMEOUT, not before. */
-ZTEST(bt_mesh_settings_store, test_generic_stored_on_store_timeout)
+static void bt_mesh_settings_store__test_generic_stored_on_store_timeout(void **cm_state)
 {
+	(void)cm_state;
 	for (size_t i = 0; i < ARRAY_SIZE(generic_flags); i++) {
 		memset(store_cnt, 0, sizeof(store_cnt));
 
 		bt_mesh_settings_store_schedule(generic_flags[i]);
-		k_sleep(K_MSEC(STORE_TIMEOUT_MS - MARGIN_MS));
+		osi_sleep_ms(BT_MSEC(STORE_TIMEOUT_MS - MARGIN_MS));
 		assert_not_stored(generic_flags[i]);
 
-		k_sleep(K_MSEC(2 * MARGIN_MS));
+		osi_sleep_ms(BT_MSEC(2 * MARGIN_MS));
 		assert_only_stored(&generic_flags[i], 1);
 	}
 }
@@ -224,81 +224,87 @@ ZTEST(bt_mesh_settings_store, test_generic_stored_on_store_timeout)
 /** A generic store pending alongside RPL must not pull the replay list forward, nor be
  *  delayed to the replay list deadline itself.
  */
-ZTEST(bt_mesh_settings_store, test_generic_does_not_pull_rpl)
+static void bt_mesh_settings_store__test_generic_does_not_pull_rpl(void **cm_state)
 {
+	(void)cm_state;
 	bt_mesh_settings_store_schedule(BT_MESH_SETTINGS_RPL_PENDING);
-	k_sleep(K_MSEC(MARGIN_MS));
+	osi_sleep_ms(BT_MSEC(MARGIN_MS));
 
 	bt_mesh_settings_store_schedule(BT_MESH_SETTINGS_MOD_PENDING);
 
-	k_sleep(K_MSEC(STORE_TIMEOUT_MS + MARGIN_MS));
+	osi_sleep_ms(BT_MSEC(STORE_TIMEOUT_MS + MARGIN_MS));
 	assert_stored(BT_MESH_SETTINGS_MOD_PENDING);
 	assert_not_stored(BT_MESH_SETTINGS_RPL_PENDING);
 
-	k_sleep(K_MSEC(RPL_TIMEOUT_MS));
+	osi_sleep_ms(BT_MSEC(RPL_TIMEOUT_MS));
 	assert_stored(BT_MESH_SETTINGS_RPL_PENDING);
 }
 
 /** A no-wait store pending alongside RPL must not pull the replay list forward. */
-ZTEST(bt_mesh_settings_store, test_no_wait_does_not_pull_rpl)
+static void bt_mesh_settings_store__test_no_wait_does_not_pull_rpl(void **cm_state)
 {
+	(void)cm_state;
 	bt_mesh_settings_store_schedule(BT_MESH_SETTINGS_SRPL_PENDING);
-	k_sleep(K_MSEC(MARGIN_MS));
+	osi_sleep_ms(BT_MSEC(MARGIN_MS));
 
 	bt_mesh_settings_store_schedule(BT_MESH_SETTINGS_IV_PENDING);
 
-	k_sleep(K_MSEC(MARGIN_MS));
+	osi_sleep_ms(BT_MSEC(MARGIN_MS));
 	assert_stored(BT_MESH_SETTINGS_IV_PENDING);
 	assert_not_stored(BT_MESH_SETTINGS_SRPL_PENDING);
 
-	k_sleep(K_MSEC(RPL_TIMEOUT_MS));
+	osi_sleep_ms(BT_MSEC(RPL_TIMEOUT_MS));
 	assert_stored(BT_MESH_SETTINGS_SRPL_PENDING);
 }
 
 /** Both replay lists share one deadline, and each is stored only when flagged. */
-ZTEST(bt_mesh_settings_store, test_rpl_and_srpl_share_deadline)
+static void bt_mesh_settings_store__test_rpl_and_srpl_share_deadline(void **cm_state)
 {
+	(void)cm_state;
 	bt_mesh_settings_store_schedule(BT_MESH_SETTINGS_RPL_PENDING);
-	k_sleep(K_MSEC(STORE_TIMEOUT_MS));
+	osi_sleep_ms(BT_MSEC(STORE_TIMEOUT_MS));
 
 	bt_mesh_settings_store_schedule(BT_MESH_SETTINGS_SRPL_PENDING);
 
-	k_sleep(K_MSEC(RPL_TIMEOUT_MS - STORE_TIMEOUT_MS - MARGIN_MS));
+	osi_sleep_ms(BT_MSEC(RPL_TIMEOUT_MS - STORE_TIMEOUT_MS - MARGIN_MS));
 	assert_not_stored(BT_MESH_SETTINGS_RPL_PENDING);
 	assert_not_stored(BT_MESH_SETTINGS_SRPL_PENDING);
 
-	k_sleep(K_MSEC(2 * MARGIN_MS));
+	osi_sleep_ms(BT_MSEC(2 * MARGIN_MS));
 	assert_only_stored(rpl_flags, ARRAY_SIZE(rpl_flags));
 }
 
 /** A no-wait flag flushes the generic flags with it: they share one work item. */
-ZTEST(bt_mesh_settings_store, test_no_wait_flushes_generic)
+static void bt_mesh_settings_store__test_no_wait_flushes_generic(void **cm_state)
 {
+	(void)cm_state;
 	bt_mesh_settings_store_schedule(BT_MESH_SETTINGS_MOD_PENDING);
 	bt_mesh_settings_store_schedule(BT_MESH_SETTINGS_NET_PENDING);
 
-	k_sleep(K_MSEC(MARGIN_MS));
+	osi_sleep_ms(BT_MSEC(MARGIN_MS));
 	assert_stored(BT_MESH_SETTINGS_MOD_PENDING);
 	assert_stored(BT_MESH_SETTINGS_NET_PENDING);
 }
 #endif /* CONFIG_BT_SETTINGS */
 
 /** A cancelled flag is not stored when its deadline expires. */
-ZTEST(bt_mesh_settings_store, test_cancel_prevents_store)
+static void bt_mesh_settings_store__test_cancel_prevents_store(void **cm_state)
 {
+	(void)cm_state;
 	bt_mesh_settings_store_schedule(BT_MESH_SETTINGS_RPL_PENDING);
 	bt_mesh_settings_store_schedule(BT_MESH_SETTINGS_MOD_PENDING);
 
 	bt_mesh_settings_store_cancel(BT_MESH_SETTINGS_RPL_PENDING);
 	bt_mesh_settings_store_cancel(BT_MESH_SETTINGS_MOD_PENDING);
 
-	k_sleep(K_MSEC(RPL_TIMEOUT_MS + MARGIN_MS));
-	zassert_equal(total_stores(), 0, "cancelled flags were stored");
+	osi_sleep_ms(BT_MSEC(RPL_TIMEOUT_MS + MARGIN_MS));
+	assert_int_equal(total_stores(), 0);
 }
 
 /** bt_mesh_settings_store_pending() flushes every group without waiting. */
-ZTEST(bt_mesh_settings_store, test_store_pending_flushes_all_groups)
+static void bt_mesh_settings_store__test_store_pending_flushes_all_groups(void **cm_state)
 {
+	(void)cm_state;
 	int scheduled = 0;
 
 	for (int i = 0; i < BT_MESH_SETTINGS_FLAG_COUNT; i++) {
@@ -323,13 +329,14 @@ ZTEST(bt_mesh_settings_store, test_store_pending_flushes_all_groups)
 	/* Nothing may remain armed to fire afterwards. The two replay list flags
 	 * share one handler, so they account for a single store.
 	 */
-	k_sleep(K_MSEC(RPL_TIMEOUT_MS + MARGIN_MS));
-	zassert_equal(total_stores(), scheduled - 1, "flag stored twice");
+	osi_sleep_ms(BT_MSEC(RPL_TIMEOUT_MS + MARGIN_MS));
+	assert_int_equal(total_stores(), scheduled - 1);
 }
 
 /** Every flag of every group completes exactly once when all are pending together. */
-ZTEST(bt_mesh_settings_store, test_all_groups_complete)
+static void bt_mesh_settings_store__test_all_groups_complete(void **cm_state)
 {
+	(void)cm_state;
 	for (int i = 0; i < BT_MESH_SETTINGS_FLAG_COUNT; i++) {
 		if (!IS_ENABLED(CONFIG_BT_SETTINGS) && is_flag_settings_only(i)) {
 			continue;
@@ -338,11 +345,11 @@ ZTEST(bt_mesh_settings_store, test_all_groups_complete)
 		bt_mesh_settings_store_schedule(i);
 	}
 
-	k_sleep(K_MSEC(MARGIN_MS));
+	osi_sleep_ms(BT_MSEC(MARGIN_MS));
 	/* Only the solicitation list is still due; the no-wait flush took everything else. */
 	assert_not_stored(BT_MESH_SETTINGS_SRPL_PENDING);
 
-	k_sleep(K_MSEC(RPL_TIMEOUT_MS));
+	osi_sleep_ms(BT_MSEC(RPL_TIMEOUT_MS));
 	for (int i = 0; i < BT_MESH_SETTINGS_FLAG_COUNT; i++) {
 		if (!IS_ENABLED(CONFIG_BT_SETTINGS) && is_flag_settings_only(i)) {
 			continue;
@@ -352,4 +359,47 @@ ZTEST(bt_mesh_settings_store, test_all_groups_complete)
 	}
 }
 
-ZTEST_SUITE(bt_mesh_settings_store, NULL, suite_setup, test_setup, NULL, NULL);
+
+
+int bt_test_bt_mesh_settings_store_setup(void **state)
+{
+	int environment_result = bt_test_base_setup(state);
+
+	if (environment_result != 0) {
+		return environment_result;
+	}
+
+	*state = suite_setup();
+	return 0;
+}
+static int bt_test_bt_mesh_settings_store_before(void **state)
+{
+	(void)state;
+	test_setup(*state);
+	return 0;
+}
+
+
+static const struct CMUnitTest test_cases_bt_mesh_settings_store[] = {
+	cmocka_unit_test_setup_teardown(bt_mesh_settings_store__test_no_wait_stored_immediately, bt_test_bt_mesh_settings_store_before, NULL),
+	cmocka_unit_test_setup_teardown(bt_mesh_settings_store__test_rpl_stored_on_rpl_timeout, bt_test_bt_mesh_settings_store_before, NULL),
+#if (defined(CONFIG_BT_SETTINGS))
+	cmocka_unit_test_setup_teardown(bt_mesh_settings_store__test_generic_stored_on_store_timeout, bt_test_bt_mesh_settings_store_before, NULL),
+#endif
+#if (defined(CONFIG_BT_SETTINGS))
+	cmocka_unit_test_setup_teardown(bt_mesh_settings_store__test_generic_does_not_pull_rpl, bt_test_bt_mesh_settings_store_before, NULL),
+#endif
+#if (defined(CONFIG_BT_SETTINGS))
+	cmocka_unit_test_setup_teardown(bt_mesh_settings_store__test_no_wait_does_not_pull_rpl, bt_test_bt_mesh_settings_store_before, NULL),
+#endif
+#if (defined(CONFIG_BT_SETTINGS))
+	cmocka_unit_test_setup_teardown(bt_mesh_settings_store__test_rpl_and_srpl_share_deadline, bt_test_bt_mesh_settings_store_before, NULL),
+#endif
+#if (defined(CONFIG_BT_SETTINGS))
+	cmocka_unit_test_setup_teardown(bt_mesh_settings_store__test_no_wait_flushes_generic, bt_test_bt_mesh_settings_store_before, NULL),
+#endif
+	cmocka_unit_test_setup_teardown(bt_mesh_settings_store__test_cancel_prevents_store, bt_test_bt_mesh_settings_store_before, NULL),
+	cmocka_unit_test_setup_teardown(bt_mesh_settings_store__test_store_pending_flushes_all_groups, bt_test_bt_mesh_settings_store_before, NULL),
+	cmocka_unit_test_setup_teardown(bt_mesh_settings_store__test_all_groups_complete, bt_test_bt_mesh_settings_store_before, NULL),
+};
+BT_TEST_SUITE(bt_mesh_settings_store, test_cases_bt_mesh_settings_store, bt_test_bt_mesh_settings_store_setup, NULL);

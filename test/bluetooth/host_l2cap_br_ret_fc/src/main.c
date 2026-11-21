@@ -1,3 +1,6 @@
+#include "support/test_support.h"
+static const struct bt_hci_transport test_driver;
+#include "host/hci_core.h"
 /*
  * SPDX-FileCopyrightText: Copyright (c) 2026 Silicon Laboratories Inc.
  * SPDX-License-Identifier: Apache-2.0
@@ -7,29 +10,25 @@
 #include <stdint.h>
 #include <string.h>
 
-#include <zephyr/bluetooth/addr.h>
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/buf.h>
-#include <zephyr/bluetooth/classic/l2cap_br.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/hci.h>
-#include <zephyr/bluetooth/hci_types.h>
-#include <zephyr/bluetooth/l2cap.h>
-#include <zephyr/device.h>
-#include <zephyr/devicetree.h>
-#include <zephyr/drivers/bluetooth.h>
-#include <zephyr/kernel.h>
-#include <zephyr/net_buf.h>
-#include <zephyr/sys/atomic.h>
-#include <zephyr/sys/byteorder.h>
-#include <zephyr/sys/crc.h>
-#include <zephyr/sys/util.h>
-#include <zephyr/ztest.h>
+#include <embt/bluetooth/addr.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/buf.h>
+#include <embt/bluetooth/classic/l2cap_br.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/hci.h>
+#include <embt/bluetooth/hci_types.h>
+#include <embt/bluetooth/l2cap.h>
+#include <embt/drivers/bluetooth.h>
 
+#include <embt/net_buf.h>
+#include <embt/base/atomic.h>
+#include <embt/base/byteorder.h>
+#include <embt/base/crc.h>
+#include <embt/base/util.h>
+#include <embt/base/work.h>
 #include "host/conn_internal.h"
 #include "host/classic/l2cap_br_internal.h"
 
-#define DT_DRV_COMPAT zephyr_bt_hci_test
 
 #define GENERIC_RP_SIZE 64U
 #define ACL_MAX_LEN     310U
@@ -54,7 +53,12 @@
 #define FCS_POLY     0xa001U
 
 /* Shorter than the retransmission timeout, so no poll is sent meanwhile */
-#define TX_TIMEOUT K_MSEC(100)
+#define TX_TIMEOUT BT_MSEC(100)
+/* An expected packet may follow a 100 ms allocation retry plus native scheduling.
+ * Keep the observation budget below retransmission so that no poll is introduced.
+ */
+#define TX_COMPLETION_TIMEOUT BT_SECONDS(1)
+BUILD_ASSERT(1000 < CONFIG_BT_L2CAP_BR_RET_TIMEOUT);
 
 /* An SDU per case and two for the window case, which a case that fails keeps */
 NET_BUF_POOL_FIXED_DEFINE(sdu_pool, 6, BT_L2CAP_CHAN_SEND_RESERVE + sizeof(DATA),
@@ -68,20 +72,20 @@ NET_BUF_POOL_FIXED_DEFINE(sent_pool, CONFIG_BT_L2CAP_SIG_TX_BUF_COUNT + 2, ACL_M
 static struct bt_conn *conn;
 
 /* The L2CAP PDUs that the Host sent */
-static K_FIFO_DEFINE(sent);
+static BT_FIFO_DEFINE(sent);
 
 /* The controller has one ACL buffer, which it reports free again unless the
  * test holds it, as for a peer that does not acknowledge at the baseband.
  * Counted per connection handle.
  */
-static atomic_t unreported[2];
+static bt_atomic_t unreported[2];
 static bool hold;
 
 /* The buffers of the Host that the driver keeps, as one sending them later does */
-static K_FIFO_DEFINE(kept);
+static BT_FIFO_DEFINE(kept);
 static bool keep;
 
-static K_SEM_DEFINE(echo_sem, 0, 1);
+static os_sem_t echo_sem;
 
 static void evt_create(struct net_buf *buf, uint8_t evt, uint8_t len)
 {
@@ -96,7 +100,7 @@ static void *cmd_complete(struct net_buf **buf, uint8_t plen, uint16_t opcode)
 {
 	struct bt_hci_evt_cmd_complete *cc;
 
-	*buf = bt_buf_get_evt(BT_HCI_EVT_CMD_COMPLETE, false, K_FOREVER);
+	*buf = bt_buf_get_evt(BT_HCI_EVT_CMD_COMPLETE, false, BT_FOREVER);
 	evt_create(*buf, BT_HCI_EVT_CMD_COMPLETE, sizeof(*cc) + plen);
 	cc = net_buf_add(*buf, sizeof(*cc));
 	cc->ncmd = 1U;
@@ -173,7 +177,7 @@ static void le_read_supp_states(struct net_buf **evt, uint16_t opcode)
 	(void)memset(rp->le_states, 0xFF, sizeof(rp->le_states));
 }
 
-static void cmd_handle(const struct device *dev, struct net_buf *cmd)
+static void cmd_handle(const struct bt_hci_transport *dev, struct net_buf *cmd)
 {
 	struct net_buf *evt = NULL;
 	struct bt_hci_cmd_hdr *hdr;
@@ -212,10 +216,10 @@ static void cmd_handle(const struct device *dev, struct net_buf *cmd)
 	bt_hci_recv(dev, evt);
 }
 
-static void completed_handler(struct k_work *work)
+static void completed_handler(struct bt_work *work)
 {
-	const struct device *dev = DEVICE_DT_GET(DT_DRV_INST(0));
-	atomic_val_t count[ARRAY_SIZE(unreported)];
+	const struct bt_hci_transport *dev = &test_driver;
+	bt_atomic_val_t count[ARRAY_SIZE(unreported)];
 	struct bt_hci_evt_num_completed_packets *ev;
 	struct bt_hci_handle_count *hc;
 	uint8_t num_handles = 0U;
@@ -224,7 +228,7 @@ static void completed_handler(struct k_work *work)
 	ARG_UNUSED(work);
 
 	ARRAY_FOR_EACH(unreported, i) {
-		count[i] = atomic_clear(&unreported[i]);
+		count[i] = bt_atomic_clear(&unreported[i]);
 		if (count[i] != 0) {
 			num_handles++;
 		}
@@ -234,7 +238,7 @@ static void completed_handler(struct k_work *work)
 		return;
 	}
 
-	evt = bt_buf_get_evt(BT_HCI_EVT_NUM_COMPLETED_PACKETS, false, K_FOREVER);
+	evt = bt_buf_get_evt(BT_HCI_EVT_NUM_COMPLETED_PACKETS, false, BT_FOREVER);
 	evt_create(evt, BT_HCI_EVT_NUM_COMPLETED_PACKETS,
 		   sizeof(*ev) + (num_handles * sizeof(*hc)));
 	ev = net_buf_add(evt, sizeof(*ev));
@@ -251,12 +255,12 @@ static void completed_handler(struct k_work *work)
 	bt_hci_recv(dev, evt);
 }
 
-static K_WORK_DEFINE(completed_work, completed_handler);
+static BT_WORK_DEFINE(completed_work, completed_handler);
 
 static void release(void)
 {
 	hold = false;
-	zassert_true(k_work_submit(&completed_work) >= 0);
+	assert_true(bt_work_submit(&completed_work) >= 0);
 }
 
 static void acl_handle(struct net_buf *acl)
@@ -268,27 +272,27 @@ static void acl_handle(struct net_buf *acl)
 	/* Every PDU fits a single ACL packet */
 	hdr = net_buf_pull_mem(acl, sizeof(*hdr));
 	handle = bt_acl_handle(sys_le16_to_cpu(hdr->handle));
-	zassert_true((handle == HANDLE) || (handle == OTHER_HANDLE), "handle %u", handle);
+	assert_true((handle == HANDLE) || (handle == OTHER_HANDLE));
 
-	pdu = net_buf_alloc(&sent_pool, K_NO_WAIT);
-	zassert_not_null(pdu);
+	pdu = net_buf_alloc(&sent_pool, BT_NO_WAIT);
+	assert_non_null(pdu);
 	(void)net_buf_add_mem(pdu, acl->data, acl->len);
-	k_fifo_put(&sent, pdu);
+	bt_fifo_put(&sent, pdu);
 
-	(void)atomic_inc(&unreported[handle - HANDLE]);
+	(void)bt_atomic_inc(&unreported[handle - HANDLE]);
 	if (!hold) {
-		zassert_true(k_work_submit(&completed_work) >= 0);
+		assert_true(bt_work_submit(&completed_work) >= 0);
 	}
 }
 
-static int driver_open(const struct device *dev)
+static int driver_open(const struct bt_hci_transport *dev)
 {
 	ARG_UNUSED(dev);
 
 	return 0;
 }
 
-static int driver_send(const struct device *dev, struct net_buf *buf)
+static int driver_send(const struct bt_hci_transport *dev, struct net_buf *buf)
 {
 	uint8_t type = net_buf_pull_u8(buf);
 
@@ -298,7 +302,7 @@ static int driver_send(const struct device *dev, struct net_buf *buf)
 		acl_handle(buf);
 
 		if (keep) {
-			k_fifo_put(&kept, buf);
+			bt_fifo_put(&kept, buf);
 			return 0;
 		}
 	}
@@ -308,19 +312,22 @@ static int driver_send(const struct device *dev, struct net_buf *buf)
 	return 0;
 }
 
-static DEVICE_API(bt_hci, driver_api) = {
+static const struct bt_hci_driver_api driver_api = {
 	.open = driver_open,
 	.send = driver_send,
 };
 
-#define TEST_DEVICE_INIT(inst)                                                                     \
-	static struct bt_hci_driver_data driver_data_##inst = {0};                                 \
-	static const struct bt_hci_driver_config driver_config_##inst =                            \
-		BT_DT_HCI_DRIVER_CONFIG_INST_GET(inst);                                            \
-	DEVICE_DT_INST_DEFINE(inst, NULL, NULL, &driver_data_##inst, &driver_config_##inst,        \
-			      POST_KERNEL, CONFIG_KERNEL_INIT_PRIORITY_DEVICE, &driver_api)
+static struct bt_hci_driver_data test_driver_data;
+static const struct bt_hci_transport test_driver = {
+ .name = "upstream-test", .bus = 0,
+ .api = &driver_api, .data = &test_driver_data,
+};
+static void test_transport_init(void)
+{
+ bt_test_require(bt_stack_init());
+ bt_dev.hci = &test_driver;
+}
 
-DT_INST_FOREACH_STATUS_OKAY(TEST_DEVICE_INIT)
 
 static void unkeep(void)
 {
@@ -328,7 +335,7 @@ static void unkeep(void)
 
 	keep = false;
 
-	while ((buf = k_fifo_get(&kept, K_NO_WAIT)) != NULL) {
+	while ((buf = bt_fifo_get(&kept, BT_NO_WAIT)) != NULL) {
 		net_buf_unref(buf);
 	}
 }
@@ -338,8 +345,14 @@ static struct net_buf *tx(void)
 {
 	struct net_buf *buf;
 
-	buf = k_fifo_get(&sent, TX_TIMEOUT);
-	zassert_not_null(buf, "Nothing sent");
+	buf = bt_fifo_get(&sent, TX_COMPLETION_TIMEOUT);
+	assert_non_null(buf);
+	/* FIFO publication precedes the driver's return. Observe that TX pass and its
+	 * system-queue completion callbacks before checking channel state.
+	 */
+	bt_dev_lock();
+	bt_dev_unlock();
+	assert_int_equal(bt_work_queue_drain(&bt_sys_work_q, false), 0);
 
 	return buf;
 }
@@ -357,15 +370,14 @@ static uint8_t tx_sig(uint8_t code, void *data, size_t len)
 	buf = tx();
 
 	hdr = net_buf_pull_mem(buf, sizeof(*hdr));
-	zassert_equal(sys_le16_to_cpu(hdr->cid), BT_L2CAP_CID_BR_SIG, "cid 0x%04x",
-		      sys_le16_to_cpu(hdr->cid));
+	assert_int_equal(sys_le16_to_cpu(hdr->cid), BT_L2CAP_CID_BR_SIG);
 
 	sig = net_buf_pull_mem(buf, sizeof(*sig));
-	zassert_equal(sig->code, code, "code 0x%02x", sig->code);
+	assert_int_equal(sig->code, code);
 	ident = sig->ident;
 
 	if (len > 0U) {
-		zassert_true(buf->len >= len);
+		assert_true(buf->len >= len);
 		(void)memcpy(data, buf->data, len);
 	}
 
@@ -379,7 +391,7 @@ static struct net_buf *rx_frame(void)
 {
 	struct net_buf *buf;
 
-	buf = bt_buf_get_rx(BT_BUF_ACL_IN, K_FOREVER);
+	buf = bt_buf_get_rx(BT_BUF_ACL_IN, BT_FOREVER);
 	(void)net_buf_add(buf, sizeof(struct bt_hci_acl_hdr));
 
 	return buf;
@@ -393,8 +405,8 @@ static void recv_frame(struct net_buf *buf, uint16_t handle)
 	acl->handle = sys_cpu_to_le16(bt_acl_handle_pack(handle, BT_ACL_START));
 	acl->len = sys_cpu_to_le16(buf->len - L2CAP_HDR_OFFSET);
 
-	bt_hci_recv(DEVICE_DT_GET(DT_DRV_INST(0)), buf);
-	(void)k_sleep(K_MSEC(1));
+	bt_hci_recv(&test_driver, buf);
+	assert_int_equal(bt_host_work_drain(), 0);
 }
 
 static struct net_buf *sig_cmd(uint8_t code, uint8_t ident)
@@ -461,7 +473,7 @@ static void take_sig_bufs(uint16_t handle)
 static void expect_info_rsps(void)
 {
 	for (uint8_t i = 0U; i < CONFIG_BT_L2CAP_SIG_TX_BUF_COUNT; i++) {
-		zassert_equal(tx_sig(BT_L2CAP_INFO_RSP, NULL, 0U), PEER_IDENT);
+		assert_int_equal(tx_sig(BT_L2CAP_INFO_RSP, NULL, 0U), PEER_IDENT);
 	}
 }
 
@@ -486,7 +498,7 @@ static void chan_connect(struct bt_l2cap_br_chan *chan, uint16_t peer_cid, uint8
 	chan->rx.mode = BT_L2CAP_BR_LINK_MODE_ERET;
 	chan->rx.fcs = BT_L2CAP_BR_FCS_16BIT;
 	chan->rx.max_transmit = 1U;
-	zassert_ok(bt_l2cap_chan_connect(conn, &chan->chan, SDP_PSM));
+	assert_int_equal(bt_l2cap_chan_connect(conn, &chan->chan, SDP_PSM), 0);
 
 	ident = tx_sig(BT_L2CAP_CONN_REQ, NULL, 0U);
 	buf = sig_cmd(BT_L2CAP_CONN_RSP, ident);
@@ -512,7 +524,7 @@ static void chan_connect(struct bt_l2cap_br_chan *chan, uint16_t peer_cid, uint8
 	net_buf_add_le16(buf, PEER_MPS);
 	recv_sig(buf);
 
-	zassert_equal(tx_sig(BT_L2CAP_CONF_RSP, NULL, 0U), PEER_IDENT);
+	assert_int_equal(tx_sig(BT_L2CAP_CONF_RSP, NULL, 0U), PEER_IDENT);
 
 	buf = sig_cmd(BT_L2CAP_CONF_RSP, ident);
 	net_buf_add_le16(buf, chan->rx.cid);
@@ -520,23 +532,23 @@ static void chan_connect(struct bt_l2cap_br_chan *chan, uint16_t peer_cid, uint8
 	net_buf_add_le16(buf, BT_L2CAP_CONF_SUCCESS);
 	recv_sig(buf);
 
-	zassert_equal(chan->state, BT_L2CAP_CONNECTED);
-	zassert_equal(chan->tx.mode, BT_L2CAP_BR_LINK_MODE_ERET);
-	zassert_equal(chan->tx.max_transmit, max_transmit);
-	zassert_equal(chan->tx.max_window, window);
-	zassert_equal(chan->rx.fcs, BT_L2CAP_BR_FCS_16BIT);
+	assert_int_equal(chan->state, BT_L2CAP_CONNECTED);
+	assert_int_equal(chan->tx.mode, BT_L2CAP_BR_LINK_MODE_ERET);
+	assert_int_equal(chan->tx.max_transmit, max_transmit);
+	assert_int_equal(chan->tx.max_window, window);
+	assert_int_equal(chan->rx.fcs, BT_L2CAP_BR_FCS_16BIT);
 }
 
 static void send_sdu(struct bt_l2cap_br_chan *chan)
 {
 	struct net_buf *buf;
 
-	buf = net_buf_alloc(&sdu_pool, K_NO_WAIT);
-	zassert_not_null(buf);
+	buf = net_buf_alloc(&sdu_pool, BT_NO_WAIT);
+	assert_non_null(buf);
 	net_buf_reserve(buf, BT_L2CAP_CHAN_SEND_RESERVE);
 	(void)net_buf_add_mem(buf, DATA, strlen(DATA));
 
-	zassert_ok(bt_l2cap_chan_send(&chan->chan, buf));
+	assert_int_equal(bt_l2cap_chan_send(&chan->chan, buf), 0);
 }
 
 /* Send an I-frame, which the peer asks for again: a second transmission would
@@ -554,7 +566,7 @@ static void lose_chan(struct bt_l2cap_br_chan *chan, uint16_t peer_cid)
 
 	buf = tx();
 	hdr = net_buf_pull_mem(buf, sizeof(*hdr));
-	zassert_equal(sys_le16_to_cpu(hdr->cid), peer_cid);
+	assert_int_equal(sys_le16_to_cpu(hdr->cid), peer_cid);
 	net_buf_unref(buf);
 
 	recv_s_frame(chan, BT_L2CAP_CONTROL_S_SREJ, 0U);
@@ -564,10 +576,12 @@ static void expect_disconn_req(struct bt_l2cap_br_chan *chan, uint16_t peer_cid)
 {
 	struct bt_l2cap_disconn_req req;
 
-	zassert_equal(tx_sig(BT_L2CAP_DISCONN_REQ, &req, sizeof(req)), chan->ident);
-	zassert_equal(sys_le16_to_cpu(req.dcid), peer_cid);
-	zassert_equal(sys_le16_to_cpu(req.scid), chan->rx.cid);
-	zassert_equal(chan->state, BT_L2CAP_DISCONNECTING);
+	uint8_t ident = tx_sig(BT_L2CAP_DISCONN_REQ, &req, sizeof(req));
+
+	assert_int_equal(ident, chan->ident);
+	assert_int_equal(sys_le16_to_cpu(req.dcid), peer_cid);
+	assert_int_equal(sys_le16_to_cpu(req.scid), chan->rx.cid);
+	assert_int_equal(chan->state, BT_L2CAP_DISCONNECTING);
 }
 
 /* The peer agrees, which removes the channel */
@@ -583,7 +597,7 @@ static void recv_disconn_rsp(struct bt_l2cap_br_chan *chan, uint16_t peer_cid)
 
 static void echo_req(struct bt_conn *c, uint8_t identifier, struct net_buf *buf)
 {
-	k_sem_give(&echo_sem);
+	osi_sem_give(&echo_sem);
 }
 
 static struct bt_l2cap_br_echo_cb echo_cb = {
@@ -596,12 +610,12 @@ static void *setup(void)
 	struct net_buf *buf;
 	uint8_t ident;
 
-	zassert_ok(bt_enable(NULL));
-	zassert_ok(bt_l2cap_br_echo_cb_register(&echo_cb));
+	assert_int_equal(bt_enable(NULL), 0);
+	assert_int_equal(bt_l2cap_br_echo_cb_register(&echo_cb), 0);
 
 	/* As on Connection Complete */
 	conn = bt_conn_add_br(&addr);
-	zassert_not_null(conn);
+	assert_non_null(conn);
 	conn->handle = HANDLE;
 	bt_conn_set_state(conn, BT_CONN_CONNECTED);
 	bt_l2cap_br_connected(conn);
@@ -616,7 +630,7 @@ static void *setup(void)
 	return NULL;
 }
 
-ZTEST_SUITE(l2cap_br_ret_fc, NULL, setup, NULL, NULL, NULL);
+
 
 /* The fallback of a signalling buffer allocation is empty */
 static void take_acl_bufs(sys_slist_t *taken)
@@ -625,7 +639,7 @@ static void take_acl_bufs(sys_slist_t *taken)
 
 	sys_slist_init(taken);
 
-	while ((buf = bt_conn_create_pdu_timeout(NULL, 0U, K_NO_WAIT)) != NULL) {
+	while ((buf = bt_conn_create_pdu_timeout(NULL, 0U, BT_NO_WAIT)) != NULL) {
 		net_buf_slist_put(taken, buf);
 	}
 }
@@ -642,8 +656,9 @@ static void give_acl_bufs(sys_slist_t *taken)
 /* A channel lost to MaxTransmit is disconnected, although signalling responses
  * queued behind it hold every signalling buffer: the TX processor sends them first.
  */
-static ZTEST(l2cap_br_ret_fc, test_max_transmit)
+static void l2cap_br_ret_fc__test_max_transmit(void **cm_state)
 {
+	(void)cm_state;
 	static struct bt_l2cap_br_chan chan;
 
 	chan_connect(&chan, PEER_CID, 1U, 1U);
@@ -662,8 +677,9 @@ static ZTEST(l2cap_br_ret_fc, test_max_transmit)
 /* The Disconnection Request of a lost channel waits for no buffer, neither on
  * the TX processor nor on the Bluetooth work queue: it follows once one is free.
  */
-static ZTEST(l2cap_br_ret_fc, test_max_transmit_no_buf)
+static void l2cap_br_ret_fc__test_max_transmit_no_buf(void **cm_state)
 {
+	(void)cm_state;
 	static struct bt_l2cap_br_chan chan;
 	struct net_buf *buf;
 	sys_slist_t taken;
@@ -682,10 +698,10 @@ static ZTEST(l2cap_br_ret_fc, test_max_transmit_no_buf)
 	/* The Bluetooth work queue still runs */
 	buf = sig_cmd(BT_L2CAP_ECHO_REQ, PEER_IDENT);
 	recv_sig(buf);
-	zassert_ok(k_sem_take(&echo_sem, TX_TIMEOUT));
+	assert_int_equal(osi_sem_take(&echo_sem, TX_TIMEOUT), 0);
 
-	zassert_is_null(k_fifo_get(&sent, TX_TIMEOUT));
-	zassert_equal(chan.state, BT_L2CAP_CONNECTED);
+	assert_null(bt_fifo_get(&sent, TX_TIMEOUT));
+	assert_int_equal(chan.state, BT_L2CAP_CONNECTED);
 
 	unkeep();
 	expect_disconn_req(&chan, PEER_CID + 1U);
@@ -697,8 +713,9 @@ static ZTEST(l2cap_br_ret_fc, test_max_transmit_no_buf)
 /* Nothing more is sent on a lost channel, although its window has room for a
  * pending SDU.
  */
-static ZTEST(l2cap_br_ret_fc, test_max_transmit_stops_tx)
+static void l2cap_br_ret_fc__test_max_transmit_stops_tx(void **cm_state)
 {
+	(void)cm_state;
 	static struct bt_l2cap_br_chan chan;
 
 	chan_connect(&chan, PEER_CID + 2U, 2U, 1U);
@@ -710,14 +727,15 @@ static ZTEST(l2cap_br_ret_fc, test_max_transmit_stops_tx)
 
 	expect_info_rsps();
 	expect_disconn_req(&chan, PEER_CID + 2U);
-	zassert_is_null(k_fifo_get(&sent, TX_TIMEOUT));
+	assert_null(bt_fifo_get(&sent, TX_TIMEOUT));
 
 	recv_disconn_rsp(&chan, PEER_CID + 2U);
 }
 
 /* The largest MaxTransmit allows that many transmissions, and no more */
-static ZTEST(l2cap_br_ret_fc, test_max_transmit_255)
+static void l2cap_br_ret_fc__test_max_transmit_255(void **cm_state)
 {
+	(void)cm_state;
 	static struct bt_l2cap_br_chan chan;
 	struct bt_l2cap_hdr *hdr;
 	struct net_buf *buf;
@@ -728,7 +746,7 @@ static ZTEST(l2cap_br_ret_fc, test_max_transmit_255)
 	for (uint16_t i = 0U; i < UINT8_MAX; i++) {
 		buf = tx();
 		hdr = net_buf_pull_mem(buf, sizeof(*hdr));
-		zassert_equal(sys_le16_to_cpu(hdr->cid), PEER_CID + 3U, "transmission %u", i);
+		assert_int_equal(sys_le16_to_cpu(hdr->cid), PEER_CID + 3U);
 		net_buf_unref(buf);
 
 		recv_s_frame(&chan, BT_L2CAP_CONTROL_S_SREJ, 0U);
@@ -741,8 +759,9 @@ static ZTEST(l2cap_br_ret_fc, test_max_transmit_255)
 /* A lost channel does not hold up another link, whose queued signalling responses
  * hold every signalling buffer that the Disconnection Request needs.
  */
-static ZTEST(l2cap_br_ret_fc, test_max_transmit_other_link)
+static void l2cap_br_ret_fc__test_max_transmit_other_link(void **cm_state)
 {
+	(void)cm_state;
 	static const bt_addr_t addr = { .val = { 0x11, 0x12, 0x13, 0x14, 0x15, 0x16 } };
 	static struct bt_l2cap_br_chan chan;
 	struct bt_conn *other;
@@ -751,11 +770,11 @@ static ZTEST(l2cap_br_ret_fc, test_max_transmit_other_link)
 	uint8_t ident;
 
 	if (CONFIG_BT_MAX_CONN < 2) {
-		ztest_test_skip();
+		skip();
 	}
 
 	other = bt_conn_add_br(&addr);
-	zassert_not_null(other);
+	assert_non_null(other);
 	other->handle = OTHER_HANDLE;
 	bt_conn_set_state(other, BT_CONN_CONNECTED);
 	bt_l2cap_br_connected(other);
@@ -780,3 +799,44 @@ static ZTEST(l2cap_br_ret_fc, test_max_transmit_other_link)
 
 	give_acl_bufs(&taken);
 }
+
+static void storage_init_18ffcfc67e(void)
+{
+	net_buf_pool_init(&sdu_pool);
+	net_buf_pool_init(&sent_pool);
+	bt_fifo_init(&sent);
+	bt_fifo_init(&kept);
+	bt_test_require(osi_sem_init(&echo_sem, 0, 1));
+}
+
+static void migrated_pools_init(void)
+{
+	net_buf_pool_init(&sdu_pool);
+	net_buf_pool_init(&sent_pool);
+}
+
+int bt_test_l2cap_br_ret_fc_setup(void **state)
+{
+	int environment_result = bt_test_host_setup(state);
+
+	if (environment_result != 0) {
+		return environment_result;
+	}
+
+	migrated_pools_init();
+	test_transport_init();
+	storage_init_18ffcfc67e();
+	*state = setup();
+	return 0;
+}
+
+
+
+static const struct CMUnitTest test_cases_l2cap_br_ret_fc[] = {
+	cmocka_unit_test(l2cap_br_ret_fc__test_max_transmit),
+	cmocka_unit_test(l2cap_br_ret_fc__test_max_transmit_no_buf),
+	cmocka_unit_test(l2cap_br_ret_fc__test_max_transmit_stops_tx),
+	cmocka_unit_test(l2cap_br_ret_fc__test_max_transmit_255),
+	cmocka_unit_test(l2cap_br_ret_fc__test_max_transmit_other_link),
+};
+BT_TEST_SUITE(l2cap_br_ret_fc, test_cases_l2cap_br_ret_fc, bt_test_l2cap_br_ret_fc_setup, NULL);

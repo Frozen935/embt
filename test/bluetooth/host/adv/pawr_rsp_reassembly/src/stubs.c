@@ -1,3 +1,4 @@
+#include "support/test_support.h"
 /*
  * Copyright (c) 2026 NXP
  *
@@ -15,16 +16,16 @@
 #include <stdint.h>
 #include <string.h>
 
-#include <zephyr/bluetooth/addr.h>
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/hci.h>
-#include <zephyr/bluetooth/hci_types.h>
-#include <zephyr/kernel.h>
-#include <zephyr/net_buf.h>
-#include <zephyr/fff.h>
+#include <embt/bluetooth/addr.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/hci.h>
+#include <embt/bluetooth/hci_types.h>
 
-#include <host/hci_core.h>
+#include <embt/net_buf.h>
+#include <fff.h>
+
+#include "host/hci_core.h"
 #include <host/conn_internal.h>
 
 /* Required by the shared host_mocks assert helper (uses the fff framework). */
@@ -52,53 +53,38 @@ void bt_addr_le_copy_resolved(bt_addr_le_t *dst, const bt_addr_le_t *src)
 	*dst = *src;
 }
 
-/*
- * Backing storage for the net_buf returned by bt_hci_cmd_alloc(). A single
- * static buffer is sufficient because the command is fully consumed by
- * bt_hci_cmd_send_sync() before the next allocation.
- */
-static uint8_t cmd_buf_storage[128];
-static struct net_buf test_cmd_buf;
-
-/* Backing storage for the response returned by bt_hci_cmd_send_sync(). */
-static struct bt_hci_rp_le_set_ext_adv_param cmd_rsp_payload;
-static uint8_t rsp_buf_storage[sizeof(cmd_rsp_payload)];
-static struct net_buf test_rsp_buf;
-
-struct net_buf *bt_hci_cmd_alloc(k_timeout_t timeout)
+/* Command and response ownership follows the real net_buf pool contract. */
+NET_BUF_POOL_FIXED_DEFINE(test_commands, 2, 128, 0, NULL);
+NET_BUF_POOL_FIXED_DEFINE(test_responses, 2, sizeof(struct bt_hci_rp_le_set_ext_adv_param), 0, NULL);
+static bool pools_initialized;
+static void command_pools_init(void)
 {
-	ARG_UNUSED(timeout);
-
-	net_buf_simple_init_with_data(&test_cmd_buf.b, cmd_buf_storage,
-				      sizeof(cmd_buf_storage));
-	net_buf_simple_reset(&test_cmd_buf.b);
-
-	return &test_cmd_buf;
+ if (!pools_initialized) {
+  net_buf_pool_init(&test_commands);
+  net_buf_pool_init(&test_responses);
+  pools_initialized = true;
+ }
 }
-
+struct net_buf *bt_hci_cmd_alloc(bt_timeout_t timeout)
+{
+ command_pools_init();
+ return net_buf_alloc(&test_commands, timeout);
+}
 int bt_hci_cmd_send_sync(uint16_t opcode, struct net_buf *buf, struct net_buf **rsp)
 {
-	ARG_UNUSED(opcode);
-	ARG_UNUSED(buf);
-
-	if (rsp != NULL) {
-		cmd_rsp_payload.status = 0;
-		cmd_rsp_payload.tx_power = 0;
-
-		net_buf_simple_init_with_data(&test_rsp_buf.b, rsp_buf_storage,
-					      sizeof(rsp_buf_storage));
-		net_buf_simple_reset(&test_rsp_buf.b);
-		net_buf_simple_add_mem(&test_rsp_buf.b, &cmd_rsp_payload,
-				       sizeof(cmd_rsp_payload));
-
-		*rsp = &test_rsp_buf;
-	}
-
-	return 0;
+ (void)opcode;
+ if (buf) { net_buf_unref(buf); }
+ if (rsp) {
+  const struct bt_hci_rp_le_set_ext_adv_param response = {0};
+  *rsp = net_buf_alloc(&test_responses, BT_NO_WAIT);
+  if (!*rsp) { return -ENOMEM; }
+  net_buf_add_mem(*rsp, &response, sizeof(response));
+ }
+ return 0;
 }
 
 void bt_hci_cmd_state_set_init(struct net_buf *buf, struct bt_hci_cmd_state_set *state,
-			       atomic_t *target, int bit, bool val)
+			       bt_atomic_t *target, int bit, bool val)
 {
 	ARG_UNUSED(buf);
 	ARG_UNUSED(state);
@@ -107,10 +93,7 @@ void bt_hci_cmd_state_set_init(struct net_buf *buf, struct bt_hci_cmd_state_set 
 	ARG_UNUSED(val);
 }
 
-void net_buf_unref(struct net_buf *buf)
-{
-	ARG_UNUSED(buf);
-}
+
 
 int bt_get_df_cte_type(uint8_t hci_cte_type)
 {
@@ -233,39 +216,24 @@ void bt_conn_unref(struct bt_conn *conn)
 	ARG_UNUSED(conn);
 }
 
-int k_work_reschedule(struct k_work_delayable *dwork, k_timeout_t delay)
-{
-	ARG_UNUSED(dwork);
-	ARG_UNUSED(delay);
 
-	return 0;
+
+
+
+
+
+
+
+
+
+
+int bt_host_work_reschedule(struct bt_work_delayable *work, bt_timeout_t delay)
+{
+ return bt_work_reschedule(work, delay);
 }
-
-int k_work_cancel_delayable(struct k_work_delayable *dwork)
+enum bt_le_addr_res_support bt_le_bond_addr_res_support(uint8_t id, const bt_addr_le_t *peer)
 {
-	ARG_UNUSED(dwork);
-
-	return 0;
-}
-
-int bt_work_reschedule(struct k_work_delayable *dwork, k_timeout_t delay)
-{
-	ARG_UNUSED(dwork);
-	ARG_UNUSED(delay);
-
-	return 0;
-}
-
-int bt_work_cancel_delayable(struct k_work_delayable *dwork)
-{
-	ARG_UNUSED(dwork);
-
-	return 0;
-}
-
-
-void k_work_init_delayable(struct k_work_delayable *dwork, k_work_handler_t handler)
-{
-	ARG_UNUSED(dwork);
-	ARG_UNUSED(handler);
+ (void)id; (void)peer;
+ fail_msg("Unexpected bonded-peer query in PAwR report reassembly test");
+ return BT_LE_ADDR_RES_SUPPORT_UNKNOWN;
 }

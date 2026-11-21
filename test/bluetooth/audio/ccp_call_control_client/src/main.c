@@ -1,3 +1,6 @@
+#include "support/test_support.h"
+#include "test_environment.h"
+
 /* main.c - Application main entry point */
 
 /*
@@ -10,14 +13,11 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <zephyr/autoconf.h>
-#include <zephyr/bluetooth/audio/ccp.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/hci_types.h>
-#include <zephyr/sys/util_macro.h>
-#include <zephyr/ztest_test.h>
-#include <zephyr/ztest_assert.h>
-
+#include <embt/autoconf.h>
+#include <embt/bluetooth/audio/ccp.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/hci_types.h>
+#include <embt/base/util_macro.h>
 #include "conn.h"
 #include "expects_util.h"
 #include "test_common.h"
@@ -38,21 +38,21 @@ static void discover_cb(struct bt_ccp_call_control_client *client, int err,
 {
 	struct ccp_call_control_client_test_suite_fixture *fixture = user_data;
 
-	zassert_not_null(client);
-	zassert_equal(err, 0);
-	zassert_not_null(bearers);
-	zassert_not_null(user_data);
-	zassert_is_null(fixture->bearers[0]); /* expect only a single call */
+	assert_non_null(client);
+	assert_int_equal(err, 0);
+	assert_non_null(bearers);
+	assert_non_null(user_data);
+	assert_null(fixture->bearers[0]); /* expect only a single call */
 
 #if defined(CONFIG_BT_TBS_CLIENT_GTBS)
-	zassert_not_null(bearers->gtbs_bearer);
+	assert_non_null(bearers->gtbs_bearer);
 	fixture->bearers[0] = bearers->gtbs_bearer;
 #endif /* CONFIG_BT_TBS_CLIENT_GTBS */
 
 #if defined(CONFIG_BT_TBS_CLIENT_TBS)
-	zassert_equal(CONFIG_BT_TBS_CLIENT_MAX_TBS_INSTANCES, bearers->tbs_count);
+	assert_int_equal(CONFIG_BT_TBS_CLIENT_MAX_TBS_INSTANCES, bearers->tbs_count);
 	for (size_t i = 0U; i < bearers->tbs_count; i++) {
-		zassert_not_null(bearers->tbs_bearers[i]);
+		assert_non_null(bearers->tbs_bearers[i]);
 		fixture->bearers[i + IS_ENABLED(CONFIG_BT_TBS_CLIENT_GTBS)] =
 			bearers->tbs_bearers[i];
 	}
@@ -64,7 +64,7 @@ static void *ccp_call_control_client_test_suite_setup(void)
 	struct ccp_call_control_client_test_suite_fixture *fixture;
 
 	fixture = malloc(sizeof(*fixture));
-	zassert_not_null(fixture);
+	assert_non_null(fixture);
 
 	return fixture;
 }
@@ -93,131 +93,176 @@ static void ccp_call_control_client_test_suite_teardown(void *f)
 	free(f);
 }
 
-ZTEST_SUITE(ccp_call_control_client_test_suite, NULL, ccp_call_control_client_test_suite_setup,
-	    ccp_call_control_client_test_suite_before, ccp_call_control_client_test_suite_after,
-	    ccp_call_control_client_test_suite_teardown);
 
-static ZTEST_F(ccp_call_control_client_test_suite, test_ccp_call_control_client_register_cb)
+
+static void ccp_call_control_client_test_suite__test_ccp_call_control_client_register_cb(void **cm_state)
 {
+	struct ccp_call_control_client_test_suite_fixture *fixture = *cm_state;
 	int err;
 
 	err = bt_ccp_call_control_client_register_cb(&fixture->client_cbs);
-	zassert_equal(0, err, "Unexpected return value %d", err);
+	assert_int_equal(0, err);
 }
 
-static ZTEST_F(ccp_call_control_client_test_suite,
-	       test_ccp_call_control_client_register_cb_inval_param_null)
+static void ccp_call_control_client_test_suite__test_ccp_call_control_client_register_cb_inval_param_null(void **cm_state)
 {
+	struct ccp_call_control_client_test_suite_fixture *fixture = *cm_state;
 	int err;
 
 	err = bt_ccp_call_control_client_register_cb(NULL);
-	zassert_equal(-EINVAL, err, "Unexpected return value %d", err);
+	assert_int_equal(-EINVAL, err);
 }
 
-static ZTEST_F(ccp_call_control_client_test_suite,
-	       test_ccp_call_control_client_register_cb_inval_double_register)
+static void ccp_call_control_client_test_suite__test_ccp_call_control_client_register_cb_inval_double_register(void **cm_state)
 {
+	struct ccp_call_control_client_test_suite_fixture *fixture = *cm_state;
 	int err;
 
 	err = bt_ccp_call_control_client_register_cb(&fixture->client_cbs);
-	zassert_equal(0, err, "Unexpected return value %d", err);
+	assert_int_equal(0, err);
 
 	err = bt_ccp_call_control_client_register_cb(&fixture->client_cbs);
-	zassert_equal(-EEXIST, err, "Unexpected return value %d", err);
+	assert_int_equal(-EEXIST, err);
 }
 
-static ZTEST_F(ccp_call_control_client_test_suite, test_ccp_call_control_client_unregister_cb)
+static void ccp_call_control_client_test_suite__test_ccp_call_control_client_unregister_cb(void **cm_state)
 {
+	struct ccp_call_control_client_test_suite_fixture *fixture = *cm_state;
 	int err;
 
 	err = bt_ccp_call_control_client_register_cb(&fixture->client_cbs);
-	zassert_equal(0, err, "Unexpected return value %d", err);
+	assert_int_equal(0, err);
 
 	err = bt_ccp_call_control_client_unregister_cb(&fixture->client_cbs);
-	zassert_equal(0, err, "Unexpected return value %d", err);
+	assert_int_equal(0, err);
 }
 
-static ZTEST_F(ccp_call_control_client_test_suite,
-	       test_ccp_call_control_client_unregister_cb_inval_param_null)
+static void ccp_call_control_client_test_suite__test_ccp_call_control_client_unregister_cb_inval_param_null(void **cm_state)
 {
+	struct ccp_call_control_client_test_suite_fixture *fixture = *cm_state;
 	int err;
 
 	err = bt_ccp_call_control_client_unregister_cb(NULL);
-	zassert_equal(-EINVAL, err, "Unexpected return value %d", err);
+	assert_int_equal(-EINVAL, err);
 }
 
-static ZTEST_F(ccp_call_control_client_test_suite,
-	       test_ccp_call_control_client_unregister_cb_inval_double_unregister)
+static void ccp_call_control_client_test_suite__test_ccp_call_control_client_unregister_cb_inval_double_unregister(void **cm_state)
 {
+	struct ccp_call_control_client_test_suite_fixture *fixture = *cm_state;
 	int err;
 
 	err = bt_ccp_call_control_client_register_cb(&fixture->client_cbs);
-	zassert_equal(0, err, "Unexpected return value %d", err);
+	assert_int_equal(0, err);
 
 	err = bt_ccp_call_control_client_unregister_cb(&fixture->client_cbs);
-	zassert_equal(0, err, "Unexpected return value %d", err);
+	assert_int_equal(0, err);
 
 	err = bt_ccp_call_control_client_unregister_cb(&fixture->client_cbs);
-	zassert_equal(-EALREADY, err, "Unexpected return value %d", err);
+	assert_int_equal(-EALREADY, err);
 }
 
-static ZTEST_F(ccp_call_control_client_test_suite, test_ccp_call_control_client_discover)
+static void ccp_call_control_client_test_suite__test_ccp_call_control_client_discover(void **cm_state)
 {
+	struct ccp_call_control_client_test_suite_fixture *fixture = *cm_state;
 	int err;
 
 	err = bt_ccp_call_control_client_register_cb(&fixture->client_cbs);
-	zassert_equal(0, err, "Unexpected return value %d", err);
+	assert_int_equal(0, err);
 
 	err = bt_ccp_call_control_client_discover(&fixture->conn, &fixture->client);
-	zassert_equal(0, err, "Unexpected return value %d", err);
+	assert_int_equal(0, err);
 }
 
-static ZTEST_F(ccp_call_control_client_test_suite,
-	       test_ccp_call_control_client_discover_inval_param_null_conn)
+static void ccp_call_control_client_test_suite__test_ccp_call_control_client_discover_inval_param_null_conn(void **cm_state)
 {
+	struct ccp_call_control_client_test_suite_fixture *fixture = *cm_state;
 	int err;
 
 	err = bt_ccp_call_control_client_register_cb(&fixture->client_cbs);
-	zassert_equal(0, err, "Unexpected return value %d", err);
+	assert_int_equal(0, err);
 
 	err = bt_ccp_call_control_client_discover(NULL, &fixture->client);
-	zassert_equal(-EINVAL, err, "Unexpected return value %d", err);
+	assert_int_equal(-EINVAL, err);
 }
 
-static ZTEST_F(ccp_call_control_client_test_suite,
-	       test_ccp_call_control_client_discover_inval_param_null_client)
+static void ccp_call_control_client_test_suite__test_ccp_call_control_client_discover_inval_param_null_client(void **cm_state)
 {
+	struct ccp_call_control_client_test_suite_fixture *fixture = *cm_state;
 	int err;
 
 	err = bt_ccp_call_control_client_register_cb(&fixture->client_cbs);
-	zassert_equal(0, err, "Unexpected return value %d", err);
+	assert_int_equal(0, err);
 
 	err = bt_ccp_call_control_client_discover(&fixture->conn, NULL);
-	zassert_equal(-EINVAL, err, "Unexpected return value %d", err);
+	assert_int_equal(-EINVAL, err);
 }
 
-static ZTEST_F(ccp_call_control_client_test_suite, test_ccp_call_control_client_get_bearers)
+static void ccp_call_control_client_test_suite__test_ccp_call_control_client_get_bearers(void **cm_state)
 {
+	struct ccp_call_control_client_test_suite_fixture *fixture = *cm_state;
 	struct bt_ccp_call_control_client_bearers bearers;
 	int err;
 
 	err = bt_ccp_call_control_client_register_cb(&fixture->client_cbs);
-	zassert_equal(0, err, "Unexpected return value %d", err);
+	assert_int_equal(0, err);
 
 	err = bt_ccp_call_control_client_discover(&fixture->conn, &fixture->client);
-	zassert_equal(0, err, "Unexpected return value %d", err);
+	assert_int_equal(0, err);
 
 	err = bt_ccp_call_control_client_get_bearers(fixture->client, &bearers);
-	zassert_equal(0, err, "Unexpected return value %d", err);
+	assert_int_equal(0, err);
 
 #if defined(CONFIG_BT_TBS_CLIENT_GTBS)
-	zassert_not_null(bearers.gtbs_bearer);
+	assert_non_null(bearers.gtbs_bearer);
 #endif /* CONFIG_BT_TBS_CLIENT_GTBS */
 
 #if defined(CONFIG_BT_TBS_CLIENT_TBS)
-	zassert_equal(CONFIG_BT_TBS_CLIENT_MAX_TBS_INSTANCES, bearers.tbs_count);
+	assert_int_equal(CONFIG_BT_TBS_CLIENT_MAX_TBS_INSTANCES, bearers.tbs_count);
 	for (size_t i = 0U; i < bearers.tbs_count; i++) {
-		zassert_not_null(bearers.tbs_bearers[i]);
+		assert_non_null(bearers.tbs_bearers[i]);
 	}
 #endif /* CONFIG_BT_TBS_CLIENT_TBS */
 }
+
+int bt_test_ccp_call_control_client_test_suite_setup(void **state)
+{
+	int environment_result = bt_test_audio_ccp_call_control_client_environment_setup(state);
+
+	if (environment_result != 0) {
+		return environment_result;
+	}
+
+	*state = ccp_call_control_client_test_suite_setup();
+	return 0;
+}
+static int bt_test_ccp_call_control_client_test_suite_before(void **state)
+{
+	(void)state;
+	ccp_call_control_client_test_suite_before(*state);
+	return 0;
+}
+int bt_test_ccp_call_control_client_test_suite_after(void **state)
+{
+	(void)state;
+	ccp_call_control_client_test_suite_after(*state);
+	return 0;
+}
+int bt_test_ccp_call_control_client_test_suite_teardown(void **state)
+{
+	(void)state;
+	ccp_call_control_client_test_suite_teardown(*state);
+	return 0;
+}
+static const struct CMUnitTest test_cases_ccp_call_control_client_test_suite[] = {
+	cmocka_unit_test_setup_teardown(ccp_call_control_client_test_suite__test_ccp_call_control_client_register_cb, bt_test_ccp_call_control_client_test_suite_before, bt_test_ccp_call_control_client_test_suite_after),
+	cmocka_unit_test_setup_teardown(ccp_call_control_client_test_suite__test_ccp_call_control_client_register_cb_inval_param_null, bt_test_ccp_call_control_client_test_suite_before, bt_test_ccp_call_control_client_test_suite_after),
+	cmocka_unit_test_setup_teardown(ccp_call_control_client_test_suite__test_ccp_call_control_client_register_cb_inval_double_register, bt_test_ccp_call_control_client_test_suite_before, bt_test_ccp_call_control_client_test_suite_after),
+	cmocka_unit_test_setup_teardown(ccp_call_control_client_test_suite__test_ccp_call_control_client_unregister_cb, bt_test_ccp_call_control_client_test_suite_before, bt_test_ccp_call_control_client_test_suite_after),
+	cmocka_unit_test_setup_teardown(ccp_call_control_client_test_suite__test_ccp_call_control_client_unregister_cb_inval_param_null, bt_test_ccp_call_control_client_test_suite_before, bt_test_ccp_call_control_client_test_suite_after),
+	cmocka_unit_test_setup_teardown(ccp_call_control_client_test_suite__test_ccp_call_control_client_unregister_cb_inval_double_unregister, bt_test_ccp_call_control_client_test_suite_before, bt_test_ccp_call_control_client_test_suite_after),
+	cmocka_unit_test_setup_teardown(ccp_call_control_client_test_suite__test_ccp_call_control_client_discover, bt_test_ccp_call_control_client_test_suite_before, bt_test_ccp_call_control_client_test_suite_after),
+	cmocka_unit_test_setup_teardown(ccp_call_control_client_test_suite__test_ccp_call_control_client_discover_inval_param_null_conn, bt_test_ccp_call_control_client_test_suite_before, bt_test_ccp_call_control_client_test_suite_after),
+	cmocka_unit_test_setup_teardown(ccp_call_control_client_test_suite__test_ccp_call_control_client_discover_inval_param_null_client, bt_test_ccp_call_control_client_test_suite_before, bt_test_ccp_call_control_client_test_suite_after),
+	cmocka_unit_test_setup_teardown(ccp_call_control_client_test_suite__test_ccp_call_control_client_get_bearers, bt_test_ccp_call_control_client_test_suite_before, bt_test_ccp_call_control_client_test_suite_after),
+};
+BT_TEST_SUITE(ccp_call_control_client_test_suite, test_cases_ccp_call_control_client_test_suite, bt_test_ccp_call_control_client_test_suite_setup, bt_test_ccp_call_control_client_test_suite_teardown);

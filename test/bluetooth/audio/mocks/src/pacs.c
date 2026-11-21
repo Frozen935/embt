@@ -1,3 +1,5 @@
+#include "support/test_support.h"
+
 /*
  * Copyright (c) 2023 Codecoup
  *
@@ -6,16 +8,15 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-#include <zephyr/bluetooth/assigned_numbers.h>
-#include <zephyr/bluetooth/audio/audio.h>
-#include <zephyr/bluetooth/audio/lc3.h>
-#include <zephyr/bluetooth/audio/pacs.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/fff.h>
-#include <zephyr/sys/util.h>
-#include <zephyr/toolchain.h>
-#include <zephyr/types.h>
-
+#include <embt/bluetooth/assigned_numbers.h>
+#include <embt/bluetooth/audio/audio.h>
+#include <embt/bluetooth/audio/lc3.h>
+#include <embt/bluetooth/audio/pacs.h>
+#include <embt/bluetooth/conn.h>
+#include <fff.h>
+#include <embt/base/util.h>
+#include <embt/compiler.h>
+#include <stdint.h>
 #include "audio/pacs_internal.h"
 
 #include "pacs.h"

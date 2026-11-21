@@ -1,3 +1,6 @@
+#include "support/test_support.h"
+static const struct bt_hci_transport test_driver;
+#include "host/hci_core.h"
 /*
  * SPDX-FileCopyrightText: Copyright (c) 2026 Silicon Laboratories Inc.
  * SPDX-License-Identifier: Apache-2.0
@@ -9,33 +12,26 @@
 #include <stdint.h>
 #include <string.h>
 
-#include <zephyr/bluetooth/addr.h>
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/buf.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/gap.h>
-#include <zephyr/bluetooth/gatt.h>
-#include <zephyr/bluetooth/hci.h>
-#include <zephyr/bluetooth/hci_types.h>
-#include <zephyr/bluetooth/l2cap.h>
-#include <zephyr/bluetooth/uuid.h>
-#include <zephyr/device.h>
-#include <zephyr/devicetree.h>
-#include <zephyr/drivers/bluetooth.h>
-#include <zephyr/kernel.h>
-#include <zephyr/net_buf.h>
-#include <zephyr/sys/atomic.h>
-#include <zephyr/sys/byteorder.h>
-#include <zephyr/sys/iterable_sections.h>
-#include <zephyr/sys/util.h>
-#include <zephyr/ztest.h>
+#include <embt/bluetooth/addr.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/buf.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/gap.h>
+#include <embt/bluetooth/gatt.h>
+#include <embt/bluetooth/hci.h>
+#include <embt/bluetooth/hci_types.h>
+#include <embt/bluetooth/l2cap.h>
+#include <embt/bluetooth/uuid.h>
+#include <embt/drivers/bluetooth.h>
 
+#include <embt/net_buf.h>
+#include <embt/base/atomic.h>
+#include <embt/base/byteorder.h>
+#include <embt/base/util.h>
 #include "host/att_internal.h"
 #include "host/conn_internal.h"
-#include "host/hci_core.h"
 #include "host/l2cap_internal.h"
 
-#define DT_DRV_COMPAT zephyr_bt_hci_test
 
 /* Large enough for the return parameters of initialization commands that are
  * irrelevant to this test
@@ -57,27 +53,29 @@ BT_GATT_SERVICE_DEFINE(test_svc,
 /* The notifications, indications and signalling PDUs that the controller got,
  * and the data packets it did not expect
  */
-static atomic_t notifications;
-static atomic_t indications;
-static atomic_t sig_pdus;
-static atomic_t acl_unexpected;
+static bt_atomic_t notifications;
+static bt_atomic_t indications;
+static bt_atomic_t sig_pdus;
+static os_sem_t sig_sent_sem;
+static bt_atomic_t acl_unexpected;
 
 /* Whether the link is up, and the data packets that the controller holds on it
  * until it reports them as completed
  */
-static atomic_t link_up;
-static atomic_t acl_pending;
+static bt_atomic_t link_up;
+static bt_atomic_t acl_pending;
 
 /* The driver's send() of the next data packet blocks until the test releases it */
-static atomic_t send_block;
-static K_SEM_DEFINE(send_blocked_sem, 0, 1);
-static K_SEM_DEFINE(send_release_sem, 0, 1);
+static bt_atomic_t send_block;
+static os_sem_t send_blocked_sem;
+static os_sem_t send_release_sem;
 
 /* The driver keeps the next data packet, so that its buffer is released, and
  * the Host completes the PDU in it, only when the test lets it go
  */
-static atomic_t acl_hold;
+static bt_atomic_t acl_hold;
 static struct net_buf *acl_held;
+static os_sem_t acl_held_sem;
 
 static void evt_create(struct net_buf *buf, uint8_t evt, uint8_t len)
 {
@@ -92,7 +90,7 @@ static void *cmd_complete(struct net_buf **buf, uint8_t plen, uint16_t opcode)
 {
 	struct bt_hci_evt_cmd_complete *cc;
 
-	*buf = bt_buf_get_evt(BT_HCI_EVT_CMD_COMPLETE, false, K_FOREVER);
+	*buf = bt_buf_get_evt(BT_HCI_EVT_CMD_COMPLETE, false, BT_FOREVER);
 	evt_create(*buf, BT_HCI_EVT_CMD_COMPLETE, sizeof(*cc) + plen);
 	cc = net_buf_add(*buf, sizeof(*cc));
 	cc->ncmd = 1U;
@@ -158,7 +156,7 @@ static void le_read_supp_states(struct net_buf **evt, uint16_t opcode)
 	(void)memset(rp->le_states, 0xFF, sizeof(rp->le_states));
 }
 
-static void cmd_handle(const struct device *dev, struct net_buf *cmd)
+static void cmd_handle(const struct bt_hci_transport *dev, struct net_buf *cmd)
 {
 	struct net_buf *evt = NULL;
 	struct bt_hci_cmd_hdr *hdr;
@@ -207,7 +205,7 @@ static void acl_handle(struct net_buf *buf)
 
 	if (bt_acl_handle(sys_le16_to_cpu(hdr->handle)) != TEST_CONN_HANDLE ||
 	    buf->len < BT_L2CAP_HDR_SIZE) {
-		(void)atomic_inc(&acl_unexpected);
+		(void)bt_atomic_inc(&acl_unexpected);
 		return;
 	}
 
@@ -215,39 +213,40 @@ static void acl_handle(struct net_buf *buf)
 	cid = net_buf_pull_le16(buf);
 
 	if (len != buf->len || buf->len == 0U) {
-		(void)atomic_inc(&acl_unexpected);
+		(void)bt_atomic_inc(&acl_unexpected);
 		return;
 	}
 
 	if (cid == BT_L2CAP_CID_LE_SIG) {
-		(void)atomic_inc(&sig_pdus);
+		(void)bt_atomic_inc(&sig_pdus);
+		osi_sem_give(&sig_sent_sem);
 	} else if (cid != BT_L2CAP_CID_ATT) {
-		(void)atomic_inc(&acl_unexpected);
+		(void)bt_atomic_inc(&acl_unexpected);
 	} else if (buf->data[0] == BT_ATT_OP_NOTIFY) {
-		(void)atomic_inc(&notifications);
+		(void)bt_atomic_inc(&notifications);
 	} else if (buf->data[0] == BT_ATT_OP_INDICATE) {
-		(void)atomic_inc(&indications);
+		(void)bt_atomic_inc(&indications);
 	} else {
-		(void)atomic_inc(&acl_unexpected);
+		(void)bt_atomic_inc(&acl_unexpected);
 	}
 }
 
-static void completed_handler(struct k_work *work)
+static void completed_handler(struct bt_work *work)
 {
-	const struct device *dev = DEVICE_DT_GET(DT_DRV_INST(0));
+	const struct bt_hci_transport *dev = &test_driver;
 	struct bt_hci_evt_num_completed_packets *evt;
 	struct bt_hci_handle_count *hc;
 	struct net_buf *buf;
-	atomic_val_t count;
+	bt_atomic_val_t count;
 
 	ARG_UNUSED(work);
 
-	count = atomic_set(&acl_pending, 0);
-	if (count == 0 || atomic_get(&link_up) == 0) {
+	count = bt_atomic_set(&acl_pending, 0);
+	if (count == 0 || bt_atomic_get(&link_up) == 0) {
 		return;
 	}
 
-	buf = bt_buf_get_evt(BT_HCI_EVT_NUM_COMPLETED_PACKETS, false, K_FOREVER);
+	buf = bt_buf_get_evt(BT_HCI_EVT_NUM_COMPLETED_PACKETS, false, BT_FOREVER);
 	evt_create(buf, BT_HCI_EVT_NUM_COMPLETED_PACKETS, sizeof(*evt) + sizeof(*hc));
 	evt = net_buf_add(buf, sizeof(*evt));
 	evt->num_handles = 1U;
@@ -257,16 +256,16 @@ static void completed_handler(struct k_work *work)
 	bt_hci_recv(dev, buf);
 }
 
-static K_WORK_DEFINE(completed_work, completed_handler);
+static BT_WORK_DEFINE(completed_work, completed_handler);
 
-static int driver_open(const struct device *dev)
+static int driver_open(const struct bt_hci_transport *dev)
 {
 	ARG_UNUSED(dev);
 
 	return 0;
 }
 
-static int driver_send(const struct device *dev, struct net_buf *buf)
+static int driver_send(const struct bt_hci_transport *dev, struct net_buf *buf)
 {
 	uint8_t type = net_buf_pull_u8(buf);
 
@@ -275,24 +274,25 @@ static int driver_send(const struct device *dev, struct net_buf *buf)
 	} else if (type == BT_HCI_H4_ACL) {
 		acl_handle(buf);
 
-		if (atomic_cas(&acl_hold, 1, 0)) {
+		if (bt_atomic_cas(&acl_hold, 1, 0)) {
 			acl_held = net_buf_ref(buf);
+			osi_sem_give(&acl_held_sem);
 		}
 
 		/* As a transport that waits for the controller to take the
 		 * packet. The TX processor holds the host lock meanwhile.
 		 */
-		if (atomic_cas(&send_block, 1, 0)) {
-			k_sem_give(&send_blocked_sem);
-			(void)k_sem_take(&send_release_sem, K_FOREVER);
+		if (bt_atomic_cas(&send_block, 1, 0)) {
+			osi_sem_give(&send_blocked_sem);
+			(void)osi_sem_take(&send_release_sem, BT_FOREVER);
 		}
 
-		if (atomic_get(&link_up) != 0) {
-			(void)atomic_inc(&acl_pending);
-			(void)k_work_submit(&completed_work);
+		if (bt_atomic_get(&link_up) != 0) {
+			(void)bt_atomic_inc(&acl_pending);
+			(void)bt_work_submit(&completed_work);
 		}
 	} else {
-		(void)atomic_inc(&acl_unexpected);
+		(void)bt_atomic_inc(&acl_unexpected);
 	}
 
 	net_buf_unref(buf);
@@ -300,23 +300,32 @@ static int driver_send(const struct device *dev, struct net_buf *buf)
 	return 0;
 }
 
-static DEVICE_API(bt_hci, driver_api) = {
+static const struct bt_hci_driver_api driver_api = {
 	.open = driver_open,
 	.send = driver_send,
 };
 
-#define TEST_DEVICE_INIT(inst)                                                                     \
-	static struct bt_hci_driver_data driver_data_##inst = {0};                                 \
-	static const struct bt_hci_driver_config driver_config_##inst =                            \
-		BT_DT_HCI_DRIVER_CONFIG_INST_GET(inst);                                            \
-	DEVICE_DT_INST_DEFINE(inst, NULL, NULL, &driver_data_##inst, &driver_config_##inst,        \
-			      POST_KERNEL, CONFIG_KERNEL_INIT_PRIORITY_DEVICE, &driver_api)
+static os_mutex_t observed_pool_lock;
+static struct bt_hci_driver_data test_driver_data;
+static const struct bt_hci_transport test_driver = {
+ .name = "upstream-test", .bus = 0,
+ .api = &driver_api, .data = &test_driver_data,
+};
+static void test_transport_init(void)
+{
+ static bool observer_initialized;
+ if (!observer_initialized) {
+  bt_test_require(osi_mutex_init(&observed_pool_lock, OS_MUTEX_NORMAL));
+  observer_initialized = true;
+ }
+ bt_test_require(bt_stack_init());
+ bt_dev.hci = &test_driver;
+}
 
-DT_INST_FOREACH_STATUS_OKAY(TEST_DEVICE_INIT)
 
-static K_SEM_DEFINE(connected_sem, 0, 1);
-static K_SEM_DEFINE(disconnected_sem, 0, 1);
-static K_SEM_DEFINE(recycled_sem, 0, 1);
+static os_sem_t connected_sem;
+static os_sem_t disconnected_sem;
+static os_sem_t recycled_sem;
 static struct bt_conn *test_conn;
 
 static void connected(struct bt_conn *conn, uint8_t err)
@@ -326,19 +335,19 @@ static void connected(struct bt_conn *conn, uint8_t err)
 	}
 
 	test_conn = bt_conn_ref(conn);
-	k_sem_give(&connected_sem);
+	osi_sem_give(&connected_sem);
 }
 
 static void disconnected(struct bt_conn *conn, uint8_t reason)
 {
 	ARGS_UNUSED(conn, reason);
 
-	k_sem_give(&disconnected_sem);
+	osi_sem_give(&disconnected_sem);
 }
 
 static void recycled(void)
 {
-	k_sem_give(&recycled_sem);
+	osi_sem_give(&recycled_sem);
 }
 
 BT_CONN_CB_DEFINE(conn_callbacks) = {
@@ -351,10 +360,10 @@ static void evt_send(uint8_t evt, const void *params, uint8_t len)
 {
 	struct net_buf *buf;
 
-	buf = bt_buf_get_evt(evt, false, K_FOREVER);
+	buf = bt_buf_get_evt(evt, false, BT_FOREVER);
 	evt_create(buf, evt, len);
 	net_buf_add_mem(buf, params, len);
-	bt_hci_recv(DEVICE_DT_GET(DT_DRV_INST(0)), buf);
+	bt_hci_recv(&test_driver, buf);
 }
 
 static void connect_as_peripheral(void)
@@ -368,8 +377,7 @@ static void connect_as_peripheral(void)
 		struct bt_hci_evt_le_conn_complete cc;
 	} __packed evt;
 
-	zassert_ok(bt_le_adv_start(BT_LE_ADV_CONN_FAST_1, NULL, 0U, NULL, 0U),
-		   "Advertising failed to start");
+	assert_int_equal(bt_le_adv_start(BT_LE_ADV_CONN_FAST_1, NULL, 0U, NULL, 0U), 0);
 
 	(void)memset(&evt, 0, sizeof(evt));
 	evt.meta.subevent = BT_HCI_EVT_LE_CONN_COMPLETE;
@@ -380,10 +388,10 @@ static void connect_as_peripheral(void)
 	evt.cc.interval = sys_cpu_to_le16(BT_GAP_INIT_CONN_INT_MIN);
 	evt.cc.supv_timeout = sys_cpu_to_le16(BT_GAP_MS_TO_CONN_TIMEOUT(4000U));
 
-	(void)atomic_set(&link_up, 1);
+	(void)bt_atomic_set(&link_up, 1);
 	evt_send(BT_HCI_EVT_LE_META_EVENT, &evt, sizeof(evt));
 
-	zassert_ok(k_sem_take(&connected_sem, K_SECONDS(1)), "No connection");
+	assert_int_equal(osi_sem_take(&connected_sem, BT_SECONDS(1)), 0);
 }
 
 /* The remote ends the connection. The controller drops what it holds for it. */
@@ -395,7 +403,7 @@ static void disconn_complete_send(void)
 		.reason = BT_HCI_ERR_REMOTE_USER_TERM_CONN,
 	};
 
-	(void)atomic_set(&link_up, 0);
+	(void)bt_atomic_set(&link_up, 0);
 	evt_send(BT_HCI_EVT_DISCONN_COMPLETE, &evt, sizeof(evt));
 }
 
@@ -404,7 +412,7 @@ static int disconnected_wait(void)
 {
 	int err;
 
-	err = k_sem_take(&disconnected_sem, K_SECONDS(1));
+	err = osi_sem_take(&disconnected_sem, BT_SECONDS(1));
 	if (err != 0) {
 		return err;
 	}
@@ -412,18 +420,37 @@ static int disconnected_wait(void)
 	bt_conn_unref(test_conn);
 	test_conn = NULL;
 
-	return k_sem_take(&recycled_sem, K_SECONDS(1));
+	return osi_sem_take(&recycled_sem, BT_SECONDS(1));
+}
+
+static struct net_buf_pool *observed_pools[32];
+static size_t observed_pool_count;
+struct net_buf *__real_net_buf_alloc_fixed(struct net_buf_pool *, bt_timeout_t);
+struct net_buf *__wrap_net_buf_alloc_fixed(struct net_buf_pool *pool, bt_timeout_t timeout)
+{
+ bt_test_require(osi_mutex_lock(&observed_pool_lock, OS_TIMEOUT_FOREVER));
+ size_t index;
+ for (index = 0; index < observed_pool_count; index++) {
+  if (observed_pools[index] == pool) { break; }
+ }
+ if (index == observed_pool_count) {
+  if (observed_pool_count == ARRAY_SIZE(observed_pools)) { abort(); }
+  observed_pools[observed_pool_count++] = pool;
+ }
+ bt_test_require(osi_mutex_unlock(&observed_pool_lock));
+ return __real_net_buf_alloc_fixed(pool, timeout);
 }
 
 static bool pools_full(void)
 {
-	STRUCT_SECTION_FOREACH(net_buf_pool, pool) {
-		if (atomic_get(&pool->avail_count) != pool->buf_count) {
-			return false;
-		}
-	}
-
-	return true;
+ bool full = true;
+ bt_test_require(osi_mutex_lock(&observed_pool_lock, OS_TIMEOUT_FOREVER));
+ for (size_t i = 0; i < observed_pool_count; i++) {
+  struct net_buf_pool *pool = observed_pools[i];
+  if (bt_atomic_get(&pool->avail_count) != pool->buf_count) { full = false; break; }
+ }
+ bt_test_require(osi_mutex_unlock(&observed_pool_lock));
+ return full;
 }
 
 /* No buffer of any pool is in use. Buffers are freed on other threads too,
@@ -432,14 +459,10 @@ static bool pools_full(void)
 static void pools_full_expect(void)
 {
 	for (unsigned int i = 0U; i < 100U && !pools_full(); i++) {
-		k_sleep(K_MSEC(10));
+		osi_sleep_ms(BT_MSEC(10));
 	}
 
-	STRUCT_SECTION_FOREACH(net_buf_pool, pool) {
-		zassert_equal(atomic_get(&pool->avail_count), pool->buf_count,
-			      "%ld of the %u buffers of %s are free",
-			      atomic_get(&pool->avail_count), pool->buf_count, pool->name);
-	}
+	assert_true(pools_full());
 }
 
 static int notify(void)
@@ -457,25 +480,27 @@ static int security_request(void)
 
 /* What the application thread sends, and what that returned */
 static int (*app_send)(void);
-static atomic_t app_send_done;
+static bt_atomic_t app_send_done;
 static int app_send_err;
 
 /* An application thread, which the Host's threads preempt */
-static void app_entry(void *p1, void *p2, void *p3)
+static void app_entry(void *p1)
 {
-	ARGS_UNUSED(p1, p2, p3);
+	ARG_UNUSED(p1);
 
 	app_send_err = app_send();
-	(void)atomic_set(&app_send_done, 1);
+	(void)bt_atomic_set(&app_send_done, 1);
 }
 
-static atomic_t indicate_done;
+static bt_atomic_t indicate_done;
+static os_sem_t indication_done_sem;
 
 static void indicated(struct bt_conn *conn, struct bt_gatt_indicate_params *params, uint8_t err)
 {
 	ARGS_UNUSED(conn, params, err);
 
-	(void)atomic_set(&indicate_done, 1);
+	(void)bt_atomic_set(&indicate_done, 1);
+	osi_sem_give(&indication_done_sem);
 }
 
 /* An indication, which the peer does not confirm */
@@ -494,13 +519,13 @@ static int indicate(void)
 	return bt_gatt_indicate(test_conn, &params);
 }
 
-static atomic_t notify_sent_count;
+static bt_atomic_t notify_sent_count;
 
 static void notify_sent(struct bt_conn *conn, void *user_data)
 {
 	ARGS_UNUSED(conn, user_data);
 
-	(void)atomic_inc(&notify_sent_count);
+	(void)bt_atomic_inc(&notify_sent_count);
 }
 
 /* A notification whose completion the application is told about */
@@ -526,7 +551,7 @@ static struct net_buf *l2cap_pdu_create(uint16_t cid, uint16_t len)
 	struct bt_l2cap_hdr *hdr;
 	struct net_buf *buf;
 
-	buf = bt_buf_get_rx(BT_BUF_ACL_IN, K_FOREVER);
+	buf = bt_buf_get_rx(BT_BUF_ACL_IN, BT_FOREVER);
 	acl = net_buf_add(buf, sizeof(*acl));
 	acl->handle = sys_cpu_to_le16(bt_acl_handle_pack(TEST_CONN_HANDLE, BT_ACL_START));
 	acl->len = sys_cpu_to_le16(sizeof(*hdr) + len);
@@ -547,7 +572,7 @@ static void read_req_recv(uint16_t handle)
 	net_buf_add_u8(buf, BT_ATT_OP_READ_REQ);
 	net_buf_add_le16(buf, handle);
 
-	bt_hci_recv(DEVICE_DT_GET(DT_DRV_INST(0)), buf);
+	bt_hci_recv(&test_driver, buf);
 }
 
 /* A signalling command from the peer */
@@ -563,7 +588,7 @@ static void sig_recv(uint8_t code, uint8_t ident, const void *data, uint16_t len
 	hdr->len = sys_cpu_to_le16(len);
 	net_buf_add_mem(buf, data, len);
 
-	bt_hci_recv(DEVICE_DT_GET(DT_DRV_INST(0)), buf);
+	bt_hci_recv(&test_driver, buf);
 }
 
 /* A credit-based channel, which the peer opens */
@@ -576,12 +601,12 @@ NET_BUF_POOL_FIXED_DEFINE(sdu_pool, 1, BT_L2CAP_SDU_CHAN_SEND_RESERVE + 1U,
 			  CONFIG_BT_CONN_TX_USER_DATA_SIZE, NULL);
 
 static struct bt_l2cap_le_chan test_chan;
-static K_SEM_DEFINE(chan_connected_sem, 0, 1);
+static os_sem_t chan_connected_sem;
 
 /* The disconnected callback of the channel blocks until the test lets it go */
-static atomic_t chan_disconnected_block;
-static K_SEM_DEFINE(chan_disconnected_sem, 0, 1);
-static K_SEM_DEFINE(chan_release_sem, 0, 1);
+static bt_atomic_t chan_disconnected_block;
+static os_sem_t chan_disconnected_sem;
+static os_sem_t chan_release_sem;
 
 static int chan_recv(struct bt_l2cap_chan *chan, struct net_buf *buf)
 {
@@ -594,7 +619,7 @@ static void chan_connected(struct bt_l2cap_chan *chan)
 {
 	ARG_UNUSED(chan);
 
-	k_sem_give(&chan_connected_sem);
+	osi_sem_give(&chan_connected_sem);
 }
 
 /* As an application that waits in the callback, which runs on bt_workq */
@@ -602,9 +627,9 @@ static void chan_disconnected(struct bt_l2cap_chan *chan)
 {
 	ARG_UNUSED(chan);
 
-	if (atomic_cas(&chan_disconnected_block, 1, 0)) {
-		k_sem_give(&chan_disconnected_sem);
-		(void)k_sem_take(&chan_release_sem, K_FOREVER);
+	if (bt_atomic_cas(&chan_disconnected_block, 1, 0)) {
+		osi_sem_give(&chan_disconnected_sem);
+		(void)osi_sem_take(&chan_release_sem, BT_FOREVER);
 	}
 }
 
@@ -626,26 +651,38 @@ static int chan_accept(struct bt_conn *conn, struct bt_l2cap_server *server,
 }
 
 /* bt_workq runs nothing else from blocker_handler() until the test lets it */
-static K_SEM_DEFINE(blocker_running_sem, 0, 1);
-static K_SEM_DEFINE(blocker_sem, 0, 1);
+static os_sem_t blocker_running_sem;
+static os_sem_t blocker_sem;
 
-static void blocker_handler(struct k_work *work)
+static void blocker_handler(struct bt_work *work)
 {
 	ARG_UNUSED(work);
 
-	k_sem_give(&blocker_running_sem);
-	(void)k_sem_take(&blocker_sem, K_FOREVER);
+	osi_sem_give(&blocker_running_sem);
+	(void)osi_sem_take(&blocker_sem, BT_FOREVER);
+}
+
+static os_sem_t system_blocker_running_sem;
+static os_sem_t system_blocker_sem;
+
+/** @brief Hold deferred TX completion while the Host finishes timeout handling. */
+static void system_blocker_handler(struct bt_work *work)
+{
+	ARG_UNUSED(work);
+	osi_sem_give(&system_blocker_running_sem);
+	osi_sem_take(&system_blocker_sem, BT_FOREVER);
 }
 
 static void *setup(void)
 {
+	assert_int_equal(bt_gatt_service_static_register(&test_svc), 0);
 	static struct bt_l2cap_server server = {
 		.psm = TEST_PSM,
 		.accept = chan_accept,
 	};
 
-	zassert_ok(bt_enable(NULL), "Bluetooth init failed");
-	zassert_ok(bt_l2cap_server_register(&server), "The L2CAP server was not registered");
+	assert_int_equal(bt_enable(NULL), 0);
+	assert_int_equal(bt_l2cap_server_register(&server), 0);
 
 	return NULL;
 }
@@ -654,94 +691,94 @@ static void before(void *fixture)
 {
 	ARG_UNUSED(fixture);
 
-	(void)atomic_clear(&notifications);
-	(void)atomic_clear(&indications);
-	(void)atomic_clear(&sig_pdus);
-	(void)atomic_clear(&acl_unexpected);
-	(void)atomic_clear(&app_send_done);
-	(void)atomic_clear(&indicate_done);
-	(void)atomic_clear(&notify_sent_count);
+	(void)bt_atomic_clear(&notifications);
+	(void)bt_atomic_clear(&indications);
+	(void)bt_atomic_clear(&sig_pdus);
+	(void)bt_atomic_clear(&acl_unexpected);
+	(void)bt_atomic_clear(&app_send_done);
+	(void)bt_atomic_clear(&indicate_done);
+	(void)bt_atomic_clear(&notify_sent_count);
 }
 
-ZTEST_SUITE(host_tx_disconnect, NULL, setup, before, NULL, NULL);
+
 
 /* An application thread sends while the connection is lost, and waits for the
  * host lock meanwhile. Returns what the send returned. No buffer stays in use.
  */
 static int send_during_disconnection(int (*send)(void))
 {
-	static K_THREAD_STACK_DEFINE(app_stack, 2048);
-	static struct k_thread app_thread;
+	static os_thread_t app_thread;
 
 	pools_full_expect();
 	connect_as_peripheral();
 
 	/* The TX processor stays in the driver's send() of a notification */
-	(void)atomic_set(&send_block, 1);
-	zassert_ok(notify(), "The first notification failed");
-	zassert_ok(k_sem_take(&send_blocked_sem, K_SECONDS(1)), "The driver got no data packet");
+	(void)bt_atomic_set(&send_block, 1);
+	assert_int_equal(notify(), 0);
+	assert_int_equal(osi_sem_take(&send_blocked_sem, BT_SECONDS(1)), 0);
 
 	/* The application thread waits for the TX processor */
 	app_send = send;
-	(void)k_thread_create(&app_thread, app_stack, K_THREAD_STACK_SIZEOF(app_stack), app_entry,
-			      NULL, NULL, NULL, K_PRIO_PREEMPT(0), 0, K_NO_WAIT);
-	zassert_equal(atomic_get(&app_send_done), 0, "The send did not wait");
+	bt_test_require(osi_thread_create(&app_thread, app_entry, NULL, "test-app", 0, 0));
+	assert_int_equal(bt_atomic_get(&app_send_done), 0);
 
 	/* The connection is lost meanwhile. Its handling waits for the TX
 	 * processor as well.
 	 */
 	disconn_complete_send();
-	zassert_equal(k_sem_count_get(&disconnected_sem), 0U,
-		      "The disconnection was handled without waiting");
+	do { unsigned int count; assert_int_equal(osi_sem_count_get(&disconnected_sem, &count), 0); assert_int_equal(count, 0U); } while (0);
 
-	k_sem_give(&send_release_sem);
+	osi_sem_give(&send_release_sem);
 
-	zassert_ok(k_thread_join(&app_thread, K_SECONDS(1)), "The send did not return");
-	zassert_ok(disconnected_wait(), "The connection did not go");
-	zassert_equal(atomic_get(&notifications), 1, "The controller got %ld notifications",
-		      atomic_get(&notifications));
-	zassert_equal(atomic_get(&acl_unexpected), 0, "The controller got %ld unexpected packets",
-		      atomic_get(&acl_unexpected));
+	assert_int_equal(osi_thread_join(&app_thread), 0);
+	assert_int_equal(disconnected_wait(), 0);
+	assert_int_equal(bt_atomic_get(&notifications), 1);
+	assert_int_equal(bt_atomic_get(&acl_unexpected), 0);
 	pools_full_expect();
 
 	return app_send_err;
 }
 
 /* A notification is refused */
-static ZTEST(host_tx_disconnect, test_notify_during_disconnection)
+static void host_tx_disconnect__test_notify_during_disconnection(void **cm_state)
 {
+	(void)cm_state;
 	int err = send_during_disconnection(notify);
 
-	zassert_equal(err, -ENOTCONN, "The notification returned %d", err);
+	assert_int_equal(err, -ENOTCONN);
 }
 
 /* A Security Request is refused */
-static ZTEST(host_tx_disconnect, test_security_request_during_disconnection)
+static void host_tx_disconnect__test_security_request_during_disconnection(void **cm_state)
 {
+	(void)cm_state;
 	int err = send_during_disconnection(security_request);
 
-	zassert_equal(err, -ENOTCONN, "The Security Request returned %d", err);
+	assert_int_equal(err, -ENOTCONN);
 }
 
 /* The completion of a notification waits for the host lock while ATT times
  * out, on a connection that is being lost, with the response to a request of
  * the peer left to send. The completion is dropped, and no buffer stays in use.
  */
-static ZTEST(host_tx_disconnect, test_sent_during_att_timeout)
+static void host_tx_disconnect__test_sent_during_att_timeout(void **cm_state)
 {
-	static K_WORK_DEFINE(blocker_work, blocker_handler);
+	(void)cm_state;
+	static BT_WORK_DEFINE(blocker_work, blocker_handler);
+	static BT_WORK_DEFINE(system_blocker_work, system_blocker_handler);
 
 	pools_full_expect();
 	connect_as_peripheral();
 
 	/* ATT times out the indication 30 seconds after sending it */
-	zassert_ok(indicate(), "The indication failed");
-	k_sleep(K_MSEC(29900));
+	assert_int_equal(indicate(), 0);
+	osi_sleep_ms(BT_MSEC(29900));
 
 	/* The controller keeps the buffer of a notification */
-	(void)atomic_set(&acl_hold, 1);
-	zassert_ok(notify_reported(), "The notification failed");
-	zassert_not_null(acl_held, "The driver kept no data packet");
+	(void)bt_atomic_set(&acl_hold, 1);
+	assert_int_equal(notify_reported(), 0);
+	assert_int_equal(osi_sem_take(&acl_held_sem, BT_SECONDS(1)), 0);
+	assert_non_null(acl_held);
 
 	/* The test holds the host lock, as the TX processor does in a driver's
 	 * send() that blocks. A Read Request from the peer waits for it.
@@ -750,32 +787,36 @@ static ZTEST(host_tx_disconnect, test_sent_during_att_timeout)
 	read_req_recv(bt_gatt_attr_get_handle(&test_svc.attrs[0]));
 
 	/* bt_workq stops after the request, and ATT times out meanwhile */
-	zassert_true(bt_work_submit(&blocker_work) >= 0, "The blocker was not submitted");
-	k_sleep(K_MSEC(200));
+	assert_true(bt_host_work_submit(&blocker_work) >= 0);
+	osi_sleep_ms(BT_MSEC(200));
 
 	/* The connection is lost, so the response is left to send */
 	disconn_complete_send();
 	bt_dev_unlock();
-	zassert_ok(k_sem_take(&blocker_running_sem, K_SECONDS(1)), "bt_workq did not stop");
+	assert_int_equal(osi_sem_take(&blocker_running_sem, BT_SECONDS(1)), 0);
+	assert_true(bt_work_submit(&system_blocker_work) >= 0);
+	assert_int_equal(osi_sem_take(&system_blocker_running_sem, BT_SECONDS(1)), 0);
 
 	/* The completion of the notification waits for the host lock, while
 	 * bt_workq handles the ATT timeout
 	 */
 	bt_dev_lock();
 	net_buf_drop(&acl_held);
-	zassert_equal(atomic_get(&notify_sent_count), 0, "The notification completed");
-	k_sem_give(&blocker_sem);
+	assert_int_equal(bt_atomic_get(&notify_sent_count), 0);
+	osi_sem_give(&blocker_sem);
 	bt_dev_unlock();
+	/* Wait for ATT to finish the indication before permitting its TX callback. */
+	assert_int_equal(osi_sem_take(&indication_done_sem, BT_SECONDS(1)), 0);
+	osi_sem_give(&system_blocker_sem);
+	assert_int_equal(bt_host_work_drain(), 0);
+	assert_int_equal(bt_work_queue_drain(&bt_sys_work_q, false), 0);
 
-	zassert_ok(disconnected_wait(), "The connection did not go");
-	zassert_equal(atomic_get(&indicate_done), 1, "The indication did not complete");
-	zassert_equal(atomic_get(&notify_sent_count), 0, "The notification completed");
-	zassert_equal(atomic_get(&indications), 1, "The controller got %ld indications",
-		      atomic_get(&indications));
-	zassert_equal(atomic_get(&notifications), 1, "The controller got %ld notifications",
-		      atomic_get(&notifications));
-	zassert_equal(atomic_get(&acl_unexpected), 0, "The controller got %ld unexpected packets",
-		      atomic_get(&acl_unexpected));
+	assert_int_equal(disconnected_wait(), 0);
+	assert_int_equal(bt_atomic_get(&indicate_done), 1);
+	assert_int_equal(bt_atomic_get(&notify_sent_count), 0);
+	assert_int_equal(bt_atomic_get(&indications), 1);
+	assert_int_equal(bt_atomic_get(&notifications), 1);
+	assert_int_equal(bt_atomic_get(&acl_unexpected), 0);
 	pools_full_expect();
 }
 
@@ -783,8 +824,9 @@ static ZTEST(host_tx_disconnect, test_sent_during_att_timeout)
  * disconnected callback of the channel, and an SDU is sent on the channel
  * meanwhile. The SDU is refused, and the channel is not left ready to send.
  */
-static ZTEST(host_tx_disconnect, test_sdu_during_chan_disconnection)
+static void host_tx_disconnect__test_sdu_during_chan_disconnection(void **cm_state)
 {
+	(void)cm_state;
 	const struct bt_l2cap_le_conn_req conn_req = {
 		.psm = sys_cpu_to_le16(TEST_PSM),
 		.scid = sys_cpu_to_le16(PEER_CID),
@@ -800,35 +842,98 @@ static ZTEST(host_tx_disconnect, test_sdu_during_chan_disconnection)
 	connect_as_peripheral();
 
 	sig_recv(BT_L2CAP_LE_CONN_REQ, 0x01U, &conn_req, sizeof(conn_req));
-	zassert_ok(k_sem_take(&chan_connected_sem, K_SECONDS(1)), "The channel did not connect");
+	assert_int_equal(osi_sem_take(&chan_connected_sem, BT_SECONDS(1)), 0);
 
 	disconn_req = (struct bt_l2cap_disconn_req){
 		.dcid = sys_cpu_to_le16(test_chan.rx.cid),
 		.scid = sys_cpu_to_le16(PEER_CID),
 	};
-	(void)atomic_set(&chan_disconnected_block, 1);
+	(void)bt_atomic_set(&chan_disconnected_block, 1);
 	sig_recv(BT_L2CAP_DISCONN_REQ, 0x02U, &disconn_req, sizeof(disconn_req));
-	zassert_ok(k_sem_take(&chan_disconnected_sem, K_SECONDS(1)),
-		   "The channel was not disconnected");
+	assert_int_equal(osi_sem_take(&chan_disconnected_sem, BT_SECONDS(1)), 0);
 
-	sdu = net_buf_alloc(&sdu_pool, K_NO_WAIT);
-	zassert_not_null(sdu, "No SDU buffer");
+	sdu = net_buf_alloc(&sdu_pool, BT_NO_WAIT);
+	assert_non_null(sdu);
 	net_buf_reserve(sdu, BT_L2CAP_SDU_CHAN_SEND_RESERVE);
 	net_buf_add_u8(sdu, 0x5aU);
 
 	err = bt_l2cap_chan_send(&test_chan.chan, sdu);
-	zassert_equal(err, -ENOTCONN, "The SDU returned %d", err);
+	assert_int_equal(err, -ENOTCONN);
 	net_buf_unref(sdu);
-	zassert_true(sys_slist_is_empty(&test_conn->l2cap_data_ready),
-		     "The channel is ready to send");
+	assert_true(sys_slist_is_empty(&test_conn->l2cap_data_ready));
 
-	k_sem_give(&chan_release_sem);
+	osi_sem_give(&chan_release_sem);
+	assert_int_equal(bt_host_work_drain(), 0);
+	assert_int_equal(osi_sem_take(&sig_sent_sem, BT_SECONDS(1)), 0);
+	assert_int_equal(osi_sem_take(&sig_sent_sem, BT_SECONDS(1)), 0);
 
 	disconn_complete_send();
-	zassert_ok(disconnected_wait(), "The connection did not go");
-	zassert_equal(atomic_get(&sig_pdus), 2, "The controller got %ld signalling PDUs",
-		      atomic_get(&sig_pdus));
-	zassert_equal(atomic_get(&acl_unexpected), 0, "The controller got %ld unexpected packets",
-		      atomic_get(&acl_unexpected));
+	assert_int_equal(disconnected_wait(), 0);
+	assert_int_equal(bt_atomic_get(&sig_pdus), 2);
+	assert_int_equal(bt_atomic_get(&acl_unexpected), 0);
 	pools_full_expect();
 }
+
+static void storage_init_99525333d6(void)
+{
+	bt_test_require(osi_sem_init(&sig_sent_sem, 0, 2));
+	bt_test_require(osi_sem_init(&acl_held_sem, 0, 1));
+	bt_test_require(osi_sem_init(&send_blocked_sem, 0, 1));
+	bt_test_require(osi_sem_init(&send_release_sem, 0, 1));
+	bt_test_require(osi_sem_init(&connected_sem, 0, 1));
+	bt_test_require(osi_sem_init(&disconnected_sem, 0, 1));
+	bt_test_require(osi_sem_init(&recycled_sem, 0, 1));
+	net_buf_pool_init(&sdu_pool);
+	bt_test_require(osi_sem_init(&chan_connected_sem, 0, 1));
+	bt_test_require(osi_sem_init(&chan_disconnected_sem, 0, 1));
+	bt_test_require(osi_sem_init(&chan_release_sem, 0, 1));
+	bt_test_require(osi_sem_init(&indication_done_sem, 0, 1));
+	bt_test_require(osi_sem_init(&system_blocker_running_sem, 0, 1));
+	bt_test_require(osi_sem_init(&system_blocker_sem, 0, 1));
+	bt_test_require(osi_sem_init(&blocker_running_sem, 0, 1));
+	bt_test_require(osi_sem_init(&blocker_sem, 0, 1));
+}
+
+static void migrated_pools_init(void)
+{
+	net_buf_pool_init(&sdu_pool);
+}
+
+static void migrated_callbacks_init(void)
+{
+ static bool initialized;
+ if (initialized) { return; }
+ bt_test_require(bt_conn_cb_register(&bt_conn_cb_conn_callbacks));
+ initialized = true;
+}
+
+int bt_test_host_tx_disconnect_setup(void **state)
+{
+	int environment_result = bt_test_host_setup(state);
+
+	if (environment_result != 0) {
+		return environment_result;
+	}
+
+	migrated_callbacks_init();
+	migrated_pools_init();
+	test_transport_init();
+	storage_init_99525333d6();
+	*state = setup();
+	return 0;
+}
+static int bt_test_host_tx_disconnect_before(void **state)
+{
+	(void)state;
+	before(*state);
+	return 0;
+}
+
+
+static const struct CMUnitTest test_cases_host_tx_disconnect[] = {
+	cmocka_unit_test_setup_teardown(host_tx_disconnect__test_notify_during_disconnection, bt_test_host_tx_disconnect_before, NULL),
+	cmocka_unit_test_setup_teardown(host_tx_disconnect__test_security_request_during_disconnection, bt_test_host_tx_disconnect_before, NULL),
+	cmocka_unit_test_setup_teardown(host_tx_disconnect__test_sent_during_att_timeout, bt_test_host_tx_disconnect_before, NULL),
+	cmocka_unit_test_setup_teardown(host_tx_disconnect__test_sdu_during_chan_disconnection, bt_test_host_tx_disconnect_before, NULL),
+};
+BT_TEST_SUITE(host_tx_disconnect, test_cases_host_tx_disconnect, bt_test_host_tx_disconnect_setup, NULL);

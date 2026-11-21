@@ -1,11 +1,12 @@
+#include "support/test_support.h"
 /*
  * Copyright (c) 2022 Nordic Semiconductor ASA
  *
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <zephyr/fff.h>
-#include <zephyr/kernel.h>
+#include <fff.h>
+
 
 /* List of fakes used by this unit tester */
 #define ASSERT_FFF_FAKES_LIST(FAKE)           \

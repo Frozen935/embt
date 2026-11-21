@@ -1,3 +1,4 @@
+#include "support/test_support.h"
 /*
  * SPDX-FileCopyrightText: Copyright (c) 2026 Silicon Laboratories Inc.
  * SPDX-License-Identifier: Apache-2.0
@@ -8,16 +9,13 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include <zephyr/bluetooth/addr.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/l2cap.h>
-#include <zephyr/kernel.h>
-#include <zephyr/net_buf.h>
-#include <zephyr/sys/byteorder.h>
-#include <zephyr/sys/iterable_sections.h>
-#include <zephyr/sys/util.h>
-#include <zephyr/ztest.h>
+#include <embt/bluetooth/addr.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/l2cap.h>
 
+#include <embt/net_buf.h>
+#include <embt/base/byteorder.h>
+#include <embt/base/util.h>
 #include "host/conn_internal.h"
 #include "host/classic/l2cap_br_interface.h"
 
@@ -51,8 +49,8 @@ static int test_recv(struct bt_l2cap_chan *chan, struct net_buf *buf)
 	struct test_chan *tc = CONTAINER_OF(chan, struct test_chan, br.chan);
 
 	tc->recv_count++;
-	zassert_equal(buf->len, sizeof(uint16_t));
-	zassert_equal(sys_get_le16(buf->data), PAYLOAD);
+	assert_int_equal(buf->len, sizeof(uint16_t));
+	assert_int_equal(sys_get_le16(buf->data), PAYLOAD);
 
 	if (tc->keep) {
 		tc->kept = buf;
@@ -97,8 +95,8 @@ static struct net_buf *pdu(uint16_t cid, bool i_frame)
 	struct net_buf *buf;
 	uint16_t len = sizeof(uint16_t);
 
-	buf = net_buf_alloc(&pdu_pool, K_NO_WAIT);
-	zassert_not_null(buf);
+	buf = net_buf_alloc(&pdu_pool, BT_NO_WAIT);
+	assert_non_null(buf);
 
 	if (i_frame) {
 		len += sizeof(uint16_t);
@@ -122,24 +120,24 @@ static void recv_kept(struct test_chan *tc, uint16_t cid, bool i_frame)
 	tc->keep = true;
 	bt_l2cap_br_recv(conn, pdu(cid, i_frame));
 
-	zassert_equal(tc->recv_count, 1);
-	zassert_not_null(tc->kept);
-	zassert_equal(freed, 0, "Buffer freed while the receiver owns it");
-	zassert_equal(sys_get_le16(tc->kept->data), PAYLOAD);
+	assert_int_equal(tc->recv_count, 1);
+	assert_non_null(tc->kept);
+	assert_int_equal(freed, 0);
+	assert_int_equal(sys_get_le16(tc->kept->data), PAYLOAD);
 
 	/* Without CONFIG_BT_L2CAP_RET_FC this returns -ENOTSUP for BR/EDR, but it
 	 * releases the buffer either way.
 	 */
 	(void)bt_l2cap_chan_recv_complete(&tc->br.chan, tc->kept);
-	zassert_equal(freed, 1);
+	assert_int_equal(freed, 1);
 }
 
 static void recv_consumed(struct test_chan *tc, uint16_t cid, bool i_frame)
 {
 	bt_l2cap_br_recv(conn, pdu(cid, i_frame));
 
-	zassert_equal(tc->recv_count, 1);
-	zassert_equal(freed, 1);
+	assert_int_equal(tc->recv_count, 1);
+	assert_int_equal(freed, 1);
 }
 
 static void *setup(void)
@@ -147,7 +145,7 @@ static void *setup(void)
 	static const bt_addr_t addr = { .val = { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06 } };
 
 	conn = bt_conn_add_br(&addr);
-	zassert_not_null(conn);
+	assert_non_null(conn);
 
 	bt_l2cap_br_connected(conn);
 
@@ -170,28 +168,92 @@ static void before(void *fixture)
 	freed = 0;
 }
 
-ZTEST_SUITE(l2cap_br_recv, NULL, setup, before, NULL, NULL);
 
-ZTEST(l2cap_br_recv, test_basic_kept)
+
+static void l2cap_br_recv__test_basic_kept(void **cm_state)
 {
+	(void)cm_state;
 	recv_kept(&basic_chan, BASIC_CID, false);
 }
 
-ZTEST(l2cap_br_recv, test_basic_consumed)
+static void l2cap_br_recv__test_basic_consumed(void **cm_state)
 {
+	(void)cm_state;
 	recv_consumed(&basic_chan, BASIC_CID, false);
 }
 
-ZTEST(l2cap_br_recv, test_stream_kept)
+static void l2cap_br_recv__test_stream_kept(void **cm_state)
 {
-	Z_TEST_SKIP_IFNDEF(CONFIG_BT_L2CAP_RET_FC);
+	(void)cm_state;
+	#if !defined(CONFIG_BT_L2CAP_RET_FC)
+	skip();
+#endif
+
 
 	recv_kept(&stream_chan, STREAM_CID, true);
 }
 
-ZTEST(l2cap_br_recv, test_stream_consumed)
+static void l2cap_br_recv__test_stream_consumed(void **cm_state)
 {
-	Z_TEST_SKIP_IFNDEF(CONFIG_BT_L2CAP_RET_FC);
+	(void)cm_state;
+	#if !defined(CONFIG_BT_L2CAP_RET_FC)
+	skip();
+#endif
+
 
 	recv_consumed(&stream_chan, STREAM_CID, true);
+}
+
+static void storage_init_bb9f14f0e0(void)
+{
+	net_buf_pool_init(&pdu_pool);
+}
+
+static void migrated_pools_init(void)
+{
+	net_buf_pool_init(&pdu_pool);
+}
+
+int bt_test_l2cap_br_recv_setup(void **state)
+{
+	int environment_result = bt_test_host_setup(state);
+
+	if (environment_result != 0) {
+		return environment_result;
+	}
+
+ bt_test_require(bt_l2cap_br_fixed_chan_register(&test_basic_chan));
+#if (defined(CONFIG_BT_L2CAP_RET_FC))
+ bt_test_require(bt_l2cap_br_fixed_chan_register(&test_stream_chan));
+#endif
+
+	bt_test_require(bt_conn_init());
+	migrated_pools_init();
+	storage_init_bb9f14f0e0();
+	*state = setup();
+	return 0;
+}
+static int bt_test_l2cap_br_recv_before(void **state)
+{
+	(void)state;
+	before(*state);
+	return 0;
+}
+
+
+static const struct CMUnitTest test_cases_l2cap_br_recv[] = {
+	cmocka_unit_test_setup_teardown(l2cap_br_recv__test_basic_kept, bt_test_l2cap_br_recv_before, NULL),
+	cmocka_unit_test_setup_teardown(l2cap_br_recv__test_basic_consumed, bt_test_l2cap_br_recv_before, NULL),
+	cmocka_unit_test_setup_teardown(l2cap_br_recv__test_stream_kept, bt_test_l2cap_br_recv_before, NULL),
+	cmocka_unit_test_setup_teardown(l2cap_br_recv__test_stream_consumed, bt_test_l2cap_br_recv_before, NULL),
+};
+BT_TEST_SUITE(l2cap_br_recv, test_cases_l2cap_br_recv, bt_test_l2cap_br_recv_setup, NULL);
+
+/* This fixture observes queued outbound PDUs without a running Controller.
+ * The real connection queue operations run; the TX wakeup is captured here.
+ */
+static unsigned int captured_tx_wakeups;
+void __wrap_bt_tx_irq_raise(void)
+{
+ captured_tx_wakeups++;
 }

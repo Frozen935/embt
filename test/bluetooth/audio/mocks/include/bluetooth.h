@@ -8,7 +8,7 @@
 #define MOCKS_BLUETOOTH_H_
 #include <stdint.h>
 
-#include <zephyr/bluetooth/bluetooth.h>
+#include <embt/bluetooth/bluetooth.h>
 
 struct bt_le_ext_adv {
 	/* ID Address used for advertising */

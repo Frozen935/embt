@@ -1,3 +1,10 @@
+#include "support/test_support.h"
+void mock_init_rule_before_744017(const struct bt_test_case_info *, void *);
+void mock_destroy_rule_after_744017(const struct bt_test_case_info *, void *);
+void mock_init_rule_before_127f12(const struct bt_test_case_info *, void *);
+void mock_destroy_rule_after_127f12(const struct bt_test_case_info *, void *);
+
+
 /* test_common.c - common procedures for unit test of CAP handover */
 
 /*
@@ -8,17 +15,15 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include <zephyr/autoconf.h>
-#include <zephyr/bluetooth/audio/audio.h>
-#include <zephyr/bluetooth/audio/bap.h>
-#include <zephyr/bluetooth/audio/bap_lc3_preset.h>
-#include <zephyr/bluetooth/audio/cap.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/hci_types.h>
-#include <zephyr/fff.h>
-#include <zephyr/sys/printk.h>
-#include <zephyr/ztest_assert.h>
-
+#include <embt/autoconf.h>
+#include <embt/bluetooth/audio/audio.h>
+#include <embt/bluetooth/audio/bap.h>
+#include <embt/bluetooth/audio/bap_lc3_preset.h>
+#include <embt/bluetooth/audio/cap.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/hci_types.h>
+#include <fff.h>
+#include <embt/base/log.h>
 #include "audio/bap_endpoint.h"
 #include "cap_initiator.h"
 #include "cap_handover.h"
@@ -56,16 +61,16 @@ void test_unicast_set_state(struct bt_cap_stream *cap_stream, struct bt_conn *co
 {
 	struct bt_bap_stream *bap_stream = &cap_stream->bap_stream;
 
-	printk("Setting stream %p to state %d\n", bap_stream, state);
+	bt_log_print("Setting stream %p to state %d\n", bap_stream, state);
 
 	if (state == BT_BAP_EP_STATE_IDLE) {
 		return;
 	}
 
-	zassert_not_null(cap_stream);
-	zassert_not_null(conn);
-	zassert_not_null(ep);
-	zassert_not_null(preset);
+	assert_non_null(cap_stream);
+	assert_non_null(conn);
+	assert_non_null(ep);
+	assert_non_null(preset);
 
 	bap_stream->conn = conn;
 	bap_stream->ep = ep;
@@ -89,70 +94,58 @@ void mock_unicast_client_discover(
 	int err;
 
 	err = bt_bap_unicast_client_register_cb(&unicast_client_cb);
-	zassert_equal(0, err, "Unexpected return value %d", err);
+	assert_int_equal(0, err);
 
 	if (snk_eps != NULL) {
 		RESET_FAKE(mock_bap_discover_endpoint);
 
 		err = bt_bap_unicast_client_discover(conn, BT_AUDIO_DIR_SINK);
-		zassert_equal(0, err, "Unexpected return value %d", err);
+		assert_int_equal(0, err);
 
 		zexpect_call_count("unicast_client_cb.bap_discover_endpoint",
 				   CONFIG_BT_BAP_UNICAST_CLIENT_ASE_SNK_COUNT,
 				   mock_bap_discover_endpoint_fake.call_count);
 		for (size_t i = 0U; i < mock_bap_discover_endpoint_fake.call_count; i++) {
 			/* Verify conn */
-			zassert_equal(mock_bap_discover_endpoint_fake.arg0_history[i], conn, "%p",
-				      mock_bap_discover_endpoint_fake.arg0_history[i]);
+			assert_int_equal(mock_bap_discover_endpoint_fake.arg0_history[i], conn);
 
 			/* Verify dir */
-			zassert_equal(mock_bap_discover_endpoint_fake.arg1_history[i],
-				      BT_AUDIO_DIR_SINK, "%d",
-				      mock_bap_discover_endpoint_fake.arg1_history[i]);
+			assert_int_equal(mock_bap_discover_endpoint_fake.arg1_history[i], BT_AUDIO_DIR_SINK);
 
 			/* Verify and store ep */
-			zassert_not_equal(mock_bap_discover_endpoint_fake.arg2_history[i], NULL,
-					  "%p", mock_bap_discover_endpoint_fake.arg2_history[i]);
+			assert_int_not_equal(mock_bap_discover_endpoint_fake.arg2_history[i], NULL);
 
 			snk_eps[i] = mock_bap_discover_endpoint_fake.arg2_history[i];
 
-			zassert_equal(bt_bap_ep_get_conn(snk_eps[i]), conn,
-				      "Unexpected conn %p != %p", bt_bap_ep_get_conn(snk_eps[i]),
-				      conn);
+			assert_int_equal(bt_bap_ep_get_conn(snk_eps[i]), conn);
 		}
 	}
 
 	if (src_eps != NULL) {
 		RESET_FAKE(mock_bap_discover_endpoint);
 		err = bt_bap_unicast_client_discover(conn, BT_AUDIO_DIR_SOURCE);
-		zassert_equal(0, err, "Unexpected return value %d", err);
+		assert_int_equal(0, err);
 
 		zexpect_call_count("unicast_client_cb.bap_discover_endpoint",
 				   CONFIG_BT_BAP_UNICAST_CLIENT_ASE_SRC_COUNT,
 				   mock_bap_discover_endpoint_fake.call_count);
 		for (size_t i = 0U; i < mock_bap_discover_endpoint_fake.call_count; i++) {
 			/* Verify conn */
-			zassert_equal(mock_bap_discover_endpoint_fake.arg0_history[i], conn, "%p",
-				      mock_bap_discover_endpoint_fake.arg0_history[i]);
+			assert_int_equal(mock_bap_discover_endpoint_fake.arg0_history[i], conn);
 
 			/* Verify dir */
-			zassert_equal(mock_bap_discover_endpoint_fake.arg1_history[i],
-				      BT_AUDIO_DIR_SOURCE, "%d",
-				      mock_bap_discover_endpoint_fake.arg1_history[i]);
+			assert_int_equal(mock_bap_discover_endpoint_fake.arg1_history[i], BT_AUDIO_DIR_SOURCE);
 
 			/* Verify and store ep */
-			zassert_not_equal(mock_bap_discover_endpoint_fake.arg2_history[i], NULL,
-					  "%p", mock_bap_discover_endpoint_fake.arg2_history[i]);
+			assert_int_not_equal(mock_bap_discover_endpoint_fake.arg2_history[i], NULL);
 
 			src_eps[i] = mock_bap_discover_endpoint_fake.arg2_history[i];
 
-			zassert_equal(bt_bap_ep_get_conn(src_eps[i]), conn,
-				      "Unexpected conn %p != %p", bt_bap_ep_get_conn(src_eps[i]),
-				      conn);
+			assert_int_equal(bt_bap_ep_get_conn(src_eps[i]), conn);
 		}
 	}
 
 	/* We don't need the callbacks anymore */
 	err = bt_bap_unicast_client_unregister_cb(&unicast_client_cb);
-	zassert_equal(0, err, "Unexpected return value %d", err);
+	assert_int_equal(0, err);
 }

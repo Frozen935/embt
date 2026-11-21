@@ -1,3 +1,6 @@
+#include "support/test_support.h"
+static const struct bt_hci_transport test_driver;
+#include "host/hci_core.h"
 /*
  * Copyright The Zephyr Project Contributors
  *
@@ -17,18 +20,15 @@
 #include <stdint.h>
 #include <string.h>
 
-#include <zephyr/bluetooth/addr.h>
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/buf.h>
-#include <zephyr/bluetooth/gap.h>
-#include <zephyr/bluetooth/hci_types.h>
-#include <zephyr/drivers/bluetooth.h>
-#include <zephyr/kernel.h>
-#include <zephyr/net_buf.h>
-#include <zephyr/sys/byteorder.h>
-#include <zephyr/ztest.h>
+#include <embt/bluetooth/addr.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/buf.h>
+#include <embt/bluetooth/gap.h>
+#include <embt/bluetooth/hci_types.h>
+#include <embt/drivers/bluetooth.h>
 
-#define DT_DRV_COMPAT zephyr_bt_hci_test
+#include <embt/net_buf.h>
+#include <embt/base/byteorder.h>
 
 #define TEST_RSSI (-42)
 
@@ -112,7 +112,7 @@ static void *cmd_complete(struct net_buf **buf, uint8_t plen, uint16_t opcode)
 {
 	struct bt_hci_evt_cmd_complete *cc;
 
-	*buf = bt_buf_get_evt(BT_HCI_EVT_CMD_COMPLETE, false, K_FOREVER);
+	*buf = bt_buf_get_evt(BT_HCI_EVT_CMD_COMPLETE, false, BT_FOREVER);
 	evt_create(*buf, BT_HCI_EVT_CMD_COMPLETE, sizeof(*cc) + plen);
 	cc = net_buf_add(*buf, sizeof(*cc));
 	cc->ncmd = 1U;
@@ -233,7 +233,7 @@ static const struct cmd_handler cmds[] = {
 	{BT_HCI_OP_RESET, sizeof(struct bt_hci_evt_cc_status), generic_success},
 };
 
-static int cmd_handle(const struct device *dev, struct net_buf *cmd)
+static int cmd_handle(const struct bt_hci_transport *dev, struct net_buf *cmd)
 {
 	struct net_buf *evt = NULL;
 	struct bt_hci_evt_cc_status *ccst;
@@ -264,7 +264,7 @@ static int cmd_handle(const struct device *dev, struct net_buf *cmd)
 	return 0;
 }
 
-static int driver_open(const struct device *dev)
+static int driver_open(const struct bt_hci_transport *dev)
 {
 	ARG_UNUSED(dev);
 
@@ -274,46 +274,49 @@ static int driver_open(const struct device *dev)
 /* Needed so that the test can cycle bt_disable()/bt_enable() to change the LE
  * features the fake Controller reports.
  */
-static int driver_close(const struct device *dev)
+static int driver_close(const struct bt_hci_transport *dev)
 {
 	ARG_UNUSED(dev);
 
 	return 0;
 }
 
-static int driver_send(const struct device *dev, struct net_buf *buf)
+static int driver_send(const struct bt_hci_transport *dev, struct net_buf *buf)
 {
 	uint8_t type = net_buf_pull_u8(buf);
 
-	zassert_equal(type, BT_HCI_H4_CMD, "Unexpected buffer type %u", type);
+	assert_int_equal(type, BT_HCI_H4_CMD);
 	(void)cmd_handle(dev, buf);
 	net_buf_unref(buf);
 
 	return 0;
 }
 
-static DEVICE_API(bt_hci, driver_api) = {
+static const struct bt_hci_driver_api driver_api = {
 	.open = driver_open,
 	.close = driver_close,
 	.send = driver_send,
 };
 
-#define TEST_DEVICE_INIT(inst)                                                                     \
-	static struct bt_hci_driver_data driver_data_##inst = {};                                  \
-	static const struct bt_hci_driver_config driver_config_##inst =                            \
-		BT_DT_HCI_DRIVER_CONFIG_INST_GET(inst);                                            \
-	DEVICE_DT_INST_DEFINE(inst, NULL, NULL, &driver_data_##inst, &driver_config_##inst,        \
-			      POST_KERNEL, CONFIG_KERNEL_INIT_PRIORITY_DEVICE, &driver_api)
-
-DT_INST_FOREACH_STATUS_OKAY(TEST_DEVICE_INIT);
+static struct bt_hci_driver_data test_driver_data;
+static const struct bt_hci_transport test_driver = {
+ .name = "upstream-test", .bus = 0,
+ .api = &driver_api, .data = &test_driver_data,
+};
+static void test_transport_init(void)
+{
+ bt_test_require(bt_stack_init());
+ bt_dev.hci = &test_driver;
+}
+;
 
 /*
  * Pushing events to the host
  */
 
 struct recv_job_data {
-	struct k_work work;
-	struct k_sem *sync;
+	struct bt_work work;
+	os_sem_t *sync;
 	struct net_buf *buf;
 };
 
@@ -321,13 +324,13 @@ static struct recv_job_data job_data[CONFIG_BT_BUF_EVT_RX_COUNT];
 
 #define job(buf) (&job_data[net_buf_id(buf)])
 
-static void recv_job_cb(struct k_work *item)
+static void recv_job_cb(struct bt_work *item)
 {
-	const struct device *dev = DEVICE_DT_GET(DT_DRV_INST(0));
+	const struct bt_hci_transport *dev = &test_driver;
 	struct recv_job_data *data = CONTAINER_OF(item, struct recv_job_data, work);
 
 	bt_hci_recv(dev, data->buf);
-	k_sem_give(data->sync);
+	osi_sem_give(data->sync);
 }
 
 /* Push an event to the host from the system workqueue and wait until it has
@@ -335,16 +338,22 @@ static void recv_job_cb(struct k_work *item)
  */
 static void recv_job_submit(struct net_buf *buf)
 {
-	struct k_sem sync_sem;
+	os_sem_t sync_sem;
 
 	job(buf)->buf = buf;
-	k_work_init(&job(buf)->work, recv_job_cb);
-	k_sem_init(&sync_sem, 0, 1);
+	bt_work_init(&job(buf)->work, recv_job_cb);
+	osi_sem_init(&sync_sem, 0, 1);
 	job(buf)->sync = &sync_sem;
 
 	buf = net_buf_ref(buf);
-	k_work_submit(&job(buf)->work);
-	k_sem_take(&sync_sem, K_FOREVER);
+	bt_work_submit(&job(buf)->work);
+	osi_sem_take(&sync_sem, BT_FOREVER);
+	assert_int_equal(bt_host_work_drain(), 0);
+	/* The semaphore can wake before its posting work item has returned. */
+	struct bt_work_sync injector_sync;
+
+	bt_work_flush(&job(buf)->work, &injector_sync);
+	assert_int_equal(osi_sem_deinit(&sync_sem), 0);
 	net_buf_unref(buf);
 }
 
@@ -370,7 +379,7 @@ static void send_direct_adv_report(const bt_addr_le_t *dir_addr, uint8_t num_rep
 	struct net_buf *buf;
 	uint8_t info_len = num_reports * sizeof(*info);
 
-	buf = bt_buf_get_rx(BT_BUF_EVT, K_FOREVER);
+	buf = bt_buf_get_rx(BT_BUF_EVT, BT_FOREVER);
 
 	evt_create(buf, BT_HCI_EVT_LE_META_EVENT, sizeof(*meta_evt) + 1 + info_len);
 	meta_evt = net_buf_add(buf, sizeof(*meta_evt));
@@ -392,7 +401,7 @@ static void send_adv_report(uint8_t evt_type)
 	struct bt_hci_evt_le_advertising_info *info;
 	struct net_buf *buf;
 
-	buf = bt_buf_get_rx(BT_BUF_EVT, K_FOREVER);
+	buf = bt_buf_get_rx(BT_BUF_EVT, BT_FOREVER);
 
 	evt_create(buf, BT_HCI_EVT_LE_META_EVENT, sizeof(*meta_evt) + 1 + sizeof(*info) + 1);
 	meta_evt = net_buf_add(buf, sizeof(*meta_evt));
@@ -416,7 +425,7 @@ static void send_ext_directed_report(const bt_addr_le_t *dir_addr)
 	struct bt_hci_evt_le_ext_advertising_info *info;
 	struct net_buf *buf;
 
-	buf = bt_buf_get_rx(BT_BUF_EVT, K_FOREVER);
+	buf = bt_buf_get_rx(BT_BUF_EVT, BT_FOREVER);
 
 	evt_create(buf, BT_HCI_EVT_LE_META_EVENT, sizeof(*meta_evt) + 1 + sizeof(*info));
 	meta_evt = net_buf_add(buf, sizeof(*meta_evt));
@@ -449,7 +458,7 @@ static void start_scan(uint8_t options)
 		.window = BT_GAP_SCAN_FAST_WINDOW,
 	};
 
-	zassert_ok(bt_le_scan_start(&param, NULL), "Failed to start the scanner");
+	assert_int_equal(bt_le_scan_start(&param, NULL), 0);
 }
 
 /* Start the scanner with the given options, check which filter policy the host asked the
@@ -461,11 +470,9 @@ static void check_filter_policy(uint8_t options, uint8_t expected)
 
 	start_scan(options);
 
-	zassert_equal(captured_filter_policy, expected,
-		      "Options 0x%02x requested filter policy 0x%02x, expected 0x%02x", options,
-		      captured_filter_policy, expected);
+	assert_int_equal(captured_filter_policy, expected);
 
-	zassert_ok(bt_le_scan_stop(), "Failed to stop the scanner");
+	assert_int_equal(bt_le_scan_stop(), 0);
 }
 
 static void *suite_setup(void)
@@ -474,8 +481,8 @@ static void *suite_setup(void)
 	(void)memset(test_le_features, 0, sizeof(test_le_features));
 	test_le_features[0] = BIT(BT_LE_FEAT_BIT_EXT_SCAN);
 
-	zassert_ok(bt_enable(NULL), "bt_enable failed");
-	zassert_ok(bt_le_scan_cb_register(&scan_callbacks), "Failed to register scan callbacks");
+	assert_int_equal(bt_enable(NULL), 0);
+	assert_int_equal(bt_le_scan_cb_register(&scan_callbacks), 0);
 
 	return NULL;
 }
@@ -492,26 +499,26 @@ static void test_after(void *fixture)
 {
 	ARG_UNUSED(fixture);
 
-	zassert_ok(bt_le_scan_stop(), "Failed to stop the scanner");
+	assert_int_equal(bt_le_scan_stop(), 0);
 }
 
-ZTEST_SUITE(bt_direct_adv_recv, NULL, suite_setup, test_before, test_after, NULL);
+
 
 /* The host allows the Controller to generate the LE Directed Advertising Report
  * event when the Controller supports the Extended Scanner Filter Policies.
  */
-static ZTEST(bt_direct_adv_recv, test_event_mask_bit_set)
+static void bt_direct_adv_recv__test_event_mask_bit_set(void **cm_state)
 {
-	zassert_true((captured_le_event_mask & BT_EVT_MASK_LE_DIRECT_ADV_REPORT) != 0,
-		     "LE Directed Advertising Report not unmasked, mask 0x%016llx",
-		     captured_le_event_mask);
+	(void)cm_state;
+	assert_true((captured_le_event_mask & BT_EVT_MASK_LE_DIRECT_ADV_REPORT) != 0);
 }
 
 /* Without Controller support for the Extended Scanner Filter Policies the host
  * neither unmasks the event nor lets the scanner be started with the option.
  */
-static ZTEST(bt_direct_adv_recv, test_no_controller_support)
+static void bt_direct_adv_recv__test_no_controller_support(void **cm_state)
 {
+	(void)cm_state;
 	struct bt_le_scan_param param = {
 		.type = BT_LE_SCAN_TYPE_PASSIVE,
 		.options = BT_LE_SCAN_OPT_EXT_FILTER_POLICY,
@@ -519,63 +526,54 @@ static ZTEST(bt_direct_adv_recv, test_no_controller_support)
 		.window = BT_GAP_SCAN_FAST_WINDOW,
 	};
 
-	zassert_ok(bt_disable(), "bt_disable failed");
+	assert_int_equal(bt_disable(), 0);
 
 	test_le_features[0] &= ~BIT(BT_LE_FEAT_BIT_EXT_SCAN);
 	captured_le_event_mask = 0;
 
-	zassert_ok(bt_enable(NULL), "bt_enable failed");
+	assert_int_equal(bt_enable(NULL), 0);
 
-	zassert_equal(captured_le_event_mask & BT_EVT_MASK_LE_DIRECT_ADV_REPORT, 0,
-		      "LE Directed Advertising Report unmasked without Controller support");
-	zassert_equal(bt_le_scan_start(&param, NULL), -ENOTSUP,
-		      "Scanner started without Controller support");
+	assert_int_equal(captured_le_event_mask & BT_EVT_MASK_LE_DIRECT_ADV_REPORT, 0);
+	assert_int_equal(bt_le_scan_start(&param, NULL), -ENOTSUP);
 
 	/* Restore the Controller support for the remaining tests. */
-	zassert_ok(bt_disable(), "bt_disable failed");
+	assert_int_equal(bt_disable(), 0);
 	test_le_features[0] |= BIT(BT_LE_FEAT_BIT_EXT_SCAN);
-	zassert_ok(bt_enable(NULL), "bt_enable failed");
-	zassert_true((captured_le_event_mask & BT_EVT_MASK_LE_DIRECT_ADV_REPORT) != 0,
-		     "Failed to restore Controller support");
+	assert_int_equal(bt_enable(NULL), 0);
+	assert_true((captured_le_event_mask & BT_EVT_MASK_LE_DIRECT_ADV_REPORT) != 0);
 }
 
 /* A directed advertisement whose target address the Controller could not
  * resolve is reported to the application with the target address marked as
  * unresolved.
  */
-static ZTEST(bt_direct_adv_recv, test_unresolved_target_is_reported)
+static void bt_direct_adv_recv__test_unresolved_target_is_reported(void **cm_state)
 {
+	(void)cm_state;
 	start_scan(BT_LE_SCAN_OPT_EXT_FILTER_POLICY);
 
 	send_direct_adv_report(&test_target_rpa, 1, 1);
 
-	zassert_equal(recv_call_count, 1, "Expected exactly one report, got %u", recv_call_count);
-	zassert_equal(last_report.adv_type, BT_GAP_ADV_TYPE_ADV_DIRECT_IND,
-		      "Unexpected advertising type 0x%02x", last_report.adv_type);
-	zassert_equal(last_report.adv_props, BT_GAP_ADV_PROP_CONNECTABLE | BT_GAP_ADV_PROP_DIRECTED,
-		      "Unexpected advertising properties 0x%04x", last_report.adv_props);
-	zassert_equal(last_report.rssi, TEST_RSSI, "Unexpected RSSI %d", last_report.rssi);
-	zassert_equal(last_report.sid, BT_GAP_SID_INVALID, "Unexpected SID 0x%02x",
-		      last_report.sid);
-	zassert_equal(last_report.buf_len, 0, "Unexpected advertising data length %u",
-		      last_report.buf_len);
-	zassert_true(bt_addr_le_eq(&last_report.addr, &test_adv_addr),
-		     "Unexpected advertiser address");
+	assert_int_equal(recv_call_count, 1);
+	assert_int_equal(last_report.adv_type, BT_GAP_ADV_TYPE_ADV_DIRECT_IND);
+	assert_int_equal(last_report.adv_props, BT_GAP_ADV_PROP_CONNECTABLE | BT_GAP_ADV_PROP_DIRECTED);
+	assert_int_equal(last_report.rssi, TEST_RSSI);
+	assert_int_equal(last_report.sid, BT_GAP_SID_INVALID);
+	assert_int_equal(last_report.buf_len, 0);
+	assert_true(bt_addr_le_eq(&last_report.addr, &test_adv_addr));
 
-	zassert_true(last_report.has_direct_addr, "Target address was not reported");
-	zassert_equal(last_report.direct_addr.type, BT_ADDR_LE_UNRESOLVED,
-		      "Target address not marked as unresolved, type 0x%02x",
-		      last_report.direct_addr.type);
-	zassert_mem_equal(last_report.direct_addr.a.val, test_target_rpa.a.val, BT_ADDR_SIZE,
-			  "Unexpected target address");
+	assert_true(last_report.has_direct_addr);
+	assert_int_equal(last_report.direct_addr.type, BT_ADDR_LE_UNRESOLVED);
+	assert_memory_equal(last_report.direct_addr.a.val, test_target_rpa.a.val, BT_ADDR_SIZE);
 }
 
 /* A target address the Controller did resolve identifies the local device, so
  * it stays subject to the privacy rule that drops directed reports while
  * scanning with a non-resolvable private address.
  */
-static ZTEST(bt_direct_adv_recv, test_resolved_target_follows_privacy_rules)
+static void bt_direct_adv_recv__test_resolved_target_follows_privacy_rules(void **cm_state)
 {
+	(void)cm_state;
 	bt_addr_le_t resolved_target = test_target_rpa;
 
 	resolved_target.type = BT_ADDR_LE_RANDOM_ID;
@@ -585,72 +583,73 @@ static ZTEST(bt_direct_adv_recv, test_resolved_target_follows_privacy_rules)
 	send_direct_adv_report(&resolved_target, 1, 1);
 
 	if (!IS_ENABLED(CONFIG_BT_PRIVACY) && !IS_ENABLED(CONFIG_BT_SCAN_WITH_IDENTITY)) {
-		zassert_equal(recv_call_count, 0,
-			      "Directed report for the local identity was not dropped");
+		assert_int_equal(recv_call_count, 0);
 		return;
 	}
 
-	zassert_equal(recv_call_count, 1, "Expected exactly one report, got %u", recv_call_count);
-	zassert_true(last_report.has_direct_addr, "Target address was not reported");
-	zassert_equal(last_report.direct_addr.type, BT_ADDR_LE_RANDOM,
-		      "Identity address not converted, type 0x%02x", last_report.direct_addr.type);
-	zassert_mem_equal(last_report.direct_addr.a.val, test_target_rpa.a.val, BT_ADDR_SIZE,
-			  "Unexpected target address");
+	assert_int_equal(recv_call_count, 1);
+	assert_true(last_report.has_direct_addr);
+	assert_int_equal(last_report.direct_addr.type, BT_ADDR_LE_RANDOM);
+	assert_memory_equal(last_report.direct_addr.a.val, test_target_rpa.a.val, BT_ADDR_SIZE);
 }
 
 /* Every report of an event carrying more than one is delivered. */
-static ZTEST(bt_direct_adv_recv, test_multiple_reports)
+static void bt_direct_adv_recv__test_multiple_reports(void **cm_state)
 {
+	(void)cm_state;
 	start_scan(BT_LE_SCAN_OPT_EXT_FILTER_POLICY);
 
 	send_direct_adv_report(&test_target_rpa, 3, 3);
 
-	zassert_equal(recv_call_count, 3, "Expected three reports, got %u", recv_call_count);
+	assert_int_equal(recv_call_count, 3);
 }
 
 /* An event whose num_reports field claims more reports than the payload holds is
  * parsed up to the entries that are actually present. Those complete entries are
  * delivered, and parsing stops where the payload runs out.
  */
-static ZTEST(bt_direct_adv_recv, test_truncated_event_delivers_complete_reports)
+static void bt_direct_adv_recv__test_truncated_event_delivers_complete_reports(void **cm_state)
 {
+	(void)cm_state;
 	start_scan(BT_LE_SCAN_OPT_EXT_FILTER_POLICY);
 
 	send_direct_adv_report(&test_target_rpa, 1, 2);
 
-	zassert_equal(recv_call_count, 1, "Expected only the complete report, got %u",
-		      recv_call_count);
+	assert_int_equal(recv_call_count, 1);
 }
 
 /* An event with no report payload at all is discarded. */
-static ZTEST(bt_direct_adv_recv, test_empty_event_is_not_reported)
+static void bt_direct_adv_recv__test_empty_event_is_not_reported(void **cm_state)
 {
+	(void)cm_state;
 	start_scan(BT_LE_SCAN_OPT_EXT_FILTER_POLICY);
 
 	send_direct_adv_report(&test_target_rpa, 0, 1);
 
-	zassert_equal(recv_call_count, 0, "Expected no report, got %u", recv_call_count);
+	assert_int_equal(recv_call_count, 0);
 }
 
 /* Reports are discarded while the application is not scanning. */
-static ZTEST(bt_direct_adv_recv, test_not_reported_when_not_scanning)
+static void bt_direct_adv_recv__test_not_reported_when_not_scanning(void **cm_state)
 {
+	(void)cm_state;
 	send_direct_adv_report(&test_target_rpa, 1, 1);
 
-	zassert_equal(recv_call_count, 0, "Expected no report, got %u", recv_call_count);
+	assert_int_equal(recv_call_count, 0);
 }
 
 /* An ordinary LE Advertising Report carries no target address, so direct_addr
  * stays NULL for it.
  */
-static ZTEST(bt_direct_adv_recv, test_legacy_adv_report_has_no_target_address)
+static void bt_direct_adv_recv__test_legacy_adv_report_has_no_target_address(void **cm_state)
 {
+	(void)cm_state;
 	start_scan(BT_LE_SCAN_OPT_NONE);
 
 	send_adv_report(BT_GAP_ADV_TYPE_ADV_IND);
 
-	zassert_equal(recv_call_count, 1, "Expected exactly one report, got %u", recv_call_count);
-	zassert_false(last_report.has_direct_addr, "Unexpected target address reported");
+	assert_int_equal(recv_call_count, 1);
+	assert_false(last_report.has_direct_addr);
 }
 
 /* A directed advertisement whose target address the Controller resolved is reported
@@ -658,22 +657,21 @@ static ZTEST(bt_direct_adv_recv, test_legacy_adv_report_has_no_target_address)
  * application with BT_GAP_ADV_PROP_DIRECTED set and direct_addr NULL. Whether it is
  * delivered at all depends on the privacy rule in le_adv_recv().
  */
-static ZTEST(bt_direct_adv_recv, test_legacy_directed_report_has_no_target_address)
+static void bt_direct_adv_recv__test_legacy_directed_report_has_no_target_address(void **cm_state)
 {
+	(void)cm_state;
 	start_scan(BT_LE_SCAN_OPT_NONE);
 
 	send_adv_report(BT_GAP_ADV_TYPE_ADV_DIRECT_IND);
 
 	if (!IS_ENABLED(CONFIG_BT_PRIVACY) && !IS_ENABLED(CONFIG_BT_SCAN_WITH_IDENTITY)) {
-		zassert_equal(recv_call_count, 0,
-			      "Directed report for the local identity was not dropped");
+		assert_int_equal(recv_call_count, 0);
 		return;
 	}
 
-	zassert_equal(recv_call_count, 1, "Expected exactly one report, got %u", recv_call_count);
-	zassert_true((last_report.adv_props & BT_GAP_ADV_PROP_DIRECTED) != 0U,
-		     "Report not marked as directed, props 0x%04x", last_report.adv_props);
-	zassert_false(last_report.has_direct_addr, "Unexpected target address reported");
+	assert_int_equal(recv_call_count, 1);
+	assert_true((last_report.adv_props & BT_GAP_ADV_PROP_DIRECTED) != 0U);
+	assert_false(last_report.has_direct_addr);
 }
 
 /* The extended advertising report carries the target address directly. An
@@ -681,12 +679,13 @@ static ZTEST(bt_direct_adv_recv, test_legacy_directed_report_has_no_target_addre
  * has the identity address bit set, so it must not be treated as an identity
  * address and converted.
  */
-static ZTEST(bt_direct_adv_recv, test_ext_report_unresolved_target)
+static void bt_direct_adv_recv__test_ext_report_unresolved_target(void **cm_state)
 {
+	(void)cm_state;
 	bt_addr_le_t unresolved_target = test_target_rpa;
 
 	if (!IS_ENABLED(CONFIG_BT_EXT_ADV)) {
-		ztest_test_skip();
+		skip();
 	}
 
 	unresolved_target.type = BT_ADDR_LE_UNRESOLVED;
@@ -695,13 +694,10 @@ static ZTEST(bt_direct_adv_recv, test_ext_report_unresolved_target)
 
 	send_ext_directed_report(&unresolved_target);
 
-	zassert_equal(recv_call_count, 1, "Expected exactly one report, got %u", recv_call_count);
-	zassert_true(last_report.has_direct_addr, "Target address was not reported");
-	zassert_equal(last_report.direct_addr.type, BT_ADDR_LE_UNRESOLVED,
-		      "Target address not reported as unresolved, type 0x%02x",
-		      last_report.direct_addr.type);
-	zassert_mem_equal(last_report.direct_addr.a.val, test_target_rpa.a.val, BT_ADDR_SIZE,
-			  "Unexpected target address");
+	assert_int_equal(recv_call_count, 1);
+	assert_true(last_report.has_direct_addr);
+	assert_int_equal(last_report.direct_addr.type, BT_ADDR_LE_UNRESOLVED);
+	assert_memory_equal(last_report.direct_addr.a.val, test_target_rpa.a.val, BT_ADDR_SIZE);
 }
 
 /* All four scanning filter policies are reachable, and each option combination maps to
@@ -712,8 +708,9 @@ static ZTEST(bt_direct_adv_recv, test_ext_report_unresolved_target)
  * Without CONFIG_BT_FILTER_ACCEPT_LIST there is no accept list to filter against, so the
  * host ignores BT_LE_SCAN_OPT_FILTER_ACCEPT_LIST and asks for the unfiltered policy.
  */
-static ZTEST(bt_direct_adv_recv, test_scan_filter_policy)
+static void bt_direct_adv_recv__test_scan_filter_policy(void **cm_state)
 {
+	(void)cm_state;
 	const bool fal = IS_ENABLED(CONFIG_BT_FILTER_ACCEPT_LIST);
 
 	check_filter_policy(BT_LE_SCAN_OPT_NONE, BT_HCI_LE_SCAN_FP_BASIC_NO_FILTER);
@@ -724,3 +721,44 @@ static ZTEST(bt_direct_adv_recv, test_scan_filter_policy)
 	check_filter_policy(BT_LE_SCAN_OPT_EXT_FILTER_POLICY | BT_LE_SCAN_OPT_FILTER_ACCEPT_LIST,
 			    fal ? BT_HCI_LE_SCAN_FP_EXT_FILTER : BT_HCI_LE_SCAN_FP_EXT_NO_FILTER);
 }
+
+int bt_test_bt_direct_adv_recv_setup(void **state)
+{
+	int environment_result = bt_test_host_setup(state);
+
+	if (environment_result != 0) {
+		return environment_result;
+	}
+
+	test_transport_init();
+	*state = suite_setup();
+	return 0;
+}
+static int bt_test_bt_direct_adv_recv_before(void **state)
+{
+	(void)state;
+	test_before(*state);
+	return 0;
+}
+int bt_test_bt_direct_adv_recv_after(void **state)
+{
+	(void)state;
+	test_after(*state);
+	return 0;
+}
+
+static const struct CMUnitTest test_cases_bt_direct_adv_recv[] = {
+	cmocka_unit_test_setup_teardown(bt_direct_adv_recv__test_event_mask_bit_set, bt_test_bt_direct_adv_recv_before, bt_test_bt_direct_adv_recv_after),
+	cmocka_unit_test_setup_teardown(bt_direct_adv_recv__test_no_controller_support, bt_test_bt_direct_adv_recv_before, bt_test_bt_direct_adv_recv_after),
+	cmocka_unit_test_setup_teardown(bt_direct_adv_recv__test_unresolved_target_is_reported, bt_test_bt_direct_adv_recv_before, bt_test_bt_direct_adv_recv_after),
+	cmocka_unit_test_setup_teardown(bt_direct_adv_recv__test_resolved_target_follows_privacy_rules, bt_test_bt_direct_adv_recv_before, bt_test_bt_direct_adv_recv_after),
+	cmocka_unit_test_setup_teardown(bt_direct_adv_recv__test_multiple_reports, bt_test_bt_direct_adv_recv_before, bt_test_bt_direct_adv_recv_after),
+	cmocka_unit_test_setup_teardown(bt_direct_adv_recv__test_truncated_event_delivers_complete_reports, bt_test_bt_direct_adv_recv_before, bt_test_bt_direct_adv_recv_after),
+	cmocka_unit_test_setup_teardown(bt_direct_adv_recv__test_empty_event_is_not_reported, bt_test_bt_direct_adv_recv_before, bt_test_bt_direct_adv_recv_after),
+	cmocka_unit_test_setup_teardown(bt_direct_adv_recv__test_not_reported_when_not_scanning, bt_test_bt_direct_adv_recv_before, bt_test_bt_direct_adv_recv_after),
+	cmocka_unit_test_setup_teardown(bt_direct_adv_recv__test_legacy_adv_report_has_no_target_address, bt_test_bt_direct_adv_recv_before, bt_test_bt_direct_adv_recv_after),
+	cmocka_unit_test_setup_teardown(bt_direct_adv_recv__test_legacy_directed_report_has_no_target_address, bt_test_bt_direct_adv_recv_before, bt_test_bt_direct_adv_recv_after),
+	cmocka_unit_test_setup_teardown(bt_direct_adv_recv__test_ext_report_unresolved_target, bt_test_bt_direct_adv_recv_before, bt_test_bt_direct_adv_recv_after),
+	cmocka_unit_test_setup_teardown(bt_direct_adv_recv__test_scan_filter_policy, bt_test_bt_direct_adv_recv_before, bt_test_bt_direct_adv_recv_after),
+};
+BT_TEST_SUITE(bt_direct_adv_recv, test_cases_bt_direct_adv_recv, bt_test_bt_direct_adv_recv_setup, NULL);

@@ -1,3 +1,4 @@
+#include "support/test_support.h"
 /* csip.c - CAP Commander specific CSIP mocks */
 
 /*
@@ -9,9 +10,9 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include <zephyr/bluetooth/audio/csip.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/toolchain.h>
+#include <embt/bluetooth/audio/csip.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/compiler.h>
 
 static struct bt_csip_set_coordinator_cb *csip_cb;
 

@@ -1,3 +1,9 @@
+#include "support/test_support.h"
+#include "test_environment.h"
+void mock_init_rule_before_d38d7b(const struct bt_test_case_info *, void *);
+void mock_destroy_rule_after_d38d7b(const struct bt_test_case_info *, void *);
+
+
 /* test_cancel.c - unit test for cancel command */
 
 /*
@@ -9,17 +15,14 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <zephyr/autoconf.h>
-#include <zephyr/bluetooth/addr.h>
-#include <zephyr/bluetooth/audio/bap.h>
-#include <zephyr/bluetooth/audio/cap.h>
-#include <zephyr/bluetooth/hci_types.h>
-#include <zephyr/fff.h>
-#include <zephyr/sys/util.h>
-#include <zephyr/sys/util_macro.h>
-#include <zephyr/ztest_assert.h>
-#include <zephyr/ztest_test.h>
-
+#include <embt/autoconf.h>
+#include <embt/bluetooth/addr.h>
+#include <embt/bluetooth/audio/bap.h>
+#include <embt/bluetooth/audio/cap.h>
+#include <embt/bluetooth/hci_types.h>
+#include <fff.h>
+#include <embt/base/util.h>
+#include <embt/base/util_macro.h>
 #include "cap_commander.h"
 #include "conn.h"
 #include "expects_util.h"
@@ -66,7 +69,7 @@ static void test_start_param_init(void *f)
 
 	for (size_t i = 0U; i < ARRAY_SIZE(fixture->conns); i++) {
 		err = bt_cap_commander_discover(&fixture->conns[i]);
-		zassert_equal(0, err, "Unexpected return value %d", err);
+		assert_int_equal(0, err);
 	}
 }
 
@@ -85,7 +88,7 @@ static void *cap_commander_test_cancel_setup(void)
 	struct cap_commander_test_cancel_fixture *fixture;
 
 	fixture = malloc(sizeof(*fixture));
-	zassert_not_null(fixture);
+	assert_non_null(fixture);
 
 	return fixture;
 }
@@ -104,7 +107,7 @@ static void cap_commander_test_cancel_after(void *f)
 	int err;
 
 	err = bt_cap_commander_unregister_cb(&mock_cap_commander_cb);
-	zassert_true(err == 0 || err == -EINVAL, "Unexpected error: %d", err);
+	assert_true(err == 0 || err == -EINVAL);
 
 	for (size_t i = 0U; i < ARRAY_SIZE(fixture->conns); i++) {
 		mock_bt_conn_disconnected(&fixture->conns[i], BT_HCI_ERR_REMOTE_USER_TERM_CONN);
@@ -121,28 +124,26 @@ static void test_cancel(void)
 	int err;
 
 	err = bt_cap_commander_cancel();
-	zassert_equal(0, err, "Unexpected return value %d", err);
+	assert_int_equal(0, err);
 
 	zexpect_call_count("bt_cap_commander_cb.broadcast_reception_start", 1,
 			   mock_cap_commander_broadcast_reception_start_cb_fake.call_count);
-	zassert_equal(-ECANCELED,
-		      mock_cap_commander_broadcast_reception_start_cb_fake.arg1_history[0]);
+	assert_int_equal(-ECANCELED, mock_cap_commander_broadcast_reception_start_cb_fake.arg1_history[0]);
 }
 
-ZTEST_SUITE(cap_commander_test_cancel, NULL, cap_commander_test_cancel_setup,
-	    cap_commander_test_cancel_before, cap_commander_test_cancel_after,
-	    cap_commander_test_cancel_teardown);
 
-ZTEST_F(cap_commander_test_cancel, test_commander_cancel)
+
+static void cap_commander_test_cancel__test_commander_cancel(void **cm_state)
 {
+	struct cap_commander_test_cancel_fixture *fixture = *cm_state;
 	int err;
 
 	if (CONFIG_BT_MAX_CONN == 1) {
-		ztest_test_skip();
+		skip();
 	}
 
 	err = bt_cap_commander_register_cb(&mock_cap_commander_cb);
-	zassert_equal(0, err, "Unexpected return value %d", err);
+	assert_int_equal(0, err);
 
 	/* Do not run the add_src callback, so that the broadcast reception start procedure does not
 	 * run until completion
@@ -151,39 +152,79 @@ ZTEST_F(cap_commander_test_cancel, test_commander_cancel)
 
 	/* initiate a CAP procedure; for this test we use broadcast reception start*/
 	err = bt_cap_commander_broadcast_reception_start(&fixture->start_param);
-	zassert_equal(0, err, "Could not start CAP procedure: %d", err);
+	assert_int_equal(0, err);
 
 	test_cancel();
 }
 
-ZTEST_F(cap_commander_test_cancel, test_commander_cancel_double)
+static void cap_commander_test_cancel__test_commander_cancel_double(void **cm_state)
 {
+	struct cap_commander_test_cancel_fixture *fixture = *cm_state;
 	int err;
 
 	if (CONFIG_BT_MAX_CONN == 1) {
-		ztest_test_skip();
+		skip();
 	}
 
 	err = bt_cap_commander_register_cb(&mock_cap_commander_cb);
-	zassert_equal(0, err, "Unexpected return value %d", err);
+	assert_int_equal(0, err);
 
 	set_skip_add_src(1);
 	err = bt_cap_commander_broadcast_reception_start(&fixture->start_param);
-	zassert_equal(0, err, "Could not start CAP procedure: %d", err);
+	assert_int_equal(0, err);
 
 	test_cancel();
 
 	err = bt_cap_commander_cancel();
-	zassert_equal(-EALREADY, err, "Unexpected return value %d", err);
+	assert_int_equal(-EALREADY, err);
 }
 
-ZTEST_F(cap_commander_test_cancel, test_commander_cancel_no_proc_in_progress)
+static void cap_commander_test_cancel__test_commander_cancel_no_proc_in_progress(void **cm_state)
 {
+	struct cap_commander_test_cancel_fixture *fixture = *cm_state;
 	int err;
 
 	err = bt_cap_commander_register_cb(&mock_cap_commander_cb);
-	zassert_equal(0, err, "Unexpected return value %d", err);
+	assert_int_equal(0, err);
 
 	err = bt_cap_commander_cancel();
-	zassert_equal(-EALREADY, err, "Unexpected return value %d", err);
+	assert_int_equal(-EALREADY, err);
 }
+
+int bt_test_cap_commander_test_cancel_setup(void **state)
+{
+	int environment_result = bt_test_audio_cap_commander_environment_setup(state);
+
+	if (environment_result != 0) {
+		return environment_result;
+	}
+
+	*state = cap_commander_test_cancel_setup();
+	return 0;
+}
+static int bt_test_cap_commander_test_cancel_before(void **state)
+{
+	(void)state;
+	cap_commander_test_cancel_before(*state);
+	mock_init_rule_before_d38d7b(NULL, *state);
+	return 0;
+}
+int bt_test_cap_commander_test_cancel_after(void **state)
+{
+	(void)state;
+	cap_commander_test_cancel_after(*state);
+	mock_destroy_rule_after_d38d7b(NULL, *state);
+	return 0;
+}
+int bt_test_cap_commander_test_cancel_teardown(void **state)
+{
+	(void)state;
+	cap_commander_test_cancel_teardown(*state);
+	return 0;
+}
+static const struct CMUnitTest test_cases_cap_commander_test_cancel[] = {
+	cmocka_unit_test_setup_teardown(cap_commander_test_cancel__test_commander_cancel, bt_test_cap_commander_test_cancel_before, bt_test_cap_commander_test_cancel_after),
+	cmocka_unit_test_setup_teardown(cap_commander_test_cancel__test_commander_cancel_double, bt_test_cap_commander_test_cancel_before, bt_test_cap_commander_test_cancel_after),
+	cmocka_unit_test_setup_teardown(cap_commander_test_cancel__test_commander_cancel_no_proc_in_progress, bt_test_cap_commander_test_cancel_before, bt_test_cap_commander_test_cancel_after),
+};
+BT_TEST_SUITE(cap_commander_test_cancel, test_cases_cap_commander_test_cancel, bt_test_cap_commander_test_cancel_setup, bt_test_cap_commander_test_cancel_teardown);

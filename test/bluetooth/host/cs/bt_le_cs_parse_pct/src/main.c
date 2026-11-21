@@ -1,17 +1,18 @@
+#include "support/test_support.h"
 /*
  * Copyright (c) 2024 Nordic Semiconductor ASA
  *
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <zephyr/kernel.h>
-#include <zephyr/bluetooth/cs.h>
-#include <zephyr/fff.h>
-#include <zephyr/sys/printk.h>
+
+#include <embt/bluetooth/cs.h>
+#include <fff.h>
+#include <embt/base/log.h>
 
 DEFINE_FFF_GLOBALS;
 
-ZTEST_SUITE(bt_le_cs_parse_pct, NULL, NULL, NULL, NULL, NULL);
+
 
 struct pct_test_vector {
 	uint8_t input[3];
@@ -90,17 +91,12 @@ static const char *pct_vector_name(size_t index, const void *value)
 	static char buf[16];
 
 	ARG_UNUSED(index);
-	snprintk(buf, sizeof(buf), "0x%02X%02X%02X",
+	snprintf(buf, sizeof(buf), "0x%02X%02X%02X",
 		 v->input[0], v->input[1], v->input[2]);
 	return buf;
 }
 
-static const struct ztest_param_values pct_vals = {
-	.values = test_vector,
-	.count = ARRAY_SIZE(test_vector),
-	.elem_size = sizeof(test_vector[0]),
-	.name_cb = pct_vector_name,
-};
+
 
 /*
  *  Test success case
@@ -111,16 +107,82 @@ static const struct ztest_param_values pct_vals = {
  *  Expected behaviour:
  *   - IQ term matches expected values
  */
-ZTEST_P(bt_le_cs_parse_pct, test_parsing_success)
+static void bt_le_cs_parse_pct__test_parsing_success(void **cm_state)
 {
-	const struct pct_test_vector *v = ZTEST_GET_PARAM_PTR(struct pct_test_vector);
+	const struct pct_test_vector *v = *cm_state;
 	struct bt_le_cs_iq_sample iq;
 
 	iq = bt_le_cs_parse_pct(v->input);
 
-	zassert_equal(iq.i, v->output.i, "expected i = %d, got %d", v->output.i, iq.i);
-	zassert_equal(iq.q, v->output.q, "expected q = %d, got %d", v->output.q, iq.q);
+	assert_int_equal(iq.i, v->output.i);
+	assert_int_equal(iq.q, v->output.q);
 }
 
-ZTEST_INSTANTIATE_TEST_SUITE_P(vectors, bt_le_cs_parse_pct, test_parsing_success,
-			       pct_vals);
+
+
+
+
+
+
+static const struct CMUnitTest test_cases_bt_le_cs_parse_pct[] = {
+	{"bt_le_cs_parse_pct__test_parsing_success_0", bt_le_cs_parse_pct__test_parsing_success, NULL, NULL, (void *)&test_vector[0]},
+	{"bt_le_cs_parse_pct__test_parsing_success_1", bt_le_cs_parse_pct__test_parsing_success, NULL, NULL, (void *)&test_vector[1]},
+	{"bt_le_cs_parse_pct__test_parsing_success_2", bt_le_cs_parse_pct__test_parsing_success, NULL, NULL, (void *)&test_vector[2]},
+	{"bt_le_cs_parse_pct__test_parsing_success_3", bt_le_cs_parse_pct__test_parsing_success, NULL, NULL, (void *)&test_vector[3]},
+	{"bt_le_cs_parse_pct__test_parsing_success_4", bt_le_cs_parse_pct__test_parsing_success, NULL, NULL, (void *)&test_vector[4]},
+	{"bt_le_cs_parse_pct__test_parsing_success_5", bt_le_cs_parse_pct__test_parsing_success, NULL, NULL, (void *)&test_vector[5]},
+	{"bt_le_cs_parse_pct__test_parsing_success_6", bt_le_cs_parse_pct__test_parsing_success, NULL, NULL, (void *)&test_vector[6]},
+	{"bt_le_cs_parse_pct__test_parsing_success_7", bt_le_cs_parse_pct__test_parsing_success, NULL, NULL, (void *)&test_vector[7]},
+	{"bt_le_cs_parse_pct__test_parsing_success_8", bt_le_cs_parse_pct__test_parsing_success, NULL, NULL, (void *)&test_vector[8]},
+	{"bt_le_cs_parse_pct__test_parsing_success_9", bt_le_cs_parse_pct__test_parsing_success, NULL, NULL, (void *)&test_vector[9]},
+	{"bt_le_cs_parse_pct__test_parsing_success_10", bt_le_cs_parse_pct__test_parsing_success, NULL, NULL, (void *)&test_vector[10]},
+	{"bt_le_cs_parse_pct__test_parsing_success_11", bt_le_cs_parse_pct__test_parsing_success, NULL, NULL, (void *)&test_vector[11]},
+	{"bt_le_cs_parse_pct__test_parsing_success_12", bt_le_cs_parse_pct__test_parsing_success, NULL, NULL, (void *)&test_vector[12]},
+	{"bt_le_cs_parse_pct__test_parsing_success_13", bt_le_cs_parse_pct__test_parsing_success, NULL, NULL, (void *)&test_vector[13]},
+	{"bt_le_cs_parse_pct__test_parsing_success_14", bt_le_cs_parse_pct__test_parsing_success, NULL, NULL, (void *)&test_vector[14]},
+	{"bt_le_cs_parse_pct__test_parsing_success_15", bt_le_cs_parse_pct__test_parsing_success, NULL, NULL, (void *)&test_vector[15]},
+	{"bt_le_cs_parse_pct__test_parsing_success_16", bt_le_cs_parse_pct__test_parsing_success, NULL, NULL, (void *)&test_vector[16]},
+	{"bt_le_cs_parse_pct__test_parsing_success_17", bt_le_cs_parse_pct__test_parsing_success, NULL, NULL, (void *)&test_vector[17]},
+	{"bt_le_cs_parse_pct__test_parsing_success_18", bt_le_cs_parse_pct__test_parsing_success, NULL, NULL, (void *)&test_vector[18]},
+	{"bt_le_cs_parse_pct__test_parsing_success_19", bt_le_cs_parse_pct__test_parsing_success, NULL, NULL, (void *)&test_vector[19]},
+	{"bt_le_cs_parse_pct__test_parsing_success_20", bt_le_cs_parse_pct__test_parsing_success, NULL, NULL, (void *)&test_vector[20]},
+	{"bt_le_cs_parse_pct__test_parsing_success_21", bt_le_cs_parse_pct__test_parsing_success, NULL, NULL, (void *)&test_vector[21]},
+	{"bt_le_cs_parse_pct__test_parsing_success_22", bt_le_cs_parse_pct__test_parsing_success, NULL, NULL, (void *)&test_vector[22]},
+	{"bt_le_cs_parse_pct__test_parsing_success_23", bt_le_cs_parse_pct__test_parsing_success, NULL, NULL, (void *)&test_vector[23]},
+	{"bt_le_cs_parse_pct__test_parsing_success_24", bt_le_cs_parse_pct__test_parsing_success, NULL, NULL, (void *)&test_vector[24]},
+	{"bt_le_cs_parse_pct__test_parsing_success_25", bt_le_cs_parse_pct__test_parsing_success, NULL, NULL, (void *)&test_vector[25]},
+	{"bt_le_cs_parse_pct__test_parsing_success_26", bt_le_cs_parse_pct__test_parsing_success, NULL, NULL, (void *)&test_vector[26]},
+	{"bt_le_cs_parse_pct__test_parsing_success_27", bt_le_cs_parse_pct__test_parsing_success, NULL, NULL, (void *)&test_vector[27]},
+	{"bt_le_cs_parse_pct__test_parsing_success_28", bt_le_cs_parse_pct__test_parsing_success, NULL, NULL, (void *)&test_vector[28]},
+	{"bt_le_cs_parse_pct__test_parsing_success_29", bt_le_cs_parse_pct__test_parsing_success, NULL, NULL, (void *)&test_vector[29]},
+	{"bt_le_cs_parse_pct__test_parsing_success_30", bt_le_cs_parse_pct__test_parsing_success, NULL, NULL, (void *)&test_vector[30]},
+	{"bt_le_cs_parse_pct__test_parsing_success_31", bt_le_cs_parse_pct__test_parsing_success, NULL, NULL, (void *)&test_vector[31]},
+	{"bt_le_cs_parse_pct__test_parsing_success_32", bt_le_cs_parse_pct__test_parsing_success, NULL, NULL, (void *)&test_vector[32]},
+	{"bt_le_cs_parse_pct__test_parsing_success_33", bt_le_cs_parse_pct__test_parsing_success, NULL, NULL, (void *)&test_vector[33]},
+	{"bt_le_cs_parse_pct__test_parsing_success_34", bt_le_cs_parse_pct__test_parsing_success, NULL, NULL, (void *)&test_vector[34]},
+	{"bt_le_cs_parse_pct__test_parsing_success_35", bt_le_cs_parse_pct__test_parsing_success, NULL, NULL, (void *)&test_vector[35]},
+	{"bt_le_cs_parse_pct__test_parsing_success_36", bt_le_cs_parse_pct__test_parsing_success, NULL, NULL, (void *)&test_vector[36]},
+	{"bt_le_cs_parse_pct__test_parsing_success_37", bt_le_cs_parse_pct__test_parsing_success, NULL, NULL, (void *)&test_vector[37]},
+	{"bt_le_cs_parse_pct__test_parsing_success_38", bt_le_cs_parse_pct__test_parsing_success, NULL, NULL, (void *)&test_vector[38]},
+	{"bt_le_cs_parse_pct__test_parsing_success_39", bt_le_cs_parse_pct__test_parsing_success, NULL, NULL, (void *)&test_vector[39]},
+	{"bt_le_cs_parse_pct__test_parsing_success_40", bt_le_cs_parse_pct__test_parsing_success, NULL, NULL, (void *)&test_vector[40]},
+	{"bt_le_cs_parse_pct__test_parsing_success_41", bt_le_cs_parse_pct__test_parsing_success, NULL, NULL, (void *)&test_vector[41]},
+	{"bt_le_cs_parse_pct__test_parsing_success_42", bt_le_cs_parse_pct__test_parsing_success, NULL, NULL, (void *)&test_vector[42]},
+	{"bt_le_cs_parse_pct__test_parsing_success_43", bt_le_cs_parse_pct__test_parsing_success, NULL, NULL, (void *)&test_vector[43]},
+	{"bt_le_cs_parse_pct__test_parsing_success_44", bt_le_cs_parse_pct__test_parsing_success, NULL, NULL, (void *)&test_vector[44]},
+	{"bt_le_cs_parse_pct__test_parsing_success_45", bt_le_cs_parse_pct__test_parsing_success, NULL, NULL, (void *)&test_vector[45]},
+	{"bt_le_cs_parse_pct__test_parsing_success_46", bt_le_cs_parse_pct__test_parsing_success, NULL, NULL, (void *)&test_vector[46]},
+	{"bt_le_cs_parse_pct__test_parsing_success_47", bt_le_cs_parse_pct__test_parsing_success, NULL, NULL, (void *)&test_vector[47]},
+	{"bt_le_cs_parse_pct__test_parsing_success_48", bt_le_cs_parse_pct__test_parsing_success, NULL, NULL, (void *)&test_vector[48]},
+	{"bt_le_cs_parse_pct__test_parsing_success_49", bt_le_cs_parse_pct__test_parsing_success, NULL, NULL, (void *)&test_vector[49]},
+	{"bt_le_cs_parse_pct__test_parsing_success_50", bt_le_cs_parse_pct__test_parsing_success, NULL, NULL, (void *)&test_vector[50]},
+	{"bt_le_cs_parse_pct__test_parsing_success_51", bt_le_cs_parse_pct__test_parsing_success, NULL, NULL, (void *)&test_vector[51]},
+	{"bt_le_cs_parse_pct__test_parsing_success_52", bt_le_cs_parse_pct__test_parsing_success, NULL, NULL, (void *)&test_vector[52]},
+	{"bt_le_cs_parse_pct__test_parsing_success_53", bt_le_cs_parse_pct__test_parsing_success, NULL, NULL, (void *)&test_vector[53]},
+	{"bt_le_cs_parse_pct__test_parsing_success_54", bt_le_cs_parse_pct__test_parsing_success, NULL, NULL, (void *)&test_vector[54]},
+	{"bt_le_cs_parse_pct__test_parsing_success_55", bt_le_cs_parse_pct__test_parsing_success, NULL, NULL, (void *)&test_vector[55]},
+	{"bt_le_cs_parse_pct__test_parsing_success_56", bt_le_cs_parse_pct__test_parsing_success, NULL, NULL, (void *)&test_vector[56]},
+	{"bt_le_cs_parse_pct__test_parsing_success_57", bt_le_cs_parse_pct__test_parsing_success, NULL, NULL, (void *)&test_vector[57]},
+	{"bt_le_cs_parse_pct__test_parsing_success_58", bt_le_cs_parse_pct__test_parsing_success, NULL, NULL, (void *)&test_vector[58]}
+};
+BT_TEST_SUITE(bt_le_cs_parse_pct, test_cases_bt_le_cs_parse_pct, bt_test_base_setup, NULL);

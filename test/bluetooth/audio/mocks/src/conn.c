@@ -1,3 +1,5 @@
+#include "support/test_support.h"
+
 /*
  * Copyright (c) 2023 Codecoup
  * Copyright (c) 2024-2025 Nordic Semiconductor ASA
@@ -10,18 +12,21 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include <zephyr/autoconf.h>
-#include <zephyr/bluetooth/addr.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/fff.h>
-#include <zephyr/sys/iterable_sections.h>
-#include <zephyr/sys/util.h>
-#include <zephyr/toolchain.h>
+#include <embt/autoconf.h>
+#include <embt/bluetooth/addr.h>
+#include <embt/bluetooth/conn.h>
+#include <fff.h>
+#include <errno.h>
+#include <embt/base/util.h>
+#include <embt/compiler.h>
 
 #include "conn.h"
 
 DEFINE_FAKE_VOID_FUNC(bt_conn_foreach, enum bt_conn_type, bt_conn_foreach_cb, void *);
 DEFINE_FAKE_VOID_FUNC(bt_foreach_bond, uint8_t, bt_foreach_bond_cb, void *);
+
+static struct bt_conn_cb *callbacks[32];
+static size_t callback_count;
 
 static struct bt_conn_auth_info_cb *bt_auth_info_cb;
 
@@ -93,7 +98,8 @@ void mock_bt_conn_connected(struct bt_conn *conn, uint8_t err)
 {
 	conn->info.state = BT_CONN_STATE_CONNECTED;
 
-	STRUCT_SECTION_FOREACH(bt_conn_cb, cb) {
+	for (size_t i = 0; i < callback_count; i++) {
+		struct bt_conn_cb *cb = callbacks[i];
 		if (cb->connected) {
 			cb->connected(conn, err);
 		}
@@ -104,7 +110,8 @@ void mock_bt_conn_disconnected(struct bt_conn *conn, uint8_t err)
 {
 	conn->info.state = BT_CONN_STATE_DISCONNECTING;
 
-	STRUCT_SECTION_FOREACH(bt_conn_cb, cb) {
+	for (size_t i = 0; i < callback_count; i++) {
+		struct bt_conn_cb *cb = callbacks[i];
 		if (cb->disconnected) {
 			cb->disconnected(conn, err);
 		}
@@ -121,7 +128,8 @@ void mock_bt_conn_security_changed(struct bt_conn *conn, bt_security_t level,
 		conn->info.security.level = level;
 	}
 
-	STRUCT_SECTION_FOREACH(bt_conn_cb, cb) {
+	for (size_t i = 0; i < callback_count; i++) {
+		struct bt_conn_cb *cb = callbacks[i];
 		if (cb->security_changed) {
 			cb->security_changed(conn, level, err);
 		}
@@ -136,4 +144,19 @@ bool bt_conn_is_type(const struct bt_conn *conn, enum bt_conn_type type)
 	}
 
 	return (conn->info.type & type) != 0;
+}
+
+int bt_conn_cb_register(struct bt_conn_cb *cb)
+{
+	for (size_t i = 0; i < callback_count; i++) {
+		if (callbacks[i] == cb) { return -EEXIST; }
+	}
+	if (!cb || callback_count == ARRAY_SIZE(callbacks)) { return -EINVAL; }
+	callbacks[callback_count++] = cb;
+	return 0;
+}
+
+struct bt_conn *bt_conn_take(struct bt_conn **original)
+{
+	return __atomic_exchange_n(original, NULL, __ATOMIC_SEQ_CST);
 }

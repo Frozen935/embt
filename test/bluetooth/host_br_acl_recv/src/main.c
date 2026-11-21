@@ -1,3 +1,5 @@
+#include "support/test_support.h"
+#include "host/conn_internal.h"
 /*
  * SPDX-FileCopyrightText: Copyright (c) 2026 Silicon Laboratories Inc.
  * SPDX-License-Identifier: Apache-2.0
@@ -8,14 +10,12 @@
 #include <stdint.h>
 #include <string.h>
 
-#include <zephyr/bluetooth/buf.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/kernel.h>
-#include <zephyr/net_buf.h>
-#include <zephyr/sys/byteorder.h>
-#include <zephyr/sys/util.h>
-#include <zephyr/ztest.h>
+#include <embt/bluetooth/buf.h>
+#include <embt/bluetooth/conn.h>
 
+#include <embt/net_buf.h>
+#include <embt/base/byteorder.h>
+#include <embt/base/util.h>
 #include "host/classic/conn_br_internal.h"
 
 #define L2CAP_HDR_LEN   4U
@@ -47,10 +47,10 @@ void __wrap_bt_l2cap_recv(struct bt_conn *conn, struct net_buf *buf, bool comple
 {
 	struct rx_pdu *pdu;
 
-	zassert_equal_ptr(conn, TEST_CONN);
-	zassert_true(complete);
-	zassert_true(rx_count < ARRAY_SIZE(rx), "Too many PDUs delivered");
-	zassert_true(buf->len <= sizeof(pdu->bytes));
+	assert_ptr_equal(conn, TEST_CONN);
+	assert_true(complete);
+	assert_true(rx_count < ARRAY_SIZE(rx));
+	assert_true(buf->len <= sizeof(pdu->bytes));
 
 	pdu = &rx[rx_count];
 	pdu->buf = buf;
@@ -82,15 +82,15 @@ static struct net_buf *acl_packet(const uint16_t *payload_lens, size_t count)
 {
 	struct net_buf *buf;
 
-	buf = bt_buf_get_rx(BT_BUF_ACL_IN, K_NO_WAIT);
-	zassert_not_null(buf);
+	buf = bt_buf_get_rx(BT_BUF_ACL_IN, BT_NO_WAIT);
+	assert_non_null(buf);
 
 	/* Drop the H4 packet type, as the HCI core does before L2CAP sees the buffer */
 	(void)net_buf_pull_u8(buf);
 
 	for (size_t pdu = 0; pdu < count; pdu++) {
-		zassert_true(payload_lens[pdu] <= MAX_PAYLOAD_LEN);
-		zassert_true(net_buf_tailroom(buf) >= L2CAP_HDR_LEN + payload_lens[pdu]);
+		assert_true(payload_lens[pdu] <= MAX_PAYLOAD_LEN);
+		assert_true(net_buf_tailroom(buf) >= L2CAP_HDR_LEN + payload_lens[pdu]);
 
 		net_buf_add_le16(buf, payload_lens[pdu]);
 		net_buf_add_le16(buf, 0x0040U + pdu);
@@ -105,13 +105,12 @@ static struct net_buf *acl_packet(const uint16_t *payload_lens, size_t count)
 
 static void check_pdu(size_t pdu, const uint8_t *data, uint16_t len, uint16_t payload_len)
 {
-	zassert_equal(len, L2CAP_HDR_LEN + payload_len, "PDU %zu: len %u", pdu, len);
-	zassert_equal(sys_get_le16(&data[0]), payload_len, "PDU %zu: header", pdu);
-	zassert_equal(sys_get_le16(&data[2]), 0x0040U + pdu, "PDU %zu: CID", pdu);
+	assert_int_equal(len, L2CAP_HDR_LEN + payload_len);
+	assert_int_equal(sys_get_le16(&data[0]), payload_len);
+	assert_int_equal(sys_get_le16(&data[2]), 0x0040U + pdu);
 
 	for (size_t i = 0; i < payload_len; i++) {
-		zassert_equal(data[L2CAP_HDR_LEN + i], payload_byte(pdu, i), "PDU %zu: byte %zu",
-			      pdu, i);
+		assert_int_equal(data[L2CAP_HDR_LEN + i], payload_byte(pdu, i));
 	}
 }
 
@@ -126,7 +125,7 @@ static void check_kept(size_t pdu, uint16_t payload_len)
 {
 	struct net_buf *buf = rx[pdu].buf;
 
-	zassert_equal_ptr(buf->data, rx[pdu].data, "PDU %zu: cursor moved", pdu);
+	assert_ptr_equal(buf->data, rx[pdu].data);
 	check_pdu(pdu, buf->data, buf->len, payload_len);
 }
 
@@ -141,40 +140,42 @@ static void before(void *fixture)
 	bt_buf_rx_freed_cb_set(rx_freed);
 }
 
-ZTEST_SUITE(br_acl_recv, NULL, NULL, before, NULL, NULL);
+
 
 /* A receiver that keeps the only PDU of a packet sees it after bt_br_acl_recv() returns */
-ZTEST(br_acl_recv, test_single_pdu_kept)
+static void br_acl_recv__test_single_pdu_kept(void **cm_state)
 {
+	(void)cm_state;
 	static const uint16_t lens[] = { 5 };
 	struct net_buf *acl = acl_packet(lens, ARRAY_SIZE(lens));
 
 	rx_keep = KEEP_ALL;
 	bt_br_acl_recv(TEST_CONN, acl, true);
 
-	zassert_equal(rx_count, 1);
-	zassert_equal_ptr(rx[0].buf, acl);
+	assert_int_equal(rx_count, 1);
+	assert_ptr_equal(rx[0].buf, acl);
 	check_kept(0, lens[0]);
-	zassert_equal(acl_freed, 0);
+	assert_int_equal(acl_freed, 0);
 
 	net_buf_unref(rx[0].buf);
-	zassert_equal(acl_freed, 1);
+	assert_int_equal(acl_freed, 1);
 }
 
 /* Each PDU of a packet carrying several keeps its own buffer, and the ACL
  * buffer is freed exactly once, after the last of them is released.
  */
-ZTEST(br_acl_recv, test_multiple_pdus_kept)
+static void br_acl_recv__test_multiple_pdus_kept(void **cm_state)
 {
+	(void)cm_state;
 	static const uint16_t lens[] = { 3, 1, 7 };
 	struct net_buf *acl = acl_packet(lens, ARRAY_SIZE(lens));
 
 	rx_keep = KEEP_ALL;
 	bt_br_acl_recv(TEST_CONN, acl, true);
 
-	zassert_equal(rx_count, ARRAY_SIZE(lens));
-	zassert_equal_ptr(rx[ARRAY_SIZE(lens) - 1].buf, acl, "Last PDU not in the ACL buffer");
-	zassert_not_equal(rx[0].buf, rx[1].buf);
+	assert_int_equal(rx_count, ARRAY_SIZE(lens));
+	assert_ptr_equal(rx[ARRAY_SIZE(lens) - 1].buf, acl);
+	assert_int_not_equal(rx[0].buf, rx[1].buf);
 
 	for (size_t pdu = 0; pdu < ARRAY_SIZE(lens); pdu++) {
 		check_kept(pdu, lens[pdu]);
@@ -182,37 +183,39 @@ ZTEST(br_acl_recv, test_multiple_pdus_kept)
 
 	/* A push on a view cannot reach the PDUs before it */
 	for (size_t pdu = 0; pdu < ARRAY_SIZE(lens) - 1; pdu++) {
-		zassert_equal(net_buf_headroom(rx[pdu].buf), 0U, "PDU %zu: headroom", pdu);
+		assert_int_equal(net_buf_headroom(rx[pdu].buf), 0U);
 	}
 
 	net_buf_unref(rx[2].buf);
 	net_buf_unref(rx[0].buf);
-	zassert_equal(acl_freed, 0);
+	assert_int_equal(acl_freed, 0);
 
 	net_buf_unref(rx[1].buf);
-	zassert_equal(acl_freed, 1);
+	assert_int_equal(acl_freed, 1);
 }
 
 /* A receiver that consumes each PDU synchronously sees every PDU once */
-ZTEST(br_acl_recv, test_multiple_pdus_released)
+static void br_acl_recv__test_multiple_pdus_released(void **cm_state)
 {
+	(void)cm_state;
 	static const uint16_t lens[] = { 2, 4, 6 };
 	struct net_buf *acl = acl_packet(lens, ARRAY_SIZE(lens));
 
 	bt_br_acl_recv(TEST_CONN, acl, true);
 
-	zassert_equal(rx_count, ARRAY_SIZE(lens));
+	assert_int_equal(rx_count, ARRAY_SIZE(lens));
 
 	for (size_t pdu = 0; pdu < ARRAY_SIZE(lens); pdu++) {
 		check_delivered(pdu, lens[pdu]);
 	}
 
-	zassert_equal(acl_freed, 1);
+	assert_int_equal(acl_freed, 1);
 }
 
 /* With every view kept by earlier receivers, later PDUs are still delivered */
-ZTEST(br_acl_recv, test_views_exhausted)
+static void br_acl_recv__test_views_exhausted(void **cm_state)
 {
+	(void)cm_state;
 	uint16_t lens[MAX_PDUS];
 	struct net_buf *acl;
 	size_t views = MAX_PDUS - 2;
@@ -226,31 +229,32 @@ ZTEST(br_acl_recv, test_views_exhausted)
 	rx_keep = views;
 	bt_br_acl_recv(TEST_CONN, acl, true);
 
-	zassert_equal(rx_count, ARRAY_SIZE(lens));
+	assert_int_equal(rx_count, ARRAY_SIZE(lens));
 
 	for (size_t pdu = 0; pdu < ARRAY_SIZE(lens); pdu++) {
 		check_delivered(pdu, lens[pdu]);
 	}
 
 	for (size_t pdu = 0; pdu < views; pdu++) {
-		zassert_not_equal(rx[pdu].buf, acl);
+		assert_int_not_equal(rx[pdu].buf, acl);
 		check_kept(pdu, lens[pdu]);
 	}
 
-	zassert_equal_ptr(rx[views].buf, acl, "PDU past the views not in the ACL buffer");
+	assert_ptr_equal(rx[views].buf, acl);
 
-	zassert_equal(acl_freed, 0);
+	assert_int_equal(acl_freed, 0);
 
 	for (size_t pdu = 0; pdu < views; pdu++) {
 		net_buf_unref(rx[pdu].buf);
 	}
 
-	zassert_equal(acl_freed, 1);
+	assert_int_equal(acl_freed, 1);
 }
 
 /* Bytes after the last PDU that are too few for an L2CAP header are dropped */
-ZTEST(br_acl_recv, test_trailing_bytes)
+static void br_acl_recv__test_trailing_bytes(void **cm_state)
 {
+	(void)cm_state;
 	static const uint16_t lens[] = { 3 };
 
 	for (size_t trailing = 1; trailing < L2CAP_HDR_LEN; trailing++) {
@@ -264,8 +268,38 @@ ZTEST(br_acl_recv, test_trailing_bytes)
 		acl_freed = 0;
 		bt_br_acl_recv(TEST_CONN, acl, true);
 
-		zassert_equal(rx_count, 1, "%zu trailing bytes", trailing);
+		assert_int_equal(rx_count, 1);
 		check_delivered(0, lens[0]);
-		zassert_equal(acl_freed, 1, "%zu trailing bytes", trailing);
+		assert_int_equal(acl_freed, 1);
 	}
 }
+
+int bt_test_br_acl_recv_setup(void **state)
+{
+	int environment_result = bt_test_host_setup(state);
+
+	if (environment_result != 0) {
+		return environment_result;
+	}
+
+	bt_test_select_unopened_hci();
+	bt_test_require(bt_conn_init());
+	*state = NULL;
+	return 0;
+}
+static int bt_test_br_acl_recv_before(void **state)
+{
+	(void)state;
+	before(*state);
+	return 0;
+}
+
+
+static const struct CMUnitTest test_cases_br_acl_recv[] = {
+	cmocka_unit_test_setup_teardown(br_acl_recv__test_single_pdu_kept, bt_test_br_acl_recv_before, NULL),
+	cmocka_unit_test_setup_teardown(br_acl_recv__test_multiple_pdus_kept, bt_test_br_acl_recv_before, NULL),
+	cmocka_unit_test_setup_teardown(br_acl_recv__test_multiple_pdus_released, bt_test_br_acl_recv_before, NULL),
+	cmocka_unit_test_setup_teardown(br_acl_recv__test_views_exhausted, bt_test_br_acl_recv_before, NULL),
+	cmocka_unit_test_setup_teardown(br_acl_recv__test_trailing_bytes, bt_test_br_acl_recv_before, NULL),
+};
+BT_TEST_SUITE(br_acl_recv, test_cases_br_acl_recv, bt_test_br_acl_recv_setup, NULL);

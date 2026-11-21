@@ -1,3 +1,9 @@
+#include "support/test_support.h"
+#include "test_environment.h"
+void mock_init_rule_before_d38d7b(const struct bt_test_case_info *, void *);
+void mock_destroy_rule_after_d38d7b(const struct bt_test_case_info *, void *);
+
+
 /* test_distribute_broadcast_code.c - unit test for distribute broadcast code */
 
 /*
@@ -10,14 +16,11 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <zephyr/autoconf.h>
-#include <zephyr/bluetooth/audio/bap.h>
-#include <zephyr/bluetooth/audio/cap.h>
-#include <zephyr/bluetooth/hci_types.h>
-#include <zephyr/fff.h>
-#include <zephyr/ztest_assert.h>
-#include <zephyr/ztest_test.h>
-
+#include <embt/autoconf.h>
+#include <embt/bluetooth/audio/bap.h>
+#include <embt/bluetooth/audio/cap.h>
+#include <embt/bluetooth/hci_types.h>
+#include <fff.h>
 #include "cap_commander.h"
 #include "conn.h"
 #include "expects_util.h"
@@ -25,7 +28,7 @@
 #include "test_common.h"
 
 #include <embt/base/log.h>
-#include <zephyr/sys/util.h>
+#include <embt/base/util.h>
 
 LOG_MODULE_REGISTER(bt_distribute_broadcast_code, CONFIG_BT_CAP_COMMANDER_LOG_LEVEL);
 
@@ -69,7 +72,7 @@ static void *cap_commander_test_distribute_broadcast_code_setup(void)
 	struct cap_commander_test_distribute_broadcast_code_fixture *fixture;
 
 	fixture = malloc(sizeof(*fixture));
-	zassert_not_null(fixture);
+	assert_non_null(fixture);
 
 	return fixture;
 }
@@ -84,7 +87,7 @@ static void cap_commander_test_distribute_broadcast_code_before(void *f)
 
 	for (size_t i = 0U; i < ARRAY_SIZE(fixture->conns); i++) {
 		err = bt_cap_commander_discover(&fixture->conns[i]);
-		zassert_equal(0, err, "Unexpected return value %d", err);
+		assert_int_equal(0, err);
 	}
 }
 
@@ -94,13 +97,13 @@ static void cap_commander_test_distribute_broadcast_code_after(void *f)
 	int err;
 
 	err = bt_cap_commander_unregister_cb(&mock_cap_commander_cb);
-	zassert_true(err == 0 || err == -EINVAL, "Unexpected error: %d", err);
+	assert_true(err == 0 || err == -EINVAL);
 	err = bt_bap_broadcast_assistant_unregister_cb(&fixture->broadcast_assistant_cb);
-	zassert_true(err == 0 || err == -EALREADY, "Unexpected error: %d", err);
+	assert_true(err == 0 || err == -EALREADY);
 
 	/* We need to cleanup since the CAP commander remembers state */
 	err = bt_cap_commander_cancel();
-	zassert_true(err == 0 || err == -EALREADY, "Unexpected error: %d", err);
+	assert_true(err == 0 || err == -EALREADY);
 
 	for (size_t i = 0U; i < ARRAY_SIZE(fixture->conns); i++) {
 		mock_bt_conn_disconnected(&fixture->conns[i], BT_HCI_ERR_REMOTE_USER_TERM_CONN);
@@ -118,38 +121,34 @@ static void test_distribute_broadcast_code(
 	int err;
 
 	err = bt_cap_commander_distribute_broadcast_code(distribute_broadcast_code_param);
-	zassert_equal(0, err, "Unexpected return value %d", err);
+	assert_int_equal(0, err);
 
 	zexpect_call_count("bt_cap_commander_cb.distribute_broadcast_code", 1,
 			   mock_cap_commander_distribute_broadcast_code_cb_fake.call_count);
-	zassert_equal_ptr(NULL,
-			  mock_cap_commander_distribute_broadcast_code_cb_fake.arg0_history[0]);
-	zassert_equal(0, mock_cap_commander_distribute_broadcast_code_cb_fake.arg1_history[0]);
+	assert_ptr_equal(NULL, mock_cap_commander_distribute_broadcast_code_cb_fake.arg0_history[0]);
+	assert_int_equal(0, mock_cap_commander_distribute_broadcast_code_cb_fake.arg1_history[0]);
 }
 
-ZTEST_SUITE(cap_commander_test_distribute_broadcast_code, NULL,
-	    cap_commander_test_distribute_broadcast_code_setup,
-	    cap_commander_test_distribute_broadcast_code_before,
-	    cap_commander_test_distribute_broadcast_code_after,
-	    cap_commander_test_distribute_broadcast_code_teardown);
 
-ZTEST_F(cap_commander_test_distribute_broadcast_code, test_commander_distribute_broadcast_code)
+
+static void cap_commander_test_distribute_broadcast_code__test_commander_distribute_broadcast_code(void **cm_state)
 {
+	struct cap_commander_test_distribute_broadcast_code_fixture *fixture = *cm_state;
 	int err;
 
 	err = bt_cap_commander_register_cb(&mock_cap_commander_cb);
-	zassert_equal(0, err, "Unexpected return value %d", err);
+	assert_int_equal(0, err);
 
 	test_distribute_broadcast_code(&fixture->distribute_broadcast_code_param);
 }
 
-ZTEST_F(cap_commander_test_distribute_broadcast_code,
-	test_commander_reception_distribute_broadcast_code_double)
+static void cap_commander_test_distribute_broadcast_code__test_commander_reception_distribute_broadcast_code_double(void **cm_state)
 {
+	struct cap_commander_test_distribute_broadcast_code_fixture *fixture = *cm_state;
 	int err;
 
 	err = bt_cap_commander_register_cb(&mock_cap_commander_cb);
-	zassert_equal(0, err, "Unexpected return value %d", err);
+	assert_int_equal(0, err);
 
 	test_distribute_broadcast_code(&fixture->distribute_broadcast_code_param);
 
@@ -158,58 +157,57 @@ ZTEST_F(cap_commander_test_distribute_broadcast_code,
 	 * callback function is called
 	 */
 	err = bt_cap_commander_distribute_broadcast_code(&fixture->distribute_broadcast_code_param);
-	zassert_equal(0, err, "Unexpected return value %d", err);
+	assert_int_equal(0, err);
 
 	zexpect_call_count("bt_cap_commander_cb.distribute_broadcast_code", 2,
 			   mock_cap_commander_distribute_broadcast_code_cb_fake.call_count);
-	zassert_equal_ptr(NULL,
-			  mock_cap_commander_distribute_broadcast_code_cb_fake.arg0_history[1]);
-	zassert_equal(0, mock_cap_commander_distribute_broadcast_code_cb_fake.arg1_history[1]);
+	assert_ptr_equal(NULL, mock_cap_commander_distribute_broadcast_code_cb_fake.arg0_history[1]);
+	assert_int_equal(0, mock_cap_commander_distribute_broadcast_code_cb_fake.arg1_history[1]);
 }
 
-ZTEST_F(cap_commander_test_distribute_broadcast_code,
-	test_commander_reception_distribute_broadcast_code_param_null)
+static void cap_commander_test_distribute_broadcast_code__test_commander_reception_distribute_broadcast_code_param_null(void **cm_state)
 {
+	struct cap_commander_test_distribute_broadcast_code_fixture *fixture = *cm_state;
 	int err;
 
 	err = bt_cap_commander_distribute_broadcast_code(NULL);
-	zassert_equal(-EINVAL, err, "Unexpected return value %d", err);
+	assert_int_equal(-EINVAL, err);
 
 	zexpect_call_count("bt_cap_commander_cb.distribute_broadcast_code", 0,
 			   mock_cap_commander_distribute_broadcast_code_cb_fake.call_count);
 }
 
-ZTEST_F(cap_commander_test_distribute_broadcast_code,
-	test_commander_distribute_broadcast_code_param_zero_count)
+static void cap_commander_test_distribute_broadcast_code__test_commander_distribute_broadcast_code_param_zero_count(void **cm_state)
 {
+	struct cap_commander_test_distribute_broadcast_code_fixture *fixture = *cm_state;
 	int err;
 
 	fixture->distribute_broadcast_code_param.count = 0;
 
 	err = bt_cap_commander_distribute_broadcast_code(&fixture->distribute_broadcast_code_param);
-	zassert_equal(-EINVAL, err, "Unexpected return value %d", err);
+	assert_int_equal(-EINVAL, err);
 
 	zexpect_call_count("bt_cap_commander_cb.distribute_broadcast_code", 0,
 			   mock_cap_commander_distribute_broadcast_code_cb_fake.call_count);
 }
 
-ZTEST_F(cap_commander_test_distribute_broadcast_code,
-	test_commander_distribute_broadcast_code_param_high_count)
+static void cap_commander_test_distribute_broadcast_code__test_commander_distribute_broadcast_code_param_high_count(void **cm_state)
 {
+	struct cap_commander_test_distribute_broadcast_code_fixture *fixture = *cm_state;
 	int err;
 
 	fixture->distribute_broadcast_code_param.count = CONFIG_BT_MAX_CONN + 1;
 
 	err = bt_cap_commander_distribute_broadcast_code(&fixture->distribute_broadcast_code_param);
-	zassert_equal(-EINVAL, err, "Unexpected return value %d", err);
+	assert_int_equal(-EINVAL, err);
 
 	zexpect_call_count("bt_cap_commander_cb.broadcast_distribute_broadcast_code", 0,
 			   mock_cap_commander_distribute_broadcast_code_cb_fake.call_count);
 }
 
-ZTEST_F(cap_commander_test_distribute_broadcast_code,
-	test_commander_distribute_broadcast_code_inval_param_null_param)
+static void cap_commander_test_distribute_broadcast_code__test_commander_distribute_broadcast_code_inval_param_null_param(void **cm_state)
 {
+	struct cap_commander_test_distribute_broadcast_code_fixture *fixture = *cm_state;
 	int err;
 
 	fixture->distribute_broadcast_code_param.type = BT_CAP_SET_TYPE_AD_HOC;
@@ -217,47 +215,47 @@ ZTEST_F(cap_commander_test_distribute_broadcast_code,
 	fixture->distribute_broadcast_code_param.count = ARRAY_SIZE(fixture->conns);
 
 	err = bt_cap_commander_distribute_broadcast_code(&fixture->distribute_broadcast_code_param);
-	zassert_equal(-EINVAL, err, "Unexpected return value %d", err);
+	assert_int_equal(-EINVAL, err);
 
 	zexpect_call_count("bt_cap_commander_cb.distribute_broadcast_code", 0,
 			   mock_cap_commander_distribute_broadcast_code_cb_fake.call_count);
 }
 
-ZTEST_F(cap_commander_test_distribute_broadcast_code,
-	test_commander_distribute_broadcast_code_inval_null_member)
+static void cap_commander_test_distribute_broadcast_code__test_commander_distribute_broadcast_code_inval_null_member(void **cm_state)
 {
+	struct cap_commander_test_distribute_broadcast_code_fixture *fixture = *cm_state;
 	int err;
 
 	fixture->distribute_broadcast_code_param.param[0].member.member = NULL;
 
 	err = bt_cap_commander_distribute_broadcast_code(&fixture->distribute_broadcast_code_param);
-	zassert_equal(-EINVAL, err, "Unexpected return value %d", err);
+	assert_int_equal(-EINVAL, err);
 
 	zexpect_call_count("bt_cap_commander_cb.distribute_broadcast_code", 0,
 			   mock_cap_commander_distribute_broadcast_code_cb_fake.call_count);
 }
 
-ZTEST_F(cap_commander_test_distribute_broadcast_code,
-	test_commander_distribute_broadcast_code_inval_missing_cas)
+static void cap_commander_test_distribute_broadcast_code__test_commander_distribute_broadcast_code_inval_missing_cas(void **cm_state)
 {
+	struct cap_commander_test_distribute_broadcast_code_fixture *fixture = *cm_state;
 	int err;
 
 	fixture->distribute_broadcast_code_param.type = BT_CAP_SET_TYPE_CSIP;
 
 	err = bt_cap_commander_distribute_broadcast_code(&fixture->distribute_broadcast_code_param);
-	zassert_equal(-EINVAL, err, "Unexpected return value %d", err);
+	assert_int_equal(-EINVAL, err);
 
 	zexpect_call_count("bt_cap_commander_cb.distribute_broadcast_code", 0,
 			   mock_cap_commander_distribute_broadcast_code_cb_fake.call_count);
 }
 
-ZTEST_F(cap_commander_test_distribute_broadcast_code,
-	test_commander_distribute_broadcast_code_double_conn)
+static void cap_commander_test_distribute_broadcast_code__test_commander_distribute_broadcast_code_double_conn(void **cm_state)
 {
+	struct cap_commander_test_distribute_broadcast_code_fixture *fixture = *cm_state;
 	int err;
 
 	if (CONFIG_BT_MAX_CONN == 1) {
-		ztest_test_skip();
+		skip();
 	}
 
 	for (size_t i = 0U; i < ARRAY_SIZE(fixture->broadcast_code_member_params); i++) {
@@ -265,8 +263,52 @@ ZTEST_F(cap_commander_test_distribute_broadcast_code,
 	}
 
 	err = bt_cap_commander_distribute_broadcast_code(&fixture->distribute_broadcast_code_param);
-	zassert_equal(-EINVAL, err, "Unexpected return value %d", err);
+	assert_int_equal(-EINVAL, err);
 
 	zexpect_call_count("bt_cap_commander_cb.distribute_broadcast_code", 0,
 			   mock_cap_commander_distribute_broadcast_code_cb_fake.call_count);
 }
+
+int bt_test_cap_commander_test_distribute_broadcast_code_setup(void **state)
+{
+	int environment_result = bt_test_audio_cap_commander_environment_setup(state);
+
+	if (environment_result != 0) {
+		return environment_result;
+	}
+
+	*state = cap_commander_test_distribute_broadcast_code_setup();
+	return 0;
+}
+static int bt_test_cap_commander_test_distribute_broadcast_code_before(void **state)
+{
+	(void)state;
+	cap_commander_test_distribute_broadcast_code_before(*state);
+	mock_init_rule_before_d38d7b(NULL, *state);
+	return 0;
+}
+int bt_test_cap_commander_test_distribute_broadcast_code_after(void **state)
+{
+	(void)state;
+	cap_commander_test_distribute_broadcast_code_after(*state);
+	mock_destroy_rule_after_d38d7b(NULL, *state);
+	return 0;
+}
+int bt_test_cap_commander_test_distribute_broadcast_code_teardown(void **state)
+{
+	(void)state;
+	cap_commander_test_distribute_broadcast_code_teardown(*state);
+	return 0;
+}
+static const struct CMUnitTest test_cases_cap_commander_test_distribute_broadcast_code[] = {
+	cmocka_unit_test_setup_teardown(cap_commander_test_distribute_broadcast_code__test_commander_distribute_broadcast_code, bt_test_cap_commander_test_distribute_broadcast_code_before, bt_test_cap_commander_test_distribute_broadcast_code_after),
+	cmocka_unit_test_setup_teardown(cap_commander_test_distribute_broadcast_code__test_commander_reception_distribute_broadcast_code_double, bt_test_cap_commander_test_distribute_broadcast_code_before, bt_test_cap_commander_test_distribute_broadcast_code_after),
+	cmocka_unit_test_setup_teardown(cap_commander_test_distribute_broadcast_code__test_commander_reception_distribute_broadcast_code_param_null, bt_test_cap_commander_test_distribute_broadcast_code_before, bt_test_cap_commander_test_distribute_broadcast_code_after),
+	cmocka_unit_test_setup_teardown(cap_commander_test_distribute_broadcast_code__test_commander_distribute_broadcast_code_param_zero_count, bt_test_cap_commander_test_distribute_broadcast_code_before, bt_test_cap_commander_test_distribute_broadcast_code_after),
+	cmocka_unit_test_setup_teardown(cap_commander_test_distribute_broadcast_code__test_commander_distribute_broadcast_code_param_high_count, bt_test_cap_commander_test_distribute_broadcast_code_before, bt_test_cap_commander_test_distribute_broadcast_code_after),
+	cmocka_unit_test_setup_teardown(cap_commander_test_distribute_broadcast_code__test_commander_distribute_broadcast_code_inval_param_null_param, bt_test_cap_commander_test_distribute_broadcast_code_before, bt_test_cap_commander_test_distribute_broadcast_code_after),
+	cmocka_unit_test_setup_teardown(cap_commander_test_distribute_broadcast_code__test_commander_distribute_broadcast_code_inval_null_member, bt_test_cap_commander_test_distribute_broadcast_code_before, bt_test_cap_commander_test_distribute_broadcast_code_after),
+	cmocka_unit_test_setup_teardown(cap_commander_test_distribute_broadcast_code__test_commander_distribute_broadcast_code_inval_missing_cas, bt_test_cap_commander_test_distribute_broadcast_code_before, bt_test_cap_commander_test_distribute_broadcast_code_after),
+	cmocka_unit_test_setup_teardown(cap_commander_test_distribute_broadcast_code__test_commander_distribute_broadcast_code_double_conn, bt_test_cap_commander_test_distribute_broadcast_code_before, bt_test_cap_commander_test_distribute_broadcast_code_after),
+};
+BT_TEST_SUITE(cap_commander_test_distribute_broadcast_code, test_cases_cap_commander_test_distribute_broadcast_code, bt_test_cap_commander_test_distribute_broadcast_code_setup, bt_test_cap_commander_test_distribute_broadcast_code_teardown);

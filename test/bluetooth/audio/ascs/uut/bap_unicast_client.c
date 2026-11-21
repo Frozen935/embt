@@ -1,3 +1,4 @@
+#include "support/test_support.h"
 /*
  * Copyright (c) 2023 Codecoup
  *
@@ -7,12 +8,10 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include <zephyr/bluetooth/audio/audio.h>
-#include <zephyr/bluetooth/audio/bap.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/toolchain.h>
-#include <zephyr/ztest_assert.h>
-
+#include <embt/bluetooth/audio/audio.h>
+#include <embt/bluetooth/audio/bap.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/compiler.h>
 bool bt_bap_unicast_client_has_ep(const struct bt_bap_ep *ep)
 {
 	ARG_UNUSED(ep);
@@ -26,7 +25,7 @@ int bt_bap_unicast_client_config(struct bt_bap_stream *stream,
 	ARG_UNUSED(stream);
 	ARG_UNUSED(codec_cfg);
 
-	zassert_unreachable("Unexpected call to '%s()' occurred", __func__);
+	fail_msg("Unexpected call to '%s()' occurred", __func__);
 	return 0;
 }
 
@@ -35,7 +34,7 @@ int bt_bap_unicast_client_qos(struct bt_conn *conn, struct bt_bap_unicast_group 
 	ARG_UNUSED(conn);
 	ARG_UNUSED(group);
 
-	zassert_unreachable("Unexpected call to '%s()' occurred", __func__);
+	fail_msg("Unexpected call to '%s()' occurred", __func__);
 	return 0;
 }
 
@@ -46,7 +45,7 @@ int bt_bap_unicast_client_enable(struct bt_bap_stream *stream, uint8_t meta[],
 	ARG_UNUSED(meta);
 	ARG_UNUSED(meta_len);
 
-	zassert_unreachable("Unexpected call to '%s()' occurred", __func__);
+	fail_msg("Unexpected call to '%s()' occurred", __func__);
 	return 0;
 }
 
@@ -57,7 +56,7 @@ int bt_bap_unicast_client_metadata(struct bt_bap_stream *stream, uint8_t meta[],
 	ARG_UNUSED(meta);
 	ARG_UNUSED(meta_len);
 
-	zassert_unreachable("Unexpected call to '%s()' occurred", __func__);
+	fail_msg("Unexpected call to '%s()' occurred", __func__);
 	return 0;
 }
 
@@ -65,7 +64,7 @@ int bt_bap_unicast_client_disable(struct bt_bap_stream *stream)
 {
 	ARG_UNUSED(stream);
 
-	zassert_unreachable("Unexpected call to '%s()' occurred", __func__);
+	fail_msg("Unexpected call to '%s()' occurred", __func__);
 	return 0;
 }
 
@@ -73,7 +72,7 @@ int bt_bap_unicast_client_connect(struct bt_bap_stream *stream)
 {
 	ARG_UNUSED(stream);
 
-	zassert_unreachable("Unexpected call to '%s()' occurred", __func__);
+	fail_msg("Unexpected call to '%s()' occurred", __func__);
 	return 0;
 }
 
@@ -81,7 +80,7 @@ int bt_bap_unicast_client_start(struct bt_bap_stream *stream)
 {
 	ARG_UNUSED(stream);
 
-	zassert_unreachable("Unexpected call to '%s()' occurred", __func__);
+	fail_msg("Unexpected call to '%s()' occurred", __func__);
 	return 0;
 }
 
@@ -89,7 +88,7 @@ int bt_bap_unicast_client_stop(struct bt_bap_stream *stream)
 {
 	ARG_UNUSED(stream);
 
-	zassert_unreachable("Unexpected call to '%s()' occurred", __func__);
+	fail_msg("Unexpected call to '%s()' occurred", __func__);
 	return 0;
 }
 
@@ -97,6 +96,6 @@ int bt_bap_unicast_client_release(struct bt_bap_stream *stream)
 {
 	ARG_UNUSED(stream);
 
-	zassert_unreachable("Unexpected call to '%s()' occurred", __func__);
+	fail_msg("Unexpected call to '%s()' occurred", __func__);
 	return 0;
 }

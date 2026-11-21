@@ -1,12 +1,13 @@
+#include "support/test_support.h"
 /*
  * Copyright (c) 2022 Nordic Semiconductor ASA
  *
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <zephyr/kernel.h>
-#include <zephyr/bluetooth/hci.h>
-#include <host/hci_core.h>
+
+#include <embt/bluetooth/hci.h>
+#include "host/hci_core.h"
 #include "mocks/hci_core.h"
 
 struct bt_dev bt_dev = {

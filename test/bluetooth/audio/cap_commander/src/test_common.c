@@ -1,3 +1,8 @@
+#include "support/test_support.h"
+void mock_init_rule_before_d38d7b(const struct bt_test_case_info *, void *);
+void mock_destroy_rule_after_d38d7b(const struct bt_test_case_info *, void *);
+
+
 /* test_common.c - common procedures for unit test of CAP commander */
 
 /*
@@ -5,8 +10,8 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/hci_types.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/hci_types.h>
 
 #include "cap_commander.h"
 #include "conn.h"

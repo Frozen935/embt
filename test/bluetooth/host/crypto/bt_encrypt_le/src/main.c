@@ -1,3 +1,6 @@
+#include "support/test_support.h"
+void fff_reset_rule_before(const struct bt_test_case_info *, void *);
+
 /*
  * Copyright (c) 2022 Nordic Semiconductor ASA
  *
@@ -7,22 +10,22 @@
 #include "mocks/aes.h"
 #include "mocks/aes_expects.h"
 
-#include <zephyr/bluetooth/crypto.h>
-#include <zephyr/fff.h>
-#include <zephyr/kernel.h>
+#include <embt/bluetooth/crypto.h>
+#include <fff.h>
+
 
 #include <host/crypto.h>
 
 DEFINE_FFF_GLOBALS;
 
-static void fff_reset_rule_before(const struct ztest_unit_test *test, void *fixture)
+void fff_reset_rule_before(const struct bt_test_case_info *test, void *fixture)
 {
 	AES_FFF_FAKES_LIST(RESET_FAKE);
 }
 
-ZTEST_RULE(fff_reset_rule, fff_reset_rule_before, NULL);
 
-ZTEST_SUITE(bt_encrypt_le, NULL, NULL, NULL, NULL, NULL);
+
+
 
 /*
  *  Test bt_encrypt_le() succeeds
@@ -34,8 +37,9 @@ ZTEST_SUITE(bt_encrypt_le, NULL, NULL, NULL, NULL, NULL);
  *  Expected behaviour:
  *   - bt_encrypt_le() returns 0 (success)
  */
-ZTEST(bt_encrypt_le, test_bt_encrypt_le_succeeds)
+static void bt_encrypt_le__test_bt_encrypt_le_succeeds(void **cm_state)
 {
+	(void)cm_state;
 	int err;
 	const uint8_t key[16] = {0};
 	const uint8_t plaintext[16] = {0};
@@ -48,5 +52,19 @@ ZTEST(bt_encrypt_le, test_bt_encrypt_le_succeeds)
 
 	expect_single_call_psa_cipher_encrypt(enc_data);
 
-	zassert_ok(err, "Unexpected error code '%d' was returned", err);
+	assert_int_equal(err, 0);
 }
+
+
+static int bt_test_bt_encrypt_le_before(void **state)
+{
+	(void)state;
+	fff_reset_rule_before(NULL, *state);
+	return 0;
+}
+
+
+static const struct CMUnitTest test_cases_bt_encrypt_le[] = {
+	cmocka_unit_test_setup_teardown(bt_encrypt_le__test_bt_encrypt_le_succeeds, bt_test_bt_encrypt_le_before, NULL),
+};
+BT_TEST_SUITE(bt_encrypt_le, test_cases_bt_encrypt_le, bt_test_base_setup, NULL);

@@ -1,3 +1,6 @@
+#include "support/test_support.h"
+static const struct bt_hci_transport test_driver;
+#include "host/hci_core.h"
 /*
  * SPDX-FileCopyrightText: Copyright (c) 2026 Silicon Laboratories Inc.
  * SPDX-License-Identifier: Apache-2.0
@@ -8,24 +11,19 @@
 #include <stdint.h>
 #include <string.h>
 
-#include <zephyr/bluetooth/addr.h>
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/buf.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/gap.h>
-#include <zephyr/bluetooth/hci.h>
-#include <zephyr/bluetooth/hci_types.h>
-#include <zephyr/bluetooth/iso.h>
-#include <zephyr/device.h>
-#include <zephyr/devicetree.h>
-#include <zephyr/drivers/bluetooth.h>
-#include <zephyr/kernel.h>
-#include <zephyr/net_buf.h>
-#include <zephyr/sys/byteorder.h>
-#include <zephyr/sys/util.h>
-#include <zephyr/ztest.h>
+#include <embt/bluetooth/addr.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/buf.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/gap.h>
+#include <embt/bluetooth/hci.h>
+#include <embt/bluetooth/hci_types.h>
+#include <embt/bluetooth/iso.h>
+#include <embt/drivers/bluetooth.h>
 
-#define DT_DRV_COMPAT zephyr_bt_hci_test
+#include <embt/net_buf.h>
+#include <embt/base/byteorder.h>
+#include <embt/base/util.h>
 
 /* Large enough for the return parameters of initialization commands that are
  * irrelevant to these tests.
@@ -65,7 +63,7 @@ static void *cmd_complete(struct net_buf **buf, uint8_t plen, uint16_t opcode)
 {
 	struct bt_hci_evt_cmd_complete *cc;
 
-	*buf = bt_buf_get_evt(BT_HCI_EVT_CMD_COMPLETE, false, K_FOREVER);
+	*buf = bt_buf_get_evt(BT_HCI_EVT_CMD_COMPLETE, false, BT_FOREVER);
 	evt_create(*buf, BT_HCI_EVT_CMD_COMPLETE, sizeof(*cc) + plen);
 	cc = net_buf_add(*buf, sizeof(*cc));
 	cc->ncmd = 1U;
@@ -175,7 +173,7 @@ static void le_set_cig_params(struct net_buf *buf, struct net_buf **evt, uint8_t
 
 	ARG_UNUSED(len);
 
-	zassert_equal(cp->num_cis, 1U, "CIG with %u CIS", cp->num_cis);
+	assert_int_equal(cp->num_cis, 1U);
 
 	rp = cmd_complete(evt, sizeof(*rp) + sizeof(rp->handle[0]), opcode);
 	rp->status = BT_HCI_ERR_SUCCESS;
@@ -230,9 +228,9 @@ static const struct cmd_handler cmds[] = {
  */
 static uint8_t iso_pkt_pb[ISO_PKT_MAX];
 static size_t iso_pkt_count;
-static K_SEM_DEFINE(iso_pkt_sem, 0, ISO_PKT_MAX);
+static os_sem_t iso_pkt_sem;
 
-static void cmd_handle(const struct device *dev, struct net_buf *cmd)
+static void cmd_handle(const struct bt_hci_transport *dev, struct net_buf *cmd)
 {
 	struct net_buf *evt = NULL;
 	struct bt_hci_cmd_hdr *chdr;
@@ -258,29 +256,28 @@ static void iso_handle(struct net_buf *buf)
 	const struct bt_hci_iso_hdr *hdr = (const void *)buf->data;
 	const uint16_t handle = sys_le16_to_cpu(hdr->handle);
 
-	zassert_equal(bt_iso_handle(handle), CIS_HANDLE, "ISO data for handle %u",
-		      bt_iso_handle(handle));
-	zassert_true(iso_pkt_count < ISO_PKT_MAX, "Too many ISO data packets");
+	assert_int_equal(bt_iso_handle(handle), CIS_HANDLE);
+	assert_true(iso_pkt_count < ISO_PKT_MAX);
 
 	iso_pkt_pb[iso_pkt_count++] = bt_iso_flags_pb(bt_iso_flags(handle));
-	k_sem_give(&iso_pkt_sem);
+	osi_sem_give(&iso_pkt_sem);
 }
 
-static int driver_open(const struct device *dev)
+static int driver_open(const struct bt_hci_transport *dev)
 {
 	ARG_UNUSED(dev);
 
 	return 0;
 }
 
-static int driver_close(const struct device *dev)
+static int driver_close(const struct bt_hci_transport *dev)
 {
 	ARG_UNUSED(dev);
 
 	return 0;
 }
 
-static int driver_send(const struct device *dev, struct net_buf *buf)
+static int driver_send(const struct bt_hci_transport *dev, struct net_buf *buf)
 {
 	uint8_t type = net_buf_pull_u8(buf);
 
@@ -289,7 +286,7 @@ static int driver_send(const struct device *dev, struct net_buf *buf)
 	} else if (type == BT_HCI_H4_ISO) {
 		iso_handle(buf);
 	} else {
-		zassert_unreachable("Unexpected buffer type %u", type);
+		fail_msg("Unexpected buffer type %u", type);
 	}
 
 	net_buf_unref(buf);
@@ -297,28 +294,31 @@ static int driver_send(const struct device *dev, struct net_buf *buf)
 	return 0;
 }
 
-static DEVICE_API(bt_hci, driver_api) = {
+static const struct bt_hci_driver_api driver_api = {
 	.open = driver_open,
 	.close = driver_close,
 	.send = driver_send,
 };
 
-#define TEST_DEVICE_INIT(inst)                                                                     \
-	static struct bt_hci_driver_data driver_data_##inst = {0};                                 \
-	static const struct bt_hci_driver_config driver_config_##inst =                            \
-		BT_DT_HCI_DRIVER_CONFIG_INST_GET(inst);                                            \
-	DEVICE_DT_INST_DEFINE(inst, NULL, NULL, &driver_data_##inst, &driver_config_##inst,        \
-			      POST_KERNEL, CONFIG_KERNEL_INIT_PRIORITY_DEVICE, &driver_api)
+static struct bt_hci_driver_data test_driver_data;
+static const struct bt_hci_transport test_driver = {
+ .name = "upstream-test", .bus = 0,
+ .api = &driver_api, .data = &test_driver_data,
+};
+static void test_transport_init(void)
+{
+ bt_test_require(bt_stack_init());
+ bt_dev.hci = &test_driver;
+}
 
-DT_INST_FOREACH_STATUS_OKAY(TEST_DEVICE_INIT)
 
 static void le_meta_event(uint8_t subevent, const void *data, uint8_t len)
 {
-	const struct device *dev = DEVICE_DT_GET(DT_DRV_INST(0));
+	const struct bt_hci_transport *dev = &test_driver;
 	struct bt_hci_evt_le_meta_event *meta;
 	struct net_buf *buf;
 
-	buf = bt_buf_get_evt(BT_HCI_EVT_LE_META_EVENT, false, K_FOREVER);
+	buf = bt_buf_get_evt(BT_HCI_EVT_LE_META_EVENT, false, BT_FOREVER);
 	evt_create(buf, BT_HCI_EVT_LE_META_EVENT, sizeof(*meta) + len);
 	meta = net_buf_add(buf, sizeof(*meta));
 	meta->subevent = subevent;
@@ -332,13 +332,13 @@ static const bt_addr_le_t peer = {
 };
 
 static struct bt_conn *acl;
-static K_SEM_DEFINE(acl_connected_sem, 0, 1);
+static os_sem_t acl_connected_sem;
 
 static void acl_connected(struct bt_conn *conn, uint8_t err)
 {
-	zassert_equal(err, 0U, "Connection failed (0x%02x)", err);
+	assert_int_equal(err, 0U);
 
-	k_sem_give(&acl_connected_sem);
+	osi_sem_give(&acl_connected_sem);
 }
 
 BT_CONN_CB_DEFINE(conn_callbacks) = {
@@ -355,27 +355,26 @@ static void connect_acl(void)
 		.supv_timeout = sys_cpu_to_le16(BT_GAP_MS_TO_CONN_TIMEOUT(4000U)),
 	};
 
-	zassert_ok(bt_conn_le_create(&peer, BT_CONN_LE_CREATE_CONN, BT_LE_CONN_PARAM_DEFAULT, &acl),
-		   "Connecting failed");
+	assert_int_equal(bt_conn_le_create(&peer, BT_CONN_LE_CREATE_CONN, BT_LE_CONN_PARAM_DEFAULT, &acl), 0);
 
 	bt_addr_le_copy(&evt.peer_addr, &peer);
 	le_meta_event(BT_HCI_EVT_LE_CONN_COMPLETE, &evt, sizeof(evt));
 
-	zassert_ok(k_sem_take(&acl_connected_sem, K_SECONDS(1)), "No ACL connection");
+	assert_int_equal(osi_sem_take(&acl_connected_sem, BT_SECONDS(1)), 0);
 }
 
 /* What the CIS has reported about the SDUs given to it */
 static unsigned int sent_count;
 static unsigned int send_failed_count;
 
-static K_SEM_DEFINE(iso_connected_sem, 0, 1);
-static K_SEM_DEFINE(iso_disconnected_sem, 0, 1);
+static os_sem_t iso_connected_sem;
+static os_sem_t iso_disconnected_sem;
 
 static void iso_connected(struct bt_iso_chan *chan)
 {
 	ARG_UNUSED(chan);
 
-	k_sem_give(&iso_connected_sem);
+	osi_sem_give(&iso_connected_sem);
 }
 
 static void iso_disconnected(struct bt_iso_chan *chan, uint8_t reason)
@@ -383,7 +382,7 @@ static void iso_disconnected(struct bt_iso_chan *chan, uint8_t reason)
 	ARG_UNUSED(chan);
 	ARG_UNUSED(reason);
 
-	k_sem_give(&iso_disconnected_sem);
+	osi_sem_give(&iso_disconnected_sem);
 }
 
 static void iso_sent(struct bt_iso_chan *chan)
@@ -397,7 +396,7 @@ static void iso_send_failed(struct bt_iso_chan *chan, int err)
 {
 	ARG_UNUSED(chan);
 
-	zassert_equal(err, -ESHUTDOWN, "Send failed with %d", err);
+	assert_int_equal(err, -ESHUTDOWN);
 	send_failed_count++;
 }
 
@@ -442,21 +441,21 @@ static void connect_cis(void)
 		.interval = sys_cpu_to_le16(BT_ISO_ISO_INTERVAL_MIN),
 	};
 
-	zassert_ok(bt_iso_chan_connect(&param, 1U), "Connecting the CIS failed");
+	assert_int_equal(bt_iso_chan_connect(&param, 1U), 0);
 
 	le_meta_event(BT_HCI_EVT_LE_CIS_ESTABLISHED, &evt, sizeof(evt));
 
-	zassert_ok(k_sem_take(&iso_connected_sem, K_SECONDS(1)), "No CIS");
+	assert_int_equal(osi_sem_take(&iso_connected_sem, BT_SECONDS(1)), 0);
 }
 
 /* The peer takes the CIS down, the ACL connection stays */
 static void disconnect_cis(void)
 {
-	const struct device *dev = DEVICE_DT_GET(DT_DRV_INST(0));
+	const struct bt_hci_transport *dev = &test_driver;
 	struct bt_hci_evt_disconn_complete *evt;
 	struct net_buf *buf;
 
-	buf = bt_buf_get_evt(BT_HCI_EVT_DISCONN_COMPLETE, false, K_FOREVER);
+	buf = bt_buf_get_evt(BT_HCI_EVT_DISCONN_COMPLETE, false, BT_FOREVER);
 	evt_create(buf, BT_HCI_EVT_DISCONN_COMPLETE, sizeof(*evt));
 	evt = net_buf_add(buf, sizeof(*evt));
 	evt->status = BT_HCI_ERR_SUCCESS;
@@ -464,7 +463,7 @@ static void disconnect_cis(void)
 	evt->reason = BT_HCI_ERR_REMOTE_USER_TERM_CONN;
 	bt_hci_recv(dev, buf);
 
-	zassert_ok(k_sem_take(&iso_disconnected_sem, K_SECONDS(1)), "The CIS stayed connected");
+	assert_int_equal(osi_sem_take(&iso_disconnected_sem, BT_SECONDS(1)), 0);
 }
 
 NET_BUF_POOL_FIXED_DEFINE(sdu_pool, CONFIG_BT_ISO_TX_BUF_COUNT,
@@ -477,14 +476,14 @@ static void send_sdu(size_t len)
 	struct net_buf *buf;
 	int err;
 
-	buf = net_buf_alloc(&sdu_pool, K_NO_WAIT);
-	zassert_not_null(buf, "Out of SDU buffers");
+	buf = net_buf_alloc(&sdu_pool, BT_NO_WAIT);
+	assert_non_null(buf);
 
 	net_buf_reserve(buf, BT_ISO_CHAN_SEND_RESERVE);
 	(void)memset(net_buf_add(buf, len), 0xAA, len);
 
 	err = bt_iso_chan_send(&iso_chan, buf, seq_num++);
-	zassert_ok(err, "Sending an SDU failed (err %d)", err);
+	assert_int_equal(err, 0);
 }
 
 /* Wait for the controller to have been given this many ISO data packets in
@@ -493,15 +492,11 @@ static void send_sdu(size_t len)
 static void expect_iso_packets(size_t count)
 {
 	while (iso_pkt_count < count) {
-		zassert_ok(k_sem_take(&iso_pkt_sem, K_SECONDS(1)),
-			   "The controller was given %zu ISO data packets (!= %zu)", iso_pkt_count,
-			   count);
+		assert_int_equal(osi_sem_take(&iso_pkt_sem, BT_SECONDS(1)), 0);
 	}
 
-	k_sleep(K_MSEC(10));
-	zassert_equal(iso_pkt_count, count,
-		      "The controller was given %zu ISO data packets (!= %zu)", iso_pkt_count,
-		      count);
+	osi_sleep_ms(BT_MSEC(10));
+	assert_int_equal(iso_pkt_count, count);
 }
 
 static void expect_sdu_bufs_free(void)
@@ -509,8 +504,8 @@ static void expect_sdu_bufs_free(void)
 	struct net_buf *bufs[CONFIG_BT_ISO_TX_BUF_COUNT];
 
 	ARRAY_FOR_EACH(bufs, i) {
-		bufs[i] = net_buf_alloc(&sdu_pool, K_NO_WAIT);
-		zassert_not_null(bufs[i], "%zu SDU buffers are still in use", ARRAY_SIZE(bufs) - i);
+		bufs[i] = net_buf_alloc(&sdu_pool, BT_NO_WAIT);
+		assert_non_null(bufs[i]);
 	}
 
 	ARRAY_FOR_EACH(bufs, i) {
@@ -533,14 +528,14 @@ static void start(void)
 	};
 	struct bt_iso_cig *cig;
 
-	zassert_ok(bt_enable(NULL), "Bluetooth init failed");
+	assert_int_equal(bt_enable(NULL), 0);
 	connect_acl();
-	zassert_ok(bt_iso_cig_create(&param, &cig), "Creating the CIG failed");
+	assert_int_equal(bt_iso_cig_create(&param, &cig), 0);
 }
 
 static void stop(void)
 {
-	zassert_ok(bt_disable(), "Bluetooth disable failed");
+	assert_int_equal(bt_disable(), 0);
 
 	bt_conn_unref(acl);
 	acl = NULL;
@@ -554,9 +549,9 @@ static void before(void *fixture)
 		start();
 	}
 
-	k_sem_reset(&iso_pkt_sem);
-	k_sem_reset(&iso_connected_sem);
-	k_sem_reset(&iso_disconnected_sem);
+	osi_sem_reset(&iso_pkt_sem);
+	osi_sem_reset(&iso_connected_sem);
+	osi_sem_reset(&iso_disconnected_sem);
 	iso_pkt_count = 0U;
 	sent_count = 0U;
 	send_failed_count = 0U;
@@ -573,37 +568,38 @@ static void after(void *fixture)
 	}
 }
 
-ZTEST_SUITE(iso_tx, NULL, NULL, before, after, NULL);
+
 
 /* A central keeps its CIS for the next time it connects it. An SDU that the
  * disconnection cut short must not make the first one after that a
  * continuation of it.
  */
-static ZTEST(iso_tx, test_partial_sdu_then_reconnect)
+static void iso_tx__test_partial_sdu_then_reconnect(void **cm_state)
 {
+	(void)cm_state;
 	/* The first SDU is held by the controller, so the second one gets only
 	 * its first fragment out.
 	 */
 	send_sdu(SHORT_SDU_LEN);
 	send_sdu(LONG_SDU_LEN);
 	expect_iso_packets(2U);
-	zassert_equal(iso_pkt_pb[0], BT_ISO_SINGLE, "First SDU sent with PB 0x%02x", iso_pkt_pb[0]);
-	zassert_equal(iso_pkt_pb[1], BT_ISO_START, "Second SDU sent with PB 0x%02x", iso_pkt_pb[1]);
+	assert_int_equal(iso_pkt_pb[0], BT_ISO_SINGLE);
+	assert_int_equal(iso_pkt_pb[1], BT_ISO_START);
 
 	disconnect_cis();
 	connect_cis();
 
 	send_sdu(SHORT_SDU_LEN);
 	expect_iso_packets(3U);
-	zassert_equal(iso_pkt_pb[2], BT_ISO_SINGLE, "SDU after reconnecting sent with PB 0x%02x",
-		      iso_pkt_pb[2]);
+	assert_int_equal(iso_pkt_pb[2], BT_ISO_SINGLE);
 }
 
 /* Every SDU that bt_iso_chan_send() took is reported, also the ones still
  * queued in the Host when the CIS is disconnected.
  */
-static ZTEST(iso_tx, test_queued_sdus_on_disconnect)
+static void iso_tx__test_queued_sdus_on_disconnect(void **cm_state)
 {
+	(void)cm_state;
 	/* One SDU with the controller, one that got its first fragment out and
 	 * one that is still queued as a whole.
 	 */
@@ -614,16 +610,16 @@ static ZTEST(iso_tx, test_queued_sdus_on_disconnect)
 
 	disconnect_cis();
 
-	zassert_equal(sent_count, 0U, "%u SDUs reported as sent", sent_count);
-	zassert_equal(send_failed_count, 3U, "%u SDUs reported as failed (!= 3)",
-		      send_failed_count);
+	assert_int_equal(sent_count, 0U);
+	assert_int_equal(send_failed_count, 3U);
 }
 
 /* The same when bt_disable() takes the CIS down, which also leaves no SDU
  * buffer behind.
  */
-static ZTEST(iso_tx, test_queued_sdus_on_disable)
+static void iso_tx__test_queued_sdus_on_disable(void **cm_state)
 {
+	(void)cm_state;
 	send_sdu(SHORT_SDU_LEN);
 	send_sdu(LONG_SDU_LEN);
 	send_sdu(SHORT_SDU_LEN);
@@ -631,23 +627,80 @@ static ZTEST(iso_tx, test_queued_sdus_on_disable)
 
 	stop();
 
-	zassert_equal(sent_count, 0U, "%u SDUs reported as sent", sent_count);
-	zassert_equal(send_failed_count, 3U, "%u SDUs reported as failed (!= 3)",
-		      send_failed_count);
+	assert_int_equal(sent_count, 0U);
+	assert_int_equal(send_failed_count, 3U);
 	expect_sdu_bufs_free();
 }
 
 /* With nothing queued in the Host, bt_disable() still reports the SDU that the
  * controller has not acknowledged.
  */
-static ZTEST(iso_tx, test_unacked_sdu_on_disable)
+static void iso_tx__test_unacked_sdu_on_disable(void **cm_state)
 {
+	(void)cm_state;
 	send_sdu(SHORT_SDU_LEN);
 	expect_iso_packets(1U);
 
 	stop();
 
-	zassert_equal(sent_count, 0U, "%u SDUs reported as sent", sent_count);
-	zassert_equal(send_failed_count, 1U, "%u SDUs reported as failed (!= 1)",
-		      send_failed_count);
+	assert_int_equal(sent_count, 0U);
+	assert_int_equal(send_failed_count, 1U);
 }
+
+static void storage_init_1b9c0b46ef(void)
+{
+	bt_test_require(osi_sem_init(&iso_pkt_sem, 0, ISO_PKT_MAX));
+	bt_test_require(osi_sem_init(&acl_connected_sem, 0, 1));
+	bt_test_require(osi_sem_init(&iso_connected_sem, 0, 1));
+	bt_test_require(osi_sem_init(&iso_disconnected_sem, 0, 1));
+	net_buf_pool_init(&sdu_pool);
+}
+
+static void migrated_pools_init(void)
+{
+	net_buf_pool_init(&sdu_pool);
+}
+
+static void migrated_callbacks_init(void)
+{
+ static bool initialized;
+ if (initialized) { return; }
+ bt_test_require(bt_conn_cb_register(&bt_conn_cb_conn_callbacks));
+ initialized = true;
+}
+
+int bt_test_iso_tx_setup(void **state)
+{
+	int environment_result = bt_test_host_setup(state);
+
+	if (environment_result != 0) {
+		return environment_result;
+	}
+
+	migrated_callbacks_init();
+	migrated_pools_init();
+	test_transport_init();
+	storage_init_1b9c0b46ef();
+	*state = NULL;
+	return 0;
+}
+static int bt_test_iso_tx_before(void **state)
+{
+	(void)state;
+	before(*state);
+	return 0;
+}
+int bt_test_iso_tx_after(void **state)
+{
+	(void)state;
+	after(*state);
+	return 0;
+}
+
+static const struct CMUnitTest test_cases_iso_tx[] = {
+	cmocka_unit_test_setup_teardown(iso_tx__test_partial_sdu_then_reconnect, bt_test_iso_tx_before, bt_test_iso_tx_after),
+	cmocka_unit_test_setup_teardown(iso_tx__test_queued_sdus_on_disconnect, bt_test_iso_tx_before, bt_test_iso_tx_after),
+	cmocka_unit_test_setup_teardown(iso_tx__test_queued_sdus_on_disable, bt_test_iso_tx_before, bt_test_iso_tx_after),
+	cmocka_unit_test_setup_teardown(iso_tx__test_unacked_sdu_on_disable, bt_test_iso_tx_before, bt_test_iso_tx_after),
+};
+BT_TEST_SUITE(iso_tx, test_cases_iso_tx, bt_test_iso_tx_setup, NULL);

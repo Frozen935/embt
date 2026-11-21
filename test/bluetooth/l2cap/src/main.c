@@ -1,3 +1,4 @@
+#include "support/test_support.h"
 /* main.c - Application main entry point */
 
 /*
@@ -6,13 +7,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <zephyr/kernel.h>
-#include <stddef.h>
-#include <zephyr/ztest.h>
 
-#include <zephyr/bluetooth/buf.h>
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/l2cap.h>
+#include <stddef.h>
+#include <embt/bluetooth/buf.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/l2cap.h>
 
 static int l2cap_accept(struct bt_conn *conn, struct bt_l2cap_server *server,
 			struct bt_l2cap_chan **chan)
@@ -44,66 +43,63 @@ static struct bt_l2cap_server test_unreg_server = {
 	.psm		= 0x0071,
 };
 
-ZTEST_SUITE(test_l2cap, NULL, NULL, NULL, NULL, NULL);
 
-ZTEST(test_l2cap, test_l2cap_register)
+
+static void test_l2cap__test_l2cap_register(void **cm_state)
 {
+	(void)cm_state;
 	/* Attempt to register server with PSM auto allocation */
-	zassert_false(bt_l2cap_server_register(&test_server),
-		     "Test server registration failed");
+	assert_false(bt_l2cap_server_register(&test_server));
 
 	/* Attempt to register server with fixed PSM */
-	zassert_false(bt_l2cap_server_register(&test_fixed_server),
-		     "Test fixed PSM server registration failed");
+	assert_false(bt_l2cap_server_register(&test_fixed_server));
 
 	/* Attempt to register server with dynamic PSM */
-	zassert_false(bt_l2cap_server_register(&test_dyn_server),
-		     "Test dynamic PSM server registration failed");
+	assert_false(bt_l2cap_server_register(&test_dyn_server));
 
 	/* Attempt to register server with invalid PSM */
-	zassert_true(bt_l2cap_server_register(&test_inv_server),
-		     "Test invalid PSM server registration succeeded");
+	assert_true(bt_l2cap_server_register(&test_inv_server));
 
 	/* Attempt to re-register server with PSM auto allocation */
-	zassert_equal(bt_l2cap_server_register(&test_server), -EALREADY,
-		      "Test server duplicate succeeded");
+	assert_int_equal(bt_l2cap_server_register(&test_server), -EALREADY);
 
 	/* Attempt to re-register server with fixed PSM */
-	zassert_equal(bt_l2cap_server_register(&test_fixed_server), -EALREADY,
-		      "Test fixed PSM server duplicate succeeded");
+	assert_int_equal(bt_l2cap_server_register(&test_fixed_server), -EALREADY);
 
 	/* Attempt to re-register server with dynamic PSM */
-	zassert_equal(bt_l2cap_server_register(&test_dyn_server), -EALREADY,
-		      "Test dynamic PSM server duplicate succeeded");
+	assert_int_equal(bt_l2cap_server_register(&test_dyn_server), -EALREADY);
 }
 
-ZTEST(test_l2cap, test_l2cap_unregister)
+static void test_l2cap__test_l2cap_unregister(void **cm_state)
 {
+	(void)cm_state;
 	/* Attempt to unregister a NULL server */
-	zassert_equal(bt_l2cap_server_unregister(NULL), -EINVAL,
-		      "Unregistering NULL did not fail with -EINVAL");
+	assert_int_equal(bt_l2cap_server_unregister(NULL), -EINVAL);
 
 	/* Attempt to unregister a server that was never registered */
-	zassert_equal(bt_l2cap_server_unregister(&test_unreg_server), -ENOENT,
-		      "Unregistering an unknown server did not fail with -ENOENT");
+	assert_int_equal(bt_l2cap_server_unregister(&test_unreg_server), -ENOENT);
 
-	zassert_ok(bt_l2cap_server_register(&test_unreg_server),
-		   "Test unregister server registration failed");
+	assert_int_equal(bt_l2cap_server_register(&test_unreg_server), 0);
 
 	/* The server cannot be registered twice */
-	zassert_equal(bt_l2cap_server_register(&test_unreg_server), -EALREADY,
-		      "Test unregister server duplicate succeeded");
+	assert_int_equal(bt_l2cap_server_register(&test_unreg_server), -EALREADY);
 
-	zassert_ok(bt_l2cap_server_unregister(&test_unreg_server),
-		   "Test unregister server unregistration failed");
+	assert_int_equal(bt_l2cap_server_unregister(&test_unreg_server), 0);
 
 	/* Attempt to unregister the same server twice */
-	zassert_equal(bt_l2cap_server_unregister(&test_unreg_server), -ENOENT,
-		      "Double unregistration did not fail with -ENOENT");
+	assert_int_equal(bt_l2cap_server_unregister(&test_unreg_server), -ENOENT);
 
 	/* The PSM is available again */
-	zassert_ok(bt_l2cap_server_register(&test_unreg_server),
-		   "Test unregister server re-registration failed");
-	zassert_ok(bt_l2cap_server_unregister(&test_unreg_server),
-		   "Test unregister server unregistration failed");
+	assert_int_equal(bt_l2cap_server_register(&test_unreg_server), 0);
+	assert_int_equal(bt_l2cap_server_unregister(&test_unreg_server), 0);
 }
+
+
+
+
+
+static const struct CMUnitTest test_cases_test_l2cap[] = {
+	cmocka_unit_test(test_l2cap__test_l2cap_register),
+	cmocka_unit_test(test_l2cap__test_l2cap_unregister),
+};
+BT_TEST_SUITE(test_l2cap, test_cases_test_l2cap, bt_test_host_setup, NULL);

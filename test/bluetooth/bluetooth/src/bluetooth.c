@@ -1,3 +1,6 @@
+#include "support/test_support.h"
+static const struct bt_hci_transport test_driver;
+#include "host/hci_core.h"
 /* bluetooth.c - Bluetooth smoke test */
 
 /*
@@ -6,51 +9,69 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <zephyr/kernel.h>
+
 
 #include <errno.h>
-#include <zephyr/tc_util.h>
-#include <zephyr/ztest.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/drivers/bluetooth.h>
 
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/drivers/bluetooth.h>
-
-#define DT_DRV_COMPAT zephyr_bt_hci_test
 
 #define EXPECTED_ERROR -ENOSYS
 
-static int driver_open(const struct device *dev)
+static int driver_open(const struct bt_hci_transport *dev)
 {
-	TC_PRINT("driver: %s\n", __func__);
+	printf("driver: %s\n", __func__);
 
 	/* Indicate that there is no real Bluetooth device */
 	return EXPECTED_ERROR;
 }
 
-static int driver_send(const struct device *dev, struct net_buf *buf)
+static int driver_send(const struct bt_hci_transport *dev, struct net_buf *buf)
 {
 	return 0;
 }
 
-static DEVICE_API(bt_hci, driver_api) = {
+static const struct bt_hci_driver_api driver_api = {
 	.open = driver_open,
 	.send = driver_send,
 };
 
-#define TEST_DEVICE_INIT(inst) \
-	static struct bt_hci_driver_data driver_data_##inst = { \
-	}; \
-	static const struct bt_hci_driver_config driver_config_##inst = \
-						BT_DT_HCI_DRIVER_CONFIG_INST_GET(inst); \
-	DEVICE_DT_INST_DEFINE(inst, NULL, NULL, &driver_data_##inst, &driver_config_##inst, \
-			      POST_KERNEL, CONFIG_KERNEL_INIT_PRIORITY_DEVICE, &driver_api)
-
-DT_INST_FOREACH_STATUS_OKAY(TEST_DEVICE_INIT)
-
-ZTEST_SUITE(test_bluetooth, NULL, NULL, NULL, NULL, NULL);
-
-ZTEST(test_bluetooth, test_bluetooth_entry)
+static struct bt_hci_driver_data test_driver_data;
+static const struct bt_hci_transport test_driver = {
+ .name = "upstream-test", .bus = 0,
+ .api = &driver_api, .data = &test_driver_data,
+};
+static void test_transport_init(void)
 {
-	zassert_true((bt_enable(NULL) == EXPECTED_ERROR),
-			"bt_enable failed");
+ bt_test_require(bt_stack_init());
+ bt_dev.hci = &test_driver;
 }
+
+
+
+
+static void test_bluetooth__test_bluetooth_entry(void **cm_state)
+{
+	(void)cm_state;
+	assert_true((bt_enable(NULL) == EXPECTED_ERROR));
+}
+
+int bt_test_test_bluetooth_setup(void **state)
+{
+	int environment_result = bt_test_host_setup(state);
+
+	if (environment_result != 0) {
+		return environment_result;
+	}
+
+	test_transport_init();
+	*state = NULL;
+	return 0;
+}
+
+
+
+static const struct CMUnitTest test_cases_test_bluetooth[] = {
+	cmocka_unit_test(test_bluetooth__test_bluetooth_entry),
+};
+BT_TEST_SUITE(test_bluetooth, test_cases_test_bluetooth, bt_test_test_bluetooth_setup, NULL);

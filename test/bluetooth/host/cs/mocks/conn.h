@@ -1,12 +1,13 @@
+#include "support/test_support.h"
 /*
  * Copyright (c) 2024 Nordic Semiconductor ASA
  *
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/fff.h>
-#include <zephyr/kernel.h>
+#include <embt/bluetooth/conn.h>
+#include <fff.h>
+
 
 #include <host/conn_internal.h>
 

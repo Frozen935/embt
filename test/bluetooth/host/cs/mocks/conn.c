@@ -1,3 +1,4 @@
+#include "support/test_support.h"
 /*
  * Copyright (c) 2024 Nordic Semiconductor ASA
  *
@@ -6,7 +7,7 @@
 
 #include "mocks/conn.h"
 
-#include <zephyr/kernel.h>
+
 
 DEFINE_FAKE_VOID_FUNC(bt_conn_unref, struct bt_conn *);
 DEFINE_FAKE_VOID_FUNC(bt_conn_drop, struct bt_conn **);
@@ -23,3 +24,10 @@ DEFINE_FAKE_VOID_FUNC(bt_conn_notify_cs_subevent_result, struct bt_conn *,
 DEFINE_FAKE_VOID_FUNC(bt_conn_notify_cs_security_enable_available, struct bt_conn *, uint8_t);
 DEFINE_FAKE_VOID_FUNC(bt_conn_notify_cs_procedure_enable_available, struct bt_conn *,
 		      uint8_t, struct bt_conn_le_cs_procedure_enable_complete *);
+
+int bt_conn_cb_register(struct bt_conn_cb *cb)
+{
+ (void)cb;
+ fail_msg("Unexpected CS callback registration during parser unit test");
+ return -EINVAL;
+}

@@ -1,3 +1,4 @@
+#include "support/test_support.h"
 /*
  * Copyright (c) 2025 Nordic Semiconductor ASA
  *
@@ -7,10 +8,10 @@
 #ifndef MOCKS_CAP_INITIATOR_H_
 #define MOCKS_CAP_INITIATOR_H_
 
-#include <zephyr/bluetooth/audio/cap.h>
-#include <zephyr/bluetooth/audio/csip.h>
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/fff.h>
+#include <embt/bluetooth/audio/cap.h>
+#include <embt/bluetooth/audio/csip.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <fff.h>
 
 extern const struct bt_cap_initiator_cb mock_cap_initiator_cb;
 

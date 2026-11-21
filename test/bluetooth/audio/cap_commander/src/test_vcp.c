@@ -1,3 +1,9 @@
+#include "support/test_support.h"
+#include "test_environment.h"
+void mock_init_rule_before_d38d7b(const struct bt_test_case_info *, void *);
+void mock_destroy_rule_after_d38d7b(const struct bt_test_case_info *, void *);
+
+
 /* test_vcp.c - unit test for volume settings */
 
 /*
@@ -10,16 +16,13 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <zephyr/autoconf.h>
-#include <zephyr/bluetooth/audio/cap.h>
-#include <zephyr/bluetooth/audio/vcp.h>
-#include <zephyr/bluetooth/audio/vocs.h>
-#include <zephyr/bluetooth/hci_types.h>
-#include <zephyr/fff.h>
-#include <zephyr/sys/util.h>
-#include <zephyr/ztest_assert.h>
-#include <zephyr/ztest_test.h>
-
+#include <embt/autoconf.h>
+#include <embt/bluetooth/audio/cap.h>
+#include <embt/bluetooth/audio/vcp.h>
+#include <embt/bluetooth/audio/vocs.h>
+#include <embt/bluetooth/hci_types.h>
+#include <fff.h>
+#include <embt/base/util.h>
 #include "cap_commander.h"
 #include "conn.h"
 #include "expects_util.h"
@@ -44,7 +47,7 @@ static void *cap_commander_test_vcp_setup(void)
 	struct cap_commander_test_vcp_fixture *fixture;
 
 	fixture = malloc(sizeof(*fixture));
-	zassert_not_null(fixture);
+	assert_non_null(fixture);
 
 	return fixture;
 }
@@ -61,7 +64,7 @@ static void cap_commander_test_vcp_after(void *f)
 	int err;
 
 	err = bt_cap_commander_unregister_cb(&mock_cap_commander_cb);
-	zassert_true(err == 0 || err == -EINVAL, "Unexpected error: %d", err);
+	assert_true(err == 0 || err == -EINVAL);
 
 	for (size_t i = 0U; i < ARRAY_SIZE(fixture->conns); i++) {
 		mock_bt_conn_disconnected(&fixture->conns[i], BT_HCI_ERR_REMOTE_USER_TERM_CONN);
@@ -73,12 +76,11 @@ static void cap_commander_test_vcp_teardown(void *f)
 	free(f);
 }
 
-ZTEST_SUITE(cap_commander_test_vcp, NULL, cap_commander_test_vcp_setup,
-	    cap_commander_test_vcp_before, cap_commander_test_vcp_after,
-	    cap_commander_test_vcp_teardown);
 
-ZTEST_F(cap_commander_test_vcp, test_commander_change_volume)
+
+static void cap_commander_test_vcp__test_commander_change_volume(void **cm_state)
 {
+	struct cap_commander_test_vcp_fixture *fixture = *cm_state;
 	union bt_cap_set_member members[ARRAY_SIZE(fixture->conns)];
 	const struct bt_cap_commander_change_volume_param param = {
 		.type = BT_CAP_SET_TYPE_AD_HOC,
@@ -93,24 +95,25 @@ ZTEST_F(cap_commander_test_vcp, test_commander_change_volume)
 	}
 
 	err = bt_cap_commander_register_cb(&mock_cap_commander_cb);
-	zassert_equal(0, err, "Unexpected return value %d", err);
+	assert_int_equal(0, err);
 
 	for (size_t i = 0U; i < ARRAY_SIZE(fixture->conns); i++) {
 		struct bt_vcp_vol_ctlr *vol_ctlr; /* We don't care about this */
 
 		err = bt_vcp_vol_ctlr_discover(&fixture->conns[i], &vol_ctlr);
-		zassert_equal(0, err, "Unexpected return value %d", err);
+		assert_int_equal(0, err);
 	}
 
 	err = bt_cap_commander_change_volume(&param);
-	zassert_equal(0, err, "Unexpected return value %d", err);
+	assert_int_equal(0, err);
 
 	zexpect_call_count("bt_cap_commander_cb.volume_changed", 1,
 			   mock_cap_commander_volume_changed_cb_fake.call_count);
 }
 
-ZTEST_F(cap_commander_test_vcp, test_commander_change_volume_double)
+static void cap_commander_test_vcp__test_commander_change_volume_double(void **cm_state)
 {
+	struct cap_commander_test_vcp_fixture *fixture = *cm_state;
 	union bt_cap_set_member members[ARRAY_SIZE(fixture->conns)];
 	const struct bt_cap_commander_change_volume_param param = {
 		.type = BT_CAP_SET_TYPE_AD_HOC,
@@ -125,39 +128,41 @@ ZTEST_F(cap_commander_test_vcp, test_commander_change_volume_double)
 	}
 
 	err = bt_cap_commander_register_cb(&mock_cap_commander_cb);
-	zassert_equal(0, err, "Unexpected return value %d", err);
+	assert_int_equal(0, err);
 
 	for (size_t i = 0U; i < ARRAY_SIZE(fixture->conns); i++) {
 		struct bt_vcp_vol_ctlr *vol_ctlr; /* We don't care about this */
 
 		err = bt_vcp_vol_ctlr_discover(&fixture->conns[i], &vol_ctlr);
-		zassert_equal(0, err, "Unexpected return value %d", err);
+		assert_int_equal(0, err);
 	}
 
 	err = bt_cap_commander_change_volume(&param);
-	zassert_equal(0, err, "Unexpected return value %d", err);
+	assert_int_equal(0, err);
 
 	zexpect_call_count("bt_cap_commander_cb.volume_changed", 1,
 			   mock_cap_commander_volume_changed_cb_fake.call_count);
 
 	/* Verify that it still works as expected if we set the same value twice */
 	err = bt_cap_commander_change_volume(&param);
-	zassert_equal(0, err, "Unexpected return value %d", err);
+	assert_int_equal(0, err);
 
 	zexpect_call_count("bt_cap_commander_cb.volume_changed", 2,
 			   mock_cap_commander_volume_changed_cb_fake.call_count);
 }
 
-ZTEST_F(cap_commander_test_vcp, test_commander_change_volume_inval_param_null)
+static void cap_commander_test_vcp__test_commander_change_volume_inval_param_null(void **cm_state)
 {
+	struct cap_commander_test_vcp_fixture *fixture = *cm_state;
 	int err;
 
 	err = bt_cap_commander_change_volume(NULL);
-	zassert_equal(-EINVAL, err, "Unexpected return value %d", err);
+	assert_int_equal(-EINVAL, err);
 }
 
-ZTEST_F(cap_commander_test_vcp, test_commander_change_volume_inval_param_null_members)
+static void cap_commander_test_vcp__test_commander_change_volume_inval_param_null_members(void **cm_state)
 {
+	struct cap_commander_test_vcp_fixture *fixture = *cm_state;
 	const struct bt_cap_commander_change_volume_param param = {
 		.type = BT_CAP_SET_TYPE_AD_HOC,
 		.members = NULL,
@@ -167,11 +172,12 @@ ZTEST_F(cap_commander_test_vcp, test_commander_change_volume_inval_param_null_me
 	int err;
 
 	err = bt_cap_commander_change_volume(&param);
-	zassert_equal(-EINVAL, err, "Unexpected return value %d", err);
+	assert_int_equal(-EINVAL, err);
 }
 
-ZTEST_F(cap_commander_test_vcp, test_commander_change_volume_inval_param_null_member)
+static void cap_commander_test_vcp__test_commander_change_volume_inval_param_null_member(void **cm_state)
 {
+	struct cap_commander_test_vcp_fixture *fixture = *cm_state;
 	union bt_cap_set_member members[ARRAY_SIZE(fixture->conns)];
 	const struct bt_cap_commander_change_volume_param param = {
 		.type = BT_CAP_SET_TYPE_AD_HOC,
@@ -187,11 +193,12 @@ ZTEST_F(cap_commander_test_vcp, test_commander_change_volume_inval_param_null_me
 	members[ARRAY_SIZE(members) - 1].member = NULL;
 
 	err = bt_cap_commander_change_volume(&param);
-	zassert_equal(-EINVAL, err, "Unexpected return value %d", err);
+	assert_int_equal(-EINVAL, err);
 }
 
-ZTEST_F(cap_commander_test_vcp, test_commander_change_volume_inval_missing_cas)
+static void cap_commander_test_vcp__test_commander_change_volume_inval_missing_cas(void **cm_state)
 {
+	struct cap_commander_test_vcp_fixture *fixture = *cm_state;
 	union bt_cap_set_member members[ARRAY_SIZE(fixture->conns)];
 	const struct bt_cap_commander_change_volume_param param = {
 		.type = BT_CAP_SET_TYPE_CSIP,
@@ -206,21 +213,22 @@ ZTEST_F(cap_commander_test_vcp, test_commander_change_volume_inval_missing_cas)
 	}
 
 	err = bt_cap_commander_register_cb(&mock_cap_commander_cb);
-	zassert_equal(0, err, "Unexpected return value %d", err);
+	assert_int_equal(0, err);
 
 	for (size_t i = 0U; i < ARRAY_SIZE(fixture->conns); i++) {
 		struct bt_vcp_vol_ctlr *vol_ctlr; /* We don't care about this */
 
 		err = bt_vcp_vol_ctlr_discover(&fixture->conns[i], &vol_ctlr);
-		zassert_equal(0, err, "Unexpected return value %d", err);
+		assert_int_equal(0, err);
 	}
 
 	err = bt_cap_commander_change_volume(&param);
-	zassert_equal(-EINVAL, err, "Unexpected return value %d", err);
+	assert_int_equal(-EINVAL, err);
 }
 
-ZTEST_F(cap_commander_test_vcp, test_commander_change_volume_inval_missing_vcs)
+static void cap_commander_test_vcp__test_commander_change_volume_inval_missing_vcs(void **cm_state)
 {
+	struct cap_commander_test_vcp_fixture *fixture = *cm_state;
 	union bt_cap_set_member members[ARRAY_SIZE(fixture->conns)];
 	const struct bt_cap_commander_change_volume_param param = {
 		.type = BT_CAP_SET_TYPE_AD_HOC,
@@ -235,14 +243,15 @@ ZTEST_F(cap_commander_test_vcp, test_commander_change_volume_inval_missing_vcs)
 	}
 
 	err = bt_cap_commander_register_cb(&mock_cap_commander_cb);
-	zassert_equal(0, err, "Unexpected return value %d", err);
+	assert_int_equal(0, err);
 
 	err = bt_cap_commander_change_volume(&param);
-	zassert_equal(-EINVAL, err, "Unexpected return value %d", err);
+	assert_int_equal(-EINVAL, err);
 }
 
-ZTEST_F(cap_commander_test_vcp, test_commander_change_volume_inval_param_zero_count)
+static void cap_commander_test_vcp__test_commander_change_volume_inval_param_zero_count(void **cm_state)
 {
+	struct cap_commander_test_vcp_fixture *fixture = *cm_state;
 	union bt_cap_set_member members[ARRAY_SIZE(fixture->conns)];
 	const struct bt_cap_commander_change_volume_param param = {
 		.type = BT_CAP_SET_TYPE_AD_HOC,
@@ -257,11 +266,12 @@ ZTEST_F(cap_commander_test_vcp, test_commander_change_volume_inval_param_zero_co
 	}
 
 	err = bt_cap_commander_change_volume(&param);
-	zassert_equal(-EINVAL, err, "Unexpected return value %d", err);
+	assert_int_equal(-EINVAL, err);
 }
 
-ZTEST_F(cap_commander_test_vcp, test_commander_change_volume_inval_param_inval_count)
+static void cap_commander_test_vcp__test_commander_change_volume_inval_param_inval_count(void **cm_state)
 {
+	struct cap_commander_test_vcp_fixture *fixture = *cm_state;
 	union bt_cap_set_member members[ARRAY_SIZE(fixture->conns)];
 	const struct bt_cap_commander_change_volume_param param = {
 		.type = BT_CAP_SET_TYPE_AD_HOC,
@@ -276,11 +286,12 @@ ZTEST_F(cap_commander_test_vcp, test_commander_change_volume_inval_param_inval_c
 	}
 
 	err = bt_cap_commander_change_volume(&param);
-	zassert_equal(-EINVAL, err, "Unexpected return value %d", err);
+	assert_int_equal(-EINVAL, err);
 }
 
-ZTEST_F(cap_commander_test_vcp, test_commander_change_volume_offset)
+static void cap_commander_test_vcp__test_commander_change_volume_offset(void **cm_state)
 {
+	struct cap_commander_test_vcp_fixture *fixture = *cm_state;
 	struct bt_cap_commander_change_volume_offset_member_param
 		member_params[ARRAY_SIZE(fixture->conns)];
 	const struct bt_cap_commander_change_volume_offset_param param = {
@@ -296,24 +307,25 @@ ZTEST_F(cap_commander_test_vcp, test_commander_change_volume_offset)
 	}
 
 	err = bt_cap_commander_register_cb(&mock_cap_commander_cb);
-	zassert_equal(0, err, "Unexpected return value %d", err);
+	assert_int_equal(0, err);
 
 	for (size_t i = 0U; i < ARRAY_SIZE(fixture->conns); i++) {
 		struct bt_vcp_vol_ctlr *vol_ctlr; /* We don't care about this */
 
 		err = bt_vcp_vol_ctlr_discover(&fixture->conns[i], &vol_ctlr);
-		zassert_equal(0, err, "Unexpected return value %d", err);
+		assert_int_equal(0, err);
 	}
 
 	err = bt_cap_commander_change_volume_offset(&param);
-	zassert_equal(0, err, "Unexpected return value %d", err);
+	assert_int_equal(0, err);
 
 	zexpect_call_count("bt_cap_commander_cb.volume_offset_changed", 1,
 			   mock_cap_commander_volume_offset_changed_cb_fake.call_count);
 }
 
-ZTEST_F(cap_commander_test_vcp, test_commander_change_volume_offset_double)
+static void cap_commander_test_vcp__test_commander_change_volume_offset_double(void **cm_state)
 {
+	struct cap_commander_test_vcp_fixture *fixture = *cm_state;
 	struct bt_cap_commander_change_volume_offset_member_param
 		member_params[ARRAY_SIZE(fixture->conns)];
 	const struct bt_cap_commander_change_volume_offset_param param = {
@@ -329,39 +341,41 @@ ZTEST_F(cap_commander_test_vcp, test_commander_change_volume_offset_double)
 	}
 
 	err = bt_cap_commander_register_cb(&mock_cap_commander_cb);
-	zassert_equal(0, err, "Unexpected return value %d", err);
+	assert_int_equal(0, err);
 
 	for (size_t i = 0U; i < ARRAY_SIZE(fixture->conns); i++) {
 		struct bt_vcp_vol_ctlr *vol_ctlr; /* We don't care about this */
 
 		err = bt_vcp_vol_ctlr_discover(&fixture->conns[i], &vol_ctlr);
-		zassert_equal(0, err, "Unexpected return value %d", err);
+		assert_int_equal(0, err);
 	}
 
 	err = bt_cap_commander_change_volume_offset(&param);
-	zassert_equal(0, err, "Unexpected return value %d", err);
+	assert_int_equal(0, err);
 
 	zexpect_call_count("bt_cap_commander_cb.volume_offset_changed", 1,
 			   mock_cap_commander_volume_offset_changed_cb_fake.call_count);
 
 	/* Verify that it still works as expected if we set the same value twice */
 	err = bt_cap_commander_change_volume_offset(&param);
-	zassert_equal(0, err, "Unexpected return value %d", err);
+	assert_int_equal(0, err);
 
 	zexpect_call_count("bt_cap_commander_cb.volume_offset_changed", 2,
 			   mock_cap_commander_volume_offset_changed_cb_fake.call_count);
 }
 
-ZTEST_F(cap_commander_test_vcp, test_commander_change_volume_offset_inval_param_null)
+static void cap_commander_test_vcp__test_commander_change_volume_offset_inval_param_null(void **cm_state)
 {
+	struct cap_commander_test_vcp_fixture *fixture = *cm_state;
 	int err;
 
 	err = bt_cap_commander_change_volume_offset(NULL);
-	zassert_equal(-EINVAL, err, "Unexpected return value %d", err);
+	assert_int_equal(-EINVAL, err);
 }
 
-ZTEST_F(cap_commander_test_vcp, test_commander_change_volume_offset_inval_param_null_param)
+static void cap_commander_test_vcp__test_commander_change_volume_offset_inval_param_null_param(void **cm_state)
 {
+	struct cap_commander_test_vcp_fixture *fixture = *cm_state;
 	const struct bt_cap_commander_change_volume_offset_param param = {
 		.type = BT_CAP_SET_TYPE_AD_HOC,
 		.param = NULL,
@@ -370,11 +384,12 @@ ZTEST_F(cap_commander_test_vcp, test_commander_change_volume_offset_inval_param_
 	int err;
 
 	err = bt_cap_commander_change_volume_offset(&param);
-	zassert_equal(-EINVAL, err, "Unexpected return value %d", err);
+	assert_int_equal(-EINVAL, err);
 }
 
-ZTEST_F(cap_commander_test_vcp, test_commander_change_volume_offset_inval_param_null_member)
+static void cap_commander_test_vcp__test_commander_change_volume_offset_inval_param_null_member(void **cm_state)
 {
+	struct cap_commander_test_vcp_fixture *fixture = *cm_state;
 	struct bt_cap_commander_change_volume_offset_member_param
 		member_params[ARRAY_SIZE(fixture->conns)];
 	const struct bt_cap_commander_change_volume_offset_param param = {
@@ -391,11 +406,12 @@ ZTEST_F(cap_commander_test_vcp, test_commander_change_volume_offset_inval_param_
 	member_params[ARRAY_SIZE(member_params) - 1].member.member = NULL;
 
 	err = bt_cap_commander_change_volume_offset(&param);
-	zassert_equal(-EINVAL, err, "Unexpected return value %d", err);
+	assert_int_equal(-EINVAL, err);
 }
 
-ZTEST_F(cap_commander_test_vcp, test_commander_change_volume_offset_inval_missing_cas)
+static void cap_commander_test_vcp__test_commander_change_volume_offset_inval_missing_cas(void **cm_state)
 {
+	struct cap_commander_test_vcp_fixture *fixture = *cm_state;
 	struct bt_cap_commander_change_volume_offset_member_param
 		member_params[ARRAY_SIZE(fixture->conns)];
 	const struct bt_cap_commander_change_volume_offset_param param = {
@@ -411,21 +427,22 @@ ZTEST_F(cap_commander_test_vcp, test_commander_change_volume_offset_inval_missin
 	}
 
 	err = bt_cap_commander_register_cb(&mock_cap_commander_cb);
-	zassert_equal(0, err, "Unexpected return value %d", err);
+	assert_int_equal(0, err);
 
 	for (size_t i = 0U; i < ARRAY_SIZE(fixture->conns); i++) {
 		struct bt_vcp_vol_ctlr *vol_ctlr; /* We don't care about this */
 
 		err = bt_vcp_vol_ctlr_discover(&fixture->conns[i], &vol_ctlr);
-		zassert_equal(0, err, "Unexpected return value %d", err);
+		assert_int_equal(0, err);
 	}
 
 	err = bt_cap_commander_change_volume_offset(&param);
-	zassert_equal(-EINVAL, err, "Unexpected return value %d", err);
+	assert_int_equal(-EINVAL, err);
 }
 
-ZTEST_F(cap_commander_test_vcp, test_commander_change_volume_offset_inval_missing_vocs)
+static void cap_commander_test_vcp__test_commander_change_volume_offset_inval_missing_vocs(void **cm_state)
 {
+	struct cap_commander_test_vcp_fixture *fixture = *cm_state;
 	struct bt_cap_commander_change_volume_offset_member_param
 		member_params[ARRAY_SIZE(fixture->conns)];
 	const struct bt_cap_commander_change_volume_offset_param param = {
@@ -441,14 +458,15 @@ ZTEST_F(cap_commander_test_vcp, test_commander_change_volume_offset_inval_missin
 	}
 
 	err = bt_cap_commander_register_cb(&mock_cap_commander_cb);
-	zassert_equal(0, err, "Unexpected return value %d", err);
+	assert_int_equal(0, err);
 
 	err = bt_cap_commander_change_volume_offset(&param);
-	zassert_equal(-EINVAL, err, "Unexpected return value %d", err);
+	assert_int_equal(-EINVAL, err);
 }
 
-ZTEST_F(cap_commander_test_vcp, test_commander_change_volume_offset_inval_param_zero_count)
+static void cap_commander_test_vcp__test_commander_change_volume_offset_inval_param_zero_count(void **cm_state)
 {
+	struct cap_commander_test_vcp_fixture *fixture = *cm_state;
 	struct bt_cap_commander_change_volume_offset_member_param
 		member_params[ARRAY_SIZE(fixture->conns)];
 	const struct bt_cap_commander_change_volume_offset_param param = {
@@ -464,11 +482,12 @@ ZTEST_F(cap_commander_test_vcp, test_commander_change_volume_offset_inval_param_
 	}
 
 	err = bt_cap_commander_change_volume_offset(&param);
-	zassert_equal(-EINVAL, err, "Unexpected return value %d", err);
+	assert_int_equal(-EINVAL, err);
 }
 
-ZTEST_F(cap_commander_test_vcp, test_commander_change_volume_offset_inval_param_inval_count)
+static void cap_commander_test_vcp__test_commander_change_volume_offset_inval_param_inval_count(void **cm_state)
 {
+	struct cap_commander_test_vcp_fixture *fixture = *cm_state;
 	struct bt_cap_commander_change_volume_offset_member_param
 		member_params[ARRAY_SIZE(fixture->conns)];
 	const struct bt_cap_commander_change_volume_offset_param param = {
@@ -484,11 +503,12 @@ ZTEST_F(cap_commander_test_vcp, test_commander_change_volume_offset_inval_param_
 	}
 
 	err = bt_cap_commander_change_volume_offset(&param);
-	zassert_equal(-EINVAL, err, "Unexpected return value %d", err);
+	assert_int_equal(-EINVAL, err);
 }
 
-ZTEST_F(cap_commander_test_vcp, test_commander_change_volume_offset_inval_param_inval_offset_max)
+static void cap_commander_test_vcp__test_commander_change_volume_offset_inval_param_inval_offset_max(void **cm_state)
 {
+	struct cap_commander_test_vcp_fixture *fixture = *cm_state;
 	struct bt_cap_commander_change_volume_offset_member_param
 		member_params[ARRAY_SIZE(fixture->conns)];
 	const struct bt_cap_commander_change_volume_offset_param param = {
@@ -504,11 +524,12 @@ ZTEST_F(cap_commander_test_vcp, test_commander_change_volume_offset_inval_param_
 	}
 
 	err = bt_cap_commander_change_volume_offset(&param);
-	zassert_equal(-EINVAL, err, "Unexpected return value %d", err);
+	assert_int_equal(-EINVAL, err);
 }
 
-ZTEST_F(cap_commander_test_vcp, test_commander_change_volume_offset_inval_param_inval_offset_min)
+static void cap_commander_test_vcp__test_commander_change_volume_offset_inval_param_inval_offset_min(void **cm_state)
 {
+	struct cap_commander_test_vcp_fixture *fixture = *cm_state;
 	struct bt_cap_commander_change_volume_offset_member_param
 		member_params[ARRAY_SIZE(fixture->conns)];
 	const struct bt_cap_commander_change_volume_offset_param param = {
@@ -524,10 +545,11 @@ ZTEST_F(cap_commander_test_vcp, test_commander_change_volume_offset_inval_param_
 	}
 
 	err = bt_cap_commander_change_volume_offset(&param);
-	zassert_equal(-EINVAL, err, "Unexpected return value %d", err);
+	assert_int_equal(-EINVAL, err);
 }
-ZTEST_F(cap_commander_test_vcp, test_commander_change_volume_mute_state)
+static void cap_commander_test_vcp__test_commander_change_volume_mute_state(void **cm_state)
 {
+	struct cap_commander_test_vcp_fixture *fixture = *cm_state;
 	union bt_cap_set_member members[ARRAY_SIZE(fixture->conns)];
 	const struct bt_cap_commander_change_volume_mute_state_param param = {
 		.type = BT_CAP_SET_TYPE_AD_HOC,
@@ -542,24 +564,25 @@ ZTEST_F(cap_commander_test_vcp, test_commander_change_volume_mute_state)
 	}
 
 	err = bt_cap_commander_register_cb(&mock_cap_commander_cb);
-	zassert_equal(0, err, "Unexpected return value %d", err);
+	assert_int_equal(0, err);
 
 	for (size_t i = 0U; i < ARRAY_SIZE(fixture->conns); i++) {
 		struct bt_vcp_vol_ctlr *vol_ctlr; /* We don't care about this */
 
 		err = bt_vcp_vol_ctlr_discover(&fixture->conns[i], &vol_ctlr);
-		zassert_equal(0, err, "Unexpected return value %d", err);
+		assert_int_equal(0, err);
 	}
 
 	err = bt_cap_commander_change_volume_mute_state(&param);
-	zassert_equal(0, err, "Unexpected return value %d", err);
+	assert_int_equal(0, err);
 
 	zexpect_call_count("bt_cap_commander_cb.volume_mute_changed", 1,
 			   mock_cap_commander_volume_mute_changed_cb_fake.call_count);
 }
 
-ZTEST_F(cap_commander_test_vcp, test_commander_change_volume_mute_state_double)
+static void cap_commander_test_vcp__test_commander_change_volume_mute_state_double(void **cm_state)
 {
+	struct cap_commander_test_vcp_fixture *fixture = *cm_state;
 	union bt_cap_set_member members[ARRAY_SIZE(fixture->conns)];
 	const struct bt_cap_commander_change_volume_mute_state_param param = {
 		.type = BT_CAP_SET_TYPE_AD_HOC,
@@ -574,39 +597,41 @@ ZTEST_F(cap_commander_test_vcp, test_commander_change_volume_mute_state_double)
 	}
 
 	err = bt_cap_commander_register_cb(&mock_cap_commander_cb);
-	zassert_equal(0, err, "Unexpected return value %d", err);
+	assert_int_equal(0, err);
 
 	for (size_t i = 0U; i < ARRAY_SIZE(fixture->conns); i++) {
 		struct bt_vcp_vol_ctlr *vol_ctlr; /* We don't care about this */
 
 		err = bt_vcp_vol_ctlr_discover(&fixture->conns[i], &vol_ctlr);
-		zassert_equal(0, err, "Unexpected return value %d", err);
+		assert_int_equal(0, err);
 	}
 
 	err = bt_cap_commander_change_volume_mute_state(&param);
-	zassert_equal(0, err, "Unexpected return value %d", err);
+	assert_int_equal(0, err);
 
 	zexpect_call_count("bt_cap_commander_cb.volume_mute_changed", 1,
 			   mock_cap_commander_volume_mute_changed_cb_fake.call_count);
 
 	/* Verify that it still works as expected if we set the same value twice */
 	err = bt_cap_commander_change_volume_mute_state(&param);
-	zassert_equal(0, err, "Unexpected return value %d", err);
+	assert_int_equal(0, err);
 
 	zexpect_call_count("bt_cap_commander_cb.volume_mute_changed", 2,
 			   mock_cap_commander_volume_mute_changed_cb_fake.call_count);
 }
 
-ZTEST_F(cap_commander_test_vcp, test_commander_change_volume_mute_state_inval_param_null)
+static void cap_commander_test_vcp__test_commander_change_volume_mute_state_inval_param_null(void **cm_state)
 {
+	struct cap_commander_test_vcp_fixture *fixture = *cm_state;
 	int err;
 
 	err = bt_cap_commander_change_volume_mute_state(NULL);
-	zassert_equal(-EINVAL, err, "Unexpected return value %d", err);
+	assert_int_equal(-EINVAL, err);
 }
 
-ZTEST_F(cap_commander_test_vcp, test_commander_change_volume_mute_state_inval_param_null_members)
+static void cap_commander_test_vcp__test_commander_change_volume_mute_state_inval_param_null_members(void **cm_state)
 {
+	struct cap_commander_test_vcp_fixture *fixture = *cm_state;
 	const struct bt_cap_commander_change_volume_mute_state_param param = {
 		.type = BT_CAP_SET_TYPE_AD_HOC,
 		.members = NULL,
@@ -616,11 +641,12 @@ ZTEST_F(cap_commander_test_vcp, test_commander_change_volume_mute_state_inval_pa
 	int err;
 
 	err = bt_cap_commander_change_volume_mute_state(&param);
-	zassert_equal(-EINVAL, err, "Unexpected return value %d", err);
+	assert_int_equal(-EINVAL, err);
 }
 
-ZTEST_F(cap_commander_test_vcp, test_commander_change_volume_mute_state_inval_param_null_member)
+static void cap_commander_test_vcp__test_commander_change_volume_mute_state_inval_param_null_member(void **cm_state)
 {
+	struct cap_commander_test_vcp_fixture *fixture = *cm_state;
 	union bt_cap_set_member members[ARRAY_SIZE(fixture->conns)];
 	const struct bt_cap_commander_change_volume_mute_state_param param = {
 		.type = BT_CAP_SET_TYPE_AD_HOC,
@@ -636,11 +662,12 @@ ZTEST_F(cap_commander_test_vcp, test_commander_change_volume_mute_state_inval_pa
 	members[ARRAY_SIZE(members) - 1].member = NULL;
 
 	err = bt_cap_commander_change_volume_mute_state(&param);
-	zassert_equal(-EINVAL, err, "Unexpected return value %d", err);
+	assert_int_equal(-EINVAL, err);
 }
 
-ZTEST_F(cap_commander_test_vcp, test_commander_change_volume_mute_state_inval_missing_cas)
+static void cap_commander_test_vcp__test_commander_change_volume_mute_state_inval_missing_cas(void **cm_state)
 {
+	struct cap_commander_test_vcp_fixture *fixture = *cm_state;
 	union bt_cap_set_member members[ARRAY_SIZE(fixture->conns)];
 	const struct bt_cap_commander_change_volume_mute_state_param param = {
 		.type = BT_CAP_SET_TYPE_CSIP,
@@ -655,21 +682,22 @@ ZTEST_F(cap_commander_test_vcp, test_commander_change_volume_mute_state_inval_mi
 	}
 
 	err = bt_cap_commander_register_cb(&mock_cap_commander_cb);
-	zassert_equal(0, err, "Unexpected return value %d", err);
+	assert_int_equal(0, err);
 
 	for (size_t i = 0U; i < ARRAY_SIZE(fixture->conns); i++) {
 		struct bt_vcp_vol_ctlr *vol_ctlr; /* We don't care about this */
 
 		err = bt_vcp_vol_ctlr_discover(&fixture->conns[i], &vol_ctlr);
-		zassert_equal(0, err, "Unexpected return value %d", err);
+		assert_int_equal(0, err);
 	}
 
 	err = bt_cap_commander_change_volume_mute_state(&param);
-	zassert_equal(-EINVAL, err, "Unexpected return value %d", err);
+	assert_int_equal(-EINVAL, err);
 }
 
-ZTEST_F(cap_commander_test_vcp, test_commander_change_volume_mute_state_inval_missing_vcs)
+static void cap_commander_test_vcp__test_commander_change_volume_mute_state_inval_missing_vcs(void **cm_state)
 {
+	struct cap_commander_test_vcp_fixture *fixture = *cm_state;
 	union bt_cap_set_member members[ARRAY_SIZE(fixture->conns)];
 	const struct bt_cap_commander_change_volume_mute_state_param param = {
 		.type = BT_CAP_SET_TYPE_AD_HOC,
@@ -684,14 +712,15 @@ ZTEST_F(cap_commander_test_vcp, test_commander_change_volume_mute_state_inval_mi
 	}
 
 	err = bt_cap_commander_register_cb(&mock_cap_commander_cb);
-	zassert_equal(0, err, "Unexpected return value %d", err);
+	assert_int_equal(0, err);
 
 	err = bt_cap_commander_change_volume_mute_state(&param);
-	zassert_equal(-EINVAL, err, "Unexpected return value %d", err);
+	assert_int_equal(-EINVAL, err);
 }
 
-ZTEST_F(cap_commander_test_vcp, test_commander_change_volume_mute_state_inval_param_zero_count)
+static void cap_commander_test_vcp__test_commander_change_volume_mute_state_inval_param_zero_count(void **cm_state)
 {
+	struct cap_commander_test_vcp_fixture *fixture = *cm_state;
 	union bt_cap_set_member members[ARRAY_SIZE(fixture->conns)];
 	const struct bt_cap_commander_change_volume_mute_state_param param = {
 		.type = BT_CAP_SET_TYPE_AD_HOC,
@@ -706,11 +735,12 @@ ZTEST_F(cap_commander_test_vcp, test_commander_change_volume_mute_state_inval_pa
 	}
 
 	err = bt_cap_commander_change_volume_mute_state(&param);
-	zassert_equal(-EINVAL, err, "Unexpected return value %d", err);
+	assert_int_equal(-EINVAL, err);
 }
 
-ZTEST_F(cap_commander_test_vcp, test_commander_change_volume_mute_state_inval_param_inval_count)
+static void cap_commander_test_vcp__test_commander_change_volume_mute_state_inval_param_inval_count(void **cm_state)
 {
+	struct cap_commander_test_vcp_fixture *fixture = *cm_state;
 	union bt_cap_set_member members[ARRAY_SIZE(fixture->conns)];
 	const struct bt_cap_commander_change_volume_mute_state_param param = {
 		.type = BT_CAP_SET_TYPE_AD_HOC,
@@ -725,5 +755,69 @@ ZTEST_F(cap_commander_test_vcp, test_commander_change_volume_mute_state_inval_pa
 	}
 
 	err = bt_cap_commander_change_volume_mute_state(&param);
-	zassert_equal(-EINVAL, err, "Unexpected return value %d", err);
+	assert_int_equal(-EINVAL, err);
 }
+
+int bt_test_cap_commander_test_vcp_setup(void **state)
+{
+	int environment_result = bt_test_audio_cap_commander_environment_setup(state);
+
+	if (environment_result != 0) {
+		return environment_result;
+	}
+
+	*state = cap_commander_test_vcp_setup();
+	return 0;
+}
+static int bt_test_cap_commander_test_vcp_before(void **state)
+{
+	(void)state;
+	cap_commander_test_vcp_before(*state);
+	mock_init_rule_before_d38d7b(NULL, *state);
+	return 0;
+}
+int bt_test_cap_commander_test_vcp_after(void **state)
+{
+	(void)state;
+	cap_commander_test_vcp_after(*state);
+	mock_destroy_rule_after_d38d7b(NULL, *state);
+	return 0;
+}
+int bt_test_cap_commander_test_vcp_teardown(void **state)
+{
+	(void)state;
+	cap_commander_test_vcp_teardown(*state);
+	return 0;
+}
+static const struct CMUnitTest test_cases_cap_commander_test_vcp[] = {
+	cmocka_unit_test_setup_teardown(cap_commander_test_vcp__test_commander_change_volume, bt_test_cap_commander_test_vcp_before, bt_test_cap_commander_test_vcp_after),
+	cmocka_unit_test_setup_teardown(cap_commander_test_vcp__test_commander_change_volume_double, bt_test_cap_commander_test_vcp_before, bt_test_cap_commander_test_vcp_after),
+	cmocka_unit_test_setup_teardown(cap_commander_test_vcp__test_commander_change_volume_inval_param_null, bt_test_cap_commander_test_vcp_before, bt_test_cap_commander_test_vcp_after),
+	cmocka_unit_test_setup_teardown(cap_commander_test_vcp__test_commander_change_volume_inval_param_null_members, bt_test_cap_commander_test_vcp_before, bt_test_cap_commander_test_vcp_after),
+	cmocka_unit_test_setup_teardown(cap_commander_test_vcp__test_commander_change_volume_inval_param_null_member, bt_test_cap_commander_test_vcp_before, bt_test_cap_commander_test_vcp_after),
+	cmocka_unit_test_setup_teardown(cap_commander_test_vcp__test_commander_change_volume_inval_missing_cas, bt_test_cap_commander_test_vcp_before, bt_test_cap_commander_test_vcp_after),
+	cmocka_unit_test_setup_teardown(cap_commander_test_vcp__test_commander_change_volume_inval_missing_vcs, bt_test_cap_commander_test_vcp_before, bt_test_cap_commander_test_vcp_after),
+	cmocka_unit_test_setup_teardown(cap_commander_test_vcp__test_commander_change_volume_inval_param_zero_count, bt_test_cap_commander_test_vcp_before, bt_test_cap_commander_test_vcp_after),
+	cmocka_unit_test_setup_teardown(cap_commander_test_vcp__test_commander_change_volume_inval_param_inval_count, bt_test_cap_commander_test_vcp_before, bt_test_cap_commander_test_vcp_after),
+	cmocka_unit_test_setup_teardown(cap_commander_test_vcp__test_commander_change_volume_offset, bt_test_cap_commander_test_vcp_before, bt_test_cap_commander_test_vcp_after),
+	cmocka_unit_test_setup_teardown(cap_commander_test_vcp__test_commander_change_volume_offset_double, bt_test_cap_commander_test_vcp_before, bt_test_cap_commander_test_vcp_after),
+	cmocka_unit_test_setup_teardown(cap_commander_test_vcp__test_commander_change_volume_offset_inval_param_null, bt_test_cap_commander_test_vcp_before, bt_test_cap_commander_test_vcp_after),
+	cmocka_unit_test_setup_teardown(cap_commander_test_vcp__test_commander_change_volume_offset_inval_param_null_param, bt_test_cap_commander_test_vcp_before, bt_test_cap_commander_test_vcp_after),
+	cmocka_unit_test_setup_teardown(cap_commander_test_vcp__test_commander_change_volume_offset_inval_param_null_member, bt_test_cap_commander_test_vcp_before, bt_test_cap_commander_test_vcp_after),
+	cmocka_unit_test_setup_teardown(cap_commander_test_vcp__test_commander_change_volume_offset_inval_missing_cas, bt_test_cap_commander_test_vcp_before, bt_test_cap_commander_test_vcp_after),
+	cmocka_unit_test_setup_teardown(cap_commander_test_vcp__test_commander_change_volume_offset_inval_missing_vocs, bt_test_cap_commander_test_vcp_before, bt_test_cap_commander_test_vcp_after),
+	cmocka_unit_test_setup_teardown(cap_commander_test_vcp__test_commander_change_volume_offset_inval_param_zero_count, bt_test_cap_commander_test_vcp_before, bt_test_cap_commander_test_vcp_after),
+	cmocka_unit_test_setup_teardown(cap_commander_test_vcp__test_commander_change_volume_offset_inval_param_inval_count, bt_test_cap_commander_test_vcp_before, bt_test_cap_commander_test_vcp_after),
+	cmocka_unit_test_setup_teardown(cap_commander_test_vcp__test_commander_change_volume_offset_inval_param_inval_offset_max, bt_test_cap_commander_test_vcp_before, bt_test_cap_commander_test_vcp_after),
+	cmocka_unit_test_setup_teardown(cap_commander_test_vcp__test_commander_change_volume_offset_inval_param_inval_offset_min, bt_test_cap_commander_test_vcp_before, bt_test_cap_commander_test_vcp_after),
+	cmocka_unit_test_setup_teardown(cap_commander_test_vcp__test_commander_change_volume_mute_state, bt_test_cap_commander_test_vcp_before, bt_test_cap_commander_test_vcp_after),
+	cmocka_unit_test_setup_teardown(cap_commander_test_vcp__test_commander_change_volume_mute_state_double, bt_test_cap_commander_test_vcp_before, bt_test_cap_commander_test_vcp_after),
+	cmocka_unit_test_setup_teardown(cap_commander_test_vcp__test_commander_change_volume_mute_state_inval_param_null, bt_test_cap_commander_test_vcp_before, bt_test_cap_commander_test_vcp_after),
+	cmocka_unit_test_setup_teardown(cap_commander_test_vcp__test_commander_change_volume_mute_state_inval_param_null_members, bt_test_cap_commander_test_vcp_before, bt_test_cap_commander_test_vcp_after),
+	cmocka_unit_test_setup_teardown(cap_commander_test_vcp__test_commander_change_volume_mute_state_inval_param_null_member, bt_test_cap_commander_test_vcp_before, bt_test_cap_commander_test_vcp_after),
+	cmocka_unit_test_setup_teardown(cap_commander_test_vcp__test_commander_change_volume_mute_state_inval_missing_cas, bt_test_cap_commander_test_vcp_before, bt_test_cap_commander_test_vcp_after),
+	cmocka_unit_test_setup_teardown(cap_commander_test_vcp__test_commander_change_volume_mute_state_inval_missing_vcs, bt_test_cap_commander_test_vcp_before, bt_test_cap_commander_test_vcp_after),
+	cmocka_unit_test_setup_teardown(cap_commander_test_vcp__test_commander_change_volume_mute_state_inval_param_zero_count, bt_test_cap_commander_test_vcp_before, bt_test_cap_commander_test_vcp_after),
+	cmocka_unit_test_setup_teardown(cap_commander_test_vcp__test_commander_change_volume_mute_state_inval_param_inval_count, bt_test_cap_commander_test_vcp_before, bt_test_cap_commander_test_vcp_after),
+};
+BT_TEST_SUITE(cap_commander_test_vcp, test_cases_cap_commander_test_vcp, bt_test_cap_commander_test_vcp_setup, bt_test_cap_commander_test_vcp_teardown);

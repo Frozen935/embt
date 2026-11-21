@@ -1,3 +1,4 @@
+#include "support/test_support.h"
 /*
  * Copyright The Zephyr Project Contributors
  *
@@ -7,11 +8,9 @@
 #include <stdint.h>
 #include <string.h>
 
-#include <zephyr/bluetooth/addr.h>
-#include <zephyr/bluetooth/crypto.h>
-#include <zephyr/sys/util.h>
-#include <zephyr/ztest.h>
-
+#include <embt/bluetooth/addr.h>
+#include <embt/bluetooth/crypto.h>
+#include <embt/base/util.h>
 /* Sample data for the random address hash function ah, from the Bluetooth Core
  * Specification, Vol 3, Part H, Appendix D.7:
  *
@@ -30,57 +29,61 @@ static const uint8_t spec_irk[BT_IRK_SIZE] = {
 
 static const bt_addr_t spec_rpa = {{0xaa, 0xfb, 0x0d, 0x94, 0x81, 0x70}};
 
-ZTEST_SUITE(bt_addr_matches_irk, NULL, NULL, NULL, NULL, NULL);
 
-static ZTEST(bt_addr_matches_irk, test_spec_sample_data)
+
+static void bt_addr_matches_irk__test_spec_sample_data(void **cm_state)
 {
-	zassert_true(BT_ADDR_IS_RPA(&spec_rpa), "Sample address is not an RPA");
-	zassert_true(bt_addr_matches_irk(&spec_rpa, spec_irk),
-		     "Sample RPA does not match the sample IRK");
+	(void)cm_state;
+	assert_true(BT_ADDR_IS_RPA(&spec_rpa));
+	assert_true(bt_addr_matches_irk(&spec_rpa, spec_irk));
 }
 
-static ZTEST(bt_addr_matches_irk, test_irk_mismatch)
+static void bt_addr_matches_irk__test_irk_mismatch(void **cm_state)
 {
+	(void)cm_state;
 	uint8_t irk[BT_IRK_SIZE];
 
 	(void)memcpy(irk, spec_irk, sizeof(irk));
 	irk[BT_IRK_SIZE - 1U] ^= 0x01;
 
-	zassert_false(bt_addr_matches_irk(&spec_rpa, irk), "RPA matches a different IRK");
+	assert_false(bt_addr_matches_irk(&spec_rpa, irk));
 }
 
-static ZTEST(bt_addr_matches_irk, test_irk_byte_order)
+static void bt_addr_matches_irk__test_irk_byte_order(void **cm_state)
 {
+	(void)cm_state;
 	uint8_t irk[BT_IRK_SIZE];
 
 	for (size_t i = 0U; i < BT_IRK_SIZE; i++) {
 		irk[i] = spec_irk[BT_IRK_SIZE - 1U - i];
 	}
 
-	zassert_false(bt_addr_matches_irk(&spec_rpa, irk),
-		      "RPA matches the IRK in most significant octet first order");
+	assert_false(bt_addr_matches_irk(&spec_rpa, irk));
 }
 
-static ZTEST(bt_addr_matches_irk, test_hash_mismatch)
+static void bt_addr_matches_irk__test_hash_mismatch(void **cm_state)
 {
+	(void)cm_state;
 	bt_addr_t rpa = spec_rpa;
 
 	rpa.val[0] ^= 0x01;
 
-	zassert_false(bt_addr_matches_irk(&rpa, spec_irk), "RPA with a modified hash matches");
+	assert_false(bt_addr_matches_irk(&rpa, spec_irk));
 }
 
-static ZTEST(bt_addr_matches_irk, test_prand_mismatch)
+static void bt_addr_matches_irk__test_prand_mismatch(void **cm_state)
 {
+	(void)cm_state;
 	bt_addr_t rpa = spec_rpa;
 
 	rpa.val[3] ^= 0x01;
 
-	zassert_false(bt_addr_matches_irk(&rpa, spec_irk), "RPA with a modified prand matches");
+	assert_false(bt_addr_matches_irk(&rpa, spec_irk));
 }
 
-static ZTEST(bt_addr_matches_irk, test_non_rpa_does_not_match)
+static void bt_addr_matches_irk__test_non_rpa_does_not_match(void **cm_state)
 {
+	(void)cm_state;
 	/* The sample prand with each value of the two most significant bits: 0b01 (RPA),
 	 * 0b00 (non-resolvable), 0b10 (reserved) and 0b11 (static)
 	 */
@@ -98,17 +101,29 @@ static ZTEST(bt_addr_matches_irk, test_non_rpa_does_not_match)
 
 		/* ah(k, r) = e(k, r') mod 2^24, with r' = padding || r */
 		(void)memcpy(r, prands[i], sizeof(prands[i]));
-		zassert_ok(bt_encrypt_le(spec_irk, r, enc), "AES encryption failed");
+		assert_int_equal(bt_encrypt_le(spec_irk, r, enc), 0);
 		(void)memcpy(&addr[i].val[0], enc, 3U);
 		(void)memcpy(&addr[i].val[3], prands[i], sizeof(prands[i]));
 	}
 
-	zassert_true(bt_addr_matches_irk(&addr[0], spec_irk),
-		     "RPA with a valid hash does not match");
+	assert_true(bt_addr_matches_irk(&addr[0], spec_irk));
 
 	for (size_t i = 1U; i < ARRAY_SIZE(prands); i++) {
-		zassert_false(BT_ADDR_IS_RPA(&addr[i]), "Address %zu is an RPA", i);
-		zassert_false(bt_addr_matches_irk(&addr[i], spec_irk),
-			      "Address %zu, which is not an RPA, matches", i);
+		assert_false(BT_ADDR_IS_RPA(&addr[i]));
+		assert_false(bt_addr_matches_irk(&addr[i], spec_irk));
 	}
 }
+
+
+
+
+
+static const struct CMUnitTest test_cases_bt_addr_matches_irk[] = {
+	cmocka_unit_test(bt_addr_matches_irk__test_spec_sample_data),
+	cmocka_unit_test(bt_addr_matches_irk__test_irk_mismatch),
+	cmocka_unit_test(bt_addr_matches_irk__test_irk_byte_order),
+	cmocka_unit_test(bt_addr_matches_irk__test_hash_mismatch),
+	cmocka_unit_test(bt_addr_matches_irk__test_prand_mismatch),
+	cmocka_unit_test(bt_addr_matches_irk__test_non_rpa_does_not_match),
+};
+BT_TEST_SUITE(bt_addr_matches_irk, test_cases_bt_addr_matches_irk, bt_test_host_setup, NULL);

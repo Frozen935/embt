@@ -1,3 +1,9 @@
+#include "support/test_support.h"
+#include "test_environment.h"
+void mock_init_rule_before_26f0f3(const struct bt_test_case_info *, void *);
+void mock_destroy_rule_after_26f0f3(const struct bt_test_case_info *, void *);
+
+
 /* test_ase_state_transition_invalid.c - ASE state transition tests */
 
 /*
@@ -13,25 +19,23 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <zephyr/bluetooth/assigned_numbers.h>
-#include <zephyr/bluetooth/audio/ascs.h>
-#include <zephyr/bluetooth/audio/lc3.h>
-#include <zephyr/bluetooth/byteorder.h>
-#include <zephyr/bluetooth/hci_types.h>
-#include <zephyr/bluetooth/iso.h>
-#include <zephyr/bluetooth/uuid.h>
-#include <zephyr/kernel.h>
-#include <zephyr/sys/slist.h>
-#include <zephyr/sys/util.h>
-#include <zephyr/toolchain.h>
-#include <zephyr/types.h>
-#include <zephyr/bluetooth/audio/audio.h>
-#include <zephyr/bluetooth/audio/bap.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/gatt.h>
-#include <zephyr/sys/util_macro.h>
-#include <zephyr/ztest_assert.h>
-#include <zephyr/ztest_test.h>
+#include <embt/bluetooth/assigned_numbers.h>
+#include <embt/bluetooth/audio/ascs.h>
+#include <embt/bluetooth/audio/lc3.h>
+#include <embt/bluetooth/byteorder.h>
+#include <embt/bluetooth/hci_types.h>
+#include <embt/bluetooth/iso.h>
+#include <embt/bluetooth/uuid.h>
+
+#include <embt/base/slist.h>
+#include <embt/base/util.h>
+#include <embt/compiler.h>
+#include <stddef.h>
+#include <embt/bluetooth/audio/audio.h>
+#include <embt/bluetooth/audio/bap.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/gatt.h>
+#include <embt/base/util_macro.h>
 #include <sys/types.h>
 
 #include "ascs.h"
@@ -55,7 +59,7 @@ static void *test_ase_state_transition_invalid_setup(void)
 	struct test_ase_state_transition_invalid_fixture *fixture;
 
 	fixture = malloc(sizeof(*fixture));
-	zassert_not_null(fixture);
+	assert_non_null(fixture);
 
 
 	return fixture;
@@ -73,7 +77,7 @@ static void test_ase_state_transition_invalid_before(void *f)
 	int err;
 
 	err = bt_ascs_register(&param);
-	zassert_equal(err, 0, "unexpected err response %d", err);
+	assert_int_equal(err, 0);
 
 	memset(fixture, 0, sizeof(struct test_ase_state_transition_invalid_fixture));
 	fixture->ase_cp = test_ase_control_point_get();
@@ -93,7 +97,7 @@ static void test_ase_state_transition_invalid_after(void *f)
 	}
 
 	err = bt_ascs_unregister();
-	zassert_equal(err, 0, "Unexpected err response %d", err);
+	assert_int_equal(err, 0);
 }
 
 static void test_ase_state_transition_invalid_teardown(void *f)
@@ -101,9 +105,7 @@ static void test_ase_state_transition_invalid_teardown(void *f)
 	free(f);
 }
 
-ZTEST_SUITE(test_ase_state_transition_invalid, NULL, test_ase_state_transition_invalid_setup,
-	    test_ase_state_transition_invalid_before, test_ase_state_transition_invalid_after,
-	    test_ase_state_transition_invalid_teardown);
+
 
 static void test_client_config_codec_expect_transition_error(struct bt_conn *conn, uint8_t ase_id,
 							     const struct bt_gatt_attr *ase_cp)
@@ -275,13 +277,17 @@ static void test_client_release_expect_transition_error(struct bt_conn *conn, ui
 	test_mocks_reset();
 }
 
-ZTEST_F(test_ase_state_transition_invalid, test_client_sink_state_idle)
+static void test_ase_state_transition_invalid__test_client_sink_state_idle(void **cm_state)
 {
+	struct test_ase_state_transition_invalid_fixture *fixture = *cm_state;
 	const struct bt_gatt_attr *ase_cp = fixture->ase_cp;
 	struct bt_conn *conn = &fixture->conn;
 	uint8_t ase_id;
 
-	Z_TEST_SKIP_IFNDEF(CONFIG_BT_ASCS_ASE_SNK);
+	#if !defined(CONFIG_BT_ASCS_ASE_SNK)
+	skip();
+#endif
+
 
 	ase_id = test_ase_id_get(fixture->ase_snk);
 
@@ -294,14 +300,18 @@ ZTEST_F(test_ase_state_transition_invalid, test_client_sink_state_idle)
 	test_client_release_expect_transition_error(conn, ase_id, ase_cp);
 }
 
-ZTEST_F(test_ase_state_transition_invalid, test_client_sink_state_codec_configured)
+static void test_ase_state_transition_invalid__test_client_sink_state_codec_configured(void **cm_state)
 {
+	struct test_ase_state_transition_invalid_fixture *fixture = *cm_state;
 	const struct bt_gatt_attr *ase_cp = fixture->ase_cp;
 	struct bt_bap_stream *stream = &fixture->stream;
 	struct bt_conn *conn = &fixture->conn;
 	uint8_t ase_id;
 
-	Z_TEST_SKIP_IFNDEF(CONFIG_BT_ASCS_ASE_SNK);
+	#if !defined(CONFIG_BT_ASCS_ASE_SNK)
+	skip();
+#endif
+
 
 	ase_id = test_ase_id_get(fixture->ase_snk);
 	test_preamble_state_codec_configured(conn, ase_id, stream);
@@ -313,14 +323,18 @@ ZTEST_F(test_ase_state_transition_invalid, test_client_sink_state_codec_configur
 	test_client_update_metadata_expect_transition_error(conn, ase_id, ase_cp);
 }
 
-ZTEST_F(test_ase_state_transition_invalid, test_client_sink_state_qos_configured)
+static void test_ase_state_transition_invalid__test_client_sink_state_qos_configured(void **cm_state)
 {
+	struct test_ase_state_transition_invalid_fixture *fixture = *cm_state;
 	const struct bt_gatt_attr *ase_cp = fixture->ase_cp;
 	struct bt_bap_stream *stream = &fixture->stream;
 	struct bt_conn *conn = &fixture->conn;
 	uint8_t ase_id;
 
-	Z_TEST_SKIP_IFNDEF(CONFIG_BT_ASCS_ASE_SNK);
+	#if !defined(CONFIG_BT_ASCS_ASE_SNK)
+	skip();
+#endif
+
 
 	ase_id = test_ase_id_get(fixture->ase_snk);
 	test_preamble_state_qos_configured(conn, ase_id, stream);
@@ -331,14 +345,18 @@ ZTEST_F(test_ase_state_transition_invalid, test_client_sink_state_qos_configured
 	test_client_update_metadata_expect_transition_error(conn, ase_id, ase_cp);
 }
 
-ZTEST_F(test_ase_state_transition_invalid, test_client_sink_state_enabling)
+static void test_ase_state_transition_invalid__test_client_sink_state_enabling(void **cm_state)
 {
+	struct test_ase_state_transition_invalid_fixture *fixture = *cm_state;
 	const struct bt_gatt_attr *ase_cp = fixture->ase_cp;
 	struct bt_bap_stream *stream = &fixture->stream;
 	struct bt_conn *conn = &fixture->conn;
 	uint8_t ase_id;
 
-	Z_TEST_SKIP_IFNDEF(CONFIG_BT_ASCS_ASE_SNK);
+	#if !defined(CONFIG_BT_ASCS_ASE_SNK)
+	skip();
+#endif
+
 
 	ase_id = test_ase_id_get(fixture->ase_snk);
 	test_preamble_state_enabling(conn, ase_id, stream);
@@ -350,15 +368,19 @@ ZTEST_F(test_ase_state_transition_invalid, test_client_sink_state_enabling)
 	test_client_receiver_stop_ready_expect_ase_direction_error(conn, ase_id, ase_cp);
 }
 
-ZTEST_F(test_ase_state_transition_invalid, test_sink_client_state_streaming)
+static void test_ase_state_transition_invalid__test_sink_client_state_streaming(void **cm_state)
 {
+	struct test_ase_state_transition_invalid_fixture *fixture = *cm_state;
 	const struct bt_gatt_attr *ase_cp = fixture->ase_cp;
 	struct bt_bap_stream *stream = &fixture->stream;
 	struct bt_conn *conn = &fixture->conn;
 	struct bt_iso_chan *chan;
 	uint8_t ase_id;
 
-	Z_TEST_SKIP_IFNDEF(CONFIG_BT_ASCS_ASE_SNK);
+	#if !defined(CONFIG_BT_ASCS_ASE_SNK)
+	skip();
+#endif
+
 
 	ase_id = test_ase_id_get(fixture->ase_snk);
 	test_preamble_state_streaming(conn, ase_id, stream, &chan, false);
@@ -375,25 +397,27 @@ static void expect_ase_state_releasing(struct bt_conn *conn, const struct bt_gat
 	struct test_ase_chrc_value_hdr hdr = { 0xff };
 	ssize_t ret;
 
-	zexpect_not_null(conn);
-	zexpect_not_null(ase);
+	assert_non_null(conn);
+	assert_non_null(ase);
 
 	ret = ase->read(conn, ase, &hdr, sizeof(hdr), 0);
-	zassert_false(ret < 0, "attr->read returned unexpected (err 0x%02x)",
-		      (uint8_t)BT_GATT_ERR(ret));
-	zassert_equal(BT_BAP_EP_STATE_RELEASING, hdr.ase_state,
-		      "unexpected ASE_State 0x%02x", hdr.ase_state);
+	assert_false(ret < 0);
+	assert_int_equal(BT_BAP_EP_STATE_RELEASING, hdr.ase_state);
 }
 
-ZTEST_F(test_ase_state_transition_invalid, test_client_sink_state_releasing)
+static void test_ase_state_transition_invalid__test_client_sink_state_releasing(void **cm_state)
 {
+	struct test_ase_state_transition_invalid_fixture *fixture = *cm_state;
 	const struct bt_gatt_attr *ase_cp = fixture->ase_cp;
 	struct bt_bap_stream *stream = &fixture->stream;
 	struct bt_conn *conn = &fixture->conn;
 	struct bt_iso_chan *chan;
 	uint8_t ase_id;
 
-	Z_TEST_SKIP_IFNDEF(CONFIG_BT_ASCS_ASE_SNK);
+	#if !defined(CONFIG_BT_ASCS_ASE_SNK)
+	skip();
+#endif
+
 
 	ase_id = test_ase_id_get(fixture->ase_snk);
 	test_preamble_state_releasing(conn, ase_id, stream, &chan, false);
@@ -408,13 +432,17 @@ ZTEST_F(test_ase_state_transition_invalid, test_client_sink_state_releasing)
 	test_client_update_metadata_expect_transition_error(conn, ase_id, ase_cp);
 }
 
-ZTEST_F(test_ase_state_transition_invalid, test_client_source_state_idle)
+static void test_ase_state_transition_invalid__test_client_source_state_idle(void **cm_state)
 {
+	struct test_ase_state_transition_invalid_fixture *fixture = *cm_state;
 	const struct bt_gatt_attr *ase_cp = fixture->ase_cp;
 	struct bt_conn *conn = &fixture->conn;
 	uint8_t ase_id;
 
-	Z_TEST_SKIP_IFNDEF(CONFIG_BT_ASCS_ASE_SRC);
+	#if !defined(CONFIG_BT_ASCS_ASE_SRC)
+	skip();
+#endif
+
 
 	ase_id = test_ase_id_get(fixture->ase_src);
 
@@ -427,14 +455,18 @@ ZTEST_F(test_ase_state_transition_invalid, test_client_source_state_idle)
 	test_client_release_expect_transition_error(conn, ase_id, ase_cp);
 }
 
-ZTEST_F(test_ase_state_transition_invalid, test_client_source_state_codec_configured)
+static void test_ase_state_transition_invalid__test_client_source_state_codec_configured(void **cm_state)
 {
+	struct test_ase_state_transition_invalid_fixture *fixture = *cm_state;
 	const struct bt_gatt_attr *ase_cp = fixture->ase_cp;
 	struct bt_bap_stream *stream = &fixture->stream;
 	struct bt_conn *conn = &fixture->conn;
 	uint8_t ase_id;
 
-	Z_TEST_SKIP_IFNDEF(CONFIG_BT_ASCS_ASE_SRC);
+	#if !defined(CONFIG_BT_ASCS_ASE_SRC)
+	skip();
+#endif
+
 
 	ase_id = test_ase_id_get(fixture->ase_src);
 	test_preamble_state_codec_configured(conn, ase_id, stream);
@@ -446,14 +478,18 @@ ZTEST_F(test_ase_state_transition_invalid, test_client_source_state_codec_config
 	test_client_update_metadata_expect_transition_error(conn, ase_id, ase_cp);
 }
 
-ZTEST_F(test_ase_state_transition_invalid, test_client_source_state_qos_configured)
+static void test_ase_state_transition_invalid__test_client_source_state_qos_configured(void **cm_state)
 {
+	struct test_ase_state_transition_invalid_fixture *fixture = *cm_state;
 	const struct bt_gatt_attr *ase_cp = fixture->ase_cp;
 	struct bt_bap_stream *stream = &fixture->stream;
 	struct bt_conn *conn = &fixture->conn;
 	uint8_t ase_id;
 
-	Z_TEST_SKIP_IFNDEF(CONFIG_BT_ASCS_ASE_SRC);
+	#if !defined(CONFIG_BT_ASCS_ASE_SRC)
+	skip();
+#endif
+
 
 	ase_id = test_ase_id_get(fixture->ase_src);
 	test_preamble_state_qos_configured(conn, ase_id, stream);
@@ -464,14 +500,18 @@ ZTEST_F(test_ase_state_transition_invalid, test_client_source_state_qos_configur
 	test_client_update_metadata_expect_transition_error(conn, ase_id, ase_cp);
 }
 
-ZTEST_F(test_ase_state_transition_invalid, test_client_source_state_enabling)
+static void test_ase_state_transition_invalid__test_client_source_state_enabling(void **cm_state)
 {
+	struct test_ase_state_transition_invalid_fixture *fixture = *cm_state;
 	const struct bt_gatt_attr *ase_cp = fixture->ase_cp;
 	struct bt_bap_stream *stream = &fixture->stream;
 	struct bt_conn *conn = &fixture->conn;
 	uint8_t ase_id;
 
-	Z_TEST_SKIP_IFNDEF(CONFIG_BT_ASCS_ASE_SRC);
+	#if !defined(CONFIG_BT_ASCS_ASE_SRC)
+	skip();
+#endif
+
 
 	ase_id = test_ase_id_get(fixture->ase_src);
 	test_preamble_state_enabling(conn, ase_id, stream);
@@ -482,15 +522,19 @@ ZTEST_F(test_ase_state_transition_invalid, test_client_source_state_enabling)
 	test_client_receiver_stop_ready_expect_transition_error(conn, ase_id, ase_cp);
 }
 
-ZTEST_F(test_ase_state_transition_invalid, test_client_source_state_streaming)
+static void test_ase_state_transition_invalid__test_client_source_state_streaming(void **cm_state)
 {
+	struct test_ase_state_transition_invalid_fixture *fixture = *cm_state;
 	const struct bt_gatt_attr *ase_cp = fixture->ase_cp;
 	struct bt_bap_stream *stream = &fixture->stream;
 	struct bt_conn *conn = &fixture->conn;
 	struct bt_iso_chan *chan;
 	uint8_t ase_id;
 
-	Z_TEST_SKIP_IFNDEF(CONFIG_BT_ASCS_ASE_SRC);
+	#if !defined(CONFIG_BT_ASCS_ASE_SRC)
+	skip();
+#endif
+
 
 	ase_id = test_ase_id_get(fixture->ase_src);
 	test_preamble_state_streaming(conn, ase_id, stream, &chan, true);
@@ -502,15 +546,19 @@ ZTEST_F(test_ase_state_transition_invalid, test_client_source_state_streaming)
 	test_client_receiver_stop_ready_expect_transition_error(conn, ase_id, ase_cp);
 }
 
-ZTEST_F(test_ase_state_transition_invalid, test_client_source_state_disabling)
+static void test_ase_state_transition_invalid__test_client_source_state_disabling(void **cm_state)
 {
+	struct test_ase_state_transition_invalid_fixture *fixture = *cm_state;
 	const struct bt_gatt_attr *ase_cp = fixture->ase_cp;
 	struct bt_bap_stream *stream = &fixture->stream;
 	struct bt_conn *conn = &fixture->conn;
 	struct bt_iso_chan *chan;
 	uint8_t ase_id;
 
-	Z_TEST_SKIP_IFNDEF(CONFIG_BT_ASCS_ASE_SRC);
+	#if !defined(CONFIG_BT_ASCS_ASE_SRC)
+	skip();
+#endif
+
 
 	ase_id = test_ase_id_get(fixture->ase_src);
 	test_preamble_state_disabling(conn, ase_id, stream, &chan);
@@ -523,15 +571,19 @@ ZTEST_F(test_ase_state_transition_invalid, test_client_source_state_disabling)
 	test_client_update_metadata_expect_transition_error(conn, ase_id, ase_cp);
 }
 
-ZTEST_F(test_ase_state_transition_invalid, test_client_source_state_releasing)
+static void test_ase_state_transition_invalid__test_client_source_state_releasing(void **cm_state)
 {
+	struct test_ase_state_transition_invalid_fixture *fixture = *cm_state;
 	const struct bt_gatt_attr *ase_cp = fixture->ase_cp;
 	struct bt_bap_stream *stream = &fixture->stream;
 	struct bt_conn *conn = &fixture->conn;
 	struct bt_iso_chan *chan;
 	uint8_t ase_id;
 
-	Z_TEST_SKIP_IFNDEF(CONFIG_BT_ASCS_ASE_SRC);
+	#if !defined(CONFIG_BT_ASCS_ASE_SRC)
+	skip();
+#endif
+
 
 	ase_id = test_ase_id_get(fixture->ase_src);
 	test_preamble_state_releasing(conn, ase_id, stream, &chan, true);
@@ -554,7 +606,7 @@ static void test_server_config_codec_expect_error(struct bt_bap_stream *stream)
 	int err;
 
 	err = bt_ascs_reconfig_ase(stream->ep, &codec_cfg);
-	zassert_false(err == 0, "bt_ascs_reconfig_ase unexpected success");
+	assert_false(err == 0);
 }
 
 static void test_server_receiver_start_ready_expect_error(struct bt_bap_stream *stream)
@@ -562,7 +614,7 @@ static void test_server_receiver_start_ready_expect_error(struct bt_bap_stream *
 	int err;
 
 	err = bt_ascs_start_ase(stream->ep);
-	zassert_false(err == 0, "bt_ascs_start_ase unexpected success");
+	assert_false(err == 0);
 }
 
 static void test_server_disable_expect_error(struct bt_bap_stream *stream)
@@ -570,11 +622,11 @@ static void test_server_disable_expect_error(struct bt_bap_stream *stream)
 	int err;
 
 	err = bt_ascs_disable_ase(stream->ep);
-	zassert_false(err == 0, "bt_ascs_disable_ase unexpected success");
+	assert_false(err == 0);
 }
 
 #if defined(CONFIG_BT_BAP_UNICAST_CLIENT)
-#include "bap_endpoint.h"
+#include "audio/bap_endpoint.h"
 
 static void test_server_config_qos_expect_error(struct bt_bap_stream *stream)
 {
@@ -585,7 +637,7 @@ static void test_server_config_qos_expect_error(struct bt_bap_stream *stream)
 	sys_slist_append(&group.streams, &stream->_node);
 
 	err = bt_bap_stream_qos(stream->conn, &group);
-	zassert_false(err == 0, "bt_bap_stream_qos unexpected success");
+	assert_false(err == 0);
 }
 
 static void test_server_enable_expect_error(struct bt_bap_stream *stream)
@@ -597,7 +649,7 @@ static void test_server_enable_expect_error(struct bt_bap_stream *stream)
 	int err;
 
 	err = bt_bap_stream_enable(stream, meta, ARRAY_SIZE(meta));
-	zassert_false(err == 0, "bt_bap_stream_enable unexpected success");
+	assert_false(err == 0);
 }
 
 static void test_server_receiver_stop_ready_expect_error(struct bt_bap_stream *stream)
@@ -605,7 +657,7 @@ static void test_server_receiver_stop_ready_expect_error(struct bt_bap_stream *s
 	int err;
 
 	err = bt_bap_stream_stop(stream);
-	zassert_false(err == 0, "bt_bap_stream_stop unexpected success");
+	assert_false(err == 0);
 }
 #else
 #define test_server_config_qos_expect_error(...)
@@ -622,16 +674,20 @@ static void test_server_update_metadata_expect_error(struct bt_bap_stream *strea
 	int err;
 
 	err = bt_ascs_metadata_ase(stream->ep, meta, ARRAY_SIZE(meta));
-	zassert_false(err == 0, "bt_ascs_metadata_ase unexpected success");
+	assert_false(err == 0);
 }
 
-ZTEST_F(test_ase_state_transition_invalid, test_server_sink_state_codec_configured)
+static void test_ase_state_transition_invalid__test_server_sink_state_codec_configured(void **cm_state)
 {
+	struct test_ase_state_transition_invalid_fixture *fixture = *cm_state;
 	struct bt_bap_stream *stream = &fixture->stream;
 	struct bt_conn *conn = &fixture->conn;
 	uint8_t ase_id;
 
-	Z_TEST_SKIP_IFNDEF(CONFIG_BT_ASCS_ASE_SNK);
+	#if !defined(CONFIG_BT_ASCS_ASE_SNK)
+	skip();
+#endif
+
 
 	ase_id = test_ase_id_get(fixture->ase_snk);
 	test_preamble_state_codec_configured(conn, ase_id, stream);
@@ -644,13 +700,17 @@ ZTEST_F(test_ase_state_transition_invalid, test_server_sink_state_codec_configur
 	test_server_update_metadata_expect_error(stream);
 }
 
-ZTEST_F(test_ase_state_transition_invalid, test_server_sink_state_qos_configured)
+static void test_ase_state_transition_invalid__test_server_sink_state_qos_configured(void **cm_state)
 {
+	struct test_ase_state_transition_invalid_fixture *fixture = *cm_state;
 	struct bt_bap_stream *stream = &fixture->stream;
 	struct bt_conn *conn = &fixture->conn;
 	uint8_t ase_id;
 
-	Z_TEST_SKIP_IFNDEF(CONFIG_BT_ASCS_ASE_SNK);
+	#if !defined(CONFIG_BT_ASCS_ASE_SNK)
+	skip();
+#endif
+
 
 	ase_id = test_ase_id_get(fixture->ase_snk);
 	test_preamble_state_qos_configured(conn, ase_id, stream);
@@ -663,13 +723,17 @@ ZTEST_F(test_ase_state_transition_invalid, test_server_sink_state_qos_configured
 	test_server_update_metadata_expect_error(stream);
 }
 
-ZTEST_F(test_ase_state_transition_invalid, test_server_sink_state_enabling)
+static void test_ase_state_transition_invalid__test_server_sink_state_enabling(void **cm_state)
 {
+	struct test_ase_state_transition_invalid_fixture *fixture = *cm_state;
 	struct bt_bap_stream *stream = &fixture->stream;
 	struct bt_conn *conn = &fixture->conn;
 	uint8_t ase_id;
 
-	Z_TEST_SKIP_IFNDEF(CONFIG_BT_ASCS_ASE_SNK);
+	#if !defined(CONFIG_BT_ASCS_ASE_SNK)
+	skip();
+#endif
+
 
 	ase_id = test_ase_id_get(fixture->ase_snk);
 	test_preamble_state_enabling(conn, ase_id, stream);
@@ -680,14 +744,18 @@ ZTEST_F(test_ase_state_transition_invalid, test_server_sink_state_enabling)
 	test_server_receiver_stop_ready_expect_error(stream);
 }
 
-ZTEST_F(test_ase_state_transition_invalid, test_server_sink_state_streaming)
+static void test_ase_state_transition_invalid__test_server_sink_state_streaming(void **cm_state)
 {
+	struct test_ase_state_transition_invalid_fixture *fixture = *cm_state;
 	struct bt_bap_stream *stream = &fixture->stream;
 	struct bt_conn *conn = &fixture->conn;
 	struct bt_iso_chan *chan;
 	uint8_t ase_id;
 
-	Z_TEST_SKIP_IFNDEF(CONFIG_BT_ASCS_ASE_SNK);
+	#if !defined(CONFIG_BT_ASCS_ASE_SNK)
+	skip();
+#endif
+
 
 	ase_id = test_ase_id_get(fixture->ase_snk);
 	test_preamble_state_streaming(conn, ase_id, stream, &chan, false);
@@ -699,14 +767,18 @@ ZTEST_F(test_ase_state_transition_invalid, test_server_sink_state_streaming)
 	test_server_receiver_stop_ready_expect_error(stream);
 }
 
-ZTEST_F(test_ase_state_transition_invalid, test_server_sink_state_releasing)
+static void test_ase_state_transition_invalid__test_server_sink_state_releasing(void **cm_state)
 {
+	struct test_ase_state_transition_invalid_fixture *fixture = *cm_state;
 	struct bt_bap_stream *stream = &fixture->stream;
 	struct bt_conn *conn = &fixture->conn;
 	struct bt_iso_chan *chan;
 	uint8_t ase_id;
 
-	Z_TEST_SKIP_IFNDEF(CONFIG_BT_ASCS_ASE_SNK);
+	#if !defined(CONFIG_BT_ASCS_ASE_SNK)
+	skip();
+#endif
+
 
 	ase_id = test_ase_id_get(fixture->ase_snk);
 	test_preamble_state_releasing(conn, ase_id, stream, &chan, false);
@@ -721,13 +793,17 @@ ZTEST_F(test_ase_state_transition_invalid, test_server_sink_state_releasing)
 	test_server_update_metadata_expect_error(stream);
 }
 
-ZTEST_F(test_ase_state_transition_invalid, test_server_source_state_codec_configured)
+static void test_ase_state_transition_invalid__test_server_source_state_codec_configured(void **cm_state)
 {
+	struct test_ase_state_transition_invalid_fixture *fixture = *cm_state;
 	struct bt_bap_stream *stream = &fixture->stream;
 	struct bt_conn *conn = &fixture->conn;
 	uint8_t ase_id;
 
-	Z_TEST_SKIP_IFNDEF(CONFIG_BT_ASCS_ASE_SRC);
+	#if !defined(CONFIG_BT_ASCS_ASE_SRC)
+	skip();
+#endif
+
 
 	ase_id = test_ase_id_get(fixture->ase_src);
 	test_preamble_state_codec_configured(conn, ase_id, stream);
@@ -740,13 +816,17 @@ ZTEST_F(test_ase_state_transition_invalid, test_server_source_state_codec_config
 	test_server_update_metadata_expect_error(stream);
 }
 
-ZTEST_F(test_ase_state_transition_invalid, test_server_source_state_qos_configured)
+static void test_ase_state_transition_invalid__test_server_source_state_qos_configured(void **cm_state)
 {
+	struct test_ase_state_transition_invalid_fixture *fixture = *cm_state;
 	struct bt_bap_stream *stream = &fixture->stream;
 	struct bt_conn *conn = &fixture->conn;
 	uint8_t ase_id;
 
-	Z_TEST_SKIP_IFNDEF(CONFIG_BT_ASCS_ASE_SRC);
+	#if !defined(CONFIG_BT_ASCS_ASE_SRC)
+	skip();
+#endif
+
 
 	ase_id = test_ase_id_get(fixture->ase_src);
 	test_preamble_state_qos_configured(conn, ase_id, stream);
@@ -759,13 +839,17 @@ ZTEST_F(test_ase_state_transition_invalid, test_server_source_state_qos_configur
 	test_server_update_metadata_expect_error(stream);
 }
 
-ZTEST_F(test_ase_state_transition_invalid, test_server_source_state_enabling)
+static void test_ase_state_transition_invalid__test_server_source_state_enabling(void **cm_state)
 {
+	struct test_ase_state_transition_invalid_fixture *fixture = *cm_state;
 	struct bt_bap_stream *stream = &fixture->stream;
 	struct bt_conn *conn = &fixture->conn;
 	uint8_t ase_id;
 
-	Z_TEST_SKIP_IFNDEF(CONFIG_BT_ASCS_ASE_SRC);
+	#if !defined(CONFIG_BT_ASCS_ASE_SRC)
+	skip();
+#endif
+
 
 	ase_id = test_ase_id_get(fixture->ase_src);
 	test_preamble_state_enabling(conn, ase_id, stream);
@@ -776,14 +860,18 @@ ZTEST_F(test_ase_state_transition_invalid, test_server_source_state_enabling)
 	test_server_receiver_stop_ready_expect_error(stream);
 }
 
-ZTEST_F(test_ase_state_transition_invalid, test_server_source_state_streaming)
+static void test_ase_state_transition_invalid__test_server_source_state_streaming(void **cm_state)
 {
+	struct test_ase_state_transition_invalid_fixture *fixture = *cm_state;
 	struct bt_bap_stream *stream = &fixture->stream;
 	struct bt_conn *conn = &fixture->conn;
 	struct bt_iso_chan *chan;
 	uint8_t ase_id;
 
-	Z_TEST_SKIP_IFNDEF(CONFIG_BT_ASCS_ASE_SRC);
+	#if !defined(CONFIG_BT_ASCS_ASE_SRC)
+	skip();
+#endif
+
 
 	ase_id = test_ase_id_get(fixture->ase_src);
 	test_preamble_state_streaming(conn, ase_id, stream, &chan, true);
@@ -795,14 +883,18 @@ ZTEST_F(test_ase_state_transition_invalid, test_server_source_state_streaming)
 	test_server_receiver_stop_ready_expect_error(stream);
 }
 
-ZTEST_F(test_ase_state_transition_invalid, test_server_source_state_disabling)
+static void test_ase_state_transition_invalid__test_server_source_state_disabling(void **cm_state)
 {
+	struct test_ase_state_transition_invalid_fixture *fixture = *cm_state;
 	struct bt_bap_stream *stream = &fixture->stream;
 	struct bt_conn *conn = &fixture->conn;
 	struct bt_iso_chan *chan;
 	uint8_t ase_id;
 
-	Z_TEST_SKIP_IFNDEF(CONFIG_BT_ASCS_ASE_SRC);
+	#if !defined(CONFIG_BT_ASCS_ASE_SRC)
+	skip();
+#endif
+
 
 	ase_id = test_ase_id_get(fixture->ase_src);
 	test_preamble_state_disabling(conn, ase_id, stream, &chan);
@@ -816,14 +908,18 @@ ZTEST_F(test_ase_state_transition_invalid, test_server_source_state_disabling)
 	test_server_update_metadata_expect_error(stream);
 }
 
-ZTEST_F(test_ase_state_transition_invalid, test_server_source_state_releasing)
+static void test_ase_state_transition_invalid__test_server_source_state_releasing(void **cm_state)
 {
+	struct test_ase_state_transition_invalid_fixture *fixture = *cm_state;
 	struct bt_bap_stream *stream = &fixture->stream;
 	struct bt_conn *conn = &fixture->conn;
 	struct bt_iso_chan *chan;
 	uint8_t ase_id;
 
-	Z_TEST_SKIP_IFNDEF(CONFIG_BT_ASCS_ASE_SRC);
+	#if !defined(CONFIG_BT_ASCS_ASE_SRC)
+	skip();
+#endif
+
 
 	ase_id = test_ase_id_get(fixture->ase_src);
 	test_preamble_state_releasing(conn, ase_id, stream, &chan, true);
@@ -837,3 +933,62 @@ ZTEST_F(test_ase_state_transition_invalid, test_server_source_state_releasing)
 	test_server_receiver_stop_ready_expect_error(stream);
 	test_server_update_metadata_expect_error(stream);
 }
+
+int bt_test_test_ase_state_transition_invalid_setup(void **state)
+{
+	int environment_result = bt_test_audio_ascs_environment_setup(state);
+
+	if (environment_result != 0) {
+		return environment_result;
+	}
+
+	*state = test_ase_state_transition_invalid_setup();
+	return 0;
+}
+static int bt_test_test_ase_state_transition_invalid_before(void **state)
+{
+	(void)state;
+	test_ase_state_transition_invalid_before(*state);
+	mock_init_rule_before_26f0f3(NULL, *state);
+	return 0;
+}
+int bt_test_test_ase_state_transition_invalid_after(void **state)
+{
+	(void)state;
+	test_ase_state_transition_invalid_after(*state);
+	mock_destroy_rule_after_26f0f3(NULL, *state);
+	return 0;
+}
+int bt_test_test_ase_state_transition_invalid_teardown(void **state)
+{
+	(void)state;
+	test_ase_state_transition_invalid_teardown(*state);
+	return 0;
+}
+static const struct CMUnitTest test_cases_test_ase_state_transition_invalid[] = {
+	cmocka_unit_test_setup_teardown(test_ase_state_transition_invalid__test_client_sink_state_idle, bt_test_test_ase_state_transition_invalid_before, bt_test_test_ase_state_transition_invalid_after),
+	cmocka_unit_test_setup_teardown(test_ase_state_transition_invalid__test_client_sink_state_codec_configured, bt_test_test_ase_state_transition_invalid_before, bt_test_test_ase_state_transition_invalid_after),
+	cmocka_unit_test_setup_teardown(test_ase_state_transition_invalid__test_client_sink_state_qos_configured, bt_test_test_ase_state_transition_invalid_before, bt_test_test_ase_state_transition_invalid_after),
+	cmocka_unit_test_setup_teardown(test_ase_state_transition_invalid__test_client_sink_state_enabling, bt_test_test_ase_state_transition_invalid_before, bt_test_test_ase_state_transition_invalid_after),
+	cmocka_unit_test_setup_teardown(test_ase_state_transition_invalid__test_sink_client_state_streaming, bt_test_test_ase_state_transition_invalid_before, bt_test_test_ase_state_transition_invalid_after),
+	cmocka_unit_test_setup_teardown(test_ase_state_transition_invalid__test_client_sink_state_releasing, bt_test_test_ase_state_transition_invalid_before, bt_test_test_ase_state_transition_invalid_after),
+	cmocka_unit_test_setup_teardown(test_ase_state_transition_invalid__test_client_source_state_idle, bt_test_test_ase_state_transition_invalid_before, bt_test_test_ase_state_transition_invalid_after),
+	cmocka_unit_test_setup_teardown(test_ase_state_transition_invalid__test_client_source_state_codec_configured, bt_test_test_ase_state_transition_invalid_before, bt_test_test_ase_state_transition_invalid_after),
+	cmocka_unit_test_setup_teardown(test_ase_state_transition_invalid__test_client_source_state_qos_configured, bt_test_test_ase_state_transition_invalid_before, bt_test_test_ase_state_transition_invalid_after),
+	cmocka_unit_test_setup_teardown(test_ase_state_transition_invalid__test_client_source_state_enabling, bt_test_test_ase_state_transition_invalid_before, bt_test_test_ase_state_transition_invalid_after),
+	cmocka_unit_test_setup_teardown(test_ase_state_transition_invalid__test_client_source_state_streaming, bt_test_test_ase_state_transition_invalid_before, bt_test_test_ase_state_transition_invalid_after),
+	cmocka_unit_test_setup_teardown(test_ase_state_transition_invalid__test_client_source_state_disabling, bt_test_test_ase_state_transition_invalid_before, bt_test_test_ase_state_transition_invalid_after),
+	cmocka_unit_test_setup_teardown(test_ase_state_transition_invalid__test_client_source_state_releasing, bt_test_test_ase_state_transition_invalid_before, bt_test_test_ase_state_transition_invalid_after),
+	cmocka_unit_test_setup_teardown(test_ase_state_transition_invalid__test_server_sink_state_codec_configured, bt_test_test_ase_state_transition_invalid_before, bt_test_test_ase_state_transition_invalid_after),
+	cmocka_unit_test_setup_teardown(test_ase_state_transition_invalid__test_server_sink_state_qos_configured, bt_test_test_ase_state_transition_invalid_before, bt_test_test_ase_state_transition_invalid_after),
+	cmocka_unit_test_setup_teardown(test_ase_state_transition_invalid__test_server_sink_state_enabling, bt_test_test_ase_state_transition_invalid_before, bt_test_test_ase_state_transition_invalid_after),
+	cmocka_unit_test_setup_teardown(test_ase_state_transition_invalid__test_server_sink_state_streaming, bt_test_test_ase_state_transition_invalid_before, bt_test_test_ase_state_transition_invalid_after),
+	cmocka_unit_test_setup_teardown(test_ase_state_transition_invalid__test_server_sink_state_releasing, bt_test_test_ase_state_transition_invalid_before, bt_test_test_ase_state_transition_invalid_after),
+	cmocka_unit_test_setup_teardown(test_ase_state_transition_invalid__test_server_source_state_codec_configured, bt_test_test_ase_state_transition_invalid_before, bt_test_test_ase_state_transition_invalid_after),
+	cmocka_unit_test_setup_teardown(test_ase_state_transition_invalid__test_server_source_state_qos_configured, bt_test_test_ase_state_transition_invalid_before, bt_test_test_ase_state_transition_invalid_after),
+	cmocka_unit_test_setup_teardown(test_ase_state_transition_invalid__test_server_source_state_enabling, bt_test_test_ase_state_transition_invalid_before, bt_test_test_ase_state_transition_invalid_after),
+	cmocka_unit_test_setup_teardown(test_ase_state_transition_invalid__test_server_source_state_streaming, bt_test_test_ase_state_transition_invalid_before, bt_test_test_ase_state_transition_invalid_after),
+	cmocka_unit_test_setup_teardown(test_ase_state_transition_invalid__test_server_source_state_disabling, bt_test_test_ase_state_transition_invalid_before, bt_test_test_ase_state_transition_invalid_after),
+	cmocka_unit_test_setup_teardown(test_ase_state_transition_invalid__test_server_source_state_releasing, bt_test_test_ase_state_transition_invalid_before, bt_test_test_ase_state_transition_invalid_after),
+};
+BT_TEST_SUITE(test_ase_state_transition_invalid, test_cases_test_ase_state_transition_invalid, bt_test_test_ase_state_transition_invalid_setup, bt_test_test_ase_state_transition_invalid_teardown);

@@ -1,3 +1,4 @@
+#include "support/test_support.h"
 /* main.c - Application main entry point */
 
 /*
@@ -6,13 +7,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <zephyr/kernel.h>
-#include <stddef.h>
-#include <zephyr/ztest.h>
 
-#include <zephyr/bluetooth/buf.h>
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/gatt.h>
+#include <stddef.h>
+#include <embt/bluetooth/buf.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/gatt.h>
 
 #include "gatt_internal.h"
 
@@ -97,65 +96,54 @@ static struct bt_gatt_attr test1_attrs[] = {
 
 static struct bt_gatt_service test1_svc = BT_GATT_SERVICE(test1_attrs);
 
-ZTEST_SUITE(test_gatt, NULL, NULL, NULL, NULL, NULL);
 
-ZTEST(test_gatt, test_gatt_register)
+
+static void test_gatt__test_gatt_register(void **cm_state)
 {
+	(void)cm_state;
 	/* Ensure our test services are not already registered */
 	bt_gatt_service_unregister(&test_svc);
 	bt_gatt_service_unregister(&test1_svc);
 
 	/* Attempt to register services */
-	zassert_false(bt_gatt_service_register(&test_svc),
-		     "Test service registration failed");
-	zassert_false(bt_gatt_service_register(&test1_svc),
-		     "Test service1 registration failed");
+	assert_false(bt_gatt_service_register(&test_svc));
+	assert_false(bt_gatt_service_register(&test1_svc));
 
 	/* Attempt to register already registered services */
-	zassert_true(bt_gatt_service_register(&test_svc),
-		     "Test service duplicate succeeded");
-	zassert_true(bt_gatt_service_register(&test1_svc),
-		     "Test service1 duplicate succeeded");
+	assert_true(bt_gatt_service_register(&test_svc));
+	assert_true(bt_gatt_service_register(&test1_svc));
 }
 
-ZTEST(test_gatt, test_gatt_unregister)
+static void test_gatt__test_gatt_unregister(void **cm_state)
 {
+	(void)cm_state;
 	/* Attempt to unregister last */
-	zassert_false(bt_gatt_service_unregister(&test1_svc),
-		     "Test service1 unregister failed");
-	zassert_false(bt_gatt_service_register(&test1_svc),
-		     "Test service1 re-registration failed");
+	assert_false(bt_gatt_service_unregister(&test1_svc));
+	assert_false(bt_gatt_service_register(&test1_svc));
 
 	/* Attempt to unregister first/middle */
-	zassert_false(bt_gatt_service_unregister(&test_svc),
-		     "Test service unregister failed");
-	zassert_false(bt_gatt_service_register(&test_svc),
-		     "Test service re-registration failed");
+	assert_false(bt_gatt_service_unregister(&test_svc));
+	assert_false(bt_gatt_service_register(&test_svc));
 
 	/* Attempt to unregister all reverse order */
-	zassert_false(bt_gatt_service_unregister(&test1_svc),
-		     "Test service1 unregister failed");
-	zassert_false(bt_gatt_service_unregister(&test_svc),
-		     "Test service unregister failed");
+	assert_false(bt_gatt_service_unregister(&test1_svc));
+	assert_false(bt_gatt_service_unregister(&test_svc));
 
-	zassert_false(bt_gatt_service_register(&test_svc),
-		     "Test service registration failed");
-	zassert_false(bt_gatt_service_register(&test1_svc),
-		     "Test service1 registration failed");
+	assert_false(bt_gatt_service_register(&test_svc));
+	assert_false(bt_gatt_service_register(&test1_svc));
 
 	/* Attempt to unregister all same order */
-	zassert_false(bt_gatt_service_unregister(&test_svc),
-		     "Test service1 unregister failed");
-	zassert_false(bt_gatt_service_unregister(&test1_svc),
-		     "Test service unregister failed");
+	assert_false(bt_gatt_service_unregister(&test_svc));
+	assert_false(bt_gatt_service_unregister(&test1_svc));
 }
 
 /* Test that a service A can be re-registered after registering it once, unregistering it, and then
  * registering another service B.
  * No pre-allocated handles. Repeat the process multiple times.
  */
-ZTEST(test_gatt, test_gatt_reregister)
+static void test_gatt__test_gatt_reregister(void **cm_state)
 {
+	(void)cm_state;
 	struct bt_gatt_attr local_test_attrs[] = {
 		/* Vendor Primary Service Declaration */
 		BT_GATT_PRIMARY_SERVICE(&test_uuid),
@@ -183,33 +171,25 @@ ZTEST(test_gatt, test_gatt_reregister)
 
 		/* Check that the handles are initially 0x0000 before registering the service */
 		for (int j = 0; j < local_test_svc.attr_count; j++) {
-			zassert_equal(local_test_svc.attrs[j].handle, 0x0000,
-				      "Test service A handle not initially reset");
+			assert_int_equal(local_test_svc.attrs[j].handle, 0x0000);
 		}
 
-		zassert_false(bt_gatt_service_register(&local_test_svc),
-			      "Test service A registration failed");
+		assert_false(bt_gatt_service_register(&local_test_svc));
 
-		zassert_false(bt_gatt_service_unregister(&local_test_svc),
-			      "Test service A unregister failed");
+		assert_false(bt_gatt_service_unregister(&local_test_svc));
 
 		/* Check that the handles are the same as before registering the service */
 		for (int j = 0; j < local_test_svc.attr_count; j++) {
-			zassert_equal(local_test_svc.attrs[j].handle, 0x0000,
-				      "Test service A handle not reset");
+			assert_int_equal(local_test_svc.attrs[j].handle, 0x0000);
 		}
 
-		zassert_false(bt_gatt_service_register(&local_test1_svc),
-			      "Test service B registration failed");
+		assert_false(bt_gatt_service_register(&local_test1_svc));
 
-		zassert_false(bt_gatt_service_register(&local_test_svc),
-			      "Test service A re-registering failed...");
+		assert_false(bt_gatt_service_register(&local_test_svc));
 
 		/* Clean up */
-		zassert_false(bt_gatt_service_unregister(&local_test_svc),
-			      "Test service A unregister failed");
-		zassert_false(bt_gatt_service_unregister(&local_test1_svc),
-			      "Test service B unregister failed");
+		assert_false(bt_gatt_service_unregister(&local_test_svc));
+		assert_false(bt_gatt_service_unregister(&local_test1_svc));
 	}
 }
 
@@ -219,8 +199,9 @@ ZTEST(test_gatt, test_gatt_reregister)
  * Check that pre-allocated handles are the same after unregistering as they were before
  * registering the service.
  */
-ZTEST(test_gatt, test_gatt_reregister_pre_allocated_handles)
+static void test_gatt__test_gatt_reregister_pre_allocated_handles(void **cm_state)
 {
+	(void)cm_state;
 	struct bt_gatt_attr local_test_attrs[] = {
 		/* Vendor Primary Service Declaration */
 		BT_GATT_PRIMARY_SERVICE(&test_uuid),
@@ -250,29 +231,22 @@ ZTEST(test_gatt, test_gatt_reregister_pre_allocated_handles)
 		prealloc_test1_svc.attrs[i].handle = 0x0200 + i;
 	}
 
-	zassert_false(bt_gatt_service_register(&prealloc_test_svc),
-		      "Test service A registration failed");
+	assert_false(bt_gatt_service_register(&prealloc_test_svc));
 
-	zassert_false(bt_gatt_service_unregister(&prealloc_test_svc),
-		      "Test service A unregister failed");
+	assert_false(bt_gatt_service_unregister(&prealloc_test_svc));
 
 	/* Check that the handles are the same as before registering the service */
 	for (int i = 0; i < prealloc_test_svc.attr_count; i++) {
-		zassert_equal(prealloc_test_svc.attrs[i].handle, 0x0100 + i,
-			      "Test service A handle not reset");
+		assert_int_equal(prealloc_test_svc.attrs[i].handle, 0x0100 + i);
 	}
 
-	zassert_false(bt_gatt_service_register(&prealloc_test1_svc),
-		      "Test service B registration failed");
+	assert_false(bt_gatt_service_register(&prealloc_test1_svc));
 
-	zassert_false(bt_gatt_service_register(&prealloc_test_svc),
-		      "Test service A re-registering failed...");
+	assert_false(bt_gatt_service_register(&prealloc_test_svc));
 
 	/* Clean up */
-	zassert_false(bt_gatt_service_unregister(&prealloc_test_svc),
-		      "Test service A unregister failed");
-	zassert_false(bt_gatt_service_unregister(&prealloc_test1_svc),
-		      "Test service B unregister failed");
+	assert_false(bt_gatt_service_unregister(&prealloc_test_svc));
+	assert_false(bt_gatt_service_unregister(&prealloc_test1_svc));
 }
 
 /* Test that a service A can be re-registered after registering it once, unregistering it, and then
@@ -282,8 +256,9 @@ ZTEST(test_gatt, test_gatt_reregister_pre_allocated_handles)
  * Check that pre-allocated handles are the same after unregistering as they were before
  * registering the service.
  */
-ZTEST(test_gatt, test_gatt_reregister_pre_allocated_handle_single)
+static void test_gatt__test_gatt_reregister_pre_allocated_handle_single(void **cm_state)
 {
+	(void)cm_state;
 	struct bt_gatt_attr local_test_attrs[] = {
 		/* Vendor Primary Service Declaration */
 		BT_GATT_PRIMARY_SERVICE(&test_uuid),
@@ -310,29 +285,22 @@ ZTEST(test_gatt, test_gatt_reregister_pre_allocated_handle_single)
 		prealloc_test_svc.attrs[j].handle = 0x0100 + j;
 	}
 
-	zassert_false(bt_gatt_service_register(&prealloc_test_svc),
-		      "Test service A registration failed");
+	assert_false(bt_gatt_service_register(&prealloc_test_svc));
 
-	zassert_false(bt_gatt_service_unregister(&prealloc_test_svc),
-		      "Test service A unregister failed");
+	assert_false(bt_gatt_service_unregister(&prealloc_test_svc));
 
 	/* Check that the handles are the same as before registering the service */
 	for (int i = 0; i < prealloc_test_svc.attr_count; i++) {
-		zassert_equal(prealloc_test_svc.attrs[i].handle, 0x0100 + i,
-			      "Test service A handle not reset");
+		assert_int_equal(prealloc_test_svc.attrs[i].handle, 0x0100 + i);
 	}
 
-	zassert_false(bt_gatt_service_register(&auto_test_svc),
-		      "Test service B registration failed");
+	assert_false(bt_gatt_service_register(&auto_test_svc));
 
-	zassert_false(bt_gatt_service_register(&prealloc_test_svc),
-		      "Test service A re-registering failed...");
+	assert_false(bt_gatt_service_register(&prealloc_test_svc));
 
 	/* Clean up */
-	zassert_false(bt_gatt_service_unregister(&prealloc_test_svc),
-		      "Test service A unregister failed");
-	zassert_false(bt_gatt_service_unregister(&auto_test_svc),
-		      "Test service B unregister failed");
+	assert_false(bt_gatt_service_unregister(&prealloc_test_svc));
+	assert_false(bt_gatt_service_unregister(&auto_test_svc));
 }
 
 static uint8_t count_attr(const struct bt_gatt_attr *attr, uint16_t handle,
@@ -355,76 +323,72 @@ static uint8_t find_attr(const struct bt_gatt_attr *attr, uint16_t handle,
 	return BT_GATT_ITER_CONTINUE;
 }
 
-ZTEST(test_gatt, test_gatt_foreach)
+static void test_gatt__test_gatt_foreach(void **cm_state)
 {
+	(void)cm_state;
 	const struct bt_gatt_attr *attr;
 	uint16_t num = 0;
 
 	/* Attempt to register services */
-	zassert_false(bt_gatt_service_register(&test_svc),
-		     "Test service registration failed");
-	zassert_false(bt_gatt_service_register(&test1_svc),
-		     "Test service1 registration failed");
+	assert_false(bt_gatt_service_register(&test_svc));
+	assert_false(bt_gatt_service_register(&test1_svc));
 
 	/* Iterate attributes */
 	bt_gatt_foreach_attr(test_attrs[0].handle, 0xffff, count_attr, &num);
-	zassert_equal(num, 7, "Number of attributes don't match");
+	assert_int_equal(num, 7);
 
 	/* Iterate 1 attribute */
 	num = 0;
 	bt_gatt_foreach_attr_type(test_attrs[0].handle, 0xffff, NULL, NULL, 1,
 				  count_attr, &num);
-	zassert_equal(num, 1, "Number of attributes don't match");
+	assert_int_equal(num, 1);
 
 	/* Find attribute by UUID */
 	attr = NULL;
 	bt_gatt_foreach_attr_type(test_attrs[0].handle, 0xffff,
 				  &test_chrc_uuid.uuid, NULL, 0, find_attr,
 				  &attr);
-	zassert_not_null(attr, "Attribute don't match");
+	assert_non_null(attr);
 	if (attr) {
-		zassert_equal(attr->uuid, &test_chrc_uuid.uuid,
-			      "Attribute UUID don't match");
+		assert_int_equal(attr->uuid, &test_chrc_uuid.uuid);
 	}
 
 	/* Find attribute by DATA */
 	attr = NULL;
 	bt_gatt_foreach_attr_type(test_attrs[0].handle, 0xffff, NULL,
 				  test_value, 0, find_attr, &attr);
-	zassert_not_null(attr, "Attribute don't match");
+	assert_non_null(attr);
 	if (attr) {
-		zassert_equal(attr->user_data, test_value,
-			      "Attribute value don't match");
+		assert_int_equal(attr->user_data, test_value);
 	}
 
 	/* Find all characteristics */
 	num = 0;
 	bt_gatt_foreach_attr_type(test_attrs[0].handle, 0xffff,
 				  BT_UUID_GATT_CHRC, NULL, 0, count_attr, &num);
-	zassert_equal(num, 2, "Number of attributes don't match");
+	assert_int_equal(num, 2);
 
 	/* Find 1 characteristic */
 	attr = NULL;
 	bt_gatt_foreach_attr_type(test_attrs[0].handle, 0xffff,
 				  BT_UUID_GATT_CHRC, NULL, 1, find_attr, &attr);
-	zassert_not_null(attr, "Attribute don't match");
+	assert_non_null(attr);
 
 	/* Find attribute by UUID and DATA */
 	attr = NULL;
 	bt_gatt_foreach_attr_type(test_attrs[0].handle, 0xffff,
 				  &test1_nfy_uuid.uuid, &nfy_enabled, 1,
 				  find_attr, &attr);
-	zassert_not_null(attr, "Attribute don't match");
+	assert_non_null(attr);
 	if (attr) {
-		zassert_equal(attr->uuid, &test1_nfy_uuid.uuid,
-			      "Attribute UUID don't match");
-		zassert_equal(attr->user_data, &nfy_enabled,
-			      "Attribute value don't match");
+		assert_int_equal(attr->uuid, &test1_nfy_uuid.uuid);
+		assert_int_equal(attr->user_data, &nfy_enabled);
 	}
 }
 
-ZTEST(test_gatt, test_gatt_read)
+static void test_gatt__test_gatt_read(void **cm_state)
 {
+	(void)cm_state;
 	const struct bt_gatt_attr *attr;
 	uint8_t buf[256];
 	ssize_t ret;
@@ -434,90 +398,82 @@ ZTEST(test_gatt, test_gatt_read)
 	bt_gatt_foreach_attr_type(test_attrs[0].handle, 0xffff,
 				  &test_chrc_uuid.uuid, NULL, 0, find_attr,
 				  &attr);
-	zassert_not_null(attr, "Attribute don't match");
-	zassert_equal(attr->uuid, &test_chrc_uuid.uuid,
-			      "Attribute UUID don't match");
+	assert_non_null(attr);
+	assert_int_equal(attr->uuid, &test_chrc_uuid.uuid);
 
 	ret = attr->read(NULL, attr, (void *)buf, sizeof(buf), 0);
-	zassert_equal(ret, strlen(test_value),
-		      "Attribute read unexpected return");
-	zassert_mem_equal(buf, test_value, ret,
-			  "Attribute read value don't match");
+	assert_int_equal(ret, strlen(test_value));
+	assert_memory_equal(buf, test_value, ret);
 }
 
-ZTEST(test_gatt, test_gatt_write)
+static void test_gatt__test_gatt_write(void **cm_state)
 {
+	(void)cm_state;
 	const struct bt_gatt_attr *attr;
 	char *value = "    ";
 	ssize_t ret;
 
-	/* Need our service to be registered */
-	zassert_false(bt_gatt_service_register(&test_svc),
-		     "Test service registration failed");
+	/* The preceding ordered cases leave the service registered. Recreate the
+	 * original write-case precondition explicitly.
+	 */
+	(void)bt_gatt_service_unregister(&test_svc);
+	assert_false(bt_gatt_service_register(&test_svc));
 
 	/* Find attribute by UUID */
 	attr = NULL;
 	bt_gatt_foreach_attr_type(test_attrs[0].handle, 0xffff,
 				  &test_chrc_uuid.uuid, NULL, 0, find_attr,
 				  &attr);
-	zassert_not_null(attr, "Attribute don't match");
+	assert_non_null(attr);
 
 	ret = attr->write(NULL, attr, (void *)value, strlen(value), 0, 0);
-	zassert_equal(ret, strlen(value), "Attribute write unexpected return");
-	zassert_mem_equal(value, test_value, ret,
-			  "Attribute write value don't match");
+	assert_int_equal(ret, strlen(value));
+	assert_memory_equal(value, test_value, ret);
 }
 
-ZTEST(test_gatt, test_bt_att_err_to_str)
+static void test_gatt__test_bt_att_err_to_str(void **cm_state)
 {
+	(void)cm_state;
 	/* Test a couple of entries */
-	zassert_str_equal(bt_att_err_to_str(BT_ATT_ERR_SUCCESS),
-			  "BT_ATT_ERR_SUCCESS");
-	zassert_str_equal(bt_att_err_to_str(BT_ATT_ERR_INSUFFICIENT_ENCRYPTION),
-			  "BT_ATT_ERR_INSUFFICIENT_ENCRYPTION");
-	zassert_str_equal(bt_att_err_to_str(BT_ATT_ERR_OUT_OF_RANGE),
-			  "BT_ATT_ERR_OUT_OF_RANGE");
+	assert_string_equal(bt_att_err_to_str(BT_ATT_ERR_SUCCESS), "BT_ATT_ERR_SUCCESS");
+	assert_string_equal(bt_att_err_to_str(BT_ATT_ERR_INSUFFICIENT_ENCRYPTION), "BT_ATT_ERR_INSUFFICIENT_ENCRYPTION");
+	assert_string_equal(bt_att_err_to_str(BT_ATT_ERR_OUT_OF_RANGE), "BT_ATT_ERR_OUT_OF_RANGE");
 
 	/* Test a entries that is not used */
-	zassert_mem_equal(bt_att_err_to_str(0x14),
-			  "(unknown)", strlen("(unknown)"));
-	zassert_mem_equal(bt_att_err_to_str(0xFB),
-			  "(unknown)", strlen("(unknown)"));
+	assert_memory_equal(bt_att_err_to_str(0x14), "(unknown)", strlen("(unknown)"));
+	assert_memory_equal(bt_att_err_to_str(0xFB), "(unknown)", strlen("(unknown)"));
 
 	for (uint16_t i = 0; i <= UINT8_MAX; i++) {
-		zassert_not_null(bt_att_err_to_str(i), ": %d", i);
+		assert_non_null(bt_att_err_to_str(i));
 	}
 }
 
-ZTEST(test_gatt, test_bt_gatt_err_to_str)
+static void test_gatt__test_bt_gatt_err_to_str(void **cm_state)
 {
+	(void)cm_state;
 	/* Test a couple of entries */
-	zassert_str_equal(bt_gatt_err_to_str(BT_GATT_ERR(BT_ATT_ERR_SUCCESS)),
-			  "BT_ATT_ERR_SUCCESS");
-	zassert_str_equal(bt_gatt_err_to_str(BT_GATT_ERR(BT_ATT_ERR_INSUFFICIENT_ENCRYPTION)),
-			  "BT_ATT_ERR_INSUFFICIENT_ENCRYPTION");
-	zassert_str_equal(bt_gatt_err_to_str(BT_GATT_ERR(BT_ATT_ERR_OUT_OF_RANGE)),
-			  "BT_ATT_ERR_OUT_OF_RANGE");
+	assert_string_equal(bt_gatt_err_to_str(BT_GATT_ERR(BT_ATT_ERR_SUCCESS)), "BT_ATT_ERR_SUCCESS");
+	assert_string_equal(bt_gatt_err_to_str(BT_GATT_ERR(BT_ATT_ERR_INSUFFICIENT_ENCRYPTION)), "BT_ATT_ERR_INSUFFICIENT_ENCRYPTION");
+	assert_string_equal(bt_gatt_err_to_str(BT_GATT_ERR(BT_ATT_ERR_OUT_OF_RANGE)), "BT_ATT_ERR_OUT_OF_RANGE");
 
 	/* Test entries that are not used */
-	zassert_mem_equal(bt_gatt_err_to_str(BT_GATT_ERR(0x14)),
-			  "(unknown)", strlen("(unknown)"));
-	zassert_mem_equal(bt_gatt_err_to_str(BT_GATT_ERR(0xFB)),
-			  "(unknown)", strlen("(unknown)"));
+	assert_memory_equal(bt_gatt_err_to_str(BT_GATT_ERR(0x14)), "(unknown)", strlen("(unknown)"));
+	assert_memory_equal(bt_gatt_err_to_str(BT_GATT_ERR(0xFB)), "(unknown)", strlen("(unknown)"));
 
 	/* Test positive values */
 	for (uint16_t i = 0; i <= UINT8_MAX; i++) {
-		zassert_not_null(bt_gatt_err_to_str(i), ": %d", i);
+		assert_non_null(bt_gatt_err_to_str(i));
 	}
 
 	/* Test negative values */
 	for (uint16_t i = 0; i <= UINT8_MAX; i++) {
-		zassert_not_null(bt_gatt_err_to_str(-i), ": %d", i);
+		assert_non_null(bt_gatt_err_to_str(-i));
 	}
 }
 
-ZTEST(test_gatt, test_gatt_ccc_write_cb)
+static void test_gatt__test_gatt_ccc_write_cb(void **cm_state)
 {
+	(void)cm_state;
 	struct bt_gatt_attr test_write_cb_attrs[] = {
 		/* Vendor Primary Service Declaration */
 		BT_GATT_PRIMARY_SERVICE(&test1_uuid),
@@ -532,10 +488,8 @@ ZTEST(test_gatt, test_gatt_ccc_write_cb)
 
 	struct bt_gatt_service test_write_cb_svc = BT_GATT_SERVICE(test_write_cb_attrs);
 
-	zassert_false(bt_gatt_service_register(&test_write_cb_svc),
-		     "Test service registration failed");
-	zassert_false(bt_gatt_service_unregister(&test_write_cb_svc),
-		     "Test service1 unregister failed");
+	assert_false(bt_gatt_service_register(&test_write_cb_svc));
+	assert_false(bt_gatt_service_unregister(&test_write_cb_svc));
 }
 
 /*
@@ -556,17 +510,18 @@ ZTEST(test_gatt, test_gatt_ccc_write_cb)
  * rescheduled; if db_hash_gen fails, the flag stays clear; otherwise the flag is set. If PSA
  * memory is not released, either dynamic registration/deregistration fails or the flag check
  * asserts.
- * k_sleep(K_MSEC(settle_ms)) is used to wait for the db_hash work to complete
+ * osi_sleep_ms(BT_MSEC(settle_ms)) is used to wait for the db_hash work to complete
  * The presence of memory leak does not depend on the PSA memory type (heap or static slot).
  * CONFIG_MBEDTLS_PSA_STATIC_KEY_SLOTS=y is used to fail quickly with fewer iterations in case of a
  * memory leak. The iteration count is set to CONFIG_MBEDTLS_PSA_KEY_SLOT_COUNT + 1: slightly
  * larger than slot_count, assuming each iteration leaks at least one key.
  */
-ZTEST(test_gatt, test_gatt_db_hash_psa_dynamic_register_no_leak)
+static void test_gatt__test_gatt_db_hash_psa_dynamic_register_no_leak(void **cm_state)
 {
+	(void)cm_state;
 
 	if (!IS_ENABLED(CONFIG_BT_GATT_CACHING) || TEST_PSA_KEY_SLOT_COUNT == 0) {
-		ztest_test_skip();
+		skip();
 	}
 
 	/*
@@ -597,25 +552,37 @@ ZTEST(test_gatt, test_gatt_db_hash_psa_dynamic_register_no_leak)
 	/* Ensure our test services are not already registered */
 	int err = bt_gatt_service_unregister(&dyn_svc);
 
-	zassert_true(err == 0 || err == -ENOENT, "unexpected pre-test unregister failed: %d", err);
+	assert_true(err == 0 || err == -ENOENT);
 
 	for (int i = 0; i < iterations; i++) {
 		err = bt_gatt_service_register(&dyn_svc);
-		zassert_true(err == 0,
-			"registration failed at iteration %d, db_hash_gen failed: %d:", i, err);
-		k_sleep(K_MSEC(settle_ms));
-		zassert_true(bt_gatt_is_db_hash_valid(),
-			     "DB hash is still invalid %dms after registration (iteration %d);"
-			     "db_hash_gen failed",
-			     settle_ms, i);
+		assert_true(err == 0);
+		osi_sleep_ms(BT_MSEC(settle_ms));
+		assert_true(bt_gatt_is_db_hash_valid());
 
 		err = bt_gatt_service_unregister(&dyn_svc);
-		zassert_true(err == 0,
-			"deregistration failed at iteration %d, db_hash_gen failed: %d", i, err);
-		k_sleep(K_MSEC(settle_ms));
-		zassert_true(bt_gatt_is_db_hash_valid(),
-			     "DB hash is still invalid %dms after deregistration (iteration %d);"
-			     "db_hash_gen failed",
-			     settle_ms, i);
+		assert_true(err == 0);
+		osi_sleep_ms(BT_MSEC(settle_ms));
+		assert_true(bt_gatt_is_db_hash_valid());
 	}
 }
+
+
+
+
+
+static const struct CMUnitTest test_cases_test_gatt[] = {
+	cmocka_unit_test(test_gatt__test_gatt_register),
+	cmocka_unit_test(test_gatt__test_gatt_unregister),
+	cmocka_unit_test(test_gatt__test_gatt_reregister),
+	cmocka_unit_test(test_gatt__test_gatt_reregister_pre_allocated_handles),
+	cmocka_unit_test(test_gatt__test_gatt_reregister_pre_allocated_handle_single),
+	cmocka_unit_test(test_gatt__test_gatt_foreach),
+	cmocka_unit_test(test_gatt__test_gatt_read),
+	cmocka_unit_test(test_gatt__test_gatt_write),
+	cmocka_unit_test(test_gatt__test_bt_att_err_to_str),
+	cmocka_unit_test(test_gatt__test_bt_gatt_err_to_str),
+	cmocka_unit_test(test_gatt__test_gatt_ccc_write_cb),
+	cmocka_unit_test(test_gatt__test_gatt_db_hash_psa_dynamic_register_no_leak),
+};
+BT_TEST_SUITE(test_gatt, test_cases_test_gatt, bt_test_host_setup, NULL);

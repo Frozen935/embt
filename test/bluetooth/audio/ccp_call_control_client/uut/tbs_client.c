@@ -1,3 +1,4 @@
+#include "support/test_support.h"
 /*
  * Copyright (c) 2024 Nordic Semiconductor ASA
  *
@@ -7,11 +8,11 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include <zephyr/autoconf.h>
-#include <zephyr/bluetooth/assigned_numbers.h>
-#include <zephyr/bluetooth/audio/tbs.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/sys/util_macro.h>
+#include <embt/autoconf.h>
+#include <embt/bluetooth/assigned_numbers.h>
+#include <embt/bluetooth/audio/tbs.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/base/util_macro.h>
 
 static struct bt_tbs_client_cb *tbs_cbs;
 

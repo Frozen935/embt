@@ -1,3 +1,4 @@
+#include "support/test_support.h"
 /*
  * Copyright (c) 2025 Nordic Semiconductor ASA
  *
@@ -9,18 +10,16 @@
 #include <stdint.h>
 #include <string.h>
 
-#include <zephyr/autoconf.h>
-#include <zephyr/bluetooth/addr.h>
-#include <zephyr/bluetooth/audio/bap.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/iso.h>
-#include <zephyr/sys/__assert.h>
-#include <zephyr/sys/slist.h>
-#include <zephyr/sys/util.h>
-#include <zephyr/sys/util_macro.h>
-#include <zephyr/toolchain.h>
-#include <zephyr/ztest_assert.h>
-
+#include <embt/autoconf.h>
+#include <embt/bluetooth/addr.h>
+#include <embt/bluetooth/audio/bap.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/iso.h>
+#include <embt/base/assert.h>
+#include <embt/base/slist.h>
+#include <embt/base/util.h>
+#include <embt/base/util_macro.h>
+#include <embt/compiler.h>
 #include "test_common.h"
 
 static struct bt_bap_broadcast_assistant_cb *broadcast_assistant_cb;
@@ -186,11 +185,11 @@ int bt_bap_broadcast_assistant_mod_src(struct bt_conn *conn,
 {
 	struct bap_broadcast_assistant_instance *assistant;
 
-	zassert_not_null(conn, "conn is NULL");
-	zassert_not_null(param, "param is NULL");
+	assert_non_null(conn);
+	assert_non_null(param);
 
 	assistant = inst_by_conn(conn);
-	zassert_not_null(assistant, "assistant is NULL");
+	assert_non_null(assistant);
 
 	assistant->recv_state.src_id = param->src_id;
 	assistant->recv_state.pa_sync_state =
@@ -232,15 +231,14 @@ int bt_bap_broadcast_assistant_rem_src(struct bt_conn *conn, uint8_t src_id)
 {
 	struct bap_broadcast_assistant_instance *assistant;
 
-	zassert_not_null(conn, "conn is NULL");
+	assert_non_null(conn);
 
 	assistant = inst_by_conn(conn);
-	zassert_not_null(assistant, "assistant is NULL");
-	zassert_equal(src_id, assistant->recv_state.src_id, "Invalid src_id");
-	zassert_equal(BT_BAP_PA_STATE_NOT_SYNCED, assistant->recv_state.pa_sync_state,
-		      "Invalid sync state");
+	assert_non_null(assistant);
+	assert_int_equal(src_id, assistant->recv_state.src_id);
+	assert_int_equal(BT_BAP_PA_STATE_NOT_SYNCED, assistant->recv_state.pa_sync_state);
 	for (uint8_t i = 0U; i < assistant->recv_state.num_subgroups; i++) {
-		zassert_equal(0U, assistant->recv_state.subgroups[i].bis_sync);
+		assert_int_equal(0U, assistant->recv_state.subgroups[i].bis_sync);
 	}
 	(void)memset(&assistant->recv_state, 0, sizeof(assistant->recv_state));
 
@@ -261,10 +259,10 @@ int bt_bap_broadcast_assistant_discover(struct bt_conn *conn)
 {
 	struct bap_broadcast_assistant_instance *assistant;
 
-	zassert_not_null(conn, "conn is NULL");
+	assert_non_null(conn);
 
 	assistant = inst_by_conn(conn);
-	zassert_not_null(assistant, "assistant is NULL");
+	assert_non_null(assistant);
 	assistant->conn = conn;
 
 	return 0;

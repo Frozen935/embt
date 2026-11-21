@@ -1,3 +1,6 @@
+#include "support/test_support.h"
+static const struct bt_hci_transport test_driver;
+#include "host/hci_core.h"
 /*
  * SPDX-FileCopyrightText: Copyright (c) 2026 Silicon Laboratories Inc.
  * SPDX-License-Identifier: Apache-2.0
@@ -7,27 +10,22 @@
 #include <stdint.h>
 #include <string.h>
 
-#include <zephyr/bluetooth/addr.h>
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/buf.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/hci.h>
-#include <zephyr/bluetooth/hci_types.h>
-#include <zephyr/bluetooth/l2cap.h>
-#include <zephyr/device.h>
-#include <zephyr/devicetree.h>
-#include <zephyr/drivers/bluetooth.h>
-#include <zephyr/kernel.h>
-#include <zephyr/net_buf.h>
-#include <zephyr/sys/atomic.h>
-#include <zephyr/sys/byteorder.h>
-#include <zephyr/sys/util.h>
-#include <zephyr/ztest.h>
+#include <embt/bluetooth/addr.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/buf.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/hci.h>
+#include <embt/bluetooth/hci_types.h>
+#include <embt/bluetooth/l2cap.h>
+#include <embt/drivers/bluetooth.h>
 
+#include <embt/net_buf.h>
+#include <embt/base/atomic.h>
+#include <embt/base/byteorder.h>
+#include <embt/base/util.h>
 #include "host/conn_internal.h"
 #include "host/l2cap_internal.h"
 
-#define DT_DRV_COMPAT zephyr_bt_hci_test
 
 #define GENERIC_RP_SIZE 64U
 #define LE_ACL_MAX_LEN  27U
@@ -48,7 +46,7 @@
 /* How long to wait for a PDU that the Host is to send. It sends it without
  * simulated time passing, so this only bounds a failed wait.
  */
-#define TX_TIMEOUT K_MSEC(100)
+#define TX_TIMEOUT BT_MSEC(100)
 
 /* One SDU is sent */
 NET_BUF_POOL_FIXED_DEFINE(sdu_pool, 1, BT_L2CAP_SDU_CHAN_SEND_RESERVE + sizeof(DATA),
@@ -62,12 +60,12 @@ static struct bt_conn *conn;
 static struct bt_l2cap_le_chan chan;
 
 /* The L2CAP PDUs that the Host sent */
-static K_FIFO_DEFINE(sent);
+static BT_FIFO_DEFINE(sent);
 
 /* The controller has one ACL buffer, which it reports free again unless the
  * test holds it, as for a peer that does not acknowledge at the link layer.
  */
-static atomic_t unreported;
+static bt_atomic_t unreported;
 static bool hold;
 
 static void evt_create(struct net_buf *buf, uint8_t evt, uint8_t len)
@@ -83,7 +81,7 @@ static void *cmd_complete(struct net_buf **buf, uint8_t plen, uint16_t opcode)
 {
 	struct bt_hci_evt_cmd_complete *cc;
 
-	*buf = bt_buf_get_evt(BT_HCI_EVT_CMD_COMPLETE, false, K_FOREVER);
+	*buf = bt_buf_get_evt(BT_HCI_EVT_CMD_COMPLETE, false, BT_FOREVER);
 	evt_create(*buf, BT_HCI_EVT_CMD_COMPLETE, sizeof(*cc) + plen);
 	cc = net_buf_add(*buf, sizeof(*cc));
 	cc->ncmd = 1U;
@@ -149,7 +147,7 @@ static void le_read_supp_states(struct net_buf **evt, uint16_t opcode)
 	(void)memset(rp->le_states, 0xFF, sizeof(rp->le_states));
 }
 
-static void cmd_handle(const struct device *dev, struct net_buf *cmd)
+static void cmd_handle(const struct bt_hci_transport *dev, struct net_buf *cmd)
 {
 	struct net_buf *evt = NULL;
 	struct bt_hci_cmd_hdr *hdr;
@@ -185,22 +183,22 @@ static void cmd_handle(const struct device *dev, struct net_buf *cmd)
 	bt_hci_recv(dev, evt);
 }
 
-static void completed_handler(struct k_work *work)
+static void completed_handler(struct bt_work *work)
 {
-	const struct device *dev = DEVICE_DT_GET(DT_DRV_INST(0));
+	const struct bt_hci_transport *dev = &test_driver;
 	struct bt_hci_evt_num_completed_packets *ev;
 	struct bt_hci_handle_count *hc;
 	struct net_buf *evt;
-	atomic_val_t count;
+	bt_atomic_val_t count;
 
 	ARG_UNUSED(work);
 
-	count = atomic_clear(&unreported);
+	count = bt_atomic_clear(&unreported);
 	if (count == 0) {
 		return;
 	}
 
-	evt = bt_buf_get_evt(BT_HCI_EVT_NUM_COMPLETED_PACKETS, false, K_FOREVER);
+	evt = bt_buf_get_evt(BT_HCI_EVT_NUM_COMPLETED_PACKETS, false, BT_FOREVER);
 	evt_create(evt, BT_HCI_EVT_NUM_COMPLETED_PACKETS, sizeof(*ev) + sizeof(*hc));
 	ev = net_buf_add(evt, sizeof(*ev));
 	ev->num_handles = 1U;
@@ -211,12 +209,12 @@ static void completed_handler(struct k_work *work)
 	bt_hci_recv(dev, evt);
 }
 
-static K_WORK_DEFINE(completed_work, completed_handler);
+static BT_WORK_DEFINE(completed_work, completed_handler);
 
 static void release(void)
 {
 	hold = false;
-	zassert_true(k_work_submit(&completed_work) >= 0);
+	assert_true(bt_work_submit(&completed_work) >= 0);
 }
 
 static void acl_handle(struct net_buf *acl)
@@ -226,27 +224,27 @@ static void acl_handle(struct net_buf *acl)
 
 	/* Every PDU fits a single ACL packet */
 	hdr = net_buf_pull_mem(acl, sizeof(*hdr));
-	zassert_equal(bt_acl_handle(sys_le16_to_cpu(hdr->handle)), HANDLE);
+	assert_int_equal(bt_acl_handle(sys_le16_to_cpu(hdr->handle)), HANDLE);
 
-	pdu = net_buf_alloc(&sent_pool, K_NO_WAIT);
-	zassert_not_null(pdu);
+	pdu = net_buf_alloc(&sent_pool, BT_NO_WAIT);
+	assert_non_null(pdu);
 	(void)net_buf_add_mem(pdu, acl->data, acl->len);
-	k_fifo_put(&sent, pdu);
+	bt_fifo_put(&sent, pdu);
 
-	(void)atomic_inc(&unreported);
+	(void)bt_atomic_inc(&unreported);
 	if (!hold) {
-		zassert_true(k_work_submit(&completed_work) >= 0);
+		assert_true(bt_work_submit(&completed_work) >= 0);
 	}
 }
 
-static int driver_open(const struct device *dev)
+static int driver_open(const struct bt_hci_transport *dev)
 {
 	ARG_UNUSED(dev);
 
 	return 0;
 }
 
-static int driver_send(const struct device *dev, struct net_buf *buf)
+static int driver_send(const struct bt_hci_transport *dev, struct net_buf *buf)
 {
 	uint8_t type = net_buf_pull_u8(buf);
 
@@ -261,19 +259,22 @@ static int driver_send(const struct device *dev, struct net_buf *buf)
 	return 0;
 }
 
-static DEVICE_API(bt_hci, driver_api) = {
+static const struct bt_hci_driver_api driver_api = {
 	.open = driver_open,
 	.send = driver_send,
 };
 
-#define TEST_DEVICE_INIT(inst)                                                                     \
-	static struct bt_hci_driver_data driver_data_##inst = {0};                                 \
-	static const struct bt_hci_driver_config driver_config_##inst =                            \
-		BT_DT_HCI_DRIVER_CONFIG_INST_GET(inst);                                            \
-	DEVICE_DT_INST_DEFINE(inst, NULL, NULL, &driver_data_##inst, &driver_config_##inst,        \
-			      POST_KERNEL, CONFIG_KERNEL_INIT_PRIORITY_DEVICE, &driver_api)
+static struct bt_hci_driver_data test_driver_data;
+static const struct bt_hci_transport test_driver = {
+ .name = "upstream-test", .bus = 0,
+ .api = &driver_api, .data = &test_driver_data,
+};
+static void test_transport_init(void)
+{
+ bt_test_require(bt_stack_init());
+ bt_dev.hci = &test_driver;
+}
 
-DT_INST_FOREACH_STATUS_OKAY(TEST_DEVICE_INIT)
 
 /* The next L2CAP PDU that the Host sent, with its header pulled */
 static struct net_buf *tx(uint16_t cid)
@@ -281,11 +282,11 @@ static struct net_buf *tx(uint16_t cid)
 	struct bt_l2cap_hdr *hdr;
 	struct net_buf *buf;
 
-	buf = k_fifo_get(&sent, TX_TIMEOUT);
-	zassert_not_null(buf, "Nothing sent");
+	buf = bt_fifo_get(&sent, TX_TIMEOUT);
+	assert_non_null(buf);
 
 	hdr = net_buf_pull_mem(buf, sizeof(*hdr));
-	zassert_equal(sys_le16_to_cpu(hdr->cid), cid, "cid 0x%04x", sys_le16_to_cpu(hdr->cid));
+	assert_int_equal(sys_le16_to_cpu(hdr->cid), cid);
 
 	return buf;
 }
@@ -302,7 +303,7 @@ static uint8_t tx_sig(uint8_t code)
 	buf = tx(BT_L2CAP_CID_LE_SIG);
 
 	sig = net_buf_pull_mem(buf, sizeof(*sig));
-	zassert_equal(sig->code, code, "code 0x%02x", sig->code);
+	assert_int_equal(sig->code, code);
 	ident = sig->ident;
 
 	net_buf_unref(buf);
@@ -315,7 +316,7 @@ static struct net_buf *sig_cmd(uint8_t code, uint8_t ident)
 	struct bt_l2cap_sig_hdr *sig;
 	struct net_buf *buf;
 
-	buf = bt_buf_get_rx(BT_BUF_ACL_IN, K_FOREVER);
+	buf = bt_buf_get_rx(BT_BUF_ACL_IN, BT_FOREVER);
 	(void)net_buf_add(buf, sizeof(struct bt_hci_acl_hdr) + sizeof(struct bt_l2cap_hdr));
 
 	sig = net_buf_add(buf, sizeof(*sig));
@@ -338,8 +339,8 @@ static void recv_sig(struct net_buf *buf)
 	acl->handle = sys_cpu_to_le16(bt_acl_handle_pack(HANDLE, BT_ACL_START));
 	acl->len = sys_cpu_to_le16(buf->len - L2CAP_HDR_OFFSET);
 
-	bt_hci_recv(DEVICE_DT_GET(DT_DRV_INST(0)), buf);
-	(void)k_sleep(K_MSEC(1));
+	bt_hci_recv(&test_driver, buf);
+	(void)osi_sleep_ms(BT_MSEC(1));
 }
 
 /* A connection request for a PSM without a server, which the Host refuses */
@@ -375,18 +376,18 @@ static void *setup(void)
 	struct net_buf *buf;
 	uint8_t ident;
 
-	zassert_ok(bt_enable(NULL));
+	assert_int_equal(bt_enable(NULL), 0);
 
 	/* As on Connection Complete */
 	conn = bt_conn_add_le(BT_ID_DEFAULT, &addr);
-	zassert_not_null(conn);
+	assert_non_null(conn);
 	conn->handle = HANDLE;
 	bt_conn_set_state(conn, BT_CONN_CONNECTED);
 	bt_l2cap_connected(conn);
 
 	chan.chan.ops = &chan_ops;
 	chan.rx.mtu = LE_MIN_MTU;
-	zassert_ok(bt_l2cap_chan_connect(conn, &chan.chan, PSM));
+	assert_int_equal(bt_l2cap_chan_connect(conn, &chan.chan, PSM), 0);
 
 	ident = tx_sig(BT_L2CAP_LE_CONN_REQ);
 	buf = sig_cmd(BT_L2CAP_LE_CONN_RSP, ident);
@@ -397,38 +398,39 @@ static void *setup(void)
 	net_buf_add_le16(buf, BT_L2CAP_LE_SUCCESS);
 	recv_sig(buf);
 
-	zassert_equal(chan.state, BT_L2CAP_CONNECTED);
-	zassert_equal(atomic_get(&chan.tx.credits), 0);
+	assert_int_equal(chan.state, BT_L2CAP_CONNECTED);
+	assert_int_equal(bt_atomic_get(&chan.tx.credits), 0);
 
 	return NULL;
 }
 
-ZTEST_SUITE(host_l2cap_le_tx, NULL, setup, NULL, NULL, NULL);
+
 
 /* A channel without credits does not hold up another channel of the connection */
-static ZTEST(host_l2cap_le_tx, test_no_credits)
+static void host_l2cap_le_tx__test_no_credits(void **cm_state)
 {
+	(void)cm_state;
 	struct net_buf *buf;
 
 	/* A response takes the controller's buffer until release() */
 	hold = true;
 	recv_unknown_conn_req(PEER_IDENT);
-	zassert_equal(tx_sig(BT_L2CAP_LE_CONN_RSP), PEER_IDENT);
+	assert_int_equal(tx_sig(BT_L2CAP_LE_CONN_RSP), PEER_IDENT);
 
 	/* Queued meanwhile: an SDU on the channel without credits, and behind it
 	 * a response on the signalling channel
 	 */
-	buf = net_buf_alloc(&sdu_pool, K_NO_WAIT);
-	zassert_not_null(buf);
+	buf = net_buf_alloc(&sdu_pool, BT_NO_WAIT);
+	assert_non_null(buf);
 	net_buf_reserve(buf, BT_L2CAP_SDU_CHAN_SEND_RESERVE);
 	(void)net_buf_add_mem(buf, DATA, strlen(DATA));
-	zassert_ok(bt_l2cap_chan_send(&chan.chan, buf));
+	assert_int_equal(bt_l2cap_chan_send(&chan.chan, buf), 0);
 
 	recv_unknown_conn_req(PEER_IDENT + 1U);
 
 	release();
 
-	zassert_equal(tx_sig(BT_L2CAP_LE_CONN_RSP), PEER_IDENT + 1U);
+	assert_int_equal(tx_sig(BT_L2CAP_LE_CONN_RSP), PEER_IDENT + 1U);
 
 	/* The SDU follows its credit */
 	buf = sig_cmd(BT_L2CAP_LE_CREDITS, PEER_IDENT + 2U);
@@ -438,8 +440,44 @@ static ZTEST(host_l2cap_le_tx, test_no_credits)
 
 	/* A single K-frame: the SDU length, then the SDU */
 	buf = tx(PEER_CID);
-	zassert_equal(net_buf_pull_le16(buf), strlen(DATA));
-	zassert_equal(buf->len, strlen(DATA));
-	zassert_mem_equal(buf->data, DATA, strlen(DATA));
+	assert_int_equal(net_buf_pull_le16(buf), strlen(DATA));
+	assert_int_equal(buf->len, strlen(DATA));
+	assert_memory_equal(buf->data, DATA, strlen(DATA));
 	net_buf_unref(buf);
 }
+
+static void storage_init_7767618e85(void)
+{
+	net_buf_pool_init(&sdu_pool);
+	net_buf_pool_init(&sent_pool);
+	bt_fifo_init(&sent);
+}
+
+static void migrated_pools_init(void)
+{
+	net_buf_pool_init(&sdu_pool);
+	net_buf_pool_init(&sent_pool);
+}
+
+int bt_test_host_l2cap_le_tx_setup(void **state)
+{
+	int environment_result = bt_test_host_setup(state);
+
+	if (environment_result != 0) {
+		return environment_result;
+	}
+
+	bt_test_require(bt_conn_init());
+	migrated_pools_init();
+	test_transport_init();
+	storage_init_7767618e85();
+	*state = setup();
+	return 0;
+}
+
+
+
+static const struct CMUnitTest test_cases_host_l2cap_le_tx[] = {
+	cmocka_unit_test(host_l2cap_le_tx__test_no_credits),
+};
+BT_TEST_SUITE(host_l2cap_le_tx, test_cases_host_l2cap_le_tx, bt_test_host_l2cap_le_tx_setup, NULL);

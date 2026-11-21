@@ -1,3 +1,8 @@
+#include "support/test_support.h"
+void mock_init_rule_before_05ae85(const struct bt_test_case_info *, void *);
+void mock_destroy_rule_after_05ae85(const struct bt_test_case_info *, void *);
+
+
 /* test_common.c - common procedures for unit test of CAP initiator */
 
 /*
@@ -10,17 +15,15 @@
 #include <stdint.h>
 #include <string.h>
 
-#include <zephyr/bluetooth/audio/audio.h>
-#include <zephyr/bluetooth/audio/bap.h>
-#include <zephyr/bluetooth/audio/bap_lc3_preset.h>
-#include <zephyr/bluetooth/audio/cap.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/hci_types.h>
-#include <zephyr/fff.h>
-#include <zephyr/sys/printk.h>
-#include <zephyr/sys/util.h>
-#include <zephyr/ztest_assert.h>
-
+#include <embt/bluetooth/audio/audio.h>
+#include <embt/bluetooth/audio/bap.h>
+#include <embt/bluetooth/audio/bap_lc3_preset.h>
+#include <embt/bluetooth/audio/cap.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/hci_types.h>
+#include <fff.h>
+#include <embt/base/log.h>
+#include <embt/base/util.h>
 #include "audio/bap_endpoint.h"
 #include "bap_unicast_client.h"
 #include "cap_initiator.h"
@@ -59,34 +62,32 @@ void test_unicast_set_state(struct bt_cap_stream *cap_stream, struct bt_conn *co
 	struct bt_bap_stream *bap_stream = &cap_stream->bap_stream;
 	int err;
 
-	printk("Setting stream %p to state %d\n", bap_stream, state);
+	bt_log_print("Setting stream %p to state %d\n", bap_stream, state);
 
 	if (state == BT_BAP_EP_STATE_IDLE) {
 		return;
 	}
 
-	zassert_not_null(cap_stream);
-	zassert_not_null(conn);
-	zassert_not_null(ep);
-	zassert_not_null(codec_cfg);
+	assert_non_null(cap_stream);
+	assert_non_null(conn);
+	assert_non_null(ep);
+	assert_non_null(codec_cfg);
 
 	err = bt_bap_stream_config(conn, &cap_stream->bap_stream, ep, codec_cfg);
-	zassert_equal(err, 0, "Unexpected return value %d", err);
+	assert_int_equal(err, 0);
 
 	/* Verify that the codec config data was updated */
-	zassert_true(util_eq(codec_cfg->data, codec_cfg->data_len, bap_stream->codec_cfg->data,
+	assert_true(util_eq(codec_cfg->data, codec_cfg->data_len, bap_stream->codec_cfg->data,
 			     bap_stream->codec_cfg->data_len));
 
 	if (state > BT_BAP_EP_STATE_CODEC_CONFIGURED) {
 		err = bt_bap_unicast_client_qos_from_group(bap_stream, &bap_stream->ep->qos);
-		zassert_equal(err, 0, "Unexpected return value %d", err);
+		assert_int_equal(err, 0);
 		bap_stream->qos = &bap_stream->ep->qos;
 	}
 
-	if (state > BT_BAP_EP_STATE_ENABLING) {
-		zassert_true(codec_cfg->meta_len <= CONFIG_BT_AUDIO_CODEC_CFG_MAX_METADATA_SIZE,
-			     "codec_cfg metadata too large: %u > %d", codec_cfg->meta_len,
-			     CONFIG_BT_AUDIO_CODEC_CFG_MAX_METADATA_SIZE);
+	if (state >= BT_BAP_EP_STATE_ENABLING) {
+		assert_true(codec_cfg->meta_len <= CONFIG_BT_AUDIO_CODEC_CFG_MAX_METADATA_SIZE);
 
 		(void)memcpy(bap_stream->ep->codec_cfg.meta, codec_cfg->meta, codec_cfg->meta_len);
 		bap_stream->ep->codec_cfg.meta_len = codec_cfg->meta_len;
@@ -111,12 +112,12 @@ void mock_discover(
 	int err;
 
 	err = bt_bap_unicast_client_register_cb(&unicast_client_cb);
-	zassert_equal(0, err, "Unexpected return value %d", err);
+	assert_int_equal(0, err);
 
 	for (int i = 0U; i < CONFIG_BT_MAX_CONN; i++) {
 		RESET_FAKE(mock_bap_discover_endpoint);
 		err = bt_bap_unicast_client_discover(&conns[i], BT_AUDIO_DIR_SINK);
-		zassert_equal(0, err, "Unexpected return value %d", err);
+		assert_int_equal(0, err);
 
 		/* TODO: use callback to populate eps */
 
@@ -125,17 +126,13 @@ void mock_discover(
 				   mock_bap_discover_endpoint_fake.call_count);
 		for (size_t j = 0U; j < mock_bap_discover_endpoint_fake.call_count; j++) {
 			/* Verify conn */
-			zassert_equal(mock_bap_discover_endpoint_fake.arg0_history[j], &conns[i],
-				      "%p", mock_bap_discover_endpoint_fake.arg0_history[j]);
+			assert_int_equal(mock_bap_discover_endpoint_fake.arg0_history[j], &conns[i]);
 
 			/* Verify dir */
-			zassert_equal(mock_bap_discover_endpoint_fake.arg1_history[j],
-				      BT_AUDIO_DIR_SINK, "%d",
-				      mock_bap_discover_endpoint_fake.arg1_history[j]);
+			assert_int_equal(mock_bap_discover_endpoint_fake.arg1_history[j], BT_AUDIO_DIR_SINK);
 
 			/* Verify and store ep */
-			zassert_not_equal(mock_bap_discover_endpoint_fake.arg2_history[j], NULL,
-					  "%p", mock_bap_discover_endpoint_fake.arg2_history[j]);
+			assert_int_not_equal(mock_bap_discover_endpoint_fake.arg2_history[j], NULL);
 
 			snk_eps[conns[i].index][j] =
 				mock_bap_discover_endpoint_fake.arg2_history[j];
@@ -143,24 +140,20 @@ void mock_discover(
 
 		RESET_FAKE(mock_bap_discover_endpoint);
 		err = bt_bap_unicast_client_discover(&conns[i], BT_AUDIO_DIR_SOURCE);
-		zassert_equal(0, err, "Unexpected return value %d", err);
+		assert_int_equal(0, err);
 
 		zexpect_call_count("unicast_client_cb.bap_discover_endpoint",
 				   CONFIG_BT_BAP_UNICAST_CLIENT_ASE_SRC_COUNT,
 				   mock_bap_discover_endpoint_fake.call_count);
 		for (size_t j = 0U; j < mock_bap_discover_endpoint_fake.call_count; j++) {
 			/* Verify conn */
-			zassert_equal(mock_bap_discover_endpoint_fake.arg0_history[j], &conns[i],
-				      "%p", mock_bap_discover_endpoint_fake.arg0_history[j]);
+			assert_int_equal(mock_bap_discover_endpoint_fake.arg0_history[j], &conns[i]);
 
 			/* Verify dir */
-			zassert_equal(mock_bap_discover_endpoint_fake.arg1_history[j],
-				      BT_AUDIO_DIR_SOURCE, "%d",
-				      mock_bap_discover_endpoint_fake.arg1_history[j]);
+			assert_int_equal(mock_bap_discover_endpoint_fake.arg1_history[j], BT_AUDIO_DIR_SOURCE);
 
 			/* Verify and store ep */
-			zassert_not_equal(mock_bap_discover_endpoint_fake.arg2_history[j], NULL,
-					  "%p", mock_bap_discover_endpoint_fake.arg2_history[j]);
+			assert_int_not_equal(mock_bap_discover_endpoint_fake.arg2_history[j], NULL);
 
 			src_eps[conns[i].index][j] =
 				mock_bap_discover_endpoint_fake.arg2_history[j];
@@ -169,5 +162,5 @@ void mock_discover(
 
 	/* We don't need the callbacks anymore */
 	err = bt_bap_unicast_client_unregister_cb(&unicast_client_cb);
-	zassert_equal(0, err, "Unexpected return value %d", err);
+	assert_int_equal(0, err);
 }

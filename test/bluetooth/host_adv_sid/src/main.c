@@ -1,3 +1,6 @@
+#include "support/test_support.h"
+static const struct bt_hci_transport test_driver;
+#include "host/hci_core.h"
 /*
  * Copyright (c) 2026 Nordic Semiconductor ASA
  * SPDX-License-Identifier: Apache-2.0
@@ -9,28 +12,21 @@
 #include <stdint.h>
 #include <string.h>
 
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/buf.h>
-#include <zephyr/bluetooth/gap.h>
-#include <zephyr/bluetooth/hci.h>
-#include <zephyr/bluetooth/hci_types.h>
-#include <zephyr/device.h>
-#include <zephyr/devicetree.h>
-#include <zephyr/drivers/bluetooth.h>
-#include <zephyr/kernel.h>
-#include <zephyr/net_buf.h>
-#include <zephyr/sys/byteorder.h>
-#include <zephyr/sys/util.h>
-#include <zephyr/sys/util_macro.h>
-#include <zephyr/toolchain.h>
-#include <zephyr/ztest.h>
-#include <zephyr/ztest_assert.h>
-#include <zephyr/ztest_test.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/buf.h>
+#include <embt/bluetooth/gap.h>
+#include <embt/bluetooth/hci.h>
+#include <embt/bluetooth/hci_types.h>
+#include <embt/drivers/bluetooth.h>
 
+#include <embt/net_buf.h>
+#include <embt/base/byteorder.h>
+#include <embt/base/util.h>
+#include <embt/base/util_macro.h>
+#include <embt/compiler.h>
 #include <embt/base/log.h>
 LOG_MODULE_REGISTER(bt_adv_sid_test, CONFIG_BT_LOG_LEVEL);
 
-#define DT_DRV_COMPAT zephyr_bt_hci_test
 
 /* Length of the command complete parameters used for commands without a dedicated handler.
  * The parameters are zeroed, and the size is large enough to hold the return parameters of any
@@ -63,7 +59,7 @@ static void *cmd_complete(struct net_buf **buf, uint8_t plen, uint16_t opcode)
 {
 	struct bt_hci_evt_cmd_complete *cc;
 
-	*buf = bt_buf_get_evt(BT_HCI_EVT_CMD_COMPLETE, false, K_FOREVER);
+	*buf = bt_buf_get_evt(BT_HCI_EVT_CMD_COMPLETE, false, BT_FOREVER);
 	evt_create(*buf, BT_HCI_EVT_CMD_COMPLETE, sizeof(*cc) + plen);
 	cc = net_buf_add(*buf, sizeof(*cc));
 	cc->ncmd = 1U;
@@ -153,7 +149,7 @@ static void le_set_ext_adv_param(struct net_buf *buf, struct net_buf **evt, uint
 	const struct bt_hci_cp_le_set_ext_adv_param *cp = (void *)buf->data;
 	struct bt_hci_rp_le_set_ext_adv_param *rp;
 
-	zassert_true(buf->len >= sizeof(*cp), "Unexpected command length %u", buf->len);
+	assert_true(buf->len >= sizeof(*cp));
 
 	last_hci_sid = cp->sid;
 
@@ -199,7 +195,7 @@ static const struct cmd_handler cmds[] = {
 };
 
 /* Lookup the command opcode and invoke the handler. */
-static void cmd_handle(const struct device *dev, struct net_buf *cmd)
+static void cmd_handle(const struct bt_hci_transport *dev, struct net_buf *cmd)
 {
 	struct net_buf *evt = NULL;
 	struct bt_hci_cmd_hdr *chdr;
@@ -225,18 +221,18 @@ static void cmd_handle(const struct device *dev, struct net_buf *cmd)
 	bt_hci_recv(dev, evt);
 }
 
-static int driver_open(const struct device *dev)
+static int driver_open(const struct bt_hci_transport *dev)
 {
 	ARG_UNUSED(dev);
 
 	return 0;
 }
 
-static int driver_send(const struct device *dev, struct net_buf *buf)
+static int driver_send(const struct bt_hci_transport *dev, struct net_buf *buf)
 {
 	uint8_t type = net_buf_pull_u8(buf);
 
-	zassert_equal(type, BT_HCI_H4_CMD, "Unexpected buffer type %u", type);
+	assert_int_equal(type, BT_HCI_H4_CMD);
 
 	cmd_handle(dev, buf);
 
@@ -245,19 +241,22 @@ static int driver_send(const struct device *dev, struct net_buf *buf)
 	return 0;
 }
 
-static DEVICE_API(bt_hci, driver_api) = {
+static const struct bt_hci_driver_api driver_api = {
 	.open = driver_open,
 	.send = driver_send,
 };
 
-#define TEST_DEVICE_INIT(inst)                                                                     \
-	static struct bt_hci_driver_data driver_data_##inst = {0};                                 \
-	static const struct bt_hci_driver_config driver_config_##inst =                            \
-		BT_DT_HCI_DRIVER_CONFIG_INST_GET(inst);                                            \
-	DEVICE_DT_INST_DEFINE(inst, NULL, NULL, &driver_data_##inst, &driver_config_##inst,        \
-			      POST_KERNEL, CONFIG_KERNEL_INIT_PRIORITY_DEVICE, &driver_api)
+static struct bt_hci_driver_data test_driver_data;
+static const struct bt_hci_transport test_driver = {
+ .name = "upstream-test", .bus = 0,
+ .api = &driver_api, .data = &test_driver_data,
+};
+static void test_transport_init(void)
+{
+ bt_test_require(bt_stack_init());
+ bt_dev.hci = &test_driver;
+}
 
-DT_INST_FOREACH_STATUS_OKAY(TEST_DEVICE_INIT)
 
 static struct bt_le_adv_param adv_param_get(uint8_t sid, bool ext_adv)
 {
@@ -280,7 +279,7 @@ static uint8_t adv_sid_get(struct bt_le_ext_adv *adv)
 	int err;
 
 	err = bt_le_ext_adv_get_info(adv, &info);
-	zassert_ok(err, "Failed to get advertising set info: %d", err);
+	assert_int_equal(err, 0);
 
 	return info.sid;
 }
@@ -290,7 +289,7 @@ static void *adv_sid_setup(void)
 	int err;
 
 	err = bt_enable(NULL);
-	zassert_ok(err, "Bluetooth init failed: %d", err);
+	assert_int_equal(err, 0);
 
 	return NULL;
 }
@@ -302,10 +301,11 @@ static void adv_sid_before(void *f)
 	last_hci_sid = BT_HCI_LE_EXT_ADV_SID_INVALID;
 }
 
-ZTEST_SUITE(bt_adv_sid, NULL, adv_sid_setup, adv_sid_before, NULL, NULL);
 
-static ZTEST(bt_adv_sid, test_ext_adv_uses_param_sid)
+
+static void bt_adv_sid__test_ext_adv_uses_param_sid(void **cm_state)
 {
+	(void)cm_state;
 	const uint8_t sids[] = {BT_GAP_SID_MIN, 5U, BT_GAP_SID_MAX};
 
 	for (size_t i = 0U; i < ARRAY_SIZE(sids); i++) {
@@ -314,37 +314,36 @@ static ZTEST(bt_adv_sid, test_ext_adv_uses_param_sid)
 		int err;
 
 		err = bt_le_ext_adv_create(&param, NULL, &adv);
-		zassert_ok(err, "Failed to create advertising set with SID %u: %d", sids[i], err);
+		assert_int_equal(err, 0);
 
-		zassert_equal(adv_sid_get(adv), sids[i],
-			      "SID %u was not set in the advertising set", sids[i]);
-		zassert_equal(last_hci_sid, sids[i], "SID %u was not sent to the controller",
-			      sids[i]);
+		assert_int_equal(adv_sid_get(adv), sids[i]);
+		assert_int_equal(last_hci_sid, sids[i]);
 
 		err = bt_le_ext_adv_delete(adv);
-		zassert_ok(err, "Failed to delete advertising set: %d", err);
+		assert_int_equal(err, 0);
 	}
 }
 
-static ZTEST(bt_adv_sid, test_legacy_adv_sid_is_invalid)
+static void bt_adv_sid__test_legacy_adv_sid_is_invalid(void **cm_state)
 {
+	(void)cm_state;
 	struct bt_le_adv_param param = adv_param_get(BT_GAP_SID_MAX + 1U, false);
 	struct bt_le_ext_adv *adv;
 	int err;
 
 	err = bt_le_ext_adv_create(&param, NULL, &adv);
-	zassert_ok(err, "Failed to create legacy advertising set: %d", err);
+	assert_int_equal(err, 0);
 
-	zassert_equal(adv_sid_get(adv), BT_GAP_SID_INVALID,
-		      "SID of a legacy advertising set shall be BT_GAP_SID_INVALID");
-	zassert_equal(last_hci_sid, 0U, "SID sent to the controller shall be 0 for legacy");
+	assert_int_equal(adv_sid_get(adv), BT_GAP_SID_INVALID);
+	assert_int_equal(last_hci_sid, 0U);
 
 	err = bt_le_ext_adv_delete(adv);
-	zassert_ok(err, "Failed to delete advertising set: %d", err);
+	assert_int_equal(err, 0);
 }
 
-static ZTEST(bt_adv_sid, test_ext_adv_invalid_sid_rejected)
+static void bt_adv_sid__test_ext_adv_invalid_sid_rejected(void **cm_state)
 {
+	(void)cm_state;
 	const uint8_t sids[] = {BT_GAP_SID_MAX + 1U, BT_GAP_SID_INVALID};
 
 	for (size_t i = 0U; i < ARRAY_SIZE(sids); i++) {
@@ -353,34 +352,61 @@ static ZTEST(bt_adv_sid, test_ext_adv_invalid_sid_rejected)
 		int err;
 
 		err = bt_le_ext_adv_create(&param, NULL, &adv);
-		zassert_equal(err, -EINVAL, "Creating advertising set with SID %u returned %d",
-			      sids[i], err);
+		assert_int_equal(err, -EINVAL);
 	}
 }
 
-static ZTEST(bt_adv_sid, test_update_param_updates_sid)
+static void bt_adv_sid__test_update_param_updates_sid(void **cm_state)
 {
+	(void)cm_state;
 	struct bt_le_adv_param param = adv_param_get(3U, true);
 	struct bt_le_ext_adv *adv;
 	int err;
 
 	err = bt_le_ext_adv_create(&param, NULL, &adv);
-	zassert_ok(err, "Failed to create advertising set: %d", err);
-	zassert_equal(adv_sid_get(adv), 3U, "SID was not set in the advertising set");
+	assert_int_equal(err, 0);
+	assert_int_equal(adv_sid_get(adv), 3U);
 
 	/* Updating with legacy parameters shall invalidate the SID */
 	param = adv_param_get(BT_GAP_SID_MAX + 1U, false);
 	err = bt_le_ext_adv_update_param(adv, &param);
-	zassert_ok(err, "Failed to update advertising parameters: %d", err);
-	zassert_equal(adv_sid_get(adv), BT_GAP_SID_INVALID,
-		      "SID of a legacy advertising set shall be BT_GAP_SID_INVALID");
+	assert_int_equal(err, 0);
+	assert_int_equal(adv_sid_get(adv), BT_GAP_SID_INVALID);
 
 	/* Updating with extended parameters shall set the SID again */
 	param = adv_param_get(7U, true);
 	err = bt_le_ext_adv_update_param(adv, &param);
-	zassert_ok(err, "Failed to update advertising parameters: %d", err);
-	zassert_equal(adv_sid_get(adv), 7U, "SID was not set in the advertising set");
+	assert_int_equal(err, 0);
+	assert_int_equal(adv_sid_get(adv), 7U);
 
 	err = bt_le_ext_adv_delete(adv);
-	zassert_ok(err, "Failed to delete advertising set: %d", err);
+	assert_int_equal(err, 0);
 }
+
+int bt_test_bt_adv_sid_setup(void **state)
+{
+	int environment_result = bt_test_host_setup(state);
+
+	if (environment_result != 0) {
+		return environment_result;
+	}
+
+	test_transport_init();
+	*state = adv_sid_setup();
+	return 0;
+}
+static int bt_test_bt_adv_sid_before(void **state)
+{
+	(void)state;
+	adv_sid_before(*state);
+	return 0;
+}
+
+
+static const struct CMUnitTest test_cases_bt_adv_sid[] = {
+	cmocka_unit_test_setup_teardown(bt_adv_sid__test_ext_adv_uses_param_sid, bt_test_bt_adv_sid_before, NULL),
+	cmocka_unit_test_setup_teardown(bt_adv_sid__test_legacy_adv_sid_is_invalid, bt_test_bt_adv_sid_before, NULL),
+	cmocka_unit_test_setup_teardown(bt_adv_sid__test_ext_adv_invalid_sid_rejected, bt_test_bt_adv_sid_before, NULL),
+	cmocka_unit_test_setup_teardown(bt_adv_sid__test_update_param_updates_sid, bt_test_bt_adv_sid_before, NULL),
+};
+BT_TEST_SUITE(bt_adv_sid, test_cases_bt_adv_sid, bt_test_bt_adv_sid_setup, NULL);

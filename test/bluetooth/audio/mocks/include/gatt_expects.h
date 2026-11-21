@@ -1,3 +1,4 @@
+#include "support/test_support.h"
 /*
  * Copyright (c) 2023 Codecoup
  *
@@ -10,11 +11,10 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/gatt.h>
-#include <zephyr/bluetooth/uuid.h>
-#include <zephyr/sys/util.h>
-#include <zephyr/ztest_assert.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/gatt.h>
+#include <embt/bluetooth/uuid.h>
+#include <embt/base/util.h>
 
 #include <sys/types.h>
 
@@ -32,7 +32,7 @@ static inline void expect_bt_gatt_notify_cb_called_with(const struct bt_conn *co
 		const struct bt_gatt_notify_params *params =
 			mock_bt_gatt_notify_cb_fake.arg1_history[i];
 
-		zassert_not_null(params);
+		assert_non_null(params);
 
 		if (conn != NULL && conn != mock_bt_gatt_notify_cb_fake.arg0_history[i]) {
 			continue;
@@ -47,7 +47,7 @@ static inline void expect_bt_gatt_notify_cb_called_with(const struct bt_conn *co
 				continue;
 			}
 		} else {
-			zassert_unreachable("Either uuid or attr shall be provided");
+			fail_msg("Either uuid or attr shall be provided");
 		}
 
 		if (data_len != -1 && data_len != params->len) {
@@ -55,7 +55,7 @@ static inline void expect_bt_gatt_notify_cb_called_with(const struct bt_conn *co
 		}
 
 		if (data != NULL) {
-			zassert_true(data_len >= 0, "data_len is required when data is provided");
+			assert_true(data_len >= 0);
 
 			if (!util_memeq(data, params->data, data_len)) {
 				continue;
@@ -66,15 +66,14 @@ static inline void expect_bt_gatt_notify_cb_called_with(const struct bt_conn *co
 		return;
 	}
 
-	zassert_unreachable("'%s()' was never called with the expected arguments", func_name);
+	fail_msg("'%s()' was never called with the expected arguments", func_name);
 }
 
 static inline void expect_bt_gatt_notify_cb_not_called(void)
 {
 	const char *func_name = "bt_gatt_notify_cb";
 
-	zassert_equal(0, mock_bt_gatt_notify_cb_fake.call_count, "'%s()' was called unexpectedly",
-		      func_name);
+	assert_int_equal(0, mock_bt_gatt_notify_cb_fake.call_count);
 }
 
 #endif /* MOCKS_GATT_EXPECTS_H_ */

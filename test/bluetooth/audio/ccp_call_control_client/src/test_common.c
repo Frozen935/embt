@@ -1,3 +1,5 @@
+#include "support/test_support.h"
+
 /* test_common.c - Common functions */
 
 /*
@@ -6,8 +8,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/hci_types.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/hci_types.h>
 
 #include "conn.h"
 

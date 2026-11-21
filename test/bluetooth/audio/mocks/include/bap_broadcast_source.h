@@ -9,8 +9,8 @@
 
 #include <stdint.h>
 
-#include <zephyr/bluetooth/audio/bap.h>
-#include <zephyr/fff.h>
+#include <embt/bluetooth/audio/bap.h>
+#include <fff.h>
 
 extern struct bt_bap_broadcast_source_cb mock_bap_broadcast_source_cb;
 

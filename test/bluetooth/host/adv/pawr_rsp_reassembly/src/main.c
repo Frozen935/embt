@@ -1,3 +1,4 @@
+#include "support/test_support.h"
 /*
  * Copyright (c) 2026 NXP
  *
@@ -18,13 +19,11 @@
 #include <stdint.h>
 #include <string.h>
 
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/hci_types.h>
-#include <zephyr/kernel.h>
-#include <zephyr/net_buf.h>
-#include <zephyr/ztest.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/hci_types.h>
 
-#include <host/hci_core.h>
+#include <embt/net_buf.h>
+#include "host/hci_core.h"
 
 #define TEST_SUBEVENT      3
 #define TEST_RESPONSE_SLOT 5
@@ -65,8 +64,7 @@ static void pawr_response_cb(struct bt_le_ext_adv *adv, struct bt_le_per_adv_res
 	} else {
 		last_response.data_null = false;
 		last_response.data_len = buf->len;
-		zassert_true(buf->len <= sizeof(last_response.data),
-			     "Reported data larger than reassembly buffer");
+		assert_true(buf->len <= sizeof(last_response.data));
 		memcpy(last_response.data, buf->data, buf->len);
 	}
 }
@@ -187,12 +185,12 @@ static void *pawr_setup(void)
 	bt_dev.id_addr[0].type = BT_ADDR_LE_RANDOM;
 	bt_dev.id_addr[0].a.val[0] = 0x01;
 	bt_dev.id_addr[0].a.val[5] = 0xC0;
-	atomic_set_bit(bt_dev.flags, BT_DEV_READY);
+	bt_atomic_set_bit(bt_dev.flags, BT_DEV_READY);
 
 	err = bt_le_ext_adv_create(BT_LE_EXT_ADV_NCONN, &adv_cb, &test_adv);
 
-	zassert_ok(err, "Failed to create ext adv set (%d)", err);
-	zassert_not_null(test_adv, "adv set is NULL");
+	assert_int_equal(err, 0);
+	assert_non_null(test_adv);
 
 	return NULL;
 }
@@ -205,35 +203,37 @@ static void pawr_before(void *fixture)
 	response_call_count = 0;
 }
 
-ZTEST_SUITE(pawr_rsp_reassembly, NULL, pawr_setup, pawr_before, NULL, NULL);
+
 
 /*
  * A single COMPLETE response with no preceding fragments must be reported
  * verbatim to the application.
  */
-ZTEST(pawr_rsp_reassembly, test_single_complete_report)
+static void pawr_rsp_reassembly__test_single_complete_report(void **cm_state)
 {
+	(void)cm_state;
 	uint8_t data[100];
 
 	fill_pattern(data, sizeof(data), 0x10);
 
 	deliver_single_response(BT_HCI_LE_ADV_EVT_TYPE_DATA_STATUS_COMPLETE, data, sizeof(data));
 
-	zassert_equal(response_call_count, 1, "Expected exactly one response");
-	zassert_true(last_response.called, "Callback not invoked");
-	zassert_false(last_response.data_null, "Data unexpectedly NULL");
-	zassert_equal(last_response.subevent, TEST_SUBEVENT, "Wrong subevent");
-	zassert_equal(last_response.response_slot, TEST_RESPONSE_SLOT, "Wrong response slot");
-	zassert_equal(last_response.data_len, sizeof(data), "Wrong data length");
-	zassert_mem_equal(last_response.data, data, sizeof(data), "Data mismatch");
+	assert_int_equal(response_call_count, 1);
+	assert_true(last_response.called);
+	assert_false(last_response.data_null);
+	assert_int_equal(last_response.subevent, TEST_SUBEVENT);
+	assert_int_equal(last_response.response_slot, TEST_RESPONSE_SLOT);
+	assert_int_equal(last_response.data_len, sizeof(data));
+	assert_memory_equal(last_response.data, data, sizeof(data));
 }
 
 /*
  * Two PARTIAL fragments followed by a COMPLETE fragment must be reassembled
  * into a single contiguous report delivered on the COMPLETE fragment only.
  */
-ZTEST(pawr_rsp_reassembly, test_reassemble_partial_then_complete)
+static void pawr_rsp_reassembly__test_reassemble_partial_then_complete(void **cm_state)
 {
+	(void)cm_state;
 	uint8_t frag1[80];
 	uint8_t frag2[80];
 	uint8_t frag3[80];
@@ -247,37 +247,38 @@ ZTEST(pawr_rsp_reassembly, test_reassemble_partial_then_complete)
 	memcpy(&expected[160], frag3, sizeof(frag3));
 
 	deliver_single_response(BT_HCI_LE_ADV_EVT_TYPE_DATA_STATUS_PARTIAL, frag1, sizeof(frag1));
-	zassert_equal(response_call_count, 0, "Partial fragment should not report");
+	assert_int_equal(response_call_count, 0);
 
 	deliver_single_response(BT_HCI_LE_ADV_EVT_TYPE_DATA_STATUS_PARTIAL, frag2, sizeof(frag2));
-	zassert_equal(response_call_count, 0, "Partial fragment should not report");
+	assert_int_equal(response_call_count, 0);
 
 	deliver_single_response(BT_HCI_LE_ADV_EVT_TYPE_DATA_STATUS_COMPLETE, frag3, sizeof(frag3));
 
-	zassert_equal(response_call_count, 1, "Expected exactly one report on completion");
-	zassert_false(last_response.data_null, "Data unexpectedly NULL");
-	zassert_equal(last_response.data_len, sizeof(expected), "Wrong reassembled length");
-	zassert_mem_equal(last_response.data, expected, sizeof(expected), "Reassembly mismatch");
+	assert_int_equal(response_call_count, 1);
+	assert_false(last_response.data_null);
+	assert_int_equal(last_response.data_len, sizeof(expected));
+	assert_memory_equal(last_response.data, expected, sizeof(expected));
 }
 
 /*
  * RX_FAILED must be reported to the application with a NULL buffer and must
  * drop any partial chain currently being reassembled.
  */
-ZTEST(pawr_rsp_reassembly, test_rx_failed_reports_null)
+static void pawr_rsp_reassembly__test_rx_failed_reports_null(void **cm_state)
 {
+	(void)cm_state;
 	uint8_t frag1[80];
 
 	fill_pattern(frag1, sizeof(frag1), 0x00);
 
 	/* Start a chain, then have reception fail. */
 	deliver_single_response(BT_HCI_LE_ADV_EVT_TYPE_DATA_STATUS_PARTIAL, frag1, sizeof(frag1));
-	zassert_equal(response_call_count, 0, "Partial fragment should not report");
+	assert_int_equal(response_call_count, 0);
 
 	deliver_single_response(BT_HCI_LE_ADV_EVT_TYPE_DATA_STATUS_RX_FAILED, NULL, 0);
 
-	zassert_equal(response_call_count, 1, "RX_FAILED should report once");
-	zassert_true(last_response.data_null, "RX_FAILED must report NULL data");
+	assert_int_equal(response_call_count, 1);
+	assert_true(last_response.data_null);
 }
 
 /*
@@ -286,8 +287,9 @@ ZTEST(pawr_rsp_reassembly, test_rx_failed_reports_null)
  * COMPLETE fragment must be dropped instead of being reported as a valid
  * (silently truncated) response.
  */
-ZTEST(pawr_rsp_reassembly, test_overflow_drops_until_complete)
+static void pawr_rsp_reassembly__test_overflow_drops_until_complete(void **cm_state)
 {
+	(void)cm_state;
 	uint8_t big_frag[200];
 	uint8_t last_frag[100];
 
@@ -297,7 +299,7 @@ ZTEST(pawr_rsp_reassembly, test_overflow_drops_until_complete)
 	/* First partial fits (200 <= 254). */
 	deliver_single_response(BT_HCI_LE_ADV_EVT_TYPE_DATA_STATUS_PARTIAL, big_frag,
 				sizeof(big_frag));
-	zassert_equal(response_call_count, 0, "Partial fragment should not report");
+	assert_int_equal(response_call_count, 0);
 
 	/*
 	 * Second partial (another 200 bytes) does not fit in the remaining
@@ -305,7 +307,7 @@ ZTEST(pawr_rsp_reassembly, test_overflow_drops_until_complete)
 	 */
 	deliver_single_response(BT_HCI_LE_ADV_EVT_TYPE_DATA_STATUS_PARTIAL, big_frag,
 				sizeof(big_frag));
-	zassert_equal(response_call_count, 0, "Overflowing partial must not report");
+	assert_int_equal(response_call_count, 0);
 
 	/*
 	 * The terminating COMPLETE fragment matches the truncated chain and must
@@ -313,15 +315,16 @@ ZTEST(pawr_rsp_reassembly, test_overflow_drops_until_complete)
 	 */
 	deliver_single_response(BT_HCI_LE_ADV_EVT_TYPE_DATA_STATUS_COMPLETE, last_frag,
 				sizeof(last_frag));
-	zassert_equal(response_call_count, 0, "Truncated chain must not be reported");
+	assert_int_equal(response_call_count, 0);
 }
 
 /*
  * After a truncated/dropped chain, a fresh COMPLETE response for the same slot
  * must again be reported normally (state is reset).
  */
-ZTEST(pawr_rsp_reassembly, test_recovers_after_truncation)
+static void pawr_rsp_reassembly__test_recovers_after_truncation(void **cm_state)
 {
+	(void)cm_state;
 	uint8_t big_frag[200];
 	uint8_t fresh[50];
 
@@ -335,15 +338,15 @@ ZTEST(pawr_rsp_reassembly, test_recovers_after_truncation)
 				sizeof(big_frag));
 	deliver_single_response(BT_HCI_LE_ADV_EVT_TYPE_DATA_STATUS_COMPLETE, big_frag,
 				sizeof(big_frag));
-	zassert_equal(response_call_count, 0, "Truncated chain must not be reported");
+	assert_int_equal(response_call_count, 0);
 
 	/* A brand new, self-contained COMPLETE response must report normally. */
 	deliver_single_response(BT_HCI_LE_ADV_EVT_TYPE_DATA_STATUS_COMPLETE, fresh, sizeof(fresh));
 
-	zassert_equal(response_call_count, 1, "Fresh response after truncation must report");
-	zassert_false(last_response.data_null, "Data unexpectedly NULL");
-	zassert_equal(last_response.data_len, sizeof(fresh), "Wrong data length");
-	zassert_mem_equal(last_response.data, fresh, sizeof(fresh), "Data mismatch");
+	assert_int_equal(response_call_count, 1);
+	assert_false(last_response.data_null);
+	assert_int_equal(last_response.data_len, sizeof(fresh));
+	assert_memory_equal(last_response.data, fresh, sizeof(fresh));
 }
 
 /*
@@ -353,8 +356,9 @@ ZTEST(pawr_rsp_reassembly, test_recovers_after_truncation)
  * must be reported normally instead of being dropped by the stale truncation
  * state from slot A.
  */
-ZTEST(pawr_rsp_reassembly, test_truncation_does_not_leak_to_next_slot)
+static void pawr_rsp_reassembly__test_truncation_does_not_leak_to_next_slot(void **cm_state)
 {
+	(void)cm_state;
 	uint8_t big_frag[200];
 	uint8_t slot_b_frag[80];
 	uint8_t slot_b_complete[80];
@@ -371,23 +375,23 @@ ZTEST(pawr_rsp_reassembly, test_truncation_does_not_leak_to_next_slot)
 				     sizeof(big_frag), TEST_RESPONSE_SLOT);
 	deliver_single_response_slot(BT_HCI_LE_ADV_EVT_TYPE_DATA_STATUS_PARTIAL, big_frag,
 				     sizeof(big_frag), TEST_RESPONSE_SLOT);
-	zassert_equal(response_call_count, 0, "Overflowing partial must not report");
+	assert_int_equal(response_call_count, 0);
 
 	/* Slot B: a fresh partial + complete for a different slot. The stale
 	 * truncation state from slot A must not cause slot B to be dropped.
 	 */
 	deliver_single_response_slot(BT_HCI_LE_ADV_EVT_TYPE_DATA_STATUS_PARTIAL, slot_b_frag,
 				     sizeof(slot_b_frag), TEST_RESPONSE_SLOT + 1);
-	zassert_equal(response_call_count, 0, "Partial fragment should not report");
+	assert_int_equal(response_call_count, 0);
 
 	deliver_single_response_slot(BT_HCI_LE_ADV_EVT_TYPE_DATA_STATUS_COMPLETE, slot_b_complete,
 				     sizeof(slot_b_complete), TEST_RESPONSE_SLOT + 1);
 
-	zassert_equal(response_call_count, 1, "Slot B must be reported, not dropped");
-	zassert_false(last_response.data_null, "Data unexpectedly NULL");
-	zassert_equal(last_response.response_slot, TEST_RESPONSE_SLOT + 1, "Wrong response slot");
-	zassert_equal(last_response.data_len, sizeof(expected), "Wrong reassembled length");
-	zassert_mem_equal(last_response.data, expected, sizeof(expected), "Reassembly mismatch");
+	assert_int_equal(response_call_count, 1);
+	assert_false(last_response.data_null);
+	assert_int_equal(last_response.response_slot, TEST_RESPONSE_SLOT + 1);
+	assert_int_equal(last_response.data_len, sizeof(expected));
+	assert_memory_equal(last_response.data, expected, sizeof(expected));
 }
 
 /*
@@ -396,8 +400,9 @@ ZTEST(pawr_rsp_reassembly, test_truncation_does_not_leak_to_next_slot)
  * COMPLETE response for the same slot afterwards must be reported normally
  * rather than being dropped by leftover truncation state.
  */
-ZTEST(pawr_rsp_reassembly, test_rx_failed_clears_truncation)
+static void pawr_rsp_reassembly__test_rx_failed_clears_truncation(void **cm_state)
 {
+	(void)cm_state;
 	uint8_t big_frag[200];
 	uint8_t fresh[60];
 
@@ -409,20 +414,20 @@ ZTEST(pawr_rsp_reassembly, test_rx_failed_clears_truncation)
 				sizeof(big_frag));
 	deliver_single_response(BT_HCI_LE_ADV_EVT_TYPE_DATA_STATUS_PARTIAL, big_frag,
 				sizeof(big_frag));
-	zassert_equal(response_call_count, 0, "Overflowing partial must not report");
+	assert_int_equal(response_call_count, 0);
 
 	/* RX_FAILED must reset the truncated flag as well as the buffer. */
 	deliver_single_response(BT_HCI_LE_ADV_EVT_TYPE_DATA_STATUS_RX_FAILED, NULL, 0);
-	zassert_equal(response_call_count, 1, "RX_FAILED should report once");
-	zassert_true(last_response.data_null, "RX_FAILED must report NULL data");
+	assert_int_equal(response_call_count, 1);
+	assert_true(last_response.data_null);
 
 	/* A fresh self-contained COMPLETE response must report normally. */
 	deliver_single_response(BT_HCI_LE_ADV_EVT_TYPE_DATA_STATUS_COMPLETE, fresh, sizeof(fresh));
 
-	zassert_equal(response_call_count, 2, "Fresh response after RX_FAILED must report");
-	zassert_false(last_response.data_null, "Data unexpectedly NULL");
-	zassert_equal(last_response.data_len, sizeof(fresh), "Wrong data length");
-	zassert_mem_equal(last_response.data, fresh, sizeof(fresh), "Data mismatch");
+	assert_int_equal(response_call_count, 2);
+	assert_false(last_response.data_null);
+	assert_int_equal(last_response.data_len, sizeof(fresh));
+	assert_memory_equal(last_response.data, fresh, sizeof(fresh));
 }
 
 /*
@@ -437,8 +442,9 @@ ZTEST(pawr_rsp_reassembly, test_rx_failed_clears_truncation)
  * The following event delivers the COMPLETE fragment of the chain slot, which
  * must trigger reassembly of just the two chain fragments.
  */
-ZTEST(pawr_rsp_reassembly, test_multi_response_event_partial_tail_then_complete)
+static void pawr_rsp_reassembly__test_multi_response_event_partial_tail_then_complete(void **cm_state)
 {
+	(void)cm_state;
 	uint8_t self_contained[40];
 	uint8_t chain_frag1[80];
 	uint8_t chain_frag2[60];
@@ -463,17 +469,17 @@ ZTEST(pawr_rsp_reassembly, test_multi_response_event_partial_tail_then_complete)
 	/* The self-contained COMPLETE and the RX_FAILED are reported; the
 	 * trailing PARTIAL fragment is only buffered.
 	 */
-	zassert_equal(response_call_count, 2, "Expected COMPLETE and RX_FAILED to report");
+	assert_int_equal(response_call_count, 2);
 
 	/* Second event: the COMPLETE fragment terminating the buffered chain. */
 	deliver_single_response_slot(BT_HCI_LE_ADV_EVT_TYPE_DATA_STATUS_COMPLETE, chain_frag2,
 				     sizeof(chain_frag2), TEST_RESPONSE_SLOT + 2);
 
-	zassert_equal(response_call_count, 3, "Chain completion must report exactly once");
-	zassert_false(last_response.data_null, "Data unexpectedly NULL");
-	zassert_equal(last_response.response_slot, TEST_RESPONSE_SLOT + 2, "Wrong response slot");
-	zassert_equal(last_response.data_len, sizeof(expected), "Wrong reassembled length");
-	zassert_mem_equal(last_response.data, expected, sizeof(expected), "Reassembly mismatch");
+	assert_int_equal(response_call_count, 3);
+	assert_false(last_response.data_null);
+	assert_int_equal(last_response.response_slot, TEST_RESPONSE_SLOT + 2);
+	assert_int_equal(last_response.data_len, sizeof(expected));
+	assert_memory_equal(last_response.data, expected, sizeof(expected));
 }
 
 /*
@@ -481,8 +487,9 @@ ZTEST(pawr_rsp_reassembly, test_multi_response_event_partial_tail_then_complete)
  * discard the stale (mismatched) chain, then be reported as a self-contained
  * response. The interrupted chain must not leak into the new slot's report.
  */
-ZTEST(pawr_rsp_reassembly, test_complete_other_slot_discards_buffered_chain)
+static void pawr_rsp_reassembly__test_complete_other_slot_discards_buffered_chain(void **cm_state)
 {
+	(void)cm_state;
 	uint8_t chain_frag[80];
 	uint8_t other_complete[50];
 
@@ -492,7 +499,7 @@ ZTEST(pawr_rsp_reassembly, test_complete_other_slot_discards_buffered_chain)
 	/* Buffer a partial chain for slot A. */
 	deliver_single_response_slot(BT_HCI_LE_ADV_EVT_TYPE_DATA_STATUS_PARTIAL, chain_frag,
 				     sizeof(chain_frag), TEST_RESPONSE_SLOT);
-	zassert_equal(response_call_count, 0, "Partial fragment should not report");
+	assert_int_equal(response_call_count, 0);
 
 	/* A COMPLETE for slot B interrupts the buffered chain. It must be
 	 * reported as a self-contained response, carrying only slot B's data.
@@ -500,12 +507,11 @@ ZTEST(pawr_rsp_reassembly, test_complete_other_slot_discards_buffered_chain)
 	deliver_single_response_slot(BT_HCI_LE_ADV_EVT_TYPE_DATA_STATUS_COMPLETE, other_complete,
 				     sizeof(other_complete), TEST_RESPONSE_SLOT + 1);
 
-	zassert_equal(response_call_count, 1, "Slot B COMPLETE must report once");
-	zassert_false(last_response.data_null, "Data unexpectedly NULL");
-	zassert_equal(last_response.response_slot, TEST_RESPONSE_SLOT + 1, "Wrong response slot");
-	zassert_equal(last_response.data_len, sizeof(other_complete), "Wrong data length");
-	zassert_mem_equal(last_response.data, other_complete, sizeof(other_complete),
-			  "Slot B data must not include slot A chain");
+	assert_int_equal(response_call_count, 1);
+	assert_false(last_response.data_null);
+	assert_int_equal(last_response.response_slot, TEST_RESPONSE_SLOT + 1);
+	assert_int_equal(last_response.data_len, sizeof(other_complete));
+	assert_memory_equal(last_response.data, other_complete, sizeof(other_complete));
 }
 
 /*
@@ -515,8 +521,9 @@ ZTEST(pawr_rsp_reassembly, test_complete_other_slot_discards_buffered_chain)
  * a silently truncated response. This complements test_overflow_drops_until_
  * complete(), which exercises the report_truncated path instead.
  */
-ZTEST(pawr_rsp_reassembly, test_complete_fragment_overflow_drops_chain)
+static void pawr_rsp_reassembly__test_complete_fragment_overflow_drops_chain(void **cm_state)
 {
+	(void)cm_state;
 	uint8_t frag1[200];
 	uint8_t final_frag[100];
 	uint8_t fresh[50];
@@ -529,22 +536,22 @@ ZTEST(pawr_rsp_reassembly, test_complete_fragment_overflow_drops_chain)
 	 * without being marked truncated.
 	 */
 	deliver_single_response(BT_HCI_LE_ADV_EVT_TYPE_DATA_STATUS_PARTIAL, frag1, sizeof(frag1));
-	zassert_equal(response_call_count, 0, "Partial fragment should not report");
+	assert_int_equal(response_call_count, 0);
 
 	/* The COMPLETE fragment (100 bytes) does not fit in the remaining 54
 	 * bytes of tailroom, so the whole chain must be dropped.
 	 */
 	deliver_single_response(BT_HCI_LE_ADV_EVT_TYPE_DATA_STATUS_COMPLETE, final_frag,
 				sizeof(final_frag));
-	zassert_equal(response_call_count, 0, "Overflowing COMPLETE must not report");
+	assert_int_equal(response_call_count, 0);
 
 	/* State must be reset: a fresh self-contained COMPLETE reports normally. */
 	deliver_single_response(BT_HCI_LE_ADV_EVT_TYPE_DATA_STATUS_COMPLETE, fresh, sizeof(fresh));
 
-	zassert_equal(response_call_count, 1, "Fresh response after drop must report");
-	zassert_false(last_response.data_null, "Data unexpectedly NULL");
-	zassert_equal(last_response.data_len, sizeof(fresh), "Wrong data length");
-	zassert_mem_equal(last_response.data, fresh, sizeof(fresh), "Data mismatch");
+	assert_int_equal(response_call_count, 1);
+	assert_false(last_response.data_null);
+	assert_int_equal(last_response.data_len, sizeof(fresh));
+	assert_memory_equal(last_response.data, fresh, sizeof(fresh));
 }
 
 /*
@@ -555,8 +562,9 @@ ZTEST(pawr_rsp_reassembly, test_complete_fragment_overflow_drops_chain)
  * reassembly restarts for slot 5. The slot 5 chain must then complete normally,
  * carrying only slot 5 data.
  */
-ZTEST(pawr_rsp_reassembly, test_interleaved_partial_slots_keeps_latest)
+static void pawr_rsp_reassembly__test_interleaved_partial_slots_keeps_latest(void **cm_state)
 {
+	(void)cm_state;
 	uint8_t slot4_frag[80];
 	uint8_t slot5_frag1[80];
 	uint8_t slot5_frag2[60];
@@ -571,14 +579,14 @@ ZTEST(pawr_rsp_reassembly, test_interleaved_partial_slots_keeps_latest)
 	/* Buffer a PARTIAL fragment for slot 4. */
 	deliver_single_response_slot(BT_HCI_LE_ADV_EVT_TYPE_DATA_STATUS_PARTIAL, slot4_frag,
 				     sizeof(slot4_frag), 4);
-	zassert_equal(response_call_count, 0, "Partial fragment should not report");
+	assert_int_equal(response_call_count, 0);
 
 	/* A PARTIAL fragment for slot 5 interrupts and replaces the slot 4
 	 * chain. Neither reports yet.
 	 */
 	deliver_single_response_slot(BT_HCI_LE_ADV_EVT_TYPE_DATA_STATUS_PARTIAL, slot5_frag1,
 				     sizeof(slot5_frag1), 5);
-	zassert_equal(response_call_count, 0, "Partial fragment should not report");
+	assert_int_equal(response_call_count, 0);
 
 	/* The terminating COMPLETE for slot 5 must reassemble only slot 5's
 	 * fragments, with no bytes leaking from the dropped slot 4 chain.
@@ -586,12 +594,11 @@ ZTEST(pawr_rsp_reassembly, test_interleaved_partial_slots_keeps_latest)
 	deliver_single_response_slot(BT_HCI_LE_ADV_EVT_TYPE_DATA_STATUS_COMPLETE, slot5_frag2,
 				     sizeof(slot5_frag2), 5);
 
-	zassert_equal(response_call_count, 1, "Slot 5 completion must report once");
-	zassert_false(last_response.data_null, "Data unexpectedly NULL");
-	zassert_equal(last_response.response_slot, 5, "Wrong response slot");
-	zassert_equal(last_response.data_len, sizeof(expected), "Wrong reassembled length");
-	zassert_mem_equal(last_response.data, expected, sizeof(expected),
-			  "Slot 5 data must not include slot 4 chain");
+	assert_int_equal(response_call_count, 1);
+	assert_false(last_response.data_null);
+	assert_int_equal(last_response.response_slot, 5);
+	assert_int_equal(last_response.data_len, sizeof(expected));
+	assert_memory_equal(last_response.data, expected, sizeof(expected));
 }
 
 /*
@@ -602,8 +609,9 @@ ZTEST(pawr_rsp_reassembly, test_interleaved_partial_slots_keeps_latest)
  * chain (slot 5 is the buffered one), so it interrupts the slot 5 chain and is
  * reported as a self-contained response carrying only its own COMPLETE data.
  */
-ZTEST(pawr_rsp_reassembly, test_two_partial_slots_in_one_event_then_stale_complete)
+static void pawr_rsp_reassembly__test_two_partial_slots_in_one_event_then_stale_complete(void **cm_state)
 {
+	(void)cm_state;
 	uint8_t slot4_frag[80];
 	uint8_t slot5_frag[80];
 	uint8_t slot4_complete[40];
@@ -619,7 +627,7 @@ ZTEST(pawr_rsp_reassembly, test_two_partial_slots_in_one_event_then_stale_comple
 	add_response_slot(&evt_buf, BT_HCI_LE_ADV_EVT_TYPE_DATA_STATUS_PARTIAL, slot5_frag,
 			  sizeof(slot5_frag), 5);
 	deliver_event(2);
-	zassert_equal(response_call_count, 0, "Partial fragments should not report");
+	assert_int_equal(response_call_count, 0);
 
 	/* A COMPLETE for slot 4 no longer matches the buffered slot 5 chain, so
 	 * the slot 5 chain is discarded and slot 4 is reported self-contained.
@@ -627,12 +635,11 @@ ZTEST(pawr_rsp_reassembly, test_two_partial_slots_in_one_event_then_stale_comple
 	deliver_single_response_slot(BT_HCI_LE_ADV_EVT_TYPE_DATA_STATUS_COMPLETE, slot4_complete,
 				     sizeof(slot4_complete), 4);
 
-	zassert_equal(response_call_count, 1, "Slot 4 COMPLETE must report once");
-	zassert_false(last_response.data_null, "Data unexpectedly NULL");
-	zassert_equal(last_response.response_slot, 4, "Wrong response slot");
-	zassert_equal(last_response.data_len, sizeof(slot4_complete), "Wrong data length");
-	zassert_mem_equal(last_response.data, slot4_complete, sizeof(slot4_complete),
-			  "Slot 4 COMPLETE must carry only its own data");
+	assert_int_equal(response_call_count, 1);
+	assert_false(last_response.data_null);
+	assert_int_equal(last_response.response_slot, 4);
+	assert_int_equal(last_response.data_len, sizeof(slot4_complete));
+	assert_memory_equal(last_response.data, slot4_complete, sizeof(slot4_complete));
 }
 
 /*
@@ -641,8 +648,9 @@ ZTEST(pawr_rsp_reassembly, test_two_partial_slots_in_one_event_then_stale_comple
  * PARTIAL+COMPLETE sequence for slot 5 is reported. Each chain must be
  * delivered with the correct slot and its own data only.
  */
-ZTEST(pawr_rsp_reassembly, test_sequential_chains_on_different_slots)
+static void pawr_rsp_reassembly__test_sequential_chains_on_different_slots(void **cm_state)
 {
+	(void)cm_state;
 	uint8_t slot4_frag1[70];
 	uint8_t slot4_frag2[50];
 	uint8_t slot5_frag1[90];
@@ -665,10 +673,10 @@ ZTEST(pawr_rsp_reassembly, test_sequential_chains_on_different_slots)
 	deliver_single_response_slot(BT_HCI_LE_ADV_EVT_TYPE_DATA_STATUS_COMPLETE, slot4_frag2,
 				     sizeof(slot4_frag2), 4);
 
-	zassert_equal(response_call_count, 1, "Slot 4 chain must report once");
-	zassert_equal(last_response.response_slot, 4, "Wrong response slot");
-	zassert_equal(last_response.data_len, sizeof(expected4), "Wrong slot 4 length");
-	zassert_mem_equal(last_response.data, expected4, sizeof(expected4), "Slot 4 mismatch");
+	assert_int_equal(response_call_count, 1);
+	assert_int_equal(last_response.response_slot, 4);
+	assert_int_equal(last_response.data_len, sizeof(expected4));
+	assert_memory_equal(last_response.data, expected4, sizeof(expected4));
 
 	/* Slot 5: a separate PARTIAL + COMPLETE sequence reassembles cleanly. */
 	deliver_single_response_slot(BT_HCI_LE_ADV_EVT_TYPE_DATA_STATUS_PARTIAL, slot5_frag1,
@@ -676,8 +684,44 @@ ZTEST(pawr_rsp_reassembly, test_sequential_chains_on_different_slots)
 	deliver_single_response_slot(BT_HCI_LE_ADV_EVT_TYPE_DATA_STATUS_COMPLETE, slot5_frag2,
 				     sizeof(slot5_frag2), 5);
 
-	zassert_equal(response_call_count, 2, "Slot 5 chain must report once");
-	zassert_equal(last_response.response_slot, 5, "Wrong response slot");
-	zassert_equal(last_response.data_len, sizeof(expected5), "Wrong slot 5 length");
-	zassert_mem_equal(last_response.data, expected5, sizeof(expected5), "Slot 5 mismatch");
+	assert_int_equal(response_call_count, 2);
+	assert_int_equal(last_response.response_slot, 5);
+	assert_int_equal(last_response.data_len, sizeof(expected5));
+	assert_memory_equal(last_response.data, expected5, sizeof(expected5));
 }
+
+int bt_test_pawr_rsp_reassembly_setup(void **state)
+{
+	int environment_result = bt_test_base_setup(state);
+
+	if (environment_result != 0) {
+		return environment_result;
+	}
+
+	*state = pawr_setup();
+	return 0;
+}
+static int bt_test_pawr_rsp_reassembly_before(void **state)
+{
+	(void)state;
+	pawr_before(*state);
+	return 0;
+}
+
+
+static const struct CMUnitTest test_cases_pawr_rsp_reassembly[] = {
+	cmocka_unit_test_setup_teardown(pawr_rsp_reassembly__test_single_complete_report, bt_test_pawr_rsp_reassembly_before, NULL),
+	cmocka_unit_test_setup_teardown(pawr_rsp_reassembly__test_reassemble_partial_then_complete, bt_test_pawr_rsp_reassembly_before, NULL),
+	cmocka_unit_test_setup_teardown(pawr_rsp_reassembly__test_rx_failed_reports_null, bt_test_pawr_rsp_reassembly_before, NULL),
+	cmocka_unit_test_setup_teardown(pawr_rsp_reassembly__test_overflow_drops_until_complete, bt_test_pawr_rsp_reassembly_before, NULL),
+	cmocka_unit_test_setup_teardown(pawr_rsp_reassembly__test_recovers_after_truncation, bt_test_pawr_rsp_reassembly_before, NULL),
+	cmocka_unit_test_setup_teardown(pawr_rsp_reassembly__test_truncation_does_not_leak_to_next_slot, bt_test_pawr_rsp_reassembly_before, NULL),
+	cmocka_unit_test_setup_teardown(pawr_rsp_reassembly__test_rx_failed_clears_truncation, bt_test_pawr_rsp_reassembly_before, NULL),
+	cmocka_unit_test_setup_teardown(pawr_rsp_reassembly__test_multi_response_event_partial_tail_then_complete, bt_test_pawr_rsp_reassembly_before, NULL),
+	cmocka_unit_test_setup_teardown(pawr_rsp_reassembly__test_complete_other_slot_discards_buffered_chain, bt_test_pawr_rsp_reassembly_before, NULL),
+	cmocka_unit_test_setup_teardown(pawr_rsp_reassembly__test_complete_fragment_overflow_drops_chain, bt_test_pawr_rsp_reassembly_before, NULL),
+	cmocka_unit_test_setup_teardown(pawr_rsp_reassembly__test_interleaved_partial_slots_keeps_latest, bt_test_pawr_rsp_reassembly_before, NULL),
+	cmocka_unit_test_setup_teardown(pawr_rsp_reassembly__test_two_partial_slots_in_one_event_then_stale_complete, bt_test_pawr_rsp_reassembly_before, NULL),
+	cmocka_unit_test_setup_teardown(pawr_rsp_reassembly__test_sequential_chains_on_different_slots, bt_test_pawr_rsp_reassembly_before, NULL),
+};
+BT_TEST_SUITE(pawr_rsp_reassembly, test_cases_pawr_rsp_reassembly, bt_test_pawr_rsp_reassembly_setup, NULL);

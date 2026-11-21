@@ -1,3 +1,5 @@
+#include "support/test_support.h"
+
 /* main.c - Application main entry point */
 
 /*
@@ -10,37 +12,35 @@
 #include <stdint.h>
 #include <sys/types.h>
 
-#include <zephyr/bluetooth/audio/ccid.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/gatt.h>
-#include <zephyr/bluetooth/uuid.h>
-#include <zephyr/fff.h>
-#include <zephyr/sys/util.h>
-#include <zephyr/sys/util_macro.h>
-
-#include <zephyr/ztest_test.h>
-#include <zephyr/ztest_assert.h>
-
+#include <embt/bluetooth/audio/ccid.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/gatt.h>
+#include <embt/bluetooth/uuid.h>
+#include <fff.h>
+#include <embt/base/util.h>
+#include <embt/base/util_macro.h>
 DEFINE_FFF_GLOBALS;
 
-ZTEST_SUITE(audio_ccid_test_suite, NULL, NULL, NULL, NULL, NULL);
+
 
 #define MAX_CCID_CNT 256
 
-static ZTEST(audio_ccid_test_suite, test_bt_ccid_alloc_value)
+static void audio_ccid_test_suite__test_bt_ccid_alloc_value(void **cm_state)
 {
+	(void)cm_state;
 	const int ret = bt_ccid_alloc_value();
 
-	zassert_true(ret >= 0 && ret <= UINT8_MAX, "Unexpected return value %d", ret);
+	assert_true(ret >= 0 && ret <= UINT8_MAX);
 }
 
-static ZTEST(audio_ccid_test_suite, test_bt_ccid_alloc_value_more_than_max)
+static void audio_ccid_test_suite__test_bt_ccid_alloc_value_more_than_max(void **cm_state)
 {
+	(void)cm_state;
 	/* Verify that we can allocate more than max CCID if they are not registered */
 	for (uint16_t i = 0U; i < MAX_CCID_CNT * 2; i++) {
 		const int ret = bt_ccid_alloc_value();
 
-		zassert_true(ret >= 0 && ret <= UINT8_MAX, "Unexpected return value %d", ret);
+		assert_true(ret >= 0 && ret <= UINT8_MAX);
 	}
 }
 
@@ -50,7 +50,7 @@ static ssize_t read_ccid(struct bt_conn *conn, const struct bt_gatt_attr *attr, 
 	const unsigned int ccid = POINTER_TO_UINT(attr->user_data);
 	const uint8_t ccid_u8 = (uint8_t)ccid;
 
-	zassert_true(ccid <= BT_CCID_MAX);
+	assert_true(ccid <= BT_CCID_MAX);
 
 	return bt_gatt_attr_read(conn, attr, buf, len, offset, &ccid_u8, sizeof(ccid_u8));
 }
@@ -65,32 +65,46 @@ static struct bt_gatt_attr test_attrs[] = {
 	LISTIFY(MAX_CCID_CNT, CCID_DEFINE, (,)),
 };
 
-static ZTEST(audio_ccid_test_suite, test_bt_ccid_alloc_value_all_allocated)
+static void audio_ccid_test_suite__test_bt_ccid_alloc_value_all_allocated(void **cm_state)
 {
+	(void)cm_state;
 	struct bt_gatt_service test_svc = BT_GATT_SERVICE(test_attrs);
 	int ret;
 
-	zassert_ok(bt_gatt_service_register(&test_svc));
+	assert_int_equal(bt_gatt_service_register(&test_svc), 0);
 
 	/* Verify that CCID allocation fails if we have 255 characteristics with it */
 	ret = bt_ccid_alloc_value();
 
-	zassert_ok(bt_gatt_service_unregister(&test_svc));
+	assert_int_equal(bt_gatt_service_unregister(&test_svc), 0);
 
-	zassert_equal(ret, -ENOMEM, "Unexpected return value %d", ret);
+	assert_int_equal(ret, -ENOMEM);
 }
 
-static ZTEST(audio_ccid_test_suite, test_bt_ccid_find_attr)
+static void audio_ccid_test_suite__test_bt_ccid_find_attr(void **cm_state)
 {
+	(void)cm_state;
 	struct bt_gatt_service test_svc = BT_GATT_SERVICE(test_attrs);
 
 	/* Service not registered, shall fail */
-	zassert_is_null(bt_ccid_find_attr(0));
+	assert_null(bt_ccid_find_attr(0));
 
-	zassert_ok(bt_gatt_service_register(&test_svc));
+	assert_int_equal(bt_gatt_service_register(&test_svc), 0);
 
 	/* Service registered, shall not fail */
-	zassert_not_null(bt_ccid_find_attr(0));
+	assert_non_null(bt_ccid_find_attr(0));
 
-	zassert_ok(bt_gatt_service_unregister(&test_svc));
+	assert_int_equal(bt_gatt_service_unregister(&test_svc), 0);
 }
+
+
+
+
+
+static const struct CMUnitTest test_cases_audio_ccid_test_suite[] = {
+	cmocka_unit_test(audio_ccid_test_suite__test_bt_ccid_alloc_value),
+	cmocka_unit_test(audio_ccid_test_suite__test_bt_ccid_alloc_value_more_than_max),
+	cmocka_unit_test(audio_ccid_test_suite__test_bt_ccid_alloc_value_all_allocated),
+	cmocka_unit_test(audio_ccid_test_suite__test_bt_ccid_find_attr),
+};
+BT_TEST_SUITE(audio_ccid_test_suite, test_cases_audio_ccid_test_suite, bt_test_host_setup, NULL);

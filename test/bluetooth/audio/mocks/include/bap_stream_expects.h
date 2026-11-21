@@ -1,3 +1,4 @@
+#include "support/test_support.h"
 /*
  * Copyright (c) 2023 Codecoup
  *
@@ -10,11 +11,10 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include <zephyr/bluetooth/audio/bap.h>
-#include <zephyr/bluetooth/iso.h>
-#include <zephyr/net_buf.h>
-#include <zephyr/toolchain.h>
-#include <zephyr/ztest_assert.h>
+#include <embt/bluetooth/audio/bap.h>
+#include <embt/bluetooth/iso.h>
+#include <embt/net_buf.h>
+#include <embt/compiler.h>
 
 #include "bap_stream.h"
 #include "expects_util.h"
@@ -30,15 +30,12 @@ static inline void expect_bt_bap_stream_ops_codec_configured_called(
 		expected_count, mock_bap_stream_codec_configured_cb_fake.call_count);
 
 	for (unsigned int i = 0; i < mock_bap_stream_codec_configured_cb_fake.call_count; i++) {
-		zexpect_equal_ptr(streams[i],
-			mock_bap_stream_codec_configured_cb_fake.arg0_history[i],
-			"'%s()' was called with incorrect 'stream[%i]' value",
-			func_name, i);
+		assert_ptr_equal(streams[i], mock_bap_stream_codec_configured_cb_fake.arg0_history[i]);
 	}
 
 	if (pref) {
 		/* TODO */
-		zassert_unreachable("Not implemented");
+		fail_msg("Not implemented");
 	}
 }
 
@@ -52,9 +49,7 @@ static inline void expect_bt_bap_stream_ops_qos_configured_called(
 		expected_count, mock_bap_stream_qos_configured_cb_fake.call_count);
 
 	for (unsigned int i = 0; i < mock_bap_stream_qos_configured_cb_fake.call_count; i++) {
-		zexpect_equal_ptr(streams[i],
-			mock_bap_stream_qos_configured_cb_fake.arg0_history[i],
-			"'%s()' was called with incorrect '%s[%i]'", func_name, "stream", i);
+		assert_ptr_equal(streams[i], mock_bap_stream_qos_configured_cb_fake.arg0_history[i]);
 	}
 }
 
@@ -67,9 +62,7 @@ static inline void expect_bt_bap_stream_ops_enabled_called(
 	zexpect_call_count(func_name, expected_count, mock_bap_stream_enabled_cb_fake.call_count);
 
 	for (unsigned int i = 0; i < mock_bap_stream_enabled_cb_fake.call_count; i++) {
-		zexpect_equal_ptr(streams[i],
-			mock_bap_stream_enabled_cb_fake.arg0_history[i],
-			"'%s()' was called with incorrect '%s[%i]'", func_name, "stream", i);
+		assert_ptr_equal(streams[i], mock_bap_stream_enabled_cb_fake.arg0_history[i]);
 	}
 }
 
@@ -83,9 +76,7 @@ static inline void expect_bt_bap_stream_ops_metadata_updated_called(
 		expected_count, mock_bap_stream_metadata_updated_cb_fake.call_count);
 
 	for (unsigned int i = 0; i < mock_bap_stream_metadata_updated_cb_fake.call_count; i++) {
-		zexpect_equal_ptr(streams[i],
-			mock_bap_stream_metadata_updated_cb_fake.arg0_history[i],
-			"'%s()' was called with incorrect '%s[%i]'", func_name, "stream", i);
+		assert_ptr_equal(streams[i], mock_bap_stream_metadata_updated_cb_fake.arg0_history[i]);
 	}
 }
 
@@ -98,9 +89,7 @@ static inline void expect_bt_bap_stream_ops_disabled_called(
 	zexpect_call_count(func_name, expected_count, mock_bap_stream_disabled_cb_fake.call_count);
 
 	for (unsigned int i = 0; i < mock_bap_stream_disabled_cb_fake.call_count; i++) {
-		zexpect_equal_ptr(streams[i],
-			mock_bap_stream_disabled_cb_fake.arg0_history[i],
-			"'%s()' was called with incorrect '%s[%i]'", func_name, "stream", i);
+		assert_ptr_equal(streams[i], mock_bap_stream_disabled_cb_fake.arg0_history[i]);
 	}
 }
 
@@ -122,7 +111,7 @@ static inline void expect_bt_bap_stream_ops_released_called(
 			}
 		}
 
-		zexpect_true(found, "'%s()' not called with %p stream", func_name, streams[i]);
+		assert_true(found);
 	}
 }
 
@@ -135,9 +124,7 @@ static inline void expect_bt_bap_stream_ops_started_called(
 	zexpect_call_count(func_name, expected_count, mock_bap_stream_started_cb_fake.call_count);
 
 	for (unsigned int i = 0; i < mock_bap_stream_started_cb_fake.call_count; i++) {
-		zexpect_equal_ptr(streams[i],
-			mock_bap_stream_started_cb_fake.arg0_history[i],
-			"'%s()' was called with incorrect '%s[%i]'", func_name, "stream", i);
+		assert_ptr_equal(streams[i], mock_bap_stream_started_cb_fake.arg0_history[i]);
 	}
 }
 
@@ -151,12 +138,8 @@ static inline void expect_bt_bap_stream_ops_stopped_called(
 	zexpect_call_count(func_name, expected_count, mock_bap_stream_stopped_cb_fake.call_count);
 
 	for (unsigned int i = 0; i < mock_bap_stream_stopped_cb_fake.call_count; i++) {
-		zexpect_equal_ptr(streams[i],
-			mock_bap_stream_stopped_cb_fake.arg0_history[i],
-			"'%s()' was called with incorrect '%s[%i]' value", func_name, "stream", i);
-		zexpect_equal(reasons[i],
-			mock_bap_stream_stopped_cb_fake.arg1_history[i],
-			"'%s()' was called with incorrect '%s[%i]' value", func_name, "reason", i);
+		assert_ptr_equal(streams[i], mock_bap_stream_stopped_cb_fake.arg0_history[i]);
+		assert_int_equal(reasons[i], mock_bap_stream_stopped_cb_fake.arg1_history[i]);
 	}
 }
 
@@ -171,9 +154,7 @@ expect_bt_bap_stream_ops_connected_called(
 		expected_count, mock_bap_stream_connected_cb_fake.call_count);
 
 	for (unsigned int i = 0; i < mock_bap_stream_connected_cb_fake.call_count; i++) {
-		zexpect_equal_ptr(streams[i],
-			mock_bap_stream_connected_cb_fake.arg0_history[i],
-			"'%s()' was called with incorrect '%s[%i]'", func_name, "stream", i);
+		assert_ptr_equal(streams[i], mock_bap_stream_connected_cb_fake.arg0_history[i]);
 	}
 }
 
@@ -188,9 +169,7 @@ expect_bt_bap_stream_ops_disconnected_called(
 		expected_count, mock_bap_stream_disconnected_cb_fake.call_count);
 
 	for (unsigned int i = 0; i < mock_bap_stream_disconnected_cb_fake.call_count; i++) {
-		zexpect_equal_ptr(streams[i],
-			mock_bap_stream_disconnected_cb_fake.arg0_history[i],
-			"'%s()' was called with incorrect '%s[%i]'", func_name, "stream", i);
+		assert_ptr_equal(streams[i], mock_bap_stream_disconnected_cb_fake.arg0_history[i]);
 	}
 }
 
@@ -209,9 +188,7 @@ expect_bt_bap_stream_ops_recv_called(
 	zexpect_call_count(func_name, expected_count, mock_bap_stream_recv_cb_fake.call_count);
 
 	for (unsigned int i = 0; i < mock_bap_stream_recv_cb_fake.call_count; i++) {
-		zexpect_equal_ptr(streams[i],
-			mock_bap_stream_recv_cb_fake.arg0_history[i],
-			"'%s()' was called with incorrect '%s[%i]'", func_name, "stream", i);
+		assert_ptr_equal(streams[i], mock_bap_stream_recv_cb_fake.arg0_history[i]);
 	}
 
 	/* TODO: validate info && buf */
@@ -226,9 +203,7 @@ static inline void expect_bt_bap_stream_ops_sent_called(
 	zexpect_call_count(func_name, expected_count, mock_bap_stream_sent_cb_fake.call_count);
 
 	for (unsigned int i = 0; i < mock_bap_stream_sent_cb_fake.call_count; i++) {
-		zexpect_equal_ptr(streams[i],
-			mock_bap_stream_sent_cb_fake.arg0_history[i],
-			"'%s()' was called with incorrect '%s[%i]'", func_name, "stream", i);
+		assert_ptr_equal(streams[i], mock_bap_stream_sent_cb_fake.arg0_history[i]);
 	}
 }
 

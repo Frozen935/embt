@@ -1,3 +1,6 @@
+#include "support/test_support.h"
+static const struct bt_hci_transport test_driver;
+#include "host/hci_core.h"
 /* main.c - HCI prop event test */
 
 /*
@@ -6,19 +9,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <zephyr/kernel.h>
+
 
 #include <errno.h>
-#include <zephyr/tc_util.h>
-#include <zephyr/ztest.h>
+#include <embt/bluetooth/hci.h>
+#include <embt/bluetooth/buf.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/drivers/bluetooth.h>
+#include <embt/base/byteorder.h>
 
-#include <zephyr/bluetooth/hci.h>
-#include <zephyr/bluetooth/buf.h>
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/drivers/bluetooth.h>
-#include <zephyr/sys/byteorder.h>
-
-#define DT_DRV_COMPAT zephyr_bt_hci_test
 
 /* HCI Proprietary vendor event */
 const uint8_t hci_prop_evt_prefix[2] = { 0xAB, 0xBA };
@@ -55,7 +54,7 @@ static void *cmd_complete(struct net_buf **buf, uint8_t plen, uint16_t opcode)
 {
 	struct bt_hci_evt_cmd_complete *cc;
 
-	*buf = bt_buf_get_evt(BT_HCI_EVT_CMD_COMPLETE, false, K_FOREVER);
+	*buf = bt_buf_get_evt(BT_HCI_EVT_CMD_COMPLETE, false, BT_FOREVER);
 	evt_create(*buf, BT_HCI_EVT_CMD_COMPLETE, sizeof(*cc) + plen);
 	cc = net_buf_add(*buf, sizeof(*cc));
 	cc->ncmd = 1U;
@@ -86,7 +85,7 @@ static int cmd_handle_helper(uint16_t opcode, struct net_buf *cmd,
 }
 
 /* Lookup the command opcode and invoke handler. */
-static int cmd_handle(const struct device *dev,
+static int cmd_handle(const struct bt_hci_transport *dev,
 		      struct net_buf *cmd,
 		      const struct cmd_handler *handlers,
 		      size_t num_handlers)
@@ -210,90 +209,91 @@ static const struct cmd_handler cmds[] = {
 };
 
 /* HCI driver open. */
-static int driver_open(const struct device *dev)
+static int driver_open(const struct bt_hci_transport *dev)
 {
 	ARG_UNUSED(dev);
 	return 0;
 }
 
 /*  HCI driver send.  */
-static int driver_send(const struct device *dev, struct net_buf *buf)
+static int driver_send(const struct bt_hci_transport *dev, struct net_buf *buf)
 {
 	uint8_t type = net_buf_pull_u8(buf);
 
-	zassert_true(type == BT_HCI_H4_CMD, "Expected command buffer, got %u", type);
+	assert_true(type == BT_HCI_H4_CMD);
 
-	zassert_true(cmd_handle(dev, buf, cmds, ARRAY_SIZE(cmds)) == 0,
-		     "Unknown HCI command");
+	assert_true(cmd_handle(dev, buf, cmds, ARRAY_SIZE(cmds)) == 0);
 
 	net_buf_unref(buf);
 
 	return 0;
 }
 
-static DEVICE_API(bt_hci, driver_api) = {
+static const struct bt_hci_driver_api driver_api = {
 	.open = driver_open,
 	.send = driver_send,
 };
 
-#define TEST_DEVICE_INIT(inst) \
-	static struct bt_hci_driver_data driver_data_##inst = { \
-	}; \
-	static const struct bt_hci_driver_config driver_config_##inst = \
-						BT_DT_HCI_DRIVER_CONFIG_INST_GET(inst); \
-	DEVICE_DT_INST_DEFINE(inst, NULL, NULL, &driver_data_##inst, &driver_config_##inst, \
-			      POST_KERNEL, CONFIG_KERNEL_INIT_PRIORITY_DEVICE, &driver_api)
+static struct bt_hci_driver_data test_driver_data;
+static const struct bt_hci_transport test_driver = {
+ .name = "upstream-test", .bus = 0, .quirks = BT_HCI_QUIRK_NO_RESET,
+ .api = &driver_api, .data = &test_driver_data,
+};
+static void test_transport_init(void)
+{
+ bt_test_require(bt_stack_init());
+ bt_dev.hci = &test_driver;
+}
 
-DT_INST_FOREACH_STATUS_OKAY(TEST_DEVICE_INIT)
 
 struct bt_recv_job_data {
-	struct k_work work;  /* Work item */
-	struct k_sem *sync;  /* Semaphore to synchronize with */
+	struct bt_work work;  /* Work item */
+	os_sem_t *sync;  /* Semaphore to synchronize with */
 	struct net_buf *buf; /* Net buffer to be passed to bt_recv() */
 } job_data[CONFIG_BT_BUF_EVT_RX_COUNT];
 
 #define job(buf) (&job_data[net_buf_id(buf)])
 
 /* Work item handler for bt_recv() jobs. */
-static void bt_recv_job_cb(struct k_work *item)
+static void bt_recv_job_cb(struct bt_work *item)
 {
-	const struct device *dev = DEVICE_DT_GET(DT_DRV_INST(0));
+	const struct bt_hci_transport *dev = &test_driver;
 	struct bt_recv_job_data *data =
 		CONTAINER_OF(item, struct bt_recv_job_data, work);
-	struct k_sem *sync = job(data->buf)->sync;
+	os_sem_t *sync = job(data->buf)->sync;
 
 	/* Send net buffer to host */
 	bt_hci_recv(dev, data->buf);
 	data->buf = NULL;
 
 	/* Wake up bt_recv_job_submit */
-	k_sem_give(sync);
+	osi_sem_give(sync);
 }
 
 /* Prepare a job to call bt_recv() to be submitted to the system workqueue. */
 static void bt_recv_job_submit(struct net_buf *buf)
 {
-	struct k_sem sync_sem;
+	os_sem_t sync_sem;
 
 	/* Store the net buffer to be passed to bt_recv */
 	job(buf)->buf = net_buf_ref(buf);
 
 	/* Initialize job work item/semaphore */
-	k_work_init(&job(buf)->work, bt_recv_job_cb);
-	k_sem_init(&sync_sem, 0, 1);
+	bt_work_init(&job(buf)->work, bt_recv_job_cb);
+	osi_sem_init(&sync_sem, 0, 1);
 	job(buf)->sync = &sync_sem;
 
 	/* Submit the work item */
-	k_work_submit(&job(buf)->work);
+	bt_work_submit(&job(buf)->work);
 
 	/* Wait for bt_recv_job_cb to be done */
-	k_sem_take(&sync_sem, K_FOREVER);
+	osi_sem_take(&sync_sem, BT_FOREVER);
 
 	net_buf_unref(buf);
 }
 
 /* Semaphore to test if the prop callback was called. */
-static K_SEM_DEFINE(prop_cb_sem, 0, 1);
+static os_sem_t prop_cb_sem;
 
 /* Used to verify prop event data. */
 static uint8_t *prop_cb_data;
@@ -316,15 +316,15 @@ static bool prop_cb(struct net_buf_simple *buf)
 		uint8_t *data = &per->data[0];
 
 		/* Allocate memory for storing the data */
-		prop_cb_data = k_malloc(data_len);
-		zassert_not_null(prop_cb_data, "Cannot allocate memory");
+		prop_cb_data = malloc(data_len);
+		assert_non_null(prop_cb_data);
 
 		/* Copy data so it can be verified later */
 		memcpy(prop_cb_data, data, data_len);
 		prop_cb_data_len = data_len;
 
 		/* Give control back to test */
-		k_sem_give(&prop_cb_sem);
+		osi_sem_give(&prop_cb_sem);
 
 		return true;
 	}
@@ -351,7 +351,7 @@ static void send_prop_report(uint8_t *data, uint8_t data_len)
 	struct net_buf *buf;
 	struct hci_evt_prop_report *per;
 
-	buf = bt_buf_get_rx(BT_BUF_EVT, K_FOREVER);
+	buf = bt_buf_get_rx(BT_BUF_EVT, BT_FOREVER);
 	per = prop_evt(buf, sizeof(*per) + data_len);
 	per->data_len = data_len;
 	memcpy(&per->data[0], data, data_len);
@@ -360,14 +360,14 @@ static void send_prop_report(uint8_t *data, uint8_t data_len)
 	bt_recv_job_submit(buf);
 }
 
-ZTEST_SUITE(test_hci_prop_evt, NULL, NULL, NULL, NULL, NULL);
+
 
 /* Test. */
-ZTEST(test_hci_prop_evt, test_hci_prop_evt_entry)
+static void test_hci_prop_evt__test_hci_prop_evt_entry(void **cm_state)
 {
+	(void)cm_state;
 	/* Go! Wait until Bluetooth initialization is done  */
-	zassert_true((bt_enable(NULL) == 0),
-		     "bt_enable failed");
+	assert_true((bt_enable(NULL) == 0));
 
 	/* Register the prop callback */
 	bt_hci_register_vnd_evt_cb(prop_cb);
@@ -380,17 +380,40 @@ ZTEST(test_hci_prop_evt, test_hci_prop_evt_entry)
 	send_prop_report(&data[0], data_len);
 
 	/* Wait for the prop callback to be called */
-	zassert_true(k_sem_take(&prop_cb_sem, K_MSEC(100)) == 0,
-		     "prop_cb was not called within timeout");
+	assert_true(osi_sem_take(&prop_cb_sem, BT_MSEC(100)) == 0);
 
 	/* Verify the data length */
-	zassert_true(prop_cb_data_len == data_len,
-		     "prop_cb_data_len invalid");
+	assert_true(prop_cb_data_len == data_len);
 
 	/* Verify the data itself */
-	zassert_true(memcmp(prop_cb_data, data, data_len) == 0,
-		     "prop_cb_data invalid");
+	assert_true(memcmp(prop_cb_data, data, data_len) == 0);
 
 	/* Free the data memory */
-	k_free(prop_cb_data);
+	free(prop_cb_data);
 }
+
+static void storage_init_90177f7537(void)
+{
+	bt_test_require(osi_sem_init(&prop_cb_sem, 0, 1));
+}
+
+int bt_test_test_hci_prop_evt_setup(void **state)
+{
+	int environment_result = bt_test_host_setup(state);
+
+	if (environment_result != 0) {
+		return environment_result;
+	}
+
+	test_transport_init();
+	storage_init_90177f7537();
+	*state = NULL;
+	return 0;
+}
+
+
+
+static const struct CMUnitTest test_cases_test_hci_prop_evt[] = {
+	cmocka_unit_test(test_hci_prop_evt__test_hci_prop_evt_entry),
+};
+BT_TEST_SUITE(test_hci_prop_evt, test_cases_test_hci_prop_evt, bt_test_test_hci_prop_evt_setup, NULL);

@@ -1,3 +1,15 @@
+#include "support/test_support.h"
+#include "test_environment.h"
+void mock_init_rule_before_744017(const struct bt_test_case_info *, void *);
+void mock_destroy_rule_after_744017(const struct bt_test_case_info *, void *);
+void mock_init_rule_before_127f12(const struct bt_test_case_info *, void *);
+void mock_destroy_rule_after_127f12(const struct bt_test_case_info *, void *);
+
+void mock_init_rule_before_127f12(const struct bt_test_case_info *, void *);
+void mock_destroy_rule_after_127f12(const struct bt_test_case_info *, void *);
+void mock_init_rule_before_127f12(const struct bt_test_case_info *, void *);
+void mock_destroy_rule_after_127f12(const struct bt_test_case_info *, void *);
+
 /* main.c - Application main entry point */
 
 /*
@@ -12,23 +24,20 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <zephyr/autoconf.h>
-#include <zephyr/bluetooth/assigned_numbers.h>
-#include <zephyr/bluetooth/audio/audio.h>
-#include <zephyr/bluetooth/audio/bap.h>
-#include <zephyr/bluetooth/audio/bap_lc3_preset.h>
-#include <zephyr/bluetooth/audio/cap.h>
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/byteorder.h>
-#include <zephyr/bluetooth/hci_types.h>
-#include <zephyr/bluetooth/iso.h>
-#include <zephyr/fff.h>
-#include <zephyr/sys/byteorder.h>
-#include <zephyr/sys/util.h>
-#include <zephyr/toolchain.h>
-#include <zephyr/ztest_assert.h>
-#include <zephyr/ztest_test.h>
-
+#include <embt/autoconf.h>
+#include <embt/bluetooth/assigned_numbers.h>
+#include <embt/bluetooth/audio/audio.h>
+#include <embt/bluetooth/audio/bap.h>
+#include <embt/bluetooth/audio/bap_lc3_preset.h>
+#include <embt/bluetooth/audio/cap.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/byteorder.h>
+#include <embt/bluetooth/hci_types.h>
+#include <embt/bluetooth/iso.h>
+#include <fff.h>
+#include <embt/base/byteorder.h>
+#include <embt/base/util.h>
+#include <embt/compiler.h>
 #include "audio/bap_endpoint.h"
 #include "audio/bap_iso.h"
 #include "bluetooth.h"
@@ -38,17 +47,17 @@
 #include "expects_util.h"
 #include "test_common.h"
 
-static void mock_init_rule_before(const struct ztest_unit_test *test, void *fixture)
+void mock_init_rule_before_127f12(const struct bt_test_case_info *test, void *fixture)
 {
 	test_mocks_init();
 }
 
-static void mock_destroy_rule_after(const struct ztest_unit_test *test, void *fixture)
+void mock_destroy_rule_after_127f12(const struct bt_test_case_info *test, void *fixture)
 {
 	test_mocks_cleanup();
 }
 
-ZTEST_RULE(mock_rule, mock_init_rule_before, mock_destroy_rule_after);
+
 
 /* Either BT_AUDIO_DIR_SINK or BT_AUDIO_DIR_SOURCE */
 #define INDEX_TO_DIR(_idx)    (((_idx) & 1U) + 1U)
@@ -82,7 +91,7 @@ static void *cap_handover_unicast_to_broadcast_test_suite_setup(void)
 	struct cap_handover_unicast_to_broadcast_test_suite_fixture *fixture;
 
 	fixture = malloc(sizeof(*fixture));
-	zassert_not_null(fixture);
+	assert_non_null(fixture);
 
 	return fixture;
 }
@@ -101,10 +110,10 @@ static void cap_handover_unicast_to_broadcast_test_suite_before(void *f)
 	memset(fixture, 0, sizeof(*fixture));
 
 	err = bt_cap_initiator_register_cb(&mock_cap_initiator_cb);
-	zassert_equal(0, err, "Unexpected return value %d", err);
+	assert_int_equal(0, err);
 
 	err = bt_cap_handover_register_cb(&mock_cap_handover_cb);
-	zassert_equal(0, err, "Unexpected return value %d", err);
+	assert_int_equal(0, err);
 
 	/* Create unicast group */
 	ARRAY_FOR_EACH(fixture->unicast_presets, i) {
@@ -145,7 +154,7 @@ static void cap_handover_unicast_to_broadcast_test_suite_before(void *f)
 	group_param.params = unicast_group_stream_pair_params;
 
 	err = bt_cap_unicast_group_create(&group_param, &fixture->unicast_group);
-	zassert_equal(err, 0, "Unexpected return value %d", err);
+	assert_int_equal(err, 0);
 
 	/* Start unicast group */
 	fixture->unicast_audio_start_param.type = BT_CAP_SET_TYPE_AD_HOC;
@@ -187,12 +196,12 @@ static void cap_handover_unicast_to_broadcast_test_suite_before(void *f)
 	}
 
 	err = bt_cap_initiator_unicast_audio_start(&fixture->unicast_audio_start_param);
-	zassert_equal(err, 0, "Unexpected return value %d", err);
+	assert_int_equal(err, 0);
 
 	zexpect_call_count("bt_cap_initiator_cb.unicast_start_complete_cb", 1,
 			   mock_unicast_start_complete_cb_fake.call_count);
-	zassert_equal(0, mock_unicast_start_complete_cb_fake.arg0_history[0]);
-	zassert_equal_ptr(NULL, mock_unicast_start_complete_cb_fake.arg1_history[0]);
+	assert_int_equal(0, mock_unicast_start_complete_cb_fake.arg0_history[0]);
+	assert_ptr_equal(NULL, mock_unicast_start_complete_cb_fake.arg1_history[0]);
 
 	/* Prepare default handover parameters including broadcast source create parameters */
 	fixture->ext_adv.ext_adv_state = BT_LE_EXT_ADV_STATE_ENABLED;
@@ -231,10 +240,10 @@ static void cap_handover_unicast_to_broadcast_test_suite_after(void *f)
 	int err;
 
 	err = bt_cap_initiator_unregister_cb(&mock_cap_initiator_cb);
-	zassert_true(err == 0 || err == -EINVAL, "Unexpected error: %d", err);
+	assert_true(err == 0 || err == -EINVAL);
 
 	err = bt_cap_handover_unregister_cb(&mock_cap_handover_cb);
-	zassert_true(err == 0 || err == -EINVAL, "Unexpected error: %d", err);
+	assert_true(err == 0 || err == -EINVAL);
 
 	ARRAY_FOR_EACH_PTR(fixture->conns, conn) {
 		mock_bt_conn_disconnected(conn, BT_HCI_ERR_REMOTE_USER_TERM_CONN);
@@ -243,7 +252,7 @@ static void cap_handover_unicast_to_broadcast_test_suite_after(void *f)
 	/* In the case of a test failing, we cancel the procedure so that subsequent won't fail */
 	err = bt_cap_initiator_unicast_audio_cancel();
 	/* May fail if no CAP procedure is in progress */
-	zassert_true(err == 0 || err == -EALREADY, "Unexpected error: %d", err);
+	assert_true(err == 0 || err == -EALREADY);
 
 	/* In the case of a test failing, we delete the group so that subsequent tests won't fail */
 	if (fixture->unicast_group != NULL) {
@@ -261,10 +270,10 @@ static void cap_handover_unicast_to_broadcast_test_suite_after(void *f)
 		}
 
 		err = bt_cap_initiator_unicast_audio_stop(&param);
-		zassert_true(err == 0 || err == -EALREADY, "Unexpected error: %d", err);
+		assert_true(err == 0 || err == -EALREADY);
 
 		err = bt_cap_unicast_group_delete(fixture->unicast_group);
-		zassert_true(err == 0, "Unexpected error: %d", err);
+		assert_true(err == 0);
 		fixture->unicast_group = NULL;
 	}
 
@@ -274,10 +283,9 @@ static void cap_handover_unicast_to_broadcast_test_suite_after(void *f)
 			mock_unicast_to_broadcast_complete_cb_fake.arg3_history[0];
 
 		err = bt_cap_initiator_broadcast_audio_stop(broadcast_source);
-		zassert_true(err == 0 || err == -EALREADY || err == -EBADMSG,
-			     "Unexpected error: %d", err);
+		assert_true(err == 0 || err == -EALREADY || err == -EBADMSG);
 		err = bt_cap_initiator_broadcast_audio_delete(broadcast_source);
-		zassert_true(err == 0, "Unexpected error: %d", err);
+		assert_true(err == 0);
 	}
 }
 
@@ -286,122 +294,119 @@ static void cap_handover_unicast_to_broadcast_test_suite_teardown(void *f)
 	free(f);
 }
 
-ZTEST_SUITE(cap_handover_unicast_to_broadcast_test_suite, NULL,
-	    cap_handover_unicast_to_broadcast_test_suite_setup,
-	    cap_handover_unicast_to_broadcast_test_suite_before,
-	    cap_handover_unicast_to_broadcast_test_suite_after,
-	    cap_handover_unicast_to_broadcast_test_suite_teardown);
+
 
 static void validate_handover_callback(void)
 {
 	zexpect_call_count("bt_cap_initiator_cb.unicast_to_broadcast_complete_cb", 1,
 			   mock_unicast_to_broadcast_complete_cb_fake.call_count);
-	zassert_equal(0, mock_unicast_to_broadcast_complete_cb_fake.arg0_history[0]);
-	zassert_equal_ptr(NULL, mock_unicast_to_broadcast_complete_cb_fake.arg1_history[0]);
-	zassert_equal_ptr(NULL, mock_unicast_to_broadcast_complete_cb_fake.arg2_history[0]);
-	zassert_not_equal(NULL, mock_unicast_to_broadcast_complete_cb_fake.arg3_history[0]);
+	assert_int_equal(0, mock_unicast_to_broadcast_complete_cb_fake.arg0_history[0]);
+	assert_ptr_equal(NULL, mock_unicast_to_broadcast_complete_cb_fake.arg1_history[0]);
+	assert_ptr_equal(NULL, mock_unicast_to_broadcast_complete_cb_fake.arg2_history[0]);
+	assert_int_not_equal(NULL, mock_unicast_to_broadcast_complete_cb_fake.arg3_history[0]);
 }
 
-static ZTEST_F(cap_handover_unicast_to_broadcast_test_suite, test_handover_unicast_to_broadcast)
+static void cap_handover_unicast_to_broadcast_test_suite__test_handover_unicast_to_broadcast(void **cm_state)
 {
+	struct cap_handover_unicast_to_broadcast_test_suite_fixture *fixture = *cm_state;
 	int err = 0;
 
 	err = bt_cap_handover_unicast_to_broadcast(&fixture->unicast_to_broadcast_param);
-	zassert_equal(err, 0, "Unexpected return value %d", err);
+	assert_int_equal(err, 0);
 	validate_handover_callback();
 	fixture->unicast_group = NULL;
 }
 
-static ZTEST_F(cap_handover_unicast_to_broadcast_test_suite,
-	       test_handover_unicast_to_broadcast_inactive_adv)
+static void cap_handover_unicast_to_broadcast_test_suite__test_handover_unicast_to_broadcast_inactive_adv(void **cm_state)
 {
+	struct cap_handover_unicast_to_broadcast_test_suite_fixture *fixture = *cm_state;
 	int err = 0;
 
 	fixture->unicast_to_broadcast_param.ext_adv->ext_adv_state = BT_LE_EXT_ADV_STATE_DISABLED;
 
 	err = bt_cap_handover_unicast_to_broadcast(&fixture->unicast_to_broadcast_param);
-	zassert_equal(err, 0, "Unexpected return value %d", err);
+	assert_int_equal(err, 0);
 	fixture->unicast_group = NULL;
 }
 
-static ZTEST_F(cap_handover_unicast_to_broadcast_test_suite,
-	       test_handover_unicast_to_broadcast_inval_null_param)
+static void cap_handover_unicast_to_broadcast_test_suite__test_handover_unicast_to_broadcast_inval_null_param(void **cm_state)
 {
+	struct cap_handover_unicast_to_broadcast_test_suite_fixture *fixture = *cm_state;
 	int err = 0;
 
 	err = bt_cap_handover_unicast_to_broadcast(NULL);
-	zassert_equal(err, -EINVAL, "Unexpected return value %d", err);
+	assert_int_equal(err, -EINVAL);
 }
 
-static ZTEST_F(cap_handover_unicast_to_broadcast_test_suite,
-	       test_handover_unicast_to_broadcast_inval_null_unicast_group)
+static void cap_handover_unicast_to_broadcast_test_suite__test_handover_unicast_to_broadcast_inval_null_unicast_group(void **cm_state)
 {
+	struct cap_handover_unicast_to_broadcast_test_suite_fixture *fixture = *cm_state;
 	int err = 0;
 
 	fixture->unicast_to_broadcast_param.unicast_group = NULL;
 
 	err = bt_cap_handover_unicast_to_broadcast(&fixture->unicast_to_broadcast_param);
-	zassert_equal(err, -EINVAL, "Unexpected return value %d", err);
+	assert_int_equal(err, -EINVAL);
 }
 
-static ZTEST_F(cap_handover_unicast_to_broadcast_test_suite,
-	       test_handover_unicast_to_broadcast_inval_null_ext_adv)
+static void cap_handover_unicast_to_broadcast_test_suite__test_handover_unicast_to_broadcast_inval_null_ext_adv(void **cm_state)
 {
+	struct cap_handover_unicast_to_broadcast_test_suite_fixture *fixture = *cm_state;
 	int err = 0;
 
 	fixture->unicast_to_broadcast_param.ext_adv = NULL;
 
 	err = bt_cap_handover_unicast_to_broadcast(&fixture->unicast_to_broadcast_param);
-	zassert_equal(err, -EINVAL, "Unexpected return value %d", err);
+	assert_int_equal(err, -EINVAL);
 }
 
-static ZTEST_F(cap_handover_unicast_to_broadcast_test_suite,
-	       test_handover_unicast_to_broadcast_inval_ext_adv_no_pa)
+static void cap_handover_unicast_to_broadcast_test_suite__test_handover_unicast_to_broadcast_inval_ext_adv_no_pa(void **cm_state)
 {
+	struct cap_handover_unicast_to_broadcast_test_suite_fixture *fixture = *cm_state;
 	int err = 0;
 
 	fixture->unicast_to_broadcast_param.ext_adv->per_adv_state = BT_LE_PER_ADV_STATE_NONE;
 
 	err = bt_cap_handover_unicast_to_broadcast(&fixture->unicast_to_broadcast_param);
-	zassert_equal(err, -EINVAL, "Unexpected return value %d", err);
+	assert_int_equal(err, -EINVAL);
 }
 
-static ZTEST_F(cap_handover_unicast_to_broadcast_test_suite,
-	       test_handover_unicast_to_broadcast_inval_pa_interval)
+static void cap_handover_unicast_to_broadcast_test_suite__test_handover_unicast_to_broadcast_inval_pa_interval(void **cm_state)
 {
+	struct cap_handover_unicast_to_broadcast_test_suite_fixture *fixture = *cm_state;
 	int err = 0;
 
 	fixture->unicast_to_broadcast_param.pa_interval = 0U;
 
 	err = bt_cap_handover_unicast_to_broadcast(&fixture->unicast_to_broadcast_param);
-	zassert_equal(err, -EINVAL, "Unexpected return value %d", err);
+	assert_int_equal(err, -EINVAL);
 }
 
-static ZTEST_F(cap_handover_unicast_to_broadcast_test_suite,
-	       test_handover_unicast_to_broadcast_inval_broadcast_id)
+static void cap_handover_unicast_to_broadcast_test_suite__test_handover_unicast_to_broadcast_inval_broadcast_id(void **cm_state)
 {
+	struct cap_handover_unicast_to_broadcast_test_suite_fixture *fixture = *cm_state;
 	int err = 0;
 
 	fixture->unicast_to_broadcast_param.broadcast_id = 0xFFFFFFFFU;
 
 	err = bt_cap_handover_unicast_to_broadcast(&fixture->unicast_to_broadcast_param);
-	zassert_equal(err, -EINVAL, "Unexpected return value %d", err);
+	assert_int_equal(err, -EINVAL);
 }
 
-static ZTEST_F(cap_handover_unicast_to_broadcast_test_suite,
-	       test_handover_unicast_to_broadcast_inval_null_broadcast_create_param)
+static void cap_handover_unicast_to_broadcast_test_suite__test_handover_unicast_to_broadcast_inval_null_broadcast_create_param(void **cm_state)
 {
+	struct cap_handover_unicast_to_broadcast_test_suite_fixture *fixture = *cm_state;
 	int err = 0;
 
 	fixture->unicast_to_broadcast_param.broadcast_create_param = NULL;
 
 	err = bt_cap_handover_unicast_to_broadcast(&fixture->unicast_to_broadcast_param);
-	zassert_equal(err, -EINVAL, "Unexpected return value %d", err);
+	assert_int_equal(err, -EINVAL);
 }
 
-static ZTEST_F(cap_handover_unicast_to_broadcast_test_suite,
-	       test_handover_unicast_to_broadcast_inval_broadcast_stream)
+static void cap_handover_unicast_to_broadcast_test_suite__test_handover_unicast_to_broadcast_inval_broadcast_stream(void **cm_state)
 {
+	struct cap_handover_unicast_to_broadcast_test_suite_fixture *fixture = *cm_state;
 	struct bt_cap_stream cap_stream = {0};
 	int err = 0;
 
@@ -409,28 +414,28 @@ static ZTEST_F(cap_handover_unicast_to_broadcast_test_suite,
 	fixture->broadcast_stream_params[0].stream = &cap_stream;
 
 	err = bt_cap_handover_unicast_to_broadcast(&fixture->unicast_to_broadcast_param);
-	zassert_equal(err, -EINVAL, "Unexpected return value %d", err);
+	assert_int_equal(err, -EINVAL);
 }
 
-static ZTEST_F(cap_handover_unicast_to_broadcast_test_suite,
-	       test_handover_unicast_to_broadcast_inval_broadcast_stream_cnt)
+static void cap_handover_unicast_to_broadcast_test_suite__test_handover_unicast_to_broadcast_inval_broadcast_stream_cnt(void **cm_state)
 {
+	struct cap_handover_unicast_to_broadcast_test_suite_fixture *fixture = *cm_state;
 	int err = 0;
 
 	if (fixture->subgroup_params.stream_count == 1U) {
-		ztest_test_skip();
+		skip();
 	}
 
 	/* Attempt to not convert all sink streams */
 	fixture->subgroup_params.stream_count--;
 
 	err = bt_cap_handover_unicast_to_broadcast(&fixture->unicast_to_broadcast_param);
-	zassert_equal(err, -EINVAL, "Unexpected return value %d", err);
+	assert_int_equal(err, -EINVAL);
 }
 
-static ZTEST_F(cap_handover_unicast_to_broadcast_test_suite,
-	       test_handover_unicast_to_broadcast_inval_no_active_sink_streams)
+static void cap_handover_unicast_to_broadcast_test_suite__test_handover_unicast_to_broadcast_inval_no_active_sink_streams(void **cm_state)
 {
+	struct cap_handover_unicast_to_broadcast_test_suite_fixture *fixture = *cm_state;
 	struct bt_cap_stream *cap_stream_ptrs[MAX_STREAMS];
 	const struct bt_cap_unicast_audio_stop_param param = {
 		.type = BT_CAP_SET_TYPE_AD_HOC,
@@ -450,15 +455,15 @@ static ZTEST_F(cap_handover_unicast_to_broadcast_test_suite,
 
 	/* Test that it will fail if there are no active sink streams */
 	err = bt_cap_initiator_unicast_audio_stop(&param);
-	zassert_equal(err, 0, "Unexpected return value %d", err);
+	assert_int_equal(err, 0);
 
 	err = bt_cap_handover_unicast_to_broadcast(&fixture->unicast_to_broadcast_param);
-	zassert_equal(err, -EINVAL, "Unexpected return value %d", err);
+	assert_int_equal(err, -EINVAL);
 }
 
-static ZTEST_F(cap_handover_unicast_to_broadcast_test_suite,
-	       test_handover_unicast_to_broadcast_inval_unique_metadata)
+static void cap_handover_unicast_to_broadcast_test_suite__test_handover_unicast_to_broadcast_inval_unique_metadata(void **cm_state)
 {
+	struct cap_handover_unicast_to_broadcast_test_suite_fixture *fixture = *cm_state;
 	struct bt_cap_stream *cap_stream_ptrs[MAX_STREAMS];
 	const struct bt_cap_unicast_audio_stop_param param = {
 		.type = BT_CAP_SET_TYPE_AD_HOC,
@@ -469,7 +474,7 @@ static ZTEST_F(cap_handover_unicast_to_broadcast_test_suite,
 	int err = 0;
 
 	if (STREAMS_PER_DIRECTION <= 1U) {
-		ztest_test_skip();
+		skip();
 	}
 
 	ARRAY_FOR_EACH(cap_stream_ptrs, idx) {
@@ -478,7 +483,7 @@ static ZTEST_F(cap_handover_unicast_to_broadcast_test_suite,
 
 	/* Stop so that we can change the metadata  */
 	err = bt_cap_initiator_unicast_audio_stop(&param);
-	zassert_equal(err, 0, "Unexpected return value %d", err);
+	assert_int_equal(err, 0);
 
 	/* Make metadata unique per stream to require additional subgroups */
 	ARRAY_FOR_EACH(fixture->cap_streams, i) {
@@ -491,16 +496,16 @@ static ZTEST_F(cap_handover_unicast_to_broadcast_test_suite,
 
 	/* Restart with unique metadata */
 	err = bt_cap_initiator_unicast_audio_start(&fixture->unicast_audio_start_param);
-	zassert_equal(err, 0, "Unexpected return value %d", err);
+	assert_int_equal(err, 0);
 
 	/* Attempt handover with unique metadata to trigger subgroup count > max */
 	err = bt_cap_handover_unicast_to_broadcast(&fixture->unicast_to_broadcast_param);
-	zassert_equal(err, -EINVAL, "Unexpected return value %d", err);
+	assert_int_equal(err, -EINVAL);
 }
 
-static ZTEST_F(cap_handover_unicast_to_broadcast_test_suite,
-	       test_handover_unicast_to_broadcast_inval_unicast_group)
+static void cap_handover_unicast_to_broadcast_test_suite__test_handover_unicast_to_broadcast_inval_unicast_group(void **cm_state)
 {
+	struct cap_handover_unicast_to_broadcast_test_suite_fixture *fixture = *cm_state;
 	int err = 0;
 	void *group = fixture->broadcast_stream_params[0].stream->bap_stream.group;
 
@@ -508,8 +513,59 @@ static ZTEST_F(cap_handover_unicast_to_broadcast_test_suite,
 	fixture->broadcast_stream_params[0].stream->bap_stream.group = UINT_TO_POINTER(0x12345678U);
 
 	err = bt_cap_handover_unicast_to_broadcast(&fixture->unicast_to_broadcast_param);
-	zassert_equal(err, -EINVAL, "Unexpected return value %d", err);
+	assert_int_equal(err, -EINVAL);
 
 	/* Restore group to support proper cleanup after the test */
 	fixture->broadcast_stream_params[0].stream->bap_stream.group = group;
 }
+
+int bt_test_cap_handover_unicast_to_broadcast_test_suite_setup(void **state)
+{
+	int environment_result = bt_test_audio_cap_handover_environment_setup(state);
+
+	if (environment_result != 0) {
+		return environment_result;
+	}
+
+	*state = cap_handover_unicast_to_broadcast_test_suite_setup();
+	return 0;
+}
+static int bt_test_cap_handover_unicast_to_broadcast_test_suite_before(void **state)
+{
+	(void)state;
+	cap_handover_unicast_to_broadcast_test_suite_before(*state);
+	mock_init_rule_before_744017(NULL, *state);
+	mock_init_rule_before_127f12(NULL, *state);
+	return 0;
+}
+int bt_test_cap_handover_unicast_to_broadcast_test_suite_after(void **state)
+{
+	(void)state;
+	cap_handover_unicast_to_broadcast_test_suite_after(*state);
+	mock_destroy_rule_after_744017(NULL, *state);
+	mock_destroy_rule_after_127f12(NULL, *state);
+	return 0;
+}
+int bt_test_cap_handover_unicast_to_broadcast_test_suite_teardown(void **state)
+{
+	(void)state;
+	cap_handover_unicast_to_broadcast_test_suite_teardown(*state);
+	return 0;
+}
+static const struct CMUnitTest test_cases_cap_handover_unicast_to_broadcast_test_suite[] = {
+	cmocka_unit_test_setup_teardown(cap_handover_unicast_to_broadcast_test_suite__test_handover_unicast_to_broadcast, bt_test_cap_handover_unicast_to_broadcast_test_suite_before, bt_test_cap_handover_unicast_to_broadcast_test_suite_after),
+	cmocka_unit_test_setup_teardown(cap_handover_unicast_to_broadcast_test_suite__test_handover_unicast_to_broadcast_inactive_adv, bt_test_cap_handover_unicast_to_broadcast_test_suite_before, bt_test_cap_handover_unicast_to_broadcast_test_suite_after),
+	cmocka_unit_test_setup_teardown(cap_handover_unicast_to_broadcast_test_suite__test_handover_unicast_to_broadcast_inval_null_param, bt_test_cap_handover_unicast_to_broadcast_test_suite_before, bt_test_cap_handover_unicast_to_broadcast_test_suite_after),
+	cmocka_unit_test_setup_teardown(cap_handover_unicast_to_broadcast_test_suite__test_handover_unicast_to_broadcast_inval_null_unicast_group, bt_test_cap_handover_unicast_to_broadcast_test_suite_before, bt_test_cap_handover_unicast_to_broadcast_test_suite_after),
+	cmocka_unit_test_setup_teardown(cap_handover_unicast_to_broadcast_test_suite__test_handover_unicast_to_broadcast_inval_null_ext_adv, bt_test_cap_handover_unicast_to_broadcast_test_suite_before, bt_test_cap_handover_unicast_to_broadcast_test_suite_after),
+	cmocka_unit_test_setup_teardown(cap_handover_unicast_to_broadcast_test_suite__test_handover_unicast_to_broadcast_inval_ext_adv_no_pa, bt_test_cap_handover_unicast_to_broadcast_test_suite_before, bt_test_cap_handover_unicast_to_broadcast_test_suite_after),
+	cmocka_unit_test_setup_teardown(cap_handover_unicast_to_broadcast_test_suite__test_handover_unicast_to_broadcast_inval_pa_interval, bt_test_cap_handover_unicast_to_broadcast_test_suite_before, bt_test_cap_handover_unicast_to_broadcast_test_suite_after),
+	cmocka_unit_test_setup_teardown(cap_handover_unicast_to_broadcast_test_suite__test_handover_unicast_to_broadcast_inval_broadcast_id, bt_test_cap_handover_unicast_to_broadcast_test_suite_before, bt_test_cap_handover_unicast_to_broadcast_test_suite_after),
+	cmocka_unit_test_setup_teardown(cap_handover_unicast_to_broadcast_test_suite__test_handover_unicast_to_broadcast_inval_null_broadcast_create_param, bt_test_cap_handover_unicast_to_broadcast_test_suite_before, bt_test_cap_handover_unicast_to_broadcast_test_suite_after),
+	cmocka_unit_test_setup_teardown(cap_handover_unicast_to_broadcast_test_suite__test_handover_unicast_to_broadcast_inval_broadcast_stream, bt_test_cap_handover_unicast_to_broadcast_test_suite_before, bt_test_cap_handover_unicast_to_broadcast_test_suite_after),
+	cmocka_unit_test_setup_teardown(cap_handover_unicast_to_broadcast_test_suite__test_handover_unicast_to_broadcast_inval_broadcast_stream_cnt, bt_test_cap_handover_unicast_to_broadcast_test_suite_before, bt_test_cap_handover_unicast_to_broadcast_test_suite_after),
+	cmocka_unit_test_setup_teardown(cap_handover_unicast_to_broadcast_test_suite__test_handover_unicast_to_broadcast_inval_no_active_sink_streams, bt_test_cap_handover_unicast_to_broadcast_test_suite_before, bt_test_cap_handover_unicast_to_broadcast_test_suite_after),
+	cmocka_unit_test_setup_teardown(cap_handover_unicast_to_broadcast_test_suite__test_handover_unicast_to_broadcast_inval_unique_metadata, bt_test_cap_handover_unicast_to_broadcast_test_suite_before, bt_test_cap_handover_unicast_to_broadcast_test_suite_after),
+	cmocka_unit_test_setup_teardown(cap_handover_unicast_to_broadcast_test_suite__test_handover_unicast_to_broadcast_inval_unicast_group, bt_test_cap_handover_unicast_to_broadcast_test_suite_before, bt_test_cap_handover_unicast_to_broadcast_test_suite_after),
+};
+BT_TEST_SUITE(cap_handover_unicast_to_broadcast_test_suite, test_cases_cap_handover_unicast_to_broadcast_test_suite, bt_test_cap_handover_unicast_to_broadcast_test_suite_setup, bt_test_cap_handover_unicast_to_broadcast_test_suite_teardown);

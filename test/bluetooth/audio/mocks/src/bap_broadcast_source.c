@@ -1,3 +1,5 @@
+#include "support/test_support.h"
+
 /*
  * Copyright (c) 2024 Nordic Semiconductor ASA
  *
@@ -5,10 +7,10 @@
  */
 #include <stdint.h>
 
-#include <zephyr/bluetooth/audio/bap.h>
+#include <embt/bluetooth/audio/bap.h>
 
 #include "bap_broadcast_source.h"
-#include <zephyr/fff.h>
+#include <fff.h>
 
 /* List of fakes used by this unit tester */
 #define FFF_FAKES_LIST(FAKE)                                                                       \

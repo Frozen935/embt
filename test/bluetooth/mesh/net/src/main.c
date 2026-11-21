@@ -1,14 +1,13 @@
+#include "support/test_support.h"
 /*
  * Copyright (c) 2025 Nordic Semiconductor ASA
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-
-#include <zephyr/ztest.h>
-#include <zephyr/net_buf.h>
-#include <zephyr/bluetooth/mesh.h>
-#include <zephyr/sys/util.h>
-#include <zephyr/sys/byteorder.h>
+#include <embt/net_buf.h>
+#include <embt/bluetooth/mesh.h>
+#include <embt/base/util.h>
+#include <embt/base/byteorder.h>
 #include <errno.h>
 #include <string.h>
 #include "crypto.h"
@@ -92,7 +91,7 @@ bool bt_mesh_net_cred_find(struct bt_mesh_net_rx *rx, struct net_buf_simple *in,
 
 /**** Tests ****/
 
-ZTEST_SUITE(bt_mesh_net_msg_cache, NULL, NULL, NULL, NULL, NULL);
+
 
 /* Helper to build a minimal Network PDU: 9-byte header + 1B payload + 8B MIC. */
 static void build_pdu(uint8_t *dst, uint8_t nid, uint8_t ttl, uint32_t seq,
@@ -125,8 +124,9 @@ static void build_pdu(uint8_t *dst, uint8_t nid, uint8_t ttl, uint32_t seq,
  * the third PDU is rejected. Inorder to bypass 'check_dup()' function, the test builds PDUs with
  * different MICs, and PDU builder function is coded in a way that the MICs are different.
  */
-ZTEST(bt_mesh_net_msg_cache, test_cache_differentiates_by_net_idx)
+static void bt_mesh_net_msg_cache__test_cache_differentiates_by_net_idx(void **cm_state)
 {
+	(void)cm_state;
 		uint8_t pdu1[18];
 		uint8_t pdu2[18];
 		uint8_t pdu3[18];
@@ -160,17 +160,26 @@ ZTEST(bt_mesh_net_msg_cache, test_cache_differentiates_by_net_idx)
 
 		int err = bt_mesh_net_decode(&in, BT_MESH_NET_IF_ADV, &rx, &out);
 
-		zassert_equal(err, 0, "First PDU decode failed: %d", err);
+		assert_int_equal(err, 0);
 
 		/* Second PDU: expect success (not duplicate) */
 		net_buf_simple_init_with_data(&in, pdu2, sizeof(pdu2));
 		net_buf_simple_reset(&out);
 		err = bt_mesh_net_decode(&in, BT_MESH_NET_IF_ADV, &rx, &out);
-		zassert_equal(err, 0, "Second PDU decode (different net_idx) failed: %d", err);
+		assert_int_equal(err, 0);
 
 		/* Decode third PDU with same NID/net_idx: expect -ENOENT due to cache duplicate */
 		net_buf_simple_init_with_data(&in, pdu3, sizeof(pdu3));
 		net_buf_simple_reset(&out);
 		err = bt_mesh_net_decode(&in, BT_MESH_NET_IF_ADV, &rx, &out);
-		zassert_equal(err, -ENOENT, "Third PDU (same net_idx) not rejected: %d", err);
+		assert_int_equal(err, -ENOENT);
 }
+
+
+
+
+
+static const struct CMUnitTest test_cases_bt_mesh_net_msg_cache[] = {
+	cmocka_unit_test(bt_mesh_net_msg_cache__test_cache_differentiates_by_net_idx),
+};
+BT_TEST_SUITE(bt_mesh_net_msg_cache, test_cases_bt_mesh_net_msg_cache, bt_test_base_setup, NULL);

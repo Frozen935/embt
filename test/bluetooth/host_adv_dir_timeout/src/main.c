@@ -1,3 +1,6 @@
+#include "support/test_support.h"
+static const struct bt_hci_transport test_driver;
+#include "host/hci_core.h"
 /*
  * SPDX-FileCopyrightText: Copyright (c) 2026 Silicon Laboratories Inc.
  * SPDX-License-Identifier: Apache-2.0
@@ -9,26 +12,21 @@
 #include <stdint.h>
 #include <string.h>
 
-#include <zephyr/bluetooth/addr.h>
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/buf.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/gap.h>
-#include <zephyr/bluetooth/hci.h>
-#include <zephyr/bluetooth/hci_types.h>
-#include <zephyr/device.h>
-#include <zephyr/devicetree.h>
-#include <zephyr/drivers/bluetooth.h>
-#include <zephyr/kernel.h>
-#include <zephyr/net_buf.h>
-#include <zephyr/sys/byteorder.h>
-#include <zephyr/sys/util.h>
-#include <zephyr/ztest.h>
+#include <embt/bluetooth/addr.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/buf.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/gap.h>
+#include <embt/bluetooth/hci.h>
+#include <embt/bluetooth/hci_types.h>
+#include <embt/drivers/bluetooth.h>
 
+#include <embt/net_buf.h>
+#include <embt/base/byteorder.h>
+#include <embt/base/util.h>
 #include <embt/base/log.h>
 LOG_MODULE_REGISTER(bt_adv_dir_timeout_test, CONFIG_BT_LOG_LEVEL);
 
-#define DT_DRV_COMPAT zephyr_bt_hci_test
 
 /* Length of the command complete parameters used for commands without a dedicated handler.
  * The parameters are zeroed, and the size is large enough to hold the return parameters of any
@@ -40,7 +38,7 @@ LOG_MODULE_REGISTER(bt_adv_dir_timeout_test, CONFIG_BT_LOG_LEVEL);
  * connection complete event. Without this quirk an LE Advertising Set Terminated event follows.
  */
 #define CONN_COMPLETE_ONLY                                                                         \
-	((BT_DT_HCI_QUIRKS_INST_GET(0) & BT_HCI_QUIRK_NO_ADV_TERM_ON_DIR_TIMEOUT) != 0)
+	((test_driver.quirks & BT_HCI_QUIRK_NO_ADV_TERM_ON_DIR_TIMEOUT) != 0)
 
 /* Advertising handle of the most recent LE Set Extended Advertising Parameters command. */
 static uint8_t last_adv_handle;
@@ -48,8 +46,8 @@ static uint8_t last_adv_handle;
 /* Error of the most recent connected callback. */
 static uint8_t conn_err;
 
-static K_SEM_DEFINE(connected_sem, 0, 1);
-static K_SEM_DEFINE(sent_sem, 0, 1);
+static os_sem_t connected_sem;
+static os_sem_t sent_sem;
 
 /* Command handler structure for cmd_handle(). */
 struct cmd_handler {
@@ -73,7 +71,7 @@ static void *cmd_complete(struct net_buf **buf, uint8_t plen, uint16_t opcode)
 {
 	struct bt_hci_evt_cmd_complete *cc;
 
-	*buf = bt_buf_get_evt(BT_HCI_EVT_CMD_COMPLETE, false, K_FOREVER);
+	*buf = bt_buf_get_evt(BT_HCI_EVT_CMD_COMPLETE, false, BT_FOREVER);
 	evt_create(*buf, BT_HCI_EVT_CMD_COMPLETE, sizeof(*cc) + plen);
 	cc = net_buf_add(*buf, sizeof(*cc));
 	cc->ncmd = 1U;
@@ -203,7 +201,7 @@ static void le_set_ext_adv_param(struct net_buf *buf, struct net_buf **evt, uint
 
 	ARG_UNUSED(len);
 
-	zassert_true(buf->len >= sizeof(*cp), "Unexpected command length %u", buf->len);
+	assert_true(buf->len >= sizeof(*cp));
 
 	last_adv_handle = cp->handle;
 
@@ -259,7 +257,7 @@ static const struct cmd_handler cmds[] = {
 };
 
 /* Lookup the command opcode and invoke the handler. */
-static void cmd_handle(const struct device *dev, struct net_buf *cmd)
+static void cmd_handle(const struct bt_hci_transport *dev, struct net_buf *cmd)
 {
 	struct net_buf *evt = NULL;
 	struct bt_hci_cmd_hdr *chdr;
@@ -282,18 +280,18 @@ static void cmd_handle(const struct device *dev, struct net_buf *cmd)
 	bt_hci_recv(dev, evt);
 }
 
-static int driver_open(const struct device *dev)
+static int driver_open(const struct bt_hci_transport *dev)
 {
 	ARG_UNUSED(dev);
 
 	return 0;
 }
 
-static int driver_send(const struct device *dev, struct net_buf *buf)
+static int driver_send(const struct bt_hci_transport *dev, struct net_buf *buf)
 {
 	uint8_t type = net_buf_pull_u8(buf);
 
-	zassert_equal(type, BT_HCI_H4_CMD, "Unexpected buffer type %u", type);
+	assert_int_equal(type, BT_HCI_H4_CMD);
 
 	cmd_handle(dev, buf);
 
@@ -302,25 +300,30 @@ static int driver_send(const struct device *dev, struct net_buf *buf)
 	return 0;
 }
 
-static DEVICE_API(bt_hci, driver_api) = {
+static const struct bt_hci_driver_api driver_api = {
 	.open = driver_open,
 	.send = driver_send,
 };
 
-#define TEST_DEVICE_INIT(inst)                                                                     \
-	static struct bt_hci_driver_data driver_data_##inst = {0};                                 \
-	static const struct bt_hci_driver_config driver_config_##inst =                            \
-		BT_DT_HCI_DRIVER_CONFIG_INST_GET(inst);                                            \
-	DEVICE_DT_INST_DEFINE(inst, NULL, NULL, &driver_data_##inst, &driver_config_##inst,        \
-			      POST_KERNEL, CONFIG_KERNEL_INIT_PRIORITY_DEVICE, &driver_api)
+static struct bt_hci_driver_data test_driver_data;
+static const struct bt_hci_transport test_driver = {
+ .name = "upstream-test", .bus = 0,
+ .quirks = IS_ENABLED(CONFIG_TEST_NO_ADV_TERM_ON_DIR_TIMEOUT) ?
+           BT_HCI_QUIRK_NO_ADV_TERM_ON_DIR_TIMEOUT : 0,
+ .api = &driver_api, .data = &test_driver_data,
+};
+static void test_transport_init(void)
+{
+ bt_test_require(bt_stack_init());
+ bt_dev.hci = &test_driver;
+}
 
-DT_INST_FOREACH_STATUS_OKAY(TEST_DEVICE_INIT)
 
 static void *le_meta_event(struct net_buf **buf, uint8_t subevent, uint8_t len)
 {
 	struct bt_hci_evt_le_meta_event *meta;
 
-	*buf = bt_buf_get_evt(BT_HCI_EVT_LE_META_EVENT, false, K_FOREVER);
+	*buf = bt_buf_get_evt(BT_HCI_EVT_LE_META_EVENT, false, BT_FOREVER);
 	evt_create(*buf, BT_HCI_EVT_LE_META_EVENT, sizeof(*meta) + len);
 	meta = net_buf_add(*buf, sizeof(*meta));
 	meta->subevent = subevent;
@@ -338,7 +341,7 @@ static void conn_complete_timeout(void)
 	(void)memset(cc, 0, sizeof(*cc));
 	cc->status = BT_HCI_ERR_ADV_TIMEOUT;
 	cc->role = BT_HCI_ROLE_PERIPHERAL;
-	bt_hci_recv(DEVICE_DT_INST_GET(0), buf);
+	bt_hci_recv(&test_driver, buf);
 }
 
 /* Let the test Controller report the timeout with the events that it sends, and check that the
@@ -354,19 +357,20 @@ static void adv_timeout(void)
 		struct bt_hci_evt_le_adv_set_terminated *term;
 		struct net_buf *buf;
 
-		err = k_sem_take(&connected_sem, K_MSEC(100));
-		zassert_equal(err, -EAGAIN, "Advertising ended by the connection complete event");
+		err = osi_sem_take(&connected_sem, BT_MSEC(100));
+		assert_int_equal(err, -ETIMEDOUT);
 
 		term = le_meta_event(&buf, BT_HCI_EVT_LE_ADV_SET_TERMINATED, sizeof(*term));
 		(void)memset(term, 0, sizeof(*term));
 		term->status = BT_HCI_ERR_ADV_TIMEOUT;
 		term->adv_handle = last_adv_handle;
-		bt_hci_recv(DEVICE_DT_INST_GET(0), buf);
+		bt_hci_recv(&test_driver, buf);
 	}
 
-	err = k_sem_take(&connected_sem, K_SECONDS(1));
-	zassert_ok(err, "No connected callback");
-	zassert_equal(conn_err, BT_HCI_ERR_ADV_TIMEOUT, "Unexpected error 0x%02x", conn_err);
+	err = osi_sem_take(&connected_sem, BT_SECONDS(1));
+	assert_int_equal(err, 0);
+	assert_int_equal(conn_err, BT_HCI_ERR_ADV_TIMEOUT);
+	assert_int_equal(bt_host_work_drain(), 0);
 }
 
 static void connected(struct bt_conn *conn, uint8_t err)
@@ -374,7 +378,7 @@ static void connected(struct bt_conn *conn, uint8_t err)
 	ARG_UNUSED(conn);
 
 	conn_err = err;
-	k_sem_give(&connected_sem);
+	osi_sem_give(&connected_sem);
 }
 
 static void adv_sent(struct bt_le_ext_adv *adv, struct bt_le_ext_adv_sent_info *info)
@@ -382,7 +386,7 @@ static void adv_sent(struct bt_le_ext_adv *adv, struct bt_le_ext_adv_sent_info *
 	ARG_UNUSED(adv);
 	ARG_UNUSED(info);
 
-	k_sem_give(&sent_sem);
+	osi_sem_give(&sent_sem);
 }
 
 static const struct bt_le_ext_adv_cb adv_cb = {
@@ -397,15 +401,15 @@ static void *adv_dir_timeout_setup(void)
 	int err;
 
 	err = bt_enable(NULL);
-	zassert_ok(err, "Bluetooth init failed: %d", err);
+	assert_int_equal(err, 0);
 
 	err = bt_conn_cb_register(&conn_cb);
-	zassert_ok(err, "Failed to register connection callbacks: %d", err);
+	assert_int_equal(err, 0);
 
 	return NULL;
 }
 
-ZTEST_SUITE(bt_adv_dir_timeout, NULL, adv_dir_timeout_setup, NULL, NULL, NULL);
+
 
 static const bt_addr_le_t peer = {
 	.type = BT_ADDR_LE_RANDOM,
@@ -417,13 +421,14 @@ static const bt_addr_le_t other_peer = {
 	.a = { { 0x06, 0x05, 0x04, 0x03, 0x02, 0xc1 } },
 };
 
-static ZTEST(bt_adv_dir_timeout, test_ext_adv_start)
+static void bt_adv_dir_timeout__test_ext_adv_start(void **cm_state)
 {
+	(void)cm_state;
 	struct bt_le_ext_adv *adv;
 	int err;
 
 	err = bt_le_ext_adv_create(BT_LE_ADV_CONN_DIR(&peer), &adv_cb, &adv);
-	zassert_ok(err, "Failed to create advertising set: %d", err);
+	assert_int_equal(err, 0);
 
 	/* The second round fails to start if the first timeout left the set enabled */
 	for (size_t i = 0U; i < 2U; i++) {
@@ -431,31 +436,31 @@ static ZTEST(bt_adv_dir_timeout, test_ext_adv_start)
 
 		err = bt_le_ext_adv_start(
 			adv, BT_LE_EXT_ADV_START_PARAM(BT_GAP_ADV_HIGH_DUTY_CYCLE_MAX_TIMEOUT, 0));
-		zassert_ok(err, "Failed to start advertising: %d", err);
+		assert_int_equal(err, 0);
 
 		adv_timeout();
 
-		err = k_sem_take(&sent_sem, K_SECONDS(1));
-		zassert_ok(err, "No sent callback");
+		err = osi_sem_take(&sent_sem, BT_SECONDS(1));
+		assert_int_equal(err, 0);
 
 		err = bt_le_ext_adv_get_info(adv, &info);
-		zassert_ok(err, "Failed to get advertising set info: %d", err);
-		zassert_equal(info.ext_adv_state, BT_LE_EXT_ADV_STATE_DISABLED,
-			      "Advertising set still enabled");
+		assert_int_equal(err, 0);
+		assert_int_equal(info.ext_adv_state, BT_LE_EXT_ADV_STATE_DISABLED);
 	}
 
 	err = bt_le_ext_adv_delete(adv);
-	zassert_ok(err, "Failed to delete advertising set: %d", err);
+	assert_int_equal(err, 0);
 }
 
-static ZTEST(bt_adv_dir_timeout, test_adv_start)
+static void bt_adv_dir_timeout__test_adv_start(void **cm_state)
 {
+	(void)cm_state;
 	/* The second round fails to start if the first timeout left the advertiser enabled */
 	for (size_t i = 0U; i < 2U; i++) {
 		int err;
 
 		err = bt_le_adv_start(BT_LE_ADV_CONN_DIR(&peer), NULL, 0, NULL, 0);
-		zassert_ok(err, "Failed to start advertising: %d", err);
+		assert_int_equal(err, 0);
 
 		adv_timeout();
 	}
@@ -464,132 +469,164 @@ static ZTEST(bt_adv_dir_timeout, test_adv_start)
 /* A connection complete event for the timeout that arrives after the application stopped the
  * set has no effect, on that set or on its next start.
  */
-static ZTEST(bt_adv_dir_timeout, test_ext_adv_stopped)
+static void bt_adv_dir_timeout__test_ext_adv_stopped(void **cm_state)
 {
+	(void)cm_state;
 	struct bt_le_ext_adv_info info;
 	struct bt_le_ext_adv *adv;
 	int err;
 
 	err = bt_le_ext_adv_create(BT_LE_ADV_CONN_DIR(&peer), &adv_cb, &adv);
-	zassert_ok(err, "Failed to create advertising set: %d", err);
+	assert_int_equal(err, 0);
 
 	err = bt_le_ext_adv_start(
 		adv, BT_LE_EXT_ADV_START_PARAM(BT_GAP_ADV_HIGH_DUTY_CYCLE_MAX_TIMEOUT, 0));
-	zassert_ok(err, "Failed to start advertising: %d", err);
+	assert_int_equal(err, 0);
 
 	err = bt_le_ext_adv_stop(adv);
-	zassert_ok(err, "Failed to stop advertising: %d", err);
+	assert_int_equal(err, 0);
 
 	conn_complete_timeout();
 
-	err = k_sem_take(&connected_sem, K_MSEC(100));
-	zassert_equal(err, -EAGAIN, "Connected callback for a stopped set");
-	err = k_sem_take(&sent_sem, K_NO_WAIT);
-	zassert_equal(err, -EBUSY, "Sent callback for a stopped set");
+	err = osi_sem_take(&connected_sem, BT_MSEC(100));
+	assert_int_equal(err, -ETIMEDOUT);
+	err = osi_sem_take(&sent_sem, BT_NO_WAIT);
+	assert_int_equal(err, -EAGAIN);
 
 	err = bt_le_ext_adv_start(
 		adv, BT_LE_EXT_ADV_START_PARAM(BT_GAP_ADV_HIGH_DUTY_CYCLE_MAX_TIMEOUT, 0));
-	zassert_ok(err, "Failed to restart advertising: %d", err);
+	assert_int_equal(err, 0);
 
 	err = bt_le_ext_adv_get_info(adv, &info);
-	zassert_ok(err, "Failed to get advertising set info: %d", err);
-	zassert_equal(info.ext_adv_state, BT_LE_EXT_ADV_STATE_ENABLED, "Advertising set disabled");
+	assert_int_equal(err, 0);
+	assert_int_equal(info.ext_adv_state, BT_LE_EXT_ADV_STATE_ENABLED);
 
 	err = bt_le_ext_adv_stop(adv);
-	zassert_ok(err, "Failed to stop advertising: %d", err);
+	assert_int_equal(err, 0);
 
 	err = bt_le_ext_adv_delete(adv);
-	zassert_ok(err, "Failed to delete advertising set: %d", err);
+	assert_int_equal(err, 0);
 }
 
 /* The timeout of the high duty cycle set must leave a low duty cycle directed set enabled. */
-static ZTEST(bt_adv_dir_timeout, test_ext_adv_low_duty_unaffected)
+static void bt_adv_dir_timeout__test_ext_adv_low_duty_unaffected(void **cm_state)
 {
+	(void)cm_state;
 	struct bt_le_ext_adv *low_duty;
 	struct bt_le_ext_adv_info info;
 	struct bt_le_ext_adv *adv;
 	int err;
 
 	if (!CONN_COMPLETE_ONLY || CONFIG_BT_EXT_ADV_MAX_ADV_SET < 2) {
-		ztest_test_skip();
+		skip();
 	}
 
 	err = bt_le_ext_adv_create(BT_LE_ADV_CONN_DIR_LOW_DUTY(&other_peer), NULL, &low_duty);
-	zassert_ok(err, "Failed to create low duty cycle set: %d", err);
+	assert_int_equal(err, 0);
 
 	err = bt_le_ext_adv_create(BT_LE_ADV_CONN_DIR(&peer), &adv_cb, &adv);
-	zassert_ok(err, "Failed to create high duty cycle set: %d", err);
+	assert_int_equal(err, 0);
 
 	err = bt_le_ext_adv_start(low_duty, BT_LE_EXT_ADV_START_DEFAULT);
-	zassert_ok(err, "Failed to start low duty cycle advertising: %d", err);
+	assert_int_equal(err, 0);
 
 	err = bt_le_ext_adv_start(
 		adv, BT_LE_EXT_ADV_START_PARAM(BT_GAP_ADV_HIGH_DUTY_CYCLE_MAX_TIMEOUT, 0));
-	zassert_ok(err, "Failed to start high duty cycle advertising: %d", err);
+	assert_int_equal(err, 0);
 
 	adv_timeout();
 
-	err = k_sem_take(&sent_sem, K_SECONDS(1));
-	zassert_ok(err, "No sent callback");
+	err = osi_sem_take(&sent_sem, BT_SECONDS(1));
+	assert_int_equal(err, 0);
 
 	err = bt_le_ext_adv_get_info(adv, &info);
-	zassert_ok(err, "Failed to get advertising set info: %d", err);
-	zassert_equal(info.ext_adv_state, BT_LE_EXT_ADV_STATE_DISABLED,
-		      "High duty cycle set still enabled");
+	assert_int_equal(err, 0);
+	assert_int_equal(info.ext_adv_state, BT_LE_EXT_ADV_STATE_DISABLED);
 
 	err = bt_le_ext_adv_get_info(low_duty, &info);
-	zassert_ok(err, "Failed to get advertising set info: %d", err);
-	zassert_equal(info.ext_adv_state, BT_LE_EXT_ADV_STATE_ENABLED,
-		      "Low duty cycle set disabled");
+	assert_int_equal(err, 0);
+	assert_int_equal(info.ext_adv_state, BT_LE_EXT_ADV_STATE_ENABLED);
 
 	err = bt_le_ext_adv_stop(low_duty);
-	zassert_ok(err, "Failed to stop advertising: %d", err);
+	assert_int_equal(err, 0);
 
 	err = bt_le_ext_adv_delete(low_duty);
-	zassert_ok(err, "Failed to delete advertising set: %d", err);
+	assert_int_equal(err, 0);
 
 	err = bt_le_ext_adv_delete(adv);
-	zassert_ok(err, "Failed to delete advertising set: %d", err);
+	assert_int_equal(err, 0);
 }
 
 /* The connection complete event names no advertising set, so with the quirk only one high duty
  * cycle directed set can be enabled.
  */
-static ZTEST(bt_adv_dir_timeout, test_ext_adv_second_high_duty)
+static void bt_adv_dir_timeout__test_ext_adv_second_high_duty(void **cm_state)
 {
+	(void)cm_state;
 	struct bt_le_ext_adv *second;
 	struct bt_le_ext_adv *adv;
 	int err;
 
 	if (!CONN_COMPLETE_ONLY || CONFIG_BT_EXT_ADV_MAX_ADV_SET < 2) {
-		ztest_test_skip();
+		skip();
 	}
 
 	err = bt_le_ext_adv_create(BT_LE_ADV_CONN_DIR(&peer), &adv_cb, &adv);
-	zassert_ok(err, "Failed to create advertising set: %d", err);
+	assert_int_equal(err, 0);
 
 	err = bt_le_ext_adv_start(
 		adv, BT_LE_EXT_ADV_START_PARAM(BT_GAP_ADV_HIGH_DUTY_CYCLE_MAX_TIMEOUT, 0));
-	zassert_ok(err, "Failed to start advertising: %d", err);
+	assert_int_equal(err, 0);
 
 	err = bt_le_ext_adv_create(BT_LE_ADV_CONN_DIR(&other_peer), NULL, &second);
-	zassert_ok(err, "Failed to create second set: %d", err);
+	assert_int_equal(err, 0);
 
 	err = bt_le_ext_adv_start(
 		second, BT_LE_EXT_ADV_START_PARAM(BT_GAP_ADV_HIGH_DUTY_CYCLE_MAX_TIMEOUT, 0));
-	zassert_equal(err, -EBUSY, "Second high duty cycle set started: %d", err);
+	assert_int_equal(err, -EBUSY);
 
 	err = bt_le_ext_adv_delete(second);
-	zassert_ok(err, "Failed to delete second set: %d", err);
+	assert_int_equal(err, 0);
 
 	err = bt_le_adv_start(BT_LE_ADV_CONN_DIR(&other_peer), NULL, 0, NULL, 0);
-	zassert_equal(err, -EBUSY, "Legacy high duty cycle advertising started: %d", err);
+	assert_int_equal(err, -EBUSY);
 
 	adv_timeout();
 
-	err = k_sem_take(&sent_sem, K_SECONDS(1));
-	zassert_ok(err, "No sent callback");
+	err = osi_sem_take(&sent_sem, BT_SECONDS(1));
+	assert_int_equal(err, 0);
 
 	err = bt_le_ext_adv_delete(adv);
-	zassert_ok(err, "Failed to delete advertising set: %d", err);
+	assert_int_equal(err, 0);
 }
+
+static void storage_init_8ae11f157a(void)
+{
+	bt_test_require(osi_sem_init(&connected_sem, 0, 1));
+	bt_test_require(osi_sem_init(&sent_sem, 0, 1));
+}
+
+int bt_test_bt_adv_dir_timeout_setup(void **state)
+{
+	int environment_result = bt_test_host_setup(state);
+
+	if (environment_result != 0) {
+		return environment_result;
+	}
+
+	test_transport_init();
+	storage_init_8ae11f157a();
+	*state = adv_dir_timeout_setup();
+	return 0;
+}
+
+
+
+static const struct CMUnitTest test_cases_bt_adv_dir_timeout[] = {
+	cmocka_unit_test(bt_adv_dir_timeout__test_ext_adv_start),
+	cmocka_unit_test(bt_adv_dir_timeout__test_adv_start),
+	cmocka_unit_test(bt_adv_dir_timeout__test_ext_adv_stopped),
+	cmocka_unit_test(bt_adv_dir_timeout__test_ext_adv_low_duty_unaffected),
+	cmocka_unit_test(bt_adv_dir_timeout__test_ext_adv_second_high_duty),
+};
+BT_TEST_SUITE(bt_adv_dir_timeout, test_cases_bt_adv_dir_timeout, bt_test_bt_adv_dir_timeout_setup, NULL);

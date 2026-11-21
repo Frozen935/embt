@@ -1,3 +1,6 @@
+#include "support/test_support.h"
+#include "test_environment.h"
+
 /* main.c - Application main entry point */
 
 /*
@@ -12,18 +15,15 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <zephyr/autoconf.h>
-#include <zephyr/bluetooth/assigned_numbers.h>
-#include <zephyr/bluetooth/audio/ccp.h>
-#include <zephyr/bluetooth/audio/tbs.h>
-#include <zephyr/bluetooth/gatt.h>
-#include <zephyr/bluetooth/uuid.h>
-#include <zephyr/fff.h>
-#include <zephyr/sys/util.h>
-#include <zephyr/sys/util_macro.h>
-#include <zephyr/ztest_test.h>
-#include <zephyr/ztest_assert.h>
-
+#include <embt/autoconf.h>
+#include <embt/bluetooth/assigned_numbers.h>
+#include <embt/bluetooth/audio/ccp.h>
+#include <embt/bluetooth/audio/tbs.h>
+#include <embt/bluetooth/gatt.h>
+#include <embt/bluetooth/uuid.h>
+#include <fff.h>
+#include <embt/base/util.h>
+#include <embt/base/util_macro.h>
 DEFINE_FFF_GLOBALS;
 
 #define DEFAULT_BEARER_NAME "test"
@@ -42,7 +42,7 @@ static void *ccp_call_control_server_test_suite_setup(void)
 	struct ccp_call_control_server_test_suite_fixture *fixture;
 
 	fixture = malloc(sizeof(*fixture));
-	zassert_not_null(fixture);
+	assert_non_null(fixture);
 
 	return fixture;
 }
@@ -79,9 +79,7 @@ static void ccp_call_control_server_test_suite_teardown(void *f)
 	free(f);
 }
 
-ZTEST_SUITE(ccp_call_control_server_test_suite, NULL, ccp_call_control_server_test_suite_setup,
-	    ccp_call_control_server_test_suite_before, ccp_call_control_server_test_suite_after,
-	    ccp_call_control_server_test_suite_teardown);
+
 
 static void register_default_bearer(struct ccp_call_control_server_test_suite_fixture *fixture)
 {
@@ -97,19 +95,20 @@ static void register_default_bearer(struct ccp_call_control_server_test_suite_fi
 	int err;
 
 	err = bt_ccp_call_control_server_register_bearer(&register_param, &fixture->bearers[0]);
-	zassert_equal(err, 0, "Unexpected return value %d", err);
+	assert_int_equal(err, 0);
 }
 
-static ZTEST_F(ccp_call_control_server_test_suite, test_ccp_call_control_server_register_bearer)
+static void ccp_call_control_server_test_suite__test_ccp_call_control_server_register_bearer(void **cm_state)
 {
+	struct ccp_call_control_server_test_suite_fixture *fixture = *cm_state;
 	register_default_bearer(fixture);
 }
 
-static ZTEST_F(ccp_call_control_server_test_suite,
-	       test_ccp_call_control_server_register_multiple_bearers)
+static void ccp_call_control_server_test_suite__test_ccp_call_control_server_register_multiple_bearers(void **cm_state)
 {
+	struct ccp_call_control_server_test_suite_fixture *fixture = *cm_state;
 	if (CONFIG_BT_CCP_CALL_CONTROL_SERVER_BEARER_COUNT == 1) {
-		ztest_test_skip();
+		skip();
 	}
 
 	register_default_bearer(fixture);
@@ -128,22 +127,22 @@ static ZTEST_F(ccp_call_control_server_test_suite,
 
 		err = bt_ccp_call_control_server_register_bearer(&register_param,
 								 &fixture->bearers[i]);
-		zassert_equal(err, 0, "Unexpected return value %d", err);
+		assert_int_equal(err, 0);
 	}
 }
 
-static ZTEST_F(ccp_call_control_server_test_suite,
-	       test_ccp_call_control_server_register_bearer_inval_null_param)
+static void ccp_call_control_server_test_suite__test_ccp_call_control_server_register_bearer_inval_null_param(void **cm_state)
 {
+	struct ccp_call_control_server_test_suite_fixture *fixture = *cm_state;
 	int err;
 
 	err = bt_ccp_call_control_server_register_bearer(NULL, &fixture->bearers[0]);
-	zassert_equal(err, -EINVAL, "Unexpected return value %d", err);
+	assert_int_equal(err, -EINVAL);
 }
 
-static ZTEST_F(ccp_call_control_server_test_suite,
-	       test_ccp_call_control_server_register_bearer_inval_null_bearer)
+static void ccp_call_control_server_test_suite__test_ccp_call_control_server_register_bearer_inval_null_bearer(void **cm_state)
 {
+	struct ccp_call_control_server_test_suite_fixture *fixture = *cm_state;
 	const struct bt_tbs_register_param register_param = {
 		.provider_name = "test",
 		.uci = DEFAULT_BEARER_UCI,
@@ -156,12 +155,12 @@ static ZTEST_F(ccp_call_control_server_test_suite,
 	int err;
 
 	err = bt_ccp_call_control_server_register_bearer(&register_param, NULL);
-	zassert_equal(err, -EINVAL, "Unexpected return value %d", err);
+	assert_int_equal(err, -EINVAL);
 }
 
-static ZTEST_F(ccp_call_control_server_test_suite,
-	       test_ccp_call_control_server_register_bearer_inval_no_gtbs)
+static void ccp_call_control_server_test_suite__test_ccp_call_control_server_register_bearer_inval_no_gtbs(void **cm_state)
 {
+	struct ccp_call_control_server_test_suite_fixture *fixture = *cm_state;
 	const struct bt_tbs_register_param register_param = {
 		.provider_name = "test",
 		.uci = DEFAULT_BEARER_UCI,
@@ -174,12 +173,12 @@ static ZTEST_F(ccp_call_control_server_test_suite,
 	int err;
 
 	err = bt_ccp_call_control_server_register_bearer(&register_param, &fixture->bearers[0]);
-	zassert_equal(err, -EAGAIN, "Unexpected return value %d", err);
+	assert_int_equal(err, -EAGAIN);
 }
 
-static ZTEST_F(ccp_call_control_server_test_suite,
-	       test_ccp_call_control_server_register_bearer_inval_double_gtbs)
+static void ccp_call_control_server_test_suite__test_ccp_call_control_server_register_bearer_inval_double_gtbs(void **cm_state)
 {
+	struct ccp_call_control_server_test_suite_fixture *fixture = *cm_state;
 	const struct bt_tbs_register_param register_param = {
 		.provider_name = "test",
 		.uci = DEFAULT_BEARER_UCI,
@@ -192,18 +191,18 @@ static ZTEST_F(ccp_call_control_server_test_suite,
 	int err;
 
 	if (CONFIG_BT_CCP_CALL_CONTROL_SERVER_BEARER_COUNT == 1) {
-		ztest_test_skip();
+		skip();
 	}
 
 	register_default_bearer(fixture);
 
 	err = bt_ccp_call_control_server_register_bearer(&register_param, &fixture->bearers[1]);
-	zassert_equal(err, -EALREADY, "Unexpected return value %d", err);
+	assert_int_equal(err, -EALREADY);
 }
 
-static ZTEST_F(ccp_call_control_server_test_suite,
-	       test_ccp_call_control_server_register_bearer_inval_cnt)
+static void ccp_call_control_server_test_suite__test_ccp_call_control_server_register_bearer_inval_cnt(void **cm_state)
 {
+	struct ccp_call_control_server_test_suite_fixture *fixture = *cm_state;
 	const struct bt_tbs_register_param register_param = {
 		.provider_name = "test",
 		.uci = DEFAULT_BEARER_UCI,
@@ -216,7 +215,7 @@ static ZTEST_F(ccp_call_control_server_test_suite,
 	int err;
 
 	if (CONFIG_BT_CCP_CALL_CONTROL_SERVER_BEARER_COUNT == 1) {
-		ztest_test_skip();
+		skip();
 	}
 
 	register_default_bearer(fixture);
@@ -225,52 +224,53 @@ static ZTEST_F(ccp_call_control_server_test_suite,
 
 		err = bt_ccp_call_control_server_register_bearer(&register_param,
 								 &fixture->bearers[i]);
-		zassert_equal(err, 0, "Unexpected return value %d", err);
+		assert_int_equal(err, 0);
 	}
 
 	err = bt_ccp_call_control_server_register_bearer(
 		&register_param, &fixture->bearers[CONFIG_BT_CCP_CALL_CONTROL_SERVER_BEARER_COUNT]);
-	zassert_equal(err, -ENOMEM, "Unexpected return value %d", err);
+	assert_int_equal(err, -ENOMEM);
 }
 
-static ZTEST_F(ccp_call_control_server_test_suite, test_ccp_call_control_server_unregister_bearer)
+static void ccp_call_control_server_test_suite__test_ccp_call_control_server_unregister_bearer(void **cm_state)
 {
+	struct ccp_call_control_server_test_suite_fixture *fixture = *cm_state;
 	int err;
 
 	register_default_bearer(fixture);
 
 	err = bt_ccp_call_control_server_unregister_bearer(fixture->bearers[0]);
-	zassert_equal(err, 0, "Unexpected return value %d", err);
+	assert_int_equal(err, 0);
 }
 
-static ZTEST_F(ccp_call_control_server_test_suite,
-	       test_ccp_call_control_server_unregister_bearer_inval_double_unregister)
+static void ccp_call_control_server_test_suite__test_ccp_call_control_server_unregister_bearer_inval_double_unregister(void **cm_state)
 {
+	struct ccp_call_control_server_test_suite_fixture *fixture = *cm_state;
 	int err;
 
 	register_default_bearer(fixture);
 
 	err = bt_ccp_call_control_server_unregister_bearer(fixture->bearers[0]);
-	zassert_equal(err, 0, "Unexpected return value %d", err);
+	assert_int_equal(err, 0);
 
 	err = bt_ccp_call_control_server_unregister_bearer(fixture->bearers[0]);
-	zassert_equal(err, -EALREADY, "Unexpected return value %d", err);
+	assert_int_equal(err, -EALREADY);
 
 	fixture->bearers[0] = NULL;
 }
 
-static ZTEST_F(ccp_call_control_server_test_suite,
-	       test_ccp_call_control_server_unregister_bearer_inval_null_bearer)
+static void ccp_call_control_server_test_suite__test_ccp_call_control_server_unregister_bearer_inval_null_bearer(void **cm_state)
 {
+	struct ccp_call_control_server_test_suite_fixture *fixture = *cm_state;
 	int err;
 
 	err = bt_ccp_call_control_server_unregister_bearer(NULL);
-	zassert_equal(err, -EINVAL, "Unexpected return value %d", err);
+	assert_int_equal(err, -EINVAL);
 }
 
-static ZTEST_F(ccp_call_control_server_test_suite,
-	       test_bt_ccp_call_control_server_set_bearer_provider_name)
+static void ccp_call_control_server_test_suite__test_bt_ccp_call_control_server_set_bearer_provider_name(void **cm_state)
 {
+	struct ccp_call_control_server_test_suite_fixture *fixture = *cm_state;
 	char res_bearer_name[CONFIG_BT_CCP_CALL_CONTROL_SERVER_PROVIDER_NAME_MAX_LENGTH + 1];
 	const char *new_bearer_name = "New bearer name";
 	int err;
@@ -279,58 +279,57 @@ static ZTEST_F(ccp_call_control_server_test_suite,
 
 	err = bt_ccp_call_control_server_set_bearer_provider_name(fixture->bearers[0],
 								  new_bearer_name);
-	zassert_equal(err, 0, "Unexpected return value %d", err);
+	assert_int_equal(err, 0);
 
 	err = bt_ccp_call_control_server_get_bearer_provider_name(
 		fixture->bearers[0], res_bearer_name, sizeof(res_bearer_name));
-	zassert_equal(err, 0, "Unexpected return value %d", err);
+	assert_int_equal(err, 0);
 
-	zassert_str_equal(new_bearer_name, res_bearer_name, "%s != %s", new_bearer_name,
-			  res_bearer_name);
+	assert_string_equal(new_bearer_name, res_bearer_name);
 }
 
-static ZTEST_F(ccp_call_control_server_test_suite,
-	       test_bt_ccp_call_control_server_set_bearer_provider_name_inval_not_registered)
+static void ccp_call_control_server_test_suite__test_bt_ccp_call_control_server_set_bearer_provider_name_inval_not_registered(void **cm_state)
 {
+	struct ccp_call_control_server_test_suite_fixture *fixture = *cm_state;
 	const char *new_bearer_name = "New bearer name";
 	int err;
 
 	/* Register and unregister bearer to get a valid pointer but where it is unregistered*/
 	register_default_bearer(fixture);
 	err = bt_ccp_call_control_server_unregister_bearer(fixture->bearers[0]);
-	zassert_equal(err, 0, "Unexpected return value %d", err);
+	assert_int_equal(err, 0);
 
 	err = bt_ccp_call_control_server_set_bearer_provider_name(fixture->bearers[0],
 								  new_bearer_name);
-	zassert_equal(err, -EFAULT, "Unexpected return value %d", err);
+	assert_int_equal(err, -EFAULT);
 }
 
-static ZTEST_F(ccp_call_control_server_test_suite,
-	       test_bt_ccp_call_control_server_set_bearer_provider_name_inval_null_bearer)
+static void ccp_call_control_server_test_suite__test_bt_ccp_call_control_server_set_bearer_provider_name_inval_null_bearer(void **cm_state)
 {
+	struct ccp_call_control_server_test_suite_fixture *fixture = *cm_state;
 	const char *new_bearer_name = "New bearer name";
 	int err;
 
 	register_default_bearer(fixture);
 
 	err = bt_ccp_call_control_server_set_bearer_provider_name(NULL, new_bearer_name);
-	zassert_equal(err, -EINVAL, "Unexpected return value %d", err);
+	assert_int_equal(err, -EINVAL);
 }
 
-static ZTEST_F(ccp_call_control_server_test_suite,
-	       test_bt_ccp_call_control_server_set_bearer_provider_name_inval_null_name)
+static void ccp_call_control_server_test_suite__test_bt_ccp_call_control_server_set_bearer_provider_name_inval_null_name(void **cm_state)
 {
+	struct ccp_call_control_server_test_suite_fixture *fixture = *cm_state;
 	int err;
 
 	register_default_bearer(fixture);
 
 	err = bt_ccp_call_control_server_set_bearer_provider_name(fixture->bearers[0], NULL);
-	zassert_equal(err, -EINVAL, "Unexpected return value %d", err);
+	assert_int_equal(err, -EINVAL);
 }
 
-static ZTEST_F(ccp_call_control_server_test_suite,
-	       test_bt_ccp_call_control_server_set_bearer_provider_name_inval_empty_name)
+static void ccp_call_control_server_test_suite__test_bt_ccp_call_control_server_set_bearer_provider_name_inval_empty_name(void **cm_state)
 {
+	struct ccp_call_control_server_test_suite_fixture *fixture = *cm_state;
 	const char *inval_bearer_name = "";
 	int err;
 
@@ -338,12 +337,12 @@ static ZTEST_F(ccp_call_control_server_test_suite,
 
 	err = bt_ccp_call_control_server_set_bearer_provider_name(fixture->bearers[0],
 								  inval_bearer_name);
-	zassert_equal(err, -EINVAL, "Unexpected return value %d", err);
+	assert_int_equal(err, -EINVAL);
 }
 
-static ZTEST_F(ccp_call_control_server_test_suite,
-	       test_bt_ccp_call_control_server_set_bearer_provider_name_inval_long_name)
+static void ccp_call_control_server_test_suite__test_bt_ccp_call_control_server_set_bearer_provider_name_inval_long_name(void **cm_state)
 {
+	struct ccp_call_control_server_test_suite_fixture *fixture = *cm_state;
 	char inval_bearer_name[CONFIG_BT_CCP_CALL_CONTROL_SERVER_PROVIDER_NAME_MAX_LENGTH + 2];
 	int err;
 
@@ -356,12 +355,12 @@ static ZTEST_F(ccp_call_control_server_test_suite,
 
 	err = bt_ccp_call_control_server_set_bearer_provider_name(fixture->bearers[0],
 								  inval_bearer_name);
-	zassert_equal(err, -EINVAL, "Unexpected return value %d", err);
+	assert_int_equal(err, -EINVAL);
 }
 
-static ZTEST_F(ccp_call_control_server_test_suite,
-	       test_bt_ccp_call_control_server_get_bearer_provider_name)
+static void ccp_call_control_server_test_suite__test_bt_ccp_call_control_server_get_bearer_provider_name(void **cm_state)
 {
+	struct ccp_call_control_server_test_suite_fixture *fixture = *cm_state;
 	char res_bearer_name[CONFIG_BT_CCP_CALL_CONTROL_SERVER_PROVIDER_NAME_MAX_LENGTH + 1];
 	int err;
 
@@ -369,31 +368,30 @@ static ZTEST_F(ccp_call_control_server_test_suite,
 
 	err = bt_ccp_call_control_server_get_bearer_provider_name(
 		fixture->bearers[0], res_bearer_name, sizeof(res_bearer_name));
-	zassert_equal(err, 0, "Unexpected return value %d", err);
+	assert_int_equal(err, 0);
 
-	zassert_str_equal(DEFAULT_BEARER_NAME, res_bearer_name, "%s != %s", DEFAULT_BEARER_NAME,
-			  res_bearer_name);
+	assert_string_equal(DEFAULT_BEARER_NAME, res_bearer_name);
 }
 
-static ZTEST_F(ccp_call_control_server_test_suite,
-	       test_bt_ccp_call_control_server_get_bearer_provider_name_inval_not_registered)
+static void ccp_call_control_server_test_suite__test_bt_ccp_call_control_server_get_bearer_provider_name_inval_not_registered(void **cm_state)
 {
+	struct ccp_call_control_server_test_suite_fixture *fixture = *cm_state;
 	char res_bearer_name[CONFIG_BT_CCP_CALL_CONTROL_SERVER_PROVIDER_NAME_MAX_LENGTH + 1];
 	int err;
 
 	/* Register and unregister bearer to get a valid pointer but where it is unregistered*/
 	register_default_bearer(fixture);
 	err = bt_ccp_call_control_server_unregister_bearer(fixture->bearers[0]);
-	zassert_equal(err, 0, "Unexpected return value %d", err);
+	assert_int_equal(err, 0);
 
 	err = bt_ccp_call_control_server_get_bearer_provider_name(
 		fixture->bearers[0], res_bearer_name, sizeof(res_bearer_name));
-	zassert_equal(err, -EFAULT, "Unexpected return value %d", err);
+	assert_int_equal(err, -EFAULT);
 }
 
-static ZTEST_F(ccp_call_control_server_test_suite,
-	       test_bt_ccp_call_control_server_get_bearer_provider_name_inval_null_bearer)
+static void ccp_call_control_server_test_suite__test_bt_ccp_call_control_server_get_bearer_provider_name_inval_null_bearer(void **cm_state)
 {
+	struct ccp_call_control_server_test_suite_fixture *fixture = *cm_state;
 	char res_bearer_name[CONFIG_BT_CCP_CALL_CONTROL_SERVER_PROVIDER_NAME_MAX_LENGTH + 1];
 	int err;
 
@@ -401,23 +399,23 @@ static ZTEST_F(ccp_call_control_server_test_suite,
 
 	err = bt_ccp_call_control_server_get_bearer_provider_name(NULL, res_bearer_name,
 								  sizeof(res_bearer_name));
-	zassert_equal(err, -EINVAL, "Unexpected return value %d", err);
+	assert_int_equal(err, -EINVAL);
 }
 
-static ZTEST_F(ccp_call_control_server_test_suite,
-	       test_bt_ccp_call_control_server_get_bearer_provider_name_inval_null_name)
+static void ccp_call_control_server_test_suite__test_bt_ccp_call_control_server_get_bearer_provider_name_inval_null_name(void **cm_state)
 {
+	struct ccp_call_control_server_test_suite_fixture *fixture = *cm_state;
 	int err;
 
 	register_default_bearer(fixture);
 
 	err = bt_ccp_call_control_server_get_bearer_provider_name(fixture->bearers[0], NULL, 0);
-	zassert_equal(err, -EINVAL, "Unexpected return value %d", err);
+	assert_int_equal(err, -EINVAL);
 }
 
-static ZTEST_F(ccp_call_control_server_test_suite,
-	       test_bt_ccp_call_control_server_get_bearer_provider_name_inval_size_0)
+static void ccp_call_control_server_test_suite__test_bt_ccp_call_control_server_get_bearer_provider_name_inval_size_0(void **cm_state)
 {
+	struct ccp_call_control_server_test_suite_fixture *fixture = *cm_state;
 	char res_bearer_name[CONFIG_BT_CCP_CALL_CONTROL_SERVER_PROVIDER_NAME_MAX_LENGTH + 1];
 	int err;
 
@@ -425,12 +423,12 @@ static ZTEST_F(ccp_call_control_server_test_suite,
 
 	err = bt_ccp_call_control_server_get_bearer_provider_name(fixture->bearers[0],
 								  res_bearer_name, 0);
-	zassert_equal(err, -ENOMEM, "Unexpected return value %d", err);
+	assert_int_equal(err, -ENOMEM);
 }
 
-static ZTEST_F(ccp_call_control_server_test_suite,
-	       test_bt_ccp_call_control_server_get_bearer_provider_name_inval_small_size)
+static void ccp_call_control_server_test_suite__test_bt_ccp_call_control_server_get_bearer_provider_name_inval_small_size(void **cm_state)
 {
+	struct ccp_call_control_server_test_suite_fixture *fixture = *cm_state;
 	char res_bearer_name[CONFIG_BT_CCP_CALL_CONTROL_SERVER_PROVIDER_NAME_MAX_LENGTH + 1];
 	int err;
 
@@ -438,63 +436,64 @@ static ZTEST_F(ccp_call_control_server_test_suite,
 
 	err = bt_ccp_call_control_server_get_bearer_provider_name(fixture->bearers[0],
 								  res_bearer_name, 1);
-	zassert_equal(err, -ENOMEM, "Unexpected return value %d", err);
+	assert_int_equal(err, -ENOMEM);
 }
 
-static ZTEST_F(ccp_call_control_server_test_suite, test_bt_ccp_call_control_server_get_bearer_uci)
+static void ccp_call_control_server_test_suite__test_bt_ccp_call_control_server_get_bearer_uci(void **cm_state)
 {
+	struct ccp_call_control_server_test_suite_fixture *fixture = *cm_state;
 	char res_bearer_uci[BT_TBS_MAX_UCI_SIZE];
 	int err;
 
 	register_default_bearer(fixture);
 
 	err = bt_ccp_call_control_server_get_bearer_uci(fixture->bearers[0], res_bearer_uci);
-	zassert_equal(err, 0, "Unexpected return value %d", err);
+	assert_int_equal(err, 0);
 
-	zassert_str_equal(DEFAULT_BEARER_UCI, res_bearer_uci, "%s != %s", DEFAULT_BEARER_UCI,
-			  res_bearer_uci);
+	assert_string_equal(DEFAULT_BEARER_UCI, res_bearer_uci);
 }
 
-static ZTEST_F(ccp_call_control_server_test_suite,
-	       test_bt_ccp_call_control_server_get_bearer_uci_inval_not_registered)
+static void ccp_call_control_server_test_suite__test_bt_ccp_call_control_server_get_bearer_uci_inval_not_registered(void **cm_state)
 {
+	struct ccp_call_control_server_test_suite_fixture *fixture = *cm_state;
 	char res_bearer_uci[BT_TBS_MAX_UCI_SIZE];
 	int err;
 
 	/* Register and unregister bearer to get a valid pointer but where it is unregistered*/
 	register_default_bearer(fixture);
 	err = bt_ccp_call_control_server_unregister_bearer(fixture->bearers[0]);
-	zassert_equal(err, 0, "Unexpected return value %d", err);
+	assert_int_equal(err, 0);
 
 	err = bt_ccp_call_control_server_get_bearer_uci(fixture->bearers[0], res_bearer_uci);
-	zassert_equal(err, -EFAULT, "Unexpected return value %d", err);
+	assert_int_equal(err, -EFAULT);
 }
 
-static ZTEST_F(ccp_call_control_server_test_suite,
-	       test_bt_ccp_call_control_server_get_bearer_uci_inval_null_bearer)
+static void ccp_call_control_server_test_suite__test_bt_ccp_call_control_server_get_bearer_uci_inval_null_bearer(void **cm_state)
 {
+	struct ccp_call_control_server_test_suite_fixture *fixture = *cm_state;
 	char res_bearer_uci[BT_TBS_MAX_UCI_SIZE];
 	int err;
 
 	register_default_bearer(fixture);
 
 	err = bt_ccp_call_control_server_get_bearer_uci(NULL, res_bearer_uci);
-	zassert_equal(err, -EINVAL, "Unexpected return value %d", err);
+	assert_int_equal(err, -EINVAL);
 }
 
-static ZTEST_F(ccp_call_control_server_test_suite,
-	       test_bt_ccp_call_control_server_get_bearer_uci_inval_null_uci)
+static void ccp_call_control_server_test_suite__test_bt_ccp_call_control_server_get_bearer_uci_inval_null_uci(void **cm_state)
 {
+	struct ccp_call_control_server_test_suite_fixture *fixture = *cm_state;
 	int err;
 
 	register_default_bearer(fixture);
 
 	err = bt_ccp_call_control_server_get_bearer_uci(fixture->bearers[0], NULL);
-	zassert_equal(err, -EINVAL, "Unexpected return value %d", err);
+	assert_int_equal(err, -EINVAL);
 }
 
-static ZTEST_F(ccp_call_control_server_test_suite, test_bt_ccp_call_control_server_set_bearer_tech)
+static void ccp_call_control_server_test_suite__test_bt_ccp_call_control_server_set_bearer_tech(void **cm_state)
 {
+	struct ccp_call_control_server_test_suite_fixture *fixture = *cm_state;
 	const enum bt_bearer_tech new_bearer_tech = BT_BEARER_TECH_3G;
 	enum bt_bearer_tech res_bearer_tech;
 	int err;
@@ -502,108 +501,107 @@ static ZTEST_F(ccp_call_control_server_test_suite, test_bt_ccp_call_control_serv
 	register_default_bearer(fixture);
 
 	err = bt_ccp_call_control_server_set_bearer_tech(fixture->bearers[0], new_bearer_tech);
-	zassert_equal(err, 0, "Unexpected return value %d", err);
+	assert_int_equal(err, 0);
 
 	err = bt_ccp_call_control_server_get_bearer_tech(fixture->bearers[0], &res_bearer_tech);
-	zassert_equal(err, 0, "Unexpected return value %d", err);
+	assert_int_equal(err, 0);
 
-	zassert_equal(new_bearer_tech, res_bearer_tech, "%d != %d", new_bearer_tech,
-		      res_bearer_tech);
+	assert_int_equal(new_bearer_tech, res_bearer_tech);
 }
 
-static ZTEST_F(ccp_call_control_server_test_suite,
-	       test_bt_ccp_call_control_server_set_bearer_tech_inval_not_registered)
+static void ccp_call_control_server_test_suite__test_bt_ccp_call_control_server_set_bearer_tech_inval_not_registered(void **cm_state)
 {
+	struct ccp_call_control_server_test_suite_fixture *fixture = *cm_state;
 	const enum bt_bearer_tech new_bearer_tech = BT_BEARER_TECH_3G;
 	int err;
 
 	/* Register and unregister bearer to get a valid pointer but where it is unregistered*/
 	register_default_bearer(fixture);
 	err = bt_ccp_call_control_server_unregister_bearer(fixture->bearers[0]);
-	zassert_equal(err, 0, "Unexpected return value %d", err);
+	assert_int_equal(err, 0);
 
 	err = bt_ccp_call_control_server_set_bearer_tech(fixture->bearers[0], new_bearer_tech);
-	zassert_equal(err, -EFAULT, "Unexpected return value %d", err);
+	assert_int_equal(err, -EFAULT);
 }
 
-static ZTEST_F(ccp_call_control_server_test_suite,
-	       test_bt_ccp_call_control_server_set_bearer_tech_inval_null_bearer)
+static void ccp_call_control_server_test_suite__test_bt_ccp_call_control_server_set_bearer_tech_inval_null_bearer(void **cm_state)
 {
+	struct ccp_call_control_server_test_suite_fixture *fixture = *cm_state;
 	const enum bt_bearer_tech new_bearer_tech = BT_BEARER_TECH_3G;
 	int err;
 
 	register_default_bearer(fixture);
 
 	err = bt_ccp_call_control_server_set_bearer_tech(NULL, new_bearer_tech);
-	zassert_equal(err, -EINVAL, "Unexpected return value %d", err);
+	assert_int_equal(err, -EINVAL);
 }
 
-static ZTEST_F(ccp_call_control_server_test_suite,
-	       test_bt_ccp_call_control_server_set_bearer_tech_inval_tech)
+static void ccp_call_control_server_test_suite__test_bt_ccp_call_control_server_set_bearer_tech_inval_tech(void **cm_state)
 {
+	struct ccp_call_control_server_test_suite_fixture *fixture = *cm_state;
 	int err;
 
 	register_default_bearer(fixture);
 
 	err = bt_ccp_call_control_server_set_bearer_tech(fixture->bearers[0], 0x10);
-	zassert_equal(err, -EINVAL, "Unexpected return value %d", err);
+	assert_int_equal(err, -EINVAL);
 }
 
-static ZTEST_F(ccp_call_control_server_test_suite, test_bt_ccp_call_control_server_get_bearer_tech)
+static void ccp_call_control_server_test_suite__test_bt_ccp_call_control_server_get_bearer_tech(void **cm_state)
 {
+	struct ccp_call_control_server_test_suite_fixture *fixture = *cm_state;
 	enum bt_bearer_tech res_bearer_tech;
 	int err;
 
 	register_default_bearer(fixture);
 
 	err = bt_ccp_call_control_server_get_bearer_tech(fixture->bearers[0], &res_bearer_tech);
-	zassert_equal(err, 0, "Unexpected return value %d", err);
+	assert_int_equal(err, 0);
 
-	zassert_equal(DEFAULT_BEARER_TECH, res_bearer_tech, "%d != %d", DEFAULT_BEARER_TECH,
-		      res_bearer_tech);
+	assert_int_equal(DEFAULT_BEARER_TECH, res_bearer_tech);
 }
 
-static ZTEST_F(ccp_call_control_server_test_suite,
-	       test_bt_ccp_call_control_server_get_bearer_tech_inval_not_registered)
+static void ccp_call_control_server_test_suite__test_bt_ccp_call_control_server_get_bearer_tech_inval_not_registered(void **cm_state)
 {
+	struct ccp_call_control_server_test_suite_fixture *fixture = *cm_state;
 	enum bt_bearer_tech res_bearer_tech;
 	int err;
 
 	/* Register and unregister bearer to get a valid pointer but where it is unregistered*/
 	register_default_bearer(fixture);
 	err = bt_ccp_call_control_server_unregister_bearer(fixture->bearers[0]);
-	zassert_equal(err, 0, "Unexpected return value %d", err);
+	assert_int_equal(err, 0);
 
 	err = bt_ccp_call_control_server_get_bearer_tech(fixture->bearers[0], &res_bearer_tech);
-	zassert_equal(err, -EFAULT, "Unexpected return value %d", err);
+	assert_int_equal(err, -EFAULT);
 }
 
-static ZTEST_F(ccp_call_control_server_test_suite,
-	       test_bt_ccp_call_control_server_get_bearer_tech_inval_null_bearer)
+static void ccp_call_control_server_test_suite__test_bt_ccp_call_control_server_get_bearer_tech_inval_null_bearer(void **cm_state)
 {
+	struct ccp_call_control_server_test_suite_fixture *fixture = *cm_state;
 	enum bt_bearer_tech res_bearer_tech;
 	int err;
 
 	register_default_bearer(fixture);
 
 	err = bt_ccp_call_control_server_get_bearer_tech(NULL, &res_bearer_tech);
-	zassert_equal(err, -EINVAL, "Unexpected return value %d", err);
+	assert_int_equal(err, -EINVAL);
 }
 
-static ZTEST_F(ccp_call_control_server_test_suite,
-	       test_bt_ccp_call_control_server_get_bearer_tech_inval_null_tech)
+static void ccp_call_control_server_test_suite__test_bt_ccp_call_control_server_get_bearer_tech_inval_null_tech(void **cm_state)
 {
+	struct ccp_call_control_server_test_suite_fixture *fixture = *cm_state;
 	int err;
 
 	register_default_bearer(fixture);
 
 	err = bt_ccp_call_control_server_get_bearer_tech(fixture->bearers[0], NULL);
-	zassert_equal(err, -EINVAL, "Unexpected return value %d", err);
+	assert_int_equal(err, -EINVAL);
 }
 
-static ZTEST_F(ccp_call_control_server_test_suite,
-	       test_bt_ccp_call_control_server_set_bearer_uri_schemes)
+static void ccp_call_control_server_test_suite__test_bt_ccp_call_control_server_set_bearer_uri_schemes(void **cm_state)
 {
+	struct ccp_call_control_server_test_suite_fixture *fixture = *cm_state;
 	char res_uri_schemes[CONFIG_BT_CCP_CALL_CONTROL_SERVER_URI_SCHEMES_MAX_LENGTH + 1];
 	/* Contains a mix of simple URIs, but also ones that use special characters like `-`, `+`,
 	 * `.` and capital letters.
@@ -616,19 +614,18 @@ static ZTEST_F(ccp_call_control_server_test_suite,
 
 	err = bt_ccp_call_control_server_set_bearer_uri_schemes(fixture->bearers[0],
 								new_uri_schemes);
-	zassert_equal(err, 0, "Unexpected return value %d", err);
+	assert_int_equal(err, 0);
 
 	err = bt_ccp_call_control_server_get_bearer_uri_schemes(
 		fixture->bearers[0], res_uri_schemes, sizeof(res_uri_schemes));
-	zassert_equal(err, 0, "Unexpected return value %d", err);
+	assert_int_equal(err, 0);
 
-	zassert_str_equal(new_uri_schemes, res_uri_schemes, "%s != %s", new_uri_schemes,
-			  res_uri_schemes);
+	assert_string_equal(new_uri_schemes, res_uri_schemes);
 }
 
-static ZTEST_F(ccp_call_control_server_test_suite,
-	       test_bt_ccp_call_control_server_set_bearer_uri_schemes_no_change)
+static void ccp_call_control_server_test_suite__test_bt_ccp_call_control_server_set_bearer_uri_schemes_no_change(void **cm_state)
 {
+	struct ccp_call_control_server_test_suite_fixture *fixture = *cm_state;
 	char res_uri_schemes[CONFIG_BT_CCP_CALL_CONTROL_SERVER_URI_SCHEMES_MAX_LENGTH + 1];
 	/* Contains a mix of simple URIs, but also ones that use special characters like `-`, `+`,
 	 * `.` and capital letters.
@@ -641,67 +638,65 @@ static ZTEST_F(ccp_call_control_server_test_suite,
 	/* Verify that the `same_uri_schemes` is already set */
 	err = bt_ccp_call_control_server_get_bearer_uri_schemes(
 		fixture->bearers[0], res_uri_schemes, sizeof(res_uri_schemes));
-	zassert_equal(err, 0, "Unexpected return value %d", err);
+	assert_int_equal(err, 0);
 
-	zassert_str_equal(same_uri_schemes, res_uri_schemes, "%s != %s", same_uri_schemes,
-			  res_uri_schemes);
+	assert_string_equal(same_uri_schemes, res_uri_schemes);
 
 	/* Attempt to set again */
 	err = bt_ccp_call_control_server_set_bearer_uri_schemes(fixture->bearers[0],
 								same_uri_schemes);
-	zassert_equal(err, 0, "Unexpected return value %d", err);
+	assert_int_equal(err, 0);
 
 	/* Verify no change */
 	err = bt_ccp_call_control_server_get_bearer_uri_schemes(
 		fixture->bearers[0], res_uri_schemes, sizeof(res_uri_schemes));
-	zassert_equal(err, 0, "Unexpected return value %d", err);
+	assert_int_equal(err, 0);
 
-	zassert_str_equal(same_uri_schemes, res_uri_schemes, "%s != %s", same_uri_schemes,
-			  res_uri_schemes);
+	assert_string_equal(same_uri_schemes, res_uri_schemes);
 }
 
-static ZTEST_F(ccp_call_control_server_test_suite,
-	       test_bt_ccp_call_control_server_set_bearer_uri_schemes_inval_not_registered)
+static void ccp_call_control_server_test_suite__test_bt_ccp_call_control_server_set_bearer_uri_schemes_inval_not_registered(void **cm_state)
 {
+	struct ccp_call_control_server_test_suite_fixture *fixture = *cm_state;
 	const char *new_uri_schemes = "tel";
 	int err;
 
 	/* Register and unregister bearer to get a valid pointer but where it is unregistered*/
 	register_default_bearer(fixture);
 	err = bt_ccp_call_control_server_unregister_bearer(fixture->bearers[0]);
-	zassert_equal(err, 0, "Unexpected return value %d", err);
+	assert_int_equal(err, 0);
 
 	err = bt_ccp_call_control_server_set_bearer_uri_schemes(fixture->bearers[0],
 								new_uri_schemes);
-	zassert_equal(err, -EFAULT, "Unexpected return value %d", err);
+	assert_int_equal(err, -EFAULT);
 }
 
-static ZTEST_F(ccp_call_control_server_test_suite,
-	       test_bt_ccp_call_control_server_set_bearer_uri_schemes_inval_null_bearer)
+static void ccp_call_control_server_test_suite__test_bt_ccp_call_control_server_set_bearer_uri_schemes_inval_null_bearer(void **cm_state)
 {
+	struct ccp_call_control_server_test_suite_fixture *fixture = *cm_state;
 	const char *new_uri_schemes = "tel";
 	int err;
 
 	register_default_bearer(fixture);
 
 	err = bt_ccp_call_control_server_set_bearer_uri_schemes(NULL, new_uri_schemes);
-	zassert_equal(err, -EINVAL, "Unexpected return value %d", err);
+	assert_int_equal(err, -EINVAL);
 }
 
-static ZTEST_F(ccp_call_control_server_test_suite,
-	       test_bt_ccp_call_control_server_set_bearer_uri_schemes_inval_null_uri_schemes)
+static void ccp_call_control_server_test_suite__test_bt_ccp_call_control_server_set_bearer_uri_schemes_inval_null_uri_schemes(void **cm_state)
 {
+	struct ccp_call_control_server_test_suite_fixture *fixture = *cm_state;
 	int err;
 
 	register_default_bearer(fixture);
 
 	err = bt_ccp_call_control_server_set_bearer_uri_schemes(fixture->bearers[0], NULL);
-	zassert_equal(err, -EINVAL, "Unexpected return value %d", err);
+	assert_int_equal(err, -EINVAL);
 }
 
-static ZTEST_F(ccp_call_control_server_test_suite,
-	       test_bt_ccp_call_control_server_set_bearer_uri_schemes_inval_empty_uri_schemes)
+static void ccp_call_control_server_test_suite__test_bt_ccp_call_control_server_set_bearer_uri_schemes_inval_empty_uri_schemes(void **cm_state)
 {
+	struct ccp_call_control_server_test_suite_fixture *fixture = *cm_state;
 	const char *inval_bearer_uri_schemes = "";
 	int err;
 
@@ -709,12 +704,12 @@ static ZTEST_F(ccp_call_control_server_test_suite,
 
 	err = bt_ccp_call_control_server_set_bearer_uri_schemes(fixture->bearers[0],
 								inval_bearer_uri_schemes);
-	zassert_equal(err, -EINVAL, "Unexpected return value %d", err);
+	assert_int_equal(err, -EINVAL);
 }
 
-static ZTEST_F(ccp_call_control_server_test_suite,
-	       test_bt_ccp_call_control_server_set_bearer_uri_schemes_inval_long_uri_schemes)
+static void ccp_call_control_server_test_suite__test_bt_ccp_call_control_server_set_bearer_uri_schemes_inval_long_uri_schemes(void **cm_state)
 {
+	struct ccp_call_control_server_test_suite_fixture *fixture = *cm_state;
 	char inval_bearer_uri_schemes[CONFIG_BT_CCP_CALL_CONTROL_SERVER_URI_SCHEMES_MAX_LENGTH + 2];
 	int err;
 
@@ -727,12 +722,12 @@ static ZTEST_F(ccp_call_control_server_test_suite,
 
 	err = bt_ccp_call_control_server_set_bearer_uri_schemes(fixture->bearers[0],
 								inval_bearer_uri_schemes);
-	zassert_equal(err, -ENOMEM, "Unexpected return value %d", err);
+	assert_int_equal(err, -ENOMEM);
 }
 
-static ZTEST_F(ccp_call_control_server_test_suite,
-	       test_bt_ccp_call_control_server_set_bearer_uri_schemes_inval_inval_chars)
+static void ccp_call_control_server_test_suite__test_bt_ccp_call_control_server_set_bearer_uri_schemes_inval_inval_chars(void **cm_state)
 {
+	struct ccp_call_control_server_test_suite_fixture *fixture = *cm_state;
 	char *inval_bearer_uri_schemes_utf8 = "tel,🌍";
 	int err;
 
@@ -740,36 +735,36 @@ static ZTEST_F(ccp_call_control_server_test_suite,
 
 	err = bt_ccp_call_control_server_set_bearer_uri_schemes(fixture->bearers[0],
 								inval_bearer_uri_schemes_utf8);
-	zassert_equal(err, -EINVAL, "Unexpected return value %d", err);
+	assert_int_equal(err, -EINVAL);
 
 	char *inval_bearer_uri_schemes_missing_after_comma = "tel,";
 
 	err = bt_ccp_call_control_server_set_bearer_uri_schemes(
 		fixture->bearers[0], inval_bearer_uri_schemes_missing_after_comma);
-	zassert_equal(err, -EINVAL, "Unexpected return value %d", err);
+	assert_int_equal(err, -EINVAL);
 
 	char *inval_bearer_uri_schemes_special_char = "tel,a@";
 
 	err = bt_ccp_call_control_server_set_bearer_uri_schemes(
 		fixture->bearers[0], inval_bearer_uri_schemes_special_char);
-	zassert_equal(err, -EINVAL, "Unexpected return value %d", err);
+	assert_int_equal(err, -EINVAL);
 
 	char *inval_bearer_uri_schemes_number_first = "123,tel";
 
 	err = bt_ccp_call_control_server_set_bearer_uri_schemes(
 		fixture->bearers[0], inval_bearer_uri_schemes_number_first);
-	zassert_equal(err, -EINVAL, "Unexpected return value %d", err);
+	assert_int_equal(err, -EINVAL);
 
 	char *inval_bearer_uri_schemes_number_first_2 = "tel,123";
 
 	err = bt_ccp_call_control_server_set_bearer_uri_schemes(
 		fixture->bearers[0], inval_bearer_uri_schemes_number_first_2);
-	zassert_equal(err, -EINVAL, "Unexpected return value %d", err);
+	assert_int_equal(err, -EINVAL);
 }
 
-static ZTEST_F(ccp_call_control_server_test_suite,
-	       test_bt_ccp_call_control_server_get_bearer_uri_schemes)
+static void ccp_call_control_server_test_suite__test_bt_ccp_call_control_server_get_bearer_uri_schemes(void **cm_state)
 {
+	struct ccp_call_control_server_test_suite_fixture *fixture = *cm_state;
 	char res_uri_schemes[CONFIG_BT_CCP_CALL_CONTROL_SERVER_URI_SCHEMES_MAX_LENGTH + 1];
 	int err;
 
@@ -777,31 +772,30 @@ static ZTEST_F(ccp_call_control_server_test_suite,
 
 	err = bt_ccp_call_control_server_get_bearer_uri_schemes(
 		fixture->bearers[0], res_uri_schemes, sizeof(res_uri_schemes));
-	zassert_equal(err, 0, "Unexpected return value %d", err);
+	assert_int_equal(err, 0);
 
-	zassert_str_equal(DEFAULT_BEARER_URI_SCHEMES, res_uri_schemes, "%s != %s",
-			  DEFAULT_BEARER_NAME, res_uri_schemes);
+	assert_string_equal(DEFAULT_BEARER_URI_SCHEMES, res_uri_schemes);
 }
 
-static ZTEST_F(ccp_call_control_server_test_suite,
-	       test_bt_ccp_call_control_server_get_bearer_uri_schemes_inval_not_registered)
+static void ccp_call_control_server_test_suite__test_bt_ccp_call_control_server_get_bearer_uri_schemes_inval_not_registered(void **cm_state)
 {
+	struct ccp_call_control_server_test_suite_fixture *fixture = *cm_state;
 	char res_uri_schemes[CONFIG_BT_CCP_CALL_CONTROL_SERVER_URI_SCHEMES_MAX_LENGTH + 1];
 	int err;
 
 	/* Register and unregister bearer to get a valid pointer but where it is unregistered*/
 	register_default_bearer(fixture);
 	err = bt_ccp_call_control_server_unregister_bearer(fixture->bearers[0]);
-	zassert_equal(err, 0, "Unexpected return value %d", err);
+	assert_int_equal(err, 0);
 
 	err = bt_ccp_call_control_server_get_bearer_uri_schemes(
 		fixture->bearers[0], res_uri_schemes, sizeof(res_uri_schemes));
-	zassert_equal(err, -EFAULT, "Unexpected return value %d", err);
+	assert_int_equal(err, -EFAULT);
 }
 
-static ZTEST_F(ccp_call_control_server_test_suite,
-	       test_bt_ccp_call_control_server_get_bearer_uri_schemes_inval_null_bearer)
+static void ccp_call_control_server_test_suite__test_bt_ccp_call_control_server_get_bearer_uri_schemes_inval_null_bearer(void **cm_state)
 {
+	struct ccp_call_control_server_test_suite_fixture *fixture = *cm_state;
 	char res_uri_schemes[CONFIG_BT_CCP_CALL_CONTROL_SERVER_URI_SCHEMES_MAX_LENGTH + 1];
 	int err;
 
@@ -809,12 +803,12 @@ static ZTEST_F(ccp_call_control_server_test_suite,
 
 	err = bt_ccp_call_control_server_get_bearer_uri_schemes(NULL, res_uri_schemes,
 								sizeof(res_uri_schemes));
-	zassert_equal(err, -EINVAL, "Unexpected return value %d", err);
+	assert_int_equal(err, -EINVAL);
 }
 
-static ZTEST_F(ccp_call_control_server_test_suite,
-	       test_bt_ccp_call_control_server_get_bearer_uri_schemes_inval_null_uri_schemes)
+static void ccp_call_control_server_test_suite__test_bt_ccp_call_control_server_get_bearer_uri_schemes_inval_null_uri_schemes(void **cm_state)
 {
+	struct ccp_call_control_server_test_suite_fixture *fixture = *cm_state;
 	int err;
 
 	register_default_bearer(fixture);
@@ -822,12 +816,12 @@ static ZTEST_F(ccp_call_control_server_test_suite,
 	err = bt_ccp_call_control_server_get_bearer_uri_schemes(
 		fixture->bearers[0], NULL,
 		CONFIG_BT_CCP_CALL_CONTROL_SERVER_URI_SCHEMES_MAX_LENGTH);
-	zassert_equal(err, -EINVAL, "Unexpected return value %d", err);
+	assert_int_equal(err, -EINVAL);
 }
 
-static ZTEST_F(ccp_call_control_server_test_suite,
-	       test_bt_ccp_call_control_server_get_bearer_uri_schemes_inval_zero_size)
+static void ccp_call_control_server_test_suite__test_bt_ccp_call_control_server_get_bearer_uri_schemes_inval_zero_size(void **cm_state)
 {
+	struct ccp_call_control_server_test_suite_fixture *fixture = *cm_state;
 	char res_uri_schemes[CONFIG_BT_CCP_CALL_CONTROL_SERVER_URI_SCHEMES_MAX_LENGTH + 1];
 	int err;
 
@@ -835,5 +829,85 @@ static ZTEST_F(ccp_call_control_server_test_suite,
 
 	err = bt_ccp_call_control_server_get_bearer_uri_schemes(fixture->bearers[0],
 								res_uri_schemes, 0U);
-	zassert_equal(err, -ENOMEM, "Unexpected return value %d", err);
+	assert_int_equal(err, -ENOMEM);
 }
+
+int bt_test_ccp_call_control_server_test_suite_setup(void **state)
+{
+	int environment_result = bt_test_audio_ccp_call_control_server_environment_setup(state);
+
+	if (environment_result != 0) {
+		return environment_result;
+	}
+
+	*state = ccp_call_control_server_test_suite_setup();
+	return 0;
+}
+static int bt_test_ccp_call_control_server_test_suite_before(void **state)
+{
+	(void)state;
+	ccp_call_control_server_test_suite_before(*state);
+	return 0;
+}
+int bt_test_ccp_call_control_server_test_suite_after(void **state)
+{
+	(void)state;
+	ccp_call_control_server_test_suite_after(*state);
+	return 0;
+}
+int bt_test_ccp_call_control_server_test_suite_teardown(void **state)
+{
+	(void)state;
+	ccp_call_control_server_test_suite_teardown(*state);
+	return 0;
+}
+static const struct CMUnitTest test_cases_ccp_call_control_server_test_suite[] = {
+	cmocka_unit_test_setup_teardown(ccp_call_control_server_test_suite__test_ccp_call_control_server_register_bearer, bt_test_ccp_call_control_server_test_suite_before, bt_test_ccp_call_control_server_test_suite_after),
+	cmocka_unit_test_setup_teardown(ccp_call_control_server_test_suite__test_ccp_call_control_server_register_multiple_bearers, bt_test_ccp_call_control_server_test_suite_before, bt_test_ccp_call_control_server_test_suite_after),
+	cmocka_unit_test_setup_teardown(ccp_call_control_server_test_suite__test_ccp_call_control_server_register_bearer_inval_null_param, bt_test_ccp_call_control_server_test_suite_before, bt_test_ccp_call_control_server_test_suite_after),
+	cmocka_unit_test_setup_teardown(ccp_call_control_server_test_suite__test_ccp_call_control_server_register_bearer_inval_null_bearer, bt_test_ccp_call_control_server_test_suite_before, bt_test_ccp_call_control_server_test_suite_after),
+	cmocka_unit_test_setup_teardown(ccp_call_control_server_test_suite__test_ccp_call_control_server_register_bearer_inval_no_gtbs, bt_test_ccp_call_control_server_test_suite_before, bt_test_ccp_call_control_server_test_suite_after),
+	cmocka_unit_test_setup_teardown(ccp_call_control_server_test_suite__test_ccp_call_control_server_register_bearer_inval_double_gtbs, bt_test_ccp_call_control_server_test_suite_before, bt_test_ccp_call_control_server_test_suite_after),
+	cmocka_unit_test_setup_teardown(ccp_call_control_server_test_suite__test_ccp_call_control_server_register_bearer_inval_cnt, bt_test_ccp_call_control_server_test_suite_before, bt_test_ccp_call_control_server_test_suite_after),
+	cmocka_unit_test_setup_teardown(ccp_call_control_server_test_suite__test_ccp_call_control_server_unregister_bearer, bt_test_ccp_call_control_server_test_suite_before, bt_test_ccp_call_control_server_test_suite_after),
+	cmocka_unit_test_setup_teardown(ccp_call_control_server_test_suite__test_ccp_call_control_server_unregister_bearer_inval_double_unregister, bt_test_ccp_call_control_server_test_suite_before, bt_test_ccp_call_control_server_test_suite_after),
+	cmocka_unit_test_setup_teardown(ccp_call_control_server_test_suite__test_ccp_call_control_server_unregister_bearer_inval_null_bearer, bt_test_ccp_call_control_server_test_suite_before, bt_test_ccp_call_control_server_test_suite_after),
+	cmocka_unit_test_setup_teardown(ccp_call_control_server_test_suite__test_bt_ccp_call_control_server_set_bearer_provider_name, bt_test_ccp_call_control_server_test_suite_before, bt_test_ccp_call_control_server_test_suite_after),
+	cmocka_unit_test_setup_teardown(ccp_call_control_server_test_suite__test_bt_ccp_call_control_server_set_bearer_provider_name_inval_not_registered, bt_test_ccp_call_control_server_test_suite_before, bt_test_ccp_call_control_server_test_suite_after),
+	cmocka_unit_test_setup_teardown(ccp_call_control_server_test_suite__test_bt_ccp_call_control_server_set_bearer_provider_name_inval_null_bearer, bt_test_ccp_call_control_server_test_suite_before, bt_test_ccp_call_control_server_test_suite_after),
+	cmocka_unit_test_setup_teardown(ccp_call_control_server_test_suite__test_bt_ccp_call_control_server_set_bearer_provider_name_inval_null_name, bt_test_ccp_call_control_server_test_suite_before, bt_test_ccp_call_control_server_test_suite_after),
+	cmocka_unit_test_setup_teardown(ccp_call_control_server_test_suite__test_bt_ccp_call_control_server_set_bearer_provider_name_inval_empty_name, bt_test_ccp_call_control_server_test_suite_before, bt_test_ccp_call_control_server_test_suite_after),
+	cmocka_unit_test_setup_teardown(ccp_call_control_server_test_suite__test_bt_ccp_call_control_server_set_bearer_provider_name_inval_long_name, bt_test_ccp_call_control_server_test_suite_before, bt_test_ccp_call_control_server_test_suite_after),
+	cmocka_unit_test_setup_teardown(ccp_call_control_server_test_suite__test_bt_ccp_call_control_server_get_bearer_provider_name, bt_test_ccp_call_control_server_test_suite_before, bt_test_ccp_call_control_server_test_suite_after),
+	cmocka_unit_test_setup_teardown(ccp_call_control_server_test_suite__test_bt_ccp_call_control_server_get_bearer_provider_name_inval_not_registered, bt_test_ccp_call_control_server_test_suite_before, bt_test_ccp_call_control_server_test_suite_after),
+	cmocka_unit_test_setup_teardown(ccp_call_control_server_test_suite__test_bt_ccp_call_control_server_get_bearer_provider_name_inval_null_bearer, bt_test_ccp_call_control_server_test_suite_before, bt_test_ccp_call_control_server_test_suite_after),
+	cmocka_unit_test_setup_teardown(ccp_call_control_server_test_suite__test_bt_ccp_call_control_server_get_bearer_provider_name_inval_null_name, bt_test_ccp_call_control_server_test_suite_before, bt_test_ccp_call_control_server_test_suite_after),
+	cmocka_unit_test_setup_teardown(ccp_call_control_server_test_suite__test_bt_ccp_call_control_server_get_bearer_provider_name_inval_size_0, bt_test_ccp_call_control_server_test_suite_before, bt_test_ccp_call_control_server_test_suite_after),
+	cmocka_unit_test_setup_teardown(ccp_call_control_server_test_suite__test_bt_ccp_call_control_server_get_bearer_provider_name_inval_small_size, bt_test_ccp_call_control_server_test_suite_before, bt_test_ccp_call_control_server_test_suite_after),
+	cmocka_unit_test_setup_teardown(ccp_call_control_server_test_suite__test_bt_ccp_call_control_server_get_bearer_uci, bt_test_ccp_call_control_server_test_suite_before, bt_test_ccp_call_control_server_test_suite_after),
+	cmocka_unit_test_setup_teardown(ccp_call_control_server_test_suite__test_bt_ccp_call_control_server_get_bearer_uci_inval_not_registered, bt_test_ccp_call_control_server_test_suite_before, bt_test_ccp_call_control_server_test_suite_after),
+	cmocka_unit_test_setup_teardown(ccp_call_control_server_test_suite__test_bt_ccp_call_control_server_get_bearer_uci_inval_null_bearer, bt_test_ccp_call_control_server_test_suite_before, bt_test_ccp_call_control_server_test_suite_after),
+	cmocka_unit_test_setup_teardown(ccp_call_control_server_test_suite__test_bt_ccp_call_control_server_get_bearer_uci_inval_null_uci, bt_test_ccp_call_control_server_test_suite_before, bt_test_ccp_call_control_server_test_suite_after),
+	cmocka_unit_test_setup_teardown(ccp_call_control_server_test_suite__test_bt_ccp_call_control_server_set_bearer_tech, bt_test_ccp_call_control_server_test_suite_before, bt_test_ccp_call_control_server_test_suite_after),
+	cmocka_unit_test_setup_teardown(ccp_call_control_server_test_suite__test_bt_ccp_call_control_server_set_bearer_tech_inval_not_registered, bt_test_ccp_call_control_server_test_suite_before, bt_test_ccp_call_control_server_test_suite_after),
+	cmocka_unit_test_setup_teardown(ccp_call_control_server_test_suite__test_bt_ccp_call_control_server_set_bearer_tech_inval_null_bearer, bt_test_ccp_call_control_server_test_suite_before, bt_test_ccp_call_control_server_test_suite_after),
+	cmocka_unit_test_setup_teardown(ccp_call_control_server_test_suite__test_bt_ccp_call_control_server_set_bearer_tech_inval_tech, bt_test_ccp_call_control_server_test_suite_before, bt_test_ccp_call_control_server_test_suite_after),
+	cmocka_unit_test_setup_teardown(ccp_call_control_server_test_suite__test_bt_ccp_call_control_server_get_bearer_tech, bt_test_ccp_call_control_server_test_suite_before, bt_test_ccp_call_control_server_test_suite_after),
+	cmocka_unit_test_setup_teardown(ccp_call_control_server_test_suite__test_bt_ccp_call_control_server_get_bearer_tech_inval_not_registered, bt_test_ccp_call_control_server_test_suite_before, bt_test_ccp_call_control_server_test_suite_after),
+	cmocka_unit_test_setup_teardown(ccp_call_control_server_test_suite__test_bt_ccp_call_control_server_get_bearer_tech_inval_null_bearer, bt_test_ccp_call_control_server_test_suite_before, bt_test_ccp_call_control_server_test_suite_after),
+	cmocka_unit_test_setup_teardown(ccp_call_control_server_test_suite__test_bt_ccp_call_control_server_get_bearer_tech_inval_null_tech, bt_test_ccp_call_control_server_test_suite_before, bt_test_ccp_call_control_server_test_suite_after),
+	cmocka_unit_test_setup_teardown(ccp_call_control_server_test_suite__test_bt_ccp_call_control_server_set_bearer_uri_schemes, bt_test_ccp_call_control_server_test_suite_before, bt_test_ccp_call_control_server_test_suite_after),
+	cmocka_unit_test_setup_teardown(ccp_call_control_server_test_suite__test_bt_ccp_call_control_server_set_bearer_uri_schemes_no_change, bt_test_ccp_call_control_server_test_suite_before, bt_test_ccp_call_control_server_test_suite_after),
+	cmocka_unit_test_setup_teardown(ccp_call_control_server_test_suite__test_bt_ccp_call_control_server_set_bearer_uri_schemes_inval_not_registered, bt_test_ccp_call_control_server_test_suite_before, bt_test_ccp_call_control_server_test_suite_after),
+	cmocka_unit_test_setup_teardown(ccp_call_control_server_test_suite__test_bt_ccp_call_control_server_set_bearer_uri_schemes_inval_null_bearer, bt_test_ccp_call_control_server_test_suite_before, bt_test_ccp_call_control_server_test_suite_after),
+	cmocka_unit_test_setup_teardown(ccp_call_control_server_test_suite__test_bt_ccp_call_control_server_set_bearer_uri_schemes_inval_null_uri_schemes, bt_test_ccp_call_control_server_test_suite_before, bt_test_ccp_call_control_server_test_suite_after),
+	cmocka_unit_test_setup_teardown(ccp_call_control_server_test_suite__test_bt_ccp_call_control_server_set_bearer_uri_schemes_inval_empty_uri_schemes, bt_test_ccp_call_control_server_test_suite_before, bt_test_ccp_call_control_server_test_suite_after),
+	cmocka_unit_test_setup_teardown(ccp_call_control_server_test_suite__test_bt_ccp_call_control_server_set_bearer_uri_schemes_inval_long_uri_schemes, bt_test_ccp_call_control_server_test_suite_before, bt_test_ccp_call_control_server_test_suite_after),
+	cmocka_unit_test_setup_teardown(ccp_call_control_server_test_suite__test_bt_ccp_call_control_server_set_bearer_uri_schemes_inval_inval_chars, bt_test_ccp_call_control_server_test_suite_before, bt_test_ccp_call_control_server_test_suite_after),
+	cmocka_unit_test_setup_teardown(ccp_call_control_server_test_suite__test_bt_ccp_call_control_server_get_bearer_uri_schemes, bt_test_ccp_call_control_server_test_suite_before, bt_test_ccp_call_control_server_test_suite_after),
+	cmocka_unit_test_setup_teardown(ccp_call_control_server_test_suite__test_bt_ccp_call_control_server_get_bearer_uri_schemes_inval_not_registered, bt_test_ccp_call_control_server_test_suite_before, bt_test_ccp_call_control_server_test_suite_after),
+	cmocka_unit_test_setup_teardown(ccp_call_control_server_test_suite__test_bt_ccp_call_control_server_get_bearer_uri_schemes_inval_null_bearer, bt_test_ccp_call_control_server_test_suite_before, bt_test_ccp_call_control_server_test_suite_after),
+	cmocka_unit_test_setup_teardown(ccp_call_control_server_test_suite__test_bt_ccp_call_control_server_get_bearer_uri_schemes_inval_null_uri_schemes, bt_test_ccp_call_control_server_test_suite_before, bt_test_ccp_call_control_server_test_suite_after),
+	cmocka_unit_test_setup_teardown(ccp_call_control_server_test_suite__test_bt_ccp_call_control_server_get_bearer_uri_schemes_inval_zero_size, bt_test_ccp_call_control_server_test_suite_before, bt_test_ccp_call_control_server_test_suite_after),
+};
+BT_TEST_SUITE(ccp_call_control_server_test_suite, test_cases_ccp_call_control_server_test_suite, bt_test_ccp_call_control_server_test_suite_setup, bt_test_ccp_call_control_server_test_suite_teardown);

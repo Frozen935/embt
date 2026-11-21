@@ -1,3 +1,4 @@
+#include "support/test_support.h"
 /*
  * SPDX-FileCopyrightText: Copyright (c) 2026 Silicon Laboratories Inc.
  * SPDX-License-Identifier: Apache-2.0
@@ -8,15 +9,13 @@
 #include <stdint.h>
 #include <string.h>
 
-#include <zephyr/bluetooth/addr.h>
-#include <zephyr/bluetooth/classic/l2cap_br.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/l2cap.h>
-#include <zephyr/kernel.h>
-#include <zephyr/net_buf.h>
-#include <zephyr/sys/util.h>
-#include <zephyr/ztest.h>
+#include <embt/bluetooth/addr.h>
+#include <embt/bluetooth/classic/l2cap_br.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/l2cap.h>
 
+#include <embt/net_buf.h>
+#include <embt/base/util.h>
 #include "host/conn_internal.h"
 #include "host/classic/l2cap_br_interface.h"
 
@@ -36,8 +35,8 @@ static struct net_buf *data_buf(size_t reserve)
 {
 	struct net_buf *buf;
 
-	buf = net_buf_alloc(&unsendable_pool, K_NO_WAIT);
-	zassert_not_null(buf);
+	buf = net_buf_alloc(&unsendable_pool, BT_NO_WAIT);
+	assert_non_null(buf);
 
 	net_buf_reserve(buf, reserve);
 	net_buf_add_mem(buf, DATA, strlen(DATA));
@@ -47,9 +46,9 @@ static struct net_buf *data_buf(size_t reserve)
 
 static void check_unchanged(const struct net_buf *buf, size_t reserve)
 {
-	zassert_equal(net_buf_headroom(buf), reserve, "headroom %zu", net_buf_headroom(buf));
-	zassert_equal(buf->len, strlen(DATA));
-	zassert_mem_equal(buf->data, DATA, strlen(DATA));
+	assert_int_equal(net_buf_headroom(buf), reserve);
+	assert_int_equal(buf->len, strlen(DATA));
+	assert_memory_equal(buf->data, DATA, strlen(DATA));
 }
 
 /* Answer the Information Request sent on connection with a feature mask
@@ -61,10 +60,10 @@ static void recv_feat_mask(void)
 	struct net_buf *buf;
 
 	sig = bt_l2cap_br_lookup_rx_cid(conn, BT_L2CAP_CID_BR_SIG);
-	zassert_not_null(sig);
+	assert_non_null(sig);
 
-	buf = net_buf_alloc(&rx_pool, K_NO_WAIT);
-	zassert_not_null(buf);
+	buf = net_buf_alloc(&rx_pool, BT_NO_WAIT);
+	assert_non_null(buf);
 
 	/* L2CAP header */
 	net_buf_add_le16(buf, 12U);
@@ -86,7 +85,7 @@ static void *setup(void)
 	static const bt_addr_t addr = { .val = { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06 } };
 
 	conn = bt_conn_add_br(&addr);
-	zassert_not_null(conn);
+	assert_non_null(conn);
 
 	bt_l2cap_br_connected(conn);
 	recv_feat_mask();
@@ -94,30 +93,67 @@ static void *setup(void)
 	return NULL;
 }
 
-ZTEST_SUITE(l2cap_br_send, NULL, setup, NULL, NULL, NULL);
+
 
 /* A send that fails leaves the buffer unchanged */
-ZTEST(l2cap_br_send, test_send_failure)
+static void l2cap_br_send__test_send_failure(void **cm_state)
 {
+	(void)cm_state;
 	struct net_buf *buf = data_buf(BT_L2CAP_CHAN_SEND_RESERVE);
 	int err;
 
 	err = bt_l2cap_br_send_cb(conn, BT_L2CAP_CID_BR_SIG, buf, NULL, NULL);
-	zassert_equal(err, -EINVAL, "err %d", err);
+	assert_int_equal(err, -EINVAL);
 	check_unchanged(buf, BT_L2CAP_CHAN_SEND_RESERVE);
 
 	net_buf_unref(buf);
 }
 
 /* A connectionless send that fails leaves the buffer unchanged */
-ZTEST(l2cap_br_send, test_connless_send_failure)
+static void l2cap_br_send__test_connless_send_failure(void **cm_state)
 {
+	(void)cm_state;
 	struct net_buf *buf = data_buf(BT_L2CAP_CONNLESS_RESERVE);
 	int err;
 
 	err = bt_l2cap_br_connless_send(conn, CONNLESS_PSM, buf);
-	zassert_equal(err, -EINVAL, "err %d", err);
+	assert_int_equal(err, -EINVAL);
 	check_unchanged(buf, BT_L2CAP_CONNLESS_RESERVE);
 
 	net_buf_unref(buf);
 }
+
+static void storage_init_1991937475(void)
+{
+	net_buf_pool_init(&unsendable_pool);
+	net_buf_pool_init(&rx_pool);
+}
+
+static void migrated_pools_init(void)
+{
+	net_buf_pool_init(&unsendable_pool);
+	net_buf_pool_init(&rx_pool);
+}
+
+int bt_test_l2cap_br_send_setup(void **state)
+{
+	int environment_result = bt_test_host_setup(state);
+
+	if (environment_result != 0) {
+		return environment_result;
+	}
+
+	bt_test_require(bt_conn_init());
+	migrated_pools_init();
+	storage_init_1991937475();
+	*state = setup();
+	return 0;
+}
+
+
+
+static const struct CMUnitTest test_cases_l2cap_br_send[] = {
+	cmocka_unit_test(l2cap_br_send__test_send_failure),
+	cmocka_unit_test(l2cap_br_send__test_connless_send_failure),
+};
+BT_TEST_SUITE(l2cap_br_send, test_cases_l2cap_br_send, bt_test_l2cap_br_send_setup, NULL);

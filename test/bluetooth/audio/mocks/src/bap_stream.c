@@ -1,3 +1,5 @@
+#include "support/test_support.h"
+
 /*
  * Copyright (c) 2023 Codecoup
  *
@@ -5,11 +7,11 @@
  */
 #include <stdint.h>
 
-#include <zephyr/bluetooth/audio/ascs.h>
-#include <zephyr/bluetooth/audio/bap.h>
-#include <zephyr/bluetooth/iso.h>
-#include <zephyr/fff.h>
-#include <zephyr/net_buf.h>
+#include <embt/bluetooth/audio/ascs.h>
+#include <embt/bluetooth/audio/bap.h>
+#include <embt/bluetooth/iso.h>
+#include <fff.h>
+#include <embt/net_buf.h>
 
 #include "bap_stream.h"
 

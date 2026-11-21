@@ -1,3 +1,4 @@
+#include "support/test_support.h"
 /*
  * Copyright (c) 2026 Silicon Laboratories Inc.
  *
@@ -9,14 +10,11 @@
 #include <stdint.h>
 #include <string.h>
 
-#include <zephyr/bluetooth/hci_pkt.h>
-#include <zephyr/bluetooth/hci_types.h>
-#include <zephyr/drivers/bluetooth/hci_lockstep.h>
-#include <zephyr/irq_offload.h>
-#include <zephyr/kernel.h>
-#include <zephyr/net_buf.h>
-#include <zephyr/ztest.h>
+#include <embt/bluetooth/hci_pkt.h>
+#include <embt/bluetooth/hci_types.h>
+#include "common/hci_lockstep.h"
 
+#include <embt/net_buf.h>
 #define TEST_OPCODE 0xfc01U
 
 /* Fake transport for the lockstep tests: records the sent packet and can
@@ -24,7 +22,8 @@
  * request/response transport does) or from a delayed work item.
  */
 struct fake_transport {
-	struct device dev;
+	bool initialized;
+	struct bt_hci_transport dev;
 	struct bt_hci_lockstep ls;
 	uint8_t sent[BT_HCI_PKT_CMD_SIZE(UINT8_MAX)];
 	size_t sent_len;
@@ -40,13 +39,10 @@ struct fake_transport {
 	bool rsp_in_send;
 	/* Reset the helper from within send, before the response is fed */
 	bool reset_in_send;
-	bool rsp_from_isr;
-	bool rsp_fed_in_isr;
 	/* Reset the helper from the work item instead of feeding from it */
 	bool reset_from_work;
-	bool reset_in_isr;
 	unsigned int sends;
-	struct k_work_delayable rsp_work;
+	struct bt_work_delayable rsp_work;
 };
 
 static void feed_canned_rsp(struct fake_transport *xport)
@@ -59,27 +55,15 @@ static void feed_canned_rsp(struct fake_transport *xport)
 	(void)bt_hci_lockstep_feed(&xport->ls, xport->rsp, xport->rsp_len);
 }
 
-static void feed_canned_rsp_isr(const void *arg)
-{
-	struct fake_transport *xport = (struct fake_transport *)arg;
 
-	xport->rsp_fed_in_isr = k_is_in_isr();
-	feed_canned_rsp(xport);
-}
 
-static void reset_isr(const void *arg)
-{
-	struct fake_transport *xport = (struct fake_transport *)arg;
 
-	xport->reset_in_isr = k_is_in_isr();
-	bt_hci_lockstep_reset(&xport->ls);
-}
 
-static int fake_send(const struct device *dev, const uint8_t *pkt, size_t len)
+static int fake_send(const struct bt_hci_transport *dev, const uint8_t *pkt, size_t len)
 {
 	struct fake_transport *xport = dev->data;
 
-	zassert_true(len <= sizeof(xport->sent));
+	assert_true(len <= sizeof(xport->sent));
 	(void)memcpy(xport->sent, pkt, len);
 	xport->sent_len = len;
 	xport->sends++;
@@ -96,31 +80,53 @@ static int fake_send(const struct device *dev, const uint8_t *pkt, size_t len)
 	return xport->send_err;
 }
 
-static void rsp_work_handler(struct k_work *work)
+static void rsp_work_handler(struct bt_work *work)
 {
-	struct k_work_delayable *dwork = k_work_delayable_from_work(work);
+	struct bt_work_delayable *dwork = bt_work_delayable_from_work(work);
 	struct fake_transport *xport = CONTAINER_OF(dwork, struct fake_transport, rsp_work);
 
-	if (xport->reset_from_work && xport->rsp_from_isr) {
-		irq_offload(reset_isr, xport);
-	} else if (xport->reset_from_work) {
+	if (xport->reset_from_work) {
 		bt_hci_lockstep_reset(&xport->ls);
-	} else if (xport->rsp_from_isr) {
-		irq_offload(feed_canned_rsp_isr, xport);
 	} else {
 		feed_canned_rsp(xport);
 	}
 }
 
+static struct fake_transport *owned_transports[8];
+static size_t owned_count;
+
+static void clear_transport(struct fake_transport *xport)
+{
+	if (xport->initialized) {
+		struct bt_work_sync sync = {0};
+
+		bt_work_cancel_delayable_sync(&xport->rsp_work, &sync);
+		bt_test_require(osi_sem_deinit(&xport->ls.changed));
+		xport->initialized = false;
+	}
+}
+
+static struct fake_transport *new_transport(void)
+{
+	assert_true(owned_count < ARRAY_SIZE(owned_transports));
+	struct fake_transport *xport = calloc(1, sizeof(*xport));
+
+	assert_non_null(xport);
+	owned_transports[owned_count++] = xport;
+	return xport;
+}
+
 static void fake_transport_init(struct fake_transport *xport)
 {
+	clear_transport(xport);
 	(void)memset(xport, 0, sizeof(*xport));
 	xport->dev.name = "fake_hci";
 	xport->dev.data = xport;
-	k_work_init_delayable(&xport->rsp_work, rsp_work_handler);
+	bt_work_init_delayable(&xport->rsp_work, rsp_work_handler);
 	bt_hci_lockstep_init(&xport->ls, &xport->dev, fake_send);
+	xport->initialized = true;
 	/* Keep the timeout test short */
-	xport->ls.timeout = K_MSEC(100);
+	xport->ls.timeout = BT_MSEC(100);
 }
 
 static const uint8_t cc_ok_rsp[] = {
@@ -162,166 +168,175 @@ static void send_test_cmd(struct fake_transport *xport, struct net_buf_simple *c
 	net_buf_simple_add_u8(cmd, 0x5a);
 
 	err = bt_hci_lockstep_cmd_send_sync(&xport->ls, TEST_OPCODE, cmd, rsp);
-	zassert_equal(err, expected_err, "err %d != %d", err, expected_err);
+	assert_int_equal(err, expected_err);
 
-	zassert_equal(xport->sent_len, sizeof(expected_pkt));
-	zassert_mem_equal(xport->sent, expected_pkt, sizeof(expected_pkt));
+	assert_int_equal(xport->sent_len, sizeof(expected_pkt));
+	assert_memory_equal(xport->sent, expected_pkt, sizeof(expected_pkt));
 }
 
-static ZTEST(bt_hci_lockstep, test_cmd_complete_from_send)
+static void bt_hci_lockstep__test_cmd_complete_from_send(void **cm_state)
 {
-	struct fake_transport xport;
+	(void)cm_state;
+	struct fake_transport *xport = new_transport();
 
 	BT_HCI_PKT_CMD_DEFINE(cmd, 1);
 	NET_BUF_SIMPLE_DEFINE(rsp, 8);
 
-	fake_transport_init(&xport);
-	xport.rsp = cc_ok_rsp;
-	xport.rsp_len = sizeof(cc_ok_rsp);
-	xport.rsp_in_send = true;
+	fake_transport_init(xport);
+	xport->rsp = cc_ok_rsp;
+	xport->rsp_len = sizeof(cc_ok_rsp);
+	xport->rsp_in_send = true;
 
-	send_test_cmd(&xport, &cmd, &rsp, 0);
+	send_test_cmd(xport, &cmd, &rsp, 0);
 
-	zassert_equal(rsp.len, 3);
-	zassert_equal(rsp.data[0], BT_HCI_ERR_SUCCESS);
-	zassert_equal(rsp.data[1], 0xaa);
-	zassert_equal(rsp.data[2], 0xbb);
+	assert_int_equal(rsp.len, 3);
+	assert_int_equal(rsp.data[0], BT_HCI_ERR_SUCCESS);
+	assert_int_equal(rsp.data[1], 0xaa);
+	assert_int_equal(rsp.data[2], 0xbb);
 }
 
-static ZTEST(bt_hci_lockstep, test_cmd_complete_async)
+static void bt_hci_lockstep__test_cmd_complete_async(void **cm_state)
 {
-	struct fake_transport xport;
+	(void)cm_state;
+	struct fake_transport *xport = new_transport();
 
 	BT_HCI_PKT_CMD_DEFINE(cmd, 1);
 	NET_BUF_SIMPLE_DEFINE(rsp, 8);
 
-	fake_transport_init(&xport);
-	xport.rsp = cc_ok_rsp;
-	xport.rsp_len = sizeof(cc_ok_rsp);
-	k_work_schedule(&xport.rsp_work, K_MSEC(20));
+	fake_transport_init(xport);
+	xport->rsp = cc_ok_rsp;
+	xport->rsp_len = sizeof(cc_ok_rsp);
+	bt_work_schedule(&xport->rsp_work, BT_MSEC(20));
 
-	send_test_cmd(&xport, &cmd, &rsp, 0);
+	send_test_cmd(xport, &cmd, &rsp, 0);
 
-	zassert_equal(rsp.len, 3);
-	zassert_equal(rsp.data[1], 0xaa);
+	assert_int_equal(rsp.len, 3);
+	assert_int_equal(rsp.data[1], 0xaa);
 }
 
-static ZTEST(bt_hci_lockstep, test_cmd_complete_error_status)
+static void bt_hci_lockstep__test_cmd_complete_error_status(void **cm_state)
 {
-	struct fake_transport xport;
+	(void)cm_state;
+	struct fake_transport *xport = new_transport();
 
 	BT_HCI_PKT_CMD_DEFINE(cmd, 1);
 	NET_BUF_SIMPLE_DEFINE(rsp, 8);
 
-	fake_transport_init(&xport);
-	xport.rsp = cc_err_rsp;
-	xport.rsp_len = sizeof(cc_err_rsp);
-	xport.rsp_in_send = true;
+	fake_transport_init(xport);
+	xport->rsp = cc_err_rsp;
+	xport->rsp_len = sizeof(cc_err_rsp);
+	xport->rsp_in_send = true;
 
-	send_test_cmd(&xport, &cmd, &rsp, -EIO);
+	send_test_cmd(xport, &cmd, &rsp, -EIO);
 
-	zassert_equal(rsp.len, 1);
-	zassert_equal(rsp.data[0], BT_HCI_ERR_UNSPECIFIED);
+	assert_int_equal(rsp.len, 1);
+	assert_int_equal(rsp.data[0], BT_HCI_ERR_UNSPECIFIED);
 }
 
-static ZTEST(bt_hci_lockstep, test_cmd_status)
+static void bt_hci_lockstep__test_cmd_status(void **cm_state)
 {
-	struct fake_transport xport;
+	(void)cm_state;
+	struct fake_transport *xport = new_transport();
 
 	BT_HCI_PKT_CMD_DEFINE(cmd, 1);
 	NET_BUF_SIMPLE_DEFINE(rsp, 8);
 
-	fake_transport_init(&xport);
-	xport.rsp = cs_ok_rsp;
-	xport.rsp_len = sizeof(cs_ok_rsp);
-	xport.rsp_in_send = true;
+	fake_transport_init(xport);
+	xport->rsp = cs_ok_rsp;
+	xport->rsp_len = sizeof(cs_ok_rsp);
+	xport->rsp_in_send = true;
 
-	send_test_cmd(&xport, &cmd, &rsp, 0);
+	send_test_cmd(xport, &cmd, &rsp, 0);
 
 	/* A Command Status has nothing but its status */
-	zassert_equal(rsp.len, 1);
-	zassert_equal(rsp.data[0], BT_HCI_ERR_SUCCESS);
+	assert_int_equal(rsp.len, 1);
+	assert_int_equal(rsp.data[0], BT_HCI_ERR_SUCCESS);
 }
 
-static ZTEST(bt_hci_lockstep, test_no_rsp_buffer)
+static void bt_hci_lockstep__test_no_rsp_buffer(void **cm_state)
 {
-	struct fake_transport xport;
+	(void)cm_state;
+	struct fake_transport *xport = new_transport();
 
 	BT_HCI_PKT_CMD_DEFINE(cmd, 1);
 
-	fake_transport_init(&xport);
-	xport.rsp = cc_ok_rsp;
-	xport.rsp_len = sizeof(cc_ok_rsp);
-	xport.rsp_in_send = true;
+	fake_transport_init(xport);
+	xport->rsp = cc_ok_rsp;
+	xport->rsp_len = sizeof(cc_ok_rsp);
+	xport->rsp_in_send = true;
 
-	send_test_cmd(&xport, &cmd, NULL, 0);
+	send_test_cmd(xport, &cmd, NULL, 0);
 
 	/* A following command with a response buffer is unaffected */
 	NET_BUF_SIMPLE_DEFINE(rsp, 8);
 
-	send_test_cmd(&xport, &cmd, &rsp, 0);
-	zassert_equal(rsp.len, 3);
+	send_test_cmd(xport, &cmd, &rsp, 0);
+	assert_int_equal(rsp.len, 3);
 }
 
-static ZTEST(bt_hci_lockstep, test_rsp_truncated_to_buffer)
+static void bt_hci_lockstep__test_rsp_truncated_to_buffer(void **cm_state)
 {
-	struct fake_transport xport;
+	(void)cm_state;
+	struct fake_transport *xport = new_transport();
 
 	BT_HCI_PKT_CMD_DEFINE(cmd, 1);
 	NET_BUF_SIMPLE_DEFINE(rsp, 2);
 
-	fake_transport_init(&xport);
-	xport.rsp = cc_ok_rsp;
-	xport.rsp_len = sizeof(cc_ok_rsp);
-	xport.rsp_in_send = true;
+	fake_transport_init(xport);
+	xport->rsp = cc_ok_rsp;
+	xport->rsp_len = sizeof(cc_ok_rsp);
+	xport->rsp_in_send = true;
 
-	send_test_cmd(&xport, &cmd, &rsp, 0);
+	send_test_cmd(xport, &cmd, &rsp, 0);
 
-	zassert_equal(rsp.len, 2);
-	zassert_equal(rsp.data[0], 0x00);
-	zassert_equal(rsp.data[1], 0xaa);
+	assert_int_equal(rsp.len, 2);
+	assert_int_equal(rsp.data[0], 0x00);
+	assert_int_equal(rsp.data[1], 0xaa);
 }
 
-static ZTEST(bt_hci_lockstep, test_timeout)
+static void bt_hci_lockstep__test_timeout(void **cm_state)
 {
-	struct fake_transport xport;
+	(void)cm_state;
+	struct fake_transport *xport = new_transport();
 
 	BT_HCI_PKT_CMD_DEFINE(cmd, 1);
 	NET_BUF_SIMPLE_DEFINE(rsp, 8);
 
-	fake_transport_init(&xport);
+	fake_transport_init(xport);
 
-	send_test_cmd(&xport, &cmd, &rsp, -EAGAIN);
+	send_test_cmd(xport, &cmd, &rsp, -EAGAIN);
 
 	/* A late response is not consumed */
-	zassert_false(bt_hci_lockstep_feed(&xport.ls, cc_ok_rsp, sizeof(cc_ok_rsp)));
-	zassert_equal(rsp.len, 0);
+	assert_false(bt_hci_lockstep_feed(&xport->ls, cc_ok_rsp, sizeof(cc_ok_rsp)));
+	assert_int_equal(rsp.len, 0);
 }
 
-static ZTEST(bt_hci_lockstep, test_send_error)
+static void bt_hci_lockstep__test_send_error(void **cm_state)
 {
-	struct fake_transport xport;
+	(void)cm_state;
+	struct fake_transport *xport = new_transport();
 
 	BT_HCI_PKT_CMD_DEFINE(cmd, 1);
 	NET_BUF_SIMPLE_DEFINE(rsp, 8);
 
-	fake_transport_init(&xport);
-	xport.send_err = -EBUSY;
+	fake_transport_init(xport);
+	xport->send_err = -EBUSY;
 
-	send_test_cmd(&xport, &cmd, &rsp, -EBUSY);
+	send_test_cmd(xport, &cmd, &rsp, -EBUSY);
 
 	/* The helper is not armed */
-	zassert_false(bt_hci_lockstep_feed(&xport.ls, cc_ok_rsp, sizeof(cc_ok_rsp)));
+	assert_false(bt_hci_lockstep_feed(&xport->ls, cc_ok_rsp, sizeof(cc_ok_rsp)));
 }
 
-static ZTEST(bt_hci_lockstep, test_feed_idle)
+static void bt_hci_lockstep__test_feed_idle(void **cm_state)
 {
-	struct fake_transport xport;
+	(void)cm_state;
+	struct fake_transport *xport = new_transport();
 
-	fake_transport_init(&xport);
+	fake_transport_init(xport);
 
 	/* Nothing outstanding: nothing is consumed */
-	zassert_false(bt_hci_lockstep_feed(&xport.ls, cc_ok_rsp, sizeof(cc_ok_rsp)));
+	assert_false(bt_hci_lockstep_feed(&xport->ls, cc_ok_rsp, sizeof(cc_ok_rsp)));
 }
 
 /* While a command is outstanding, packets that are not its response are
@@ -330,173 +345,164 @@ static ZTEST(bt_hci_lockstep, test_feed_idle)
  */
 static void check_not_consumed_while_waiting(const uint8_t *pre, size_t pre_len)
 {
-	struct fake_transport xport;
+	struct fake_transport *xport = new_transport();
 
 	BT_HCI_PKT_CMD_DEFINE(cmd, 1);
 	NET_BUF_SIMPLE_DEFINE(rsp, 8);
 
-	fake_transport_init(&xport);
-	xport.pre = pre;
-	xport.pre_len = pre_len;
-	xport.rsp = cc_ok_rsp;
-	xport.rsp_len = sizeof(cc_ok_rsp);
-	xport.rsp_in_send = true;
+	fake_transport_init(xport);
+	xport->pre = pre;
+	xport->pre_len = pre_len;
+	xport->rsp = cc_ok_rsp;
+	xport->rsp_len = sizeof(cc_ok_rsp);
+	xport->rsp_in_send = true;
 
-	send_test_cmd(&xport, &cmd, &rsp, 0);
+	send_test_cmd(xport, &cmd, &rsp, 0);
 
-	zassert_false(xport.pre_consumed);
-	zassert_equal(rsp.len, 3);
+	assert_false(xport->pre_consumed);
+	assert_int_equal(rsp.len, 3);
 }
 
-static ZTEST(bt_hci_lockstep, test_other_opcode_not_consumed)
+static void bt_hci_lockstep__test_other_opcode_not_consumed(void **cm_state)
 {
+	(void)cm_state;
 	check_not_consumed_while_waiting(cc_other_rsp, sizeof(cc_other_rsp));
 }
 
-static ZTEST(bt_hci_lockstep, test_unrelated_event_not_consumed)
+static void bt_hci_lockstep__test_unrelated_event_not_consumed(void **cm_state)
 {
+	(void)cm_state;
 	static const uint8_t le_meta[] = { BT_HCI_H4_EVT, BT_HCI_EVT_LE_META_EVENT, 0x01, 0x00 };
 
 	check_not_consumed_while_waiting(le_meta, sizeof(le_meta));
 }
 
-static ZTEST(bt_hci_lockstep, test_nop_cmd_complete_not_consumed)
+static void bt_hci_lockstep__test_nop_cmd_complete_not_consumed(void **cm_state)
 {
+	(void)cm_state;
 	check_not_consumed_while_waiting(nop_cc_grant, sizeof(nop_cc_grant));
 }
 
-static ZTEST(bt_hci_lockstep, test_malformed_event_not_consumed)
+static void bt_hci_lockstep__test_malformed_event_not_consumed(void **cm_state)
 {
+	(void)cm_state;
 	static const uint8_t short_cc[] = { BT_HCI_H4_EVT, BT_HCI_EVT_CMD_COMPLETE, 0x02,
 					    0x01, 0x01 };
 
 	check_not_consumed_while_waiting(short_cc, sizeof(short_cc));
 }
 
-static ZTEST(bt_hci_lockstep, test_cmd_complete_from_isr)
+
+
+static void bt_hci_lockstep__test_cmd_status_error(void **cm_state)
 {
-	struct fake_transport xport;
-
-	BT_HCI_PKT_CMD_DEFINE(cmd, 1);
-	NET_BUF_SIMPLE_DEFINE(rsp, 8);
-
-	fake_transport_init(&xport);
-	xport.rsp = cc_ok_rsp;
-	xport.rsp_len = sizeof(cc_ok_rsp);
-	xport.rsp_from_isr = true;
-	k_work_schedule(&xport.rsp_work, K_MSEC(20));
-
-	send_test_cmd(&xport, &cmd, &rsp, 0);
-
-	zassert_true(xport.rsp_fed_in_isr);
-	zassert_equal(rsp.len, 3);
-	zassert_equal(rsp.data[1], 0xaa);
-}
-
-static ZTEST(bt_hci_lockstep, test_cmd_status_error)
-{
+	(void)cm_state;
 	static const uint8_t cs_err_rsp[] = { BT_HCI_H4_EVT, BT_HCI_EVT_CMD_STATUS, 0x04,
 					      BT_HCI_ERR_CMD_DISALLOWED, 0x01, 0x01, 0xfc };
-	struct fake_transport xport;
+	struct fake_transport *xport = new_transport();
 
 	BT_HCI_PKT_CMD_DEFINE(cmd, 1);
 	NET_BUF_SIMPLE_DEFINE(rsp, 8);
 
-	fake_transport_init(&xport);
-	xport.rsp = cs_err_rsp;
-	xport.rsp_len = sizeof(cs_err_rsp);
-	xport.rsp_in_send = true;
+	fake_transport_init(xport);
+	xport->rsp = cs_err_rsp;
+	xport->rsp_len = sizeof(cs_err_rsp);
+	xport->rsp_in_send = true;
 
-	send_test_cmd(&xport, &cmd, &rsp, -EIO);
+	send_test_cmd(xport, &cmd, &rsp, -EIO);
 
-	zassert_equal(rsp.len, 1);
-	zassert_equal(rsp.data[0], BT_HCI_ERR_CMD_DISALLOWED);
+	assert_int_equal(rsp.len, 1);
+	assert_int_equal(rsp.data[0], BT_HCI_ERR_CMD_DISALLOWED);
 }
 
-static ZTEST(bt_hci_lockstep, test_cmd_complete_without_status)
+static void bt_hci_lockstep__test_cmd_complete_without_status(void **cm_state)
 {
+	(void)cm_state;
 	/* Command Complete for the awaited opcode with no return parameters */
 	static const uint8_t cc_no_status[] = { BT_HCI_H4_EVT, BT_HCI_EVT_CMD_COMPLETE, 0x03,
 						0x01, 0x01, 0xfc };
-	struct fake_transport xport;
+	struct fake_transport *xport = new_transport();
 
 	BT_HCI_PKT_CMD_DEFINE(cmd, 1);
 	NET_BUF_SIMPLE_DEFINE(rsp, 8);
 
-	fake_transport_init(&xport);
-	xport.rsp = cc_no_status;
-	xport.rsp_len = sizeof(cc_no_status);
-	xport.rsp_in_send = true;
+	fake_transport_init(xport);
+	xport->rsp = cc_no_status;
+	xport->rsp_len = sizeof(cc_no_status);
+	xport->rsp_in_send = true;
 
-	send_test_cmd(&xport, &cmd, &rsp, -EIO);
+	send_test_cmd(xport, &cmd, &rsp, -EIO);
 
 	/* No status byte arrived, so none is delivered */
-	zassert_equal(rsp.len, 0);
+	assert_int_equal(rsp.len, 0);
 }
 
-static ZTEST(bt_hci_lockstep, test_too_many_params)
+static void bt_hci_lockstep__test_too_many_params(void **cm_state)
 {
-	struct fake_transport xport;
+	(void)cm_state;
+	struct fake_transport *xport = new_transport();
 	int err;
 
 	BT_HCI_PKT_CMD_DEFINE(cmd, UINT8_MAX + 1);
 
-	fake_transport_init(&xport);
+	fake_transport_init(xport);
 	(void)net_buf_simple_add(&cmd, UINT8_MAX + 1);
 
-	err = bt_hci_lockstep_cmd_send_sync(&xport.ls, TEST_OPCODE, &cmd, NULL);
-	zassert_equal(err, -EMSGSIZE);
+	err = bt_hci_lockstep_cmd_send_sync(&xport->ls, TEST_OPCODE, &cmd, NULL);
+	assert_int_equal(err, -EMSGSIZE);
 	/* Nothing was sent and the helper is not armed */
-	zassert_equal(xport.sent_len, 0);
-	zassert_equal(cmd.len, UINT8_MAX + 1);
-	zassert_false(bt_hci_lockstep_feed(&xport.ls, cc_ok_rsp, sizeof(cc_ok_rsp)));
+	assert_int_equal(xport->sent_len, 0);
+	assert_int_equal(cmd.len, UINT8_MAX + 1);
+	assert_false(bt_hci_lockstep_feed(&xport->ls, cc_ok_rsp, sizeof(cc_ok_rsp)));
 }
 
-static ZTEST(bt_hci_lockstep, test_cmd_without_params)
+static void bt_hci_lockstep__test_cmd_without_params(void **cm_state)
 {
+	(void)cm_state;
 	const uint8_t expected_pkt[] = { BT_HCI_H4_CMD, 0x01, 0xfc, 0x00 };
-	struct fake_transport xport;
+	struct fake_transport *xport = new_transport();
 	int err;
 
 	NET_BUF_SIMPLE_DEFINE(rsp, 8);
 
-	fake_transport_init(&xport);
-	xport.rsp = cc_ok_rsp;
-	xport.rsp_len = sizeof(cc_ok_rsp);
-	xport.rsp_in_send = true;
+	fake_transport_init(xport);
+	xport->rsp = cc_ok_rsp;
+	xport->rsp_len = sizeof(cc_ok_rsp);
+	xport->rsp_in_send = true;
 
 	/* NULL stands for "no parameters": the helper frames the packet itself */
-	err = bt_hci_lockstep_cmd_send_sync(&xport.ls, TEST_OPCODE, NULL, &rsp);
-	zassert_equal(err, 0);
-	zassert_equal(xport.sent_len, sizeof(expected_pkt));
-	zassert_mem_equal(xport.sent, expected_pkt, sizeof(expected_pkt));
-	zassert_equal(rsp.len, 3);
+	err = bt_hci_lockstep_cmd_send_sync(&xport->ls, TEST_OPCODE, NULL, &rsp);
+	assert_int_equal(err, 0);
+	assert_int_equal(xport->sent_len, sizeof(expected_pkt));
+	assert_memory_equal(xport->sent, expected_pkt, sizeof(expected_pkt));
+	assert_int_equal(rsp.len, 3);
 }
 
-static ZTEST(bt_hci_lockstep, test_reuse)
+static void bt_hci_lockstep__test_reuse(void **cm_state)
 {
-	struct fake_transport xport;
+	(void)cm_state;
+	struct fake_transport *xport = new_transport();
 
 	BT_HCI_PKT_CMD_DEFINE(cmd, 1);
 	NET_BUF_SIMPLE_DEFINE(rsp, 8);
 
-	fake_transport_init(&xport);
-	xport.rsp = cc_ok_rsp;
-	xport.rsp_len = sizeof(cc_ok_rsp);
-	xport.rsp_in_send = true;
+	fake_transport_init(xport);
+	xport->rsp = cc_ok_rsp;
+	xport->rsp_len = sizeof(cc_ok_rsp);
+	xport->rsp_in_send = true;
 
-	send_test_cmd(&xport, &cmd, &rsp, 0);
-	zassert_equal(rsp.len, 3);
+	send_test_cmd(xport, &cmd, &rsp, 0);
+	assert_int_equal(rsp.len, 3);
 
-	xport.rsp = cs_ok_rsp;
-	xport.rsp_len = sizeof(cs_ok_rsp);
+	xport->rsp = cs_ok_rsp;
+	xport->rsp_len = sizeof(cs_ok_rsp);
 
 	/* The response buffer is emptied for the new command, which gets a
 	 * Command Status: its status alone.
 	 */
-	send_test_cmd(&xport, &cmd, &rsp, 0);
-	zassert_equal(rsp.len, 1);
-	zassert_equal(rsp.data[0], BT_HCI_ERR_SUCCESS);
+	send_test_cmd(xport, &cmd, &rsp, 0);
+	assert_int_equal(rsp.len, 1);
+	assert_int_equal(rsp.data[0], BT_HCI_ERR_SUCCESS);
 }
 
 /* Command flow control: a response that allows no further command holds the
@@ -505,149 +511,155 @@ static ZTEST(bt_hci_lockstep, test_reuse)
  */
 static void check_no_credit_holds_next_send(const uint8_t *rsp_pkt, size_t rsp_len)
 {
-	struct fake_transport xport;
+	struct fake_transport *xport = new_transport();
 	int err;
 
 	BT_HCI_PKT_CMD_DEFINE(cmd, 1);
 	NET_BUF_SIMPLE_DEFINE(rsp, 8);
 
-	fake_transport_init(&xport);
-	xport.rsp = rsp_pkt;
-	xport.rsp_len = rsp_len;
-	xport.rsp_in_send = true;
+	fake_transport_init(xport);
+	xport->rsp = rsp_pkt;
+	xport->rsp_len = rsp_len;
+	xport->rsp_in_send = true;
 
-	send_test_cmd(&xport, &cmd, &rsp, 0);
-	zassert_equal(xport.sends, 1);
+	send_test_cmd(xport, &cmd, &rsp, 0);
+	assert_int_equal(xport->sends, 1);
 
-	xport.rsp = cc_ok_rsp;
-	xport.rsp_len = sizeof(cc_ok_rsp);
+	xport->rsp = cc_ok_rsp;
+	xport->rsp_len = sizeof(cc_ok_rsp);
 
 	bt_hci_pkt_reset_cmd(&cmd);
 	net_buf_simple_add_u8(&cmd, 0x5a);
-	err = bt_hci_lockstep_cmd_send_sync(&xport.ls, TEST_OPCODE, &cmd, &rsp);
-	zassert_equal(err, -EAGAIN, "err %d", err);
-	zassert_equal(xport.sends, 1);
+	err = bt_hci_lockstep_cmd_send_sync(&xport->ls, TEST_OPCODE, &cmd, &rsp);
+	assert_int_equal(err, -EAGAIN);
+	assert_int_equal(xport->sends, 1);
 
-	zassert_false(bt_hci_lockstep_feed(&xport.ls, nop_cc_grant, sizeof(nop_cc_grant)));
+	assert_false(bt_hci_lockstep_feed(&xport->ls, nop_cc_grant, sizeof(nop_cc_grant)));
 
-	send_test_cmd(&xport, &cmd, &rsp, 0);
-	zassert_equal(xport.sends, 2);
-	zassert_equal(rsp.len, 3);
+	send_test_cmd(xport, &cmd, &rsp, 0);
+	assert_int_equal(xport->sends, 2);
+	assert_int_equal(rsp.len, 3);
 }
 
-static ZTEST(bt_hci_lockstep, test_cmd_complete_no_credit)
+static void bt_hci_lockstep__test_cmd_complete_no_credit(void **cm_state)
 {
+	(void)cm_state;
 	check_no_credit_holds_next_send(cc_ok_no_credit_rsp, sizeof(cc_ok_no_credit_rsp));
 }
 
-static ZTEST(bt_hci_lockstep, test_cmd_status_no_credit)
+static void bt_hci_lockstep__test_cmd_status_no_credit(void **cm_state)
 {
+	(void)cm_state;
 	check_no_credit_holds_next_send(cs_ok_no_credit_rsp, sizeof(cs_ok_no_credit_rsp));
 }
 
-static ZTEST(bt_hci_lockstep, test_send_error_keeps_credit)
+static void bt_hci_lockstep__test_send_error_keeps_credit(void **cm_state)
 {
-	struct fake_transport xport;
+	(void)cm_state;
+	struct fake_transport *xport = new_transport();
 
 	BT_HCI_PKT_CMD_DEFINE(cmd, 1);
 	NET_BUF_SIMPLE_DEFINE(rsp, 8);
 
-	fake_transport_init(&xport);
-	xport.send_err = -EBUSY;
+	fake_transport_init(xport);
+	xport->send_err = -EBUSY;
 
-	send_test_cmd(&xport, &cmd, &rsp, -EBUSY);
+	send_test_cmd(xport, &cmd, &rsp, -EBUSY);
 
 	/* Nothing reached the controller, so the next command is allowed */
-	xport.send_err = 0;
-	xport.rsp = cc_ok_rsp;
-	xport.rsp_len = sizeof(cc_ok_rsp);
-	xport.rsp_in_send = true;
+	xport->send_err = 0;
+	xport->rsp = cc_ok_rsp;
+	xport->rsp_len = sizeof(cc_ok_rsp);
+	xport->rsp_in_send = true;
 
-	send_test_cmd(&xport, &cmd, &rsp, 0);
-	zassert_equal(rsp.len, 3);
+	send_test_cmd(xport, &cmd, &rsp, 0);
+	assert_int_equal(rsp.len, 3);
 }
 
-static ZTEST(bt_hci_lockstep, test_timeout_uses_credit)
+static void bt_hci_lockstep__test_timeout_uses_credit(void **cm_state)
 {
-	struct fake_transport xport;
+	(void)cm_state;
+	struct fake_transport *xport = new_transport();
 	int err;
 
 	BT_HCI_PKT_CMD_DEFINE(cmd, 1);
 	NET_BUF_SIMPLE_DEFINE(rsp, 8);
 
-	fake_transport_init(&xport);
+	fake_transport_init(xport);
 
-	send_test_cmd(&xport, &cmd, &rsp, -EAGAIN);
-	zassert_equal(xport.sends, 1);
+	send_test_cmd(xport, &cmd, &rsp, -EAGAIN);
+	assert_int_equal(xport->sends, 1);
 
 	/* The unanswered command used up the allowance */
-	xport.rsp = cc_ok_rsp;
-	xport.rsp_len = sizeof(cc_ok_rsp);
-	xport.rsp_in_send = true;
+	xport->rsp = cc_ok_rsp;
+	xport->rsp_len = sizeof(cc_ok_rsp);
+	xport->rsp_in_send = true;
 
 	bt_hci_pkt_reset_cmd(&cmd);
 	net_buf_simple_add_u8(&cmd, 0x5a);
-	err = bt_hci_lockstep_cmd_send_sync(&xport.ls, TEST_OPCODE, &cmd, &rsp);
-	zassert_equal(err, -EAGAIN, "err %d", err);
-	zassert_equal(xport.sends, 1);
+	err = bt_hci_lockstep_cmd_send_sync(&xport->ls, TEST_OPCODE, &cmd, &rsp);
+	assert_int_equal(err, -EAGAIN);
+	assert_int_equal(xport->sends, 1);
 
 	/* Until the controller allows a command again */
-	zassert_false(bt_hci_lockstep_feed(&xport.ls, nop_cc_grant, sizeof(nop_cc_grant)));
+	assert_false(bt_hci_lockstep_feed(&xport->ls, nop_cc_grant, sizeof(nop_cc_grant)));
 
-	send_test_cmd(&xport, &cmd, &rsp, 0);
-	zassert_equal(xport.sends, 2);
+	send_test_cmd(xport, &cmd, &rsp, 0);
+	assert_int_equal(xport->sends, 2);
 }
 
 /* A controller reset by other means than an HCI command allows a command
  * again without announcing it, which is what bt_hci_lockstep_reset() is for.
  */
-static ZTEST(bt_hci_lockstep, test_reset_restores_the_allowance)
+static void bt_hci_lockstep__test_reset_restores_the_allowance(void **cm_state)
 {
-	struct fake_transport xport;
+	(void)cm_state;
+	struct fake_transport *xport = new_transport();
 
 	BT_HCI_PKT_CMD_DEFINE(cmd, 1);
 	NET_BUF_SIMPLE_DEFINE(rsp, 8);
 
-	fake_transport_init(&xport);
+	fake_transport_init(xport);
 
-	send_test_cmd(&xport, &cmd, &rsp, -EAGAIN);
-	zassert_equal(xport.sends, 1);
+	send_test_cmd(xport, &cmd, &rsp, -EAGAIN);
+	assert_int_equal(xport->sends, 1);
 
-	bt_hci_lockstep_reset(&xport.ls);
+	bt_hci_lockstep_reset(&xport->ls);
 
 	/* The send function and the timeout survive the reset */
-	zassert_true(K_TIMEOUT_EQ(xport.ls.timeout, K_MSEC(100)));
+	assert_true(BT_TIMEOUT_EQ(xport->ls.timeout, BT_MSEC(100)));
 
-	xport.rsp = cc_ok_rsp;
-	xport.rsp_len = sizeof(cc_ok_rsp);
-	xport.rsp_in_send = true;
+	xport->rsp = cc_ok_rsp;
+	xport->rsp_len = sizeof(cc_ok_rsp);
+	xport->rsp_in_send = true;
 
-	send_test_cmd(&xport, &cmd, &rsp, 0);
-	zassert_equal(xport.sends, 2);
-	zassert_equal(rsp.len, 3);
+	send_test_cmd(xport, &cmd, &rsp, 0);
+	assert_int_equal(xport->sends, 2);
+	assert_int_equal(rsp.len, 3);
 }
 
 /* A driver resets the helper every time it reopens its transport, so the
  * operation has to survive being repeated.
  */
-static ZTEST(bt_hci_lockstep, test_reset_is_repeatable)
+static void bt_hci_lockstep__test_reset_is_repeatable(void **cm_state)
 {
-	struct fake_transport xport;
+	(void)cm_state;
+	struct fake_transport *xport = new_transport();
 
 	BT_HCI_PKT_CMD_DEFINE(cmd, 1);
 	NET_BUF_SIMPLE_DEFINE(rsp, 8);
 
-	fake_transport_init(&xport);
+	fake_transport_init(xport);
 
-	bt_hci_lockstep_reset(&xport.ls);
-	bt_hci_lockstep_reset(&xport.ls);
+	bt_hci_lockstep_reset(&xport->ls);
+	bt_hci_lockstep_reset(&xport->ls);
 
-	xport.rsp = cc_ok_rsp;
-	xport.rsp_len = sizeof(cc_ok_rsp);
-	xport.rsp_in_send = true;
+	xport->rsp = cc_ok_rsp;
+	xport->rsp_len = sizeof(cc_ok_rsp);
+	xport->rsp_in_send = true;
 
-	send_test_cmd(&xport, &cmd, &rsp, 0);
-	zassert_equal(rsp.len, 3);
+	send_test_cmd(xport, &cmd, &rsp, 0);
+	assert_int_equal(rsp.len, 3);
 }
 
 /* A reset abandons the outstanding command: its response is no longer
@@ -655,159 +667,87 @@ static ZTEST(bt_hci_lockstep, test_reset_is_repeatable)
  * so that the response cannot be taken for that of the next command. The
  * helper is ready for that one afterwards.
  */
-static ZTEST(bt_hci_lockstep, test_reset_abandons_the_command_in_progress)
+static void bt_hci_lockstep__test_reset_abandons_the_command_in_progress(void **cm_state)
 {
-	struct fake_transport xport;
+	(void)cm_state;
+	struct fake_transport *xport = new_transport();
 	int64_t start;
 
 	BT_HCI_PKT_CMD_DEFINE(cmd, 1);
 	NET_BUF_SIMPLE_DEFINE(rsp, 8);
 
-	fake_transport_init(&xport);
+	fake_transport_init(xport);
 
-	xport.rsp = cc_ok_rsp;
-	xport.rsp_len = sizeof(cc_ok_rsp);
-	xport.rsp_in_send = true;
-	xport.reset_in_send = true;
+	xport->rsp = cc_ok_rsp;
+	xport->rsp_len = sizeof(cc_ok_rsp);
+	xport->rsp_in_send = true;
+	xport->reset_in_send = true;
 
-	start = k_uptime_get();
-	send_test_cmd(&xport, &cmd, &rsp, -EAGAIN);
-	zassert_true(k_uptime_get() - start >= 100, "Returned before the timeout");
-	zassert_equal(xport.sends, 1);
-	zassert_equal(rsp.len, 0);
+	start = bt_uptime_get_ms();
+	send_test_cmd(xport, &cmd, &rsp, -EAGAIN);
+	assert_true(bt_uptime_get_ms() - start >= 100);
+	assert_int_equal(xport->sends, 1);
+	assert_int_equal(rsp.len, 0);
 
-	xport.reset_in_send = false;
+	xport->reset_in_send = false;
 
-	send_test_cmd(&xport, &cmd, &rsp, 0);
-	zassert_equal(xport.sends, 2);
-	zassert_equal(rsp.len, 3);
+	send_test_cmd(xport, &cmd, &rsp, 0);
+	assert_int_equal(xport->sends, 2);
+	assert_int_equal(rsp.len, 3);
 }
 
 /* A send that is waiting for the controller to allow its command goes ahead
  * when a reset restores the allowance, as when a recovery path resets a
  * controller that has stopped responding.
  */
-static ZTEST(bt_hci_lockstep, test_reset_releases_a_send_waiting_for_the_allowance)
+static void bt_hci_lockstep__test_reset_releases_a_send_waiting_for_the_allowance(void **cm_state)
 {
-	struct fake_transport xport;
+	(void)cm_state;
+	struct fake_transport *xport = new_transport();
 
 	BT_HCI_PKT_CMD_DEFINE(cmd, 1);
 	NET_BUF_SIMPLE_DEFINE(rsp, 8);
 
-	fake_transport_init(&xport);
+	fake_transport_init(xport);
 
 	/* Leaves the helper without an allowance */
-	xport.rsp = cc_ok_no_credit_rsp;
-	xport.rsp_len = sizeof(cc_ok_no_credit_rsp);
-	xport.rsp_in_send = true;
+	xport->rsp = cc_ok_no_credit_rsp;
+	xport->rsp_len = sizeof(cc_ok_no_credit_rsp);
+	xport->rsp_in_send = true;
 
-	send_test_cmd(&xport, &cmd, &rsp, 0);
-	zassert_equal(xport.sends, 1);
+	send_test_cmd(xport, &cmd, &rsp, 0);
+	assert_int_equal(xport->sends, 1);
 
-	xport.rsp = cc_ok_rsp;
-	xport.rsp_len = sizeof(cc_ok_rsp);
-	xport.reset_from_work = true;
-	k_work_schedule(&xport.rsp_work, K_MSEC(20));
+	xport->rsp = cc_ok_rsp;
+	xport->rsp_len = sizeof(cc_ok_rsp);
+	xport->reset_from_work = true;
+	bt_work_schedule(&xport->rsp_work, BT_MSEC(20));
 
-	send_test_cmd(&xport, &cmd, &rsp, 0);
-	zassert_equal(xport.sends, 2);
-	zassert_equal(rsp.len, 3);
+	send_test_cmd(xport, &cmd, &rsp, 0);
+	assert_int_equal(xport->sends, 2);
+	assert_int_equal(rsp.len, 3);
 }
 
-/* The same from an ISR, which is where a driver may learn that its controller
- * has been reset.
- */
-static ZTEST(bt_hci_lockstep, test_reset_from_isr)
+
+
+
+
+static void bt_hci_lockstep__test_nop_while_waiting_is_no_response(void **cm_state)
 {
-	struct fake_transport xport;
+	(void)cm_state;
+	struct fake_transport *xport = new_transport();
 
 	BT_HCI_PKT_CMD_DEFINE(cmd, 1);
 	NET_BUF_SIMPLE_DEFINE(rsp, 8);
 
-	fake_transport_init(&xport);
-
-	/* Leaves the helper without an allowance */
-	xport.rsp = cc_ok_no_credit_rsp;
-	xport.rsp_len = sizeof(cc_ok_no_credit_rsp);
-	xport.rsp_in_send = true;
-
-	send_test_cmd(&xport, &cmd, &rsp, 0);
-
-	xport.rsp = cc_ok_rsp;
-	xport.rsp_len = sizeof(cc_ok_rsp);
-	xport.reset_from_work = true;
-	xport.rsp_from_isr = true;
-	k_work_schedule(&xport.rsp_work, K_MSEC(20));
-
-	send_test_cmd(&xport, &cmd, &rsp, 0);
-	zassert_true(xport.reset_in_isr);
-	zassert_equal(xport.sends, 2);
-	zassert_equal(rsp.len, 3);
-}
-
-static ZTEST(bt_hci_lockstep, test_allowance_revoked_before_send)
-{
-	struct fake_transport xport;
-	int err;
-
-	BT_HCI_PKT_CMD_DEFINE(cmd, 1);
-	NET_BUF_SIMPLE_DEFINE(rsp, 8);
-
-	fake_transport_init(&xport);
-	xport.rsp = cc_ok_no_credit_rsp;
-	xport.rsp_len = sizeof(cc_ok_no_credit_rsp);
-	xport.rsp_in_send = true;
-
-	send_test_cmd(&xport, &cmd, &rsp, 0);
-	zassert_equal(xport.sends, 1);
-
-	/* While the next command waits for an allowance, the controller
-	 * grants one and revokes it again before the sender gets to run (both
-	 * fed from an ISR): the latest word counts, nothing is sent.
-	 */
-	xport.rsp_in_send = false;
-	xport.rsp_from_isr = true;
-	xport.pre = nop_cc_grant;
-	xport.pre_len = sizeof(nop_cc_grant);
-	xport.rsp = nop_cc_revoke;
-	xport.rsp_len = sizeof(nop_cc_revoke);
-	k_work_schedule(&xport.rsp_work, K_MSEC(20));
-
-	bt_hci_pkt_reset_cmd(&cmd);
-	net_buf_simple_add_u8(&cmd, 0x5a);
-	err = bt_hci_lockstep_cmd_send_sync(&xport.ls, TEST_OPCODE, &cmd, &rsp);
-	zassert_equal(err, -EAGAIN, "err %d", err);
-	zassert_equal(xport.sends, 1);
-	zassert_true(xport.rsp_fed_in_isr);
-	zassert_false(xport.pre_consumed);
-
-	/* A grant on its own lets the command through */
-	xport.pre = NULL;
-	xport.rsp_from_isr = false;
-	xport.rsp = cc_ok_rsp;
-	xport.rsp_len = sizeof(cc_ok_rsp);
-	xport.rsp_in_send = true;
-	zassert_false(bt_hci_lockstep_feed(&xport.ls, nop_cc_grant, sizeof(nop_cc_grant)));
-
-	send_test_cmd(&xport, &cmd, &rsp, 0);
-	zassert_equal(xport.sends, 2);
-}
-
-static ZTEST(bt_hci_lockstep, test_nop_while_waiting_is_no_response)
-{
-	struct fake_transport xport;
-
-	BT_HCI_PKT_CMD_DEFINE(cmd, 1);
-	NET_BUF_SIMPLE_DEFINE(rsp, 8);
-
-	fake_transport_init(&xport);
-	xport.rsp = nop_cc_grant;
-	xport.rsp_len = sizeof(nop_cc_grant);
-	xport.rsp_in_send = true;
+	fake_transport_init(xport);
+	xport->rsp = nop_cc_grant;
+	xport->rsp_len = sizeof(nop_cc_grant);
+	xport->rsp_in_send = true;
 
 	/* The NOP wakes the sender, which keeps waiting for its response */
-	send_test_cmd(&xport, &cmd, &rsp, -EAGAIN);
-	zassert_equal(rsp.len, 0);
+	send_test_cmd(xport, &cmd, &rsp, -EAGAIN);
+	assert_int_equal(rsp.len, 0);
 }
 
 /* A transport failure reported after the controller's allowance changed
@@ -816,56 +756,107 @@ static ZTEST(bt_hci_lockstep, test_nop_while_waiting_is_no_response)
 static void check_send_error_keeps_allowance(const uint8_t *nop, size_t nop_len,
 					     int second_err, unsigned int sends)
 {
-	struct fake_transport xport;
+	struct fake_transport *xport = new_transport();
 
 	BT_HCI_PKT_CMD_DEFINE(cmd, 1);
 	NET_BUF_SIMPLE_DEFINE(rsp, 8);
 
-	fake_transport_init(&xport);
-	xport.rsp = nop;
-	xport.rsp_len = nop_len;
-	xport.rsp_in_send = true;
-	xport.send_err = -EIO;
+	fake_transport_init(xport);
+	xport->rsp = nop;
+	xport->rsp_len = nop_len;
+	xport->rsp_in_send = true;
+	xport->send_err = -EIO;
 
-	send_test_cmd(&xport, &cmd, &rsp, -EIO);
-	send_test_cmd(&xport, &cmd, &rsp, second_err);
-	zassert_equal(xport.sends, sends);
+	send_test_cmd(xport, &cmd, &rsp, -EIO);
+	send_test_cmd(xport, &cmd, &rsp, second_err);
+	assert_int_equal(xport->sends, sends);
 }
 
-static ZTEST(bt_hci_lockstep, test_send_error_after_revoke)
+static void bt_hci_lockstep__test_send_error_after_revoke(void **cm_state)
 {
+	(void)cm_state;
 	check_send_error_keeps_allowance(nop_cc_revoke, sizeof(nop_cc_revoke), -EAGAIN, 1);
 }
 
-static ZTEST(bt_hci_lockstep, test_send_error_after_grant)
+static void bt_hci_lockstep__test_send_error_after_grant(void **cm_state)
 {
+	(void)cm_state;
 	check_send_error_keeps_allowance(nop_cc_grant, sizeof(nop_cc_grant), -EIO, 2);
 }
 
-static ZTEST(bt_hci_lockstep, test_response_before_send_error)
+static void bt_hci_lockstep__test_response_before_send_error(void **cm_state)
 {
-	struct fake_transport xport;
+	(void)cm_state;
+	struct fake_transport *xport = new_transport();
 
 	BT_HCI_PKT_CMD_DEFINE(cmd, 1);
 	NET_BUF_SIMPLE_DEFINE(rsp, 8);
 
-	fake_transport_init(&xport);
-	xport.rsp = cc_ok_rsp;
-	xport.rsp_len = sizeof(cc_ok_rsp);
-	xport.rsp_in_send = true;
-	xport.send_err = -EIO;
+	fake_transport_init(xport);
+	xport->rsp = cc_ok_rsp;
+	xport->rsp_len = sizeof(cc_ok_rsp);
+	xport->rsp_in_send = true;
+	xport->send_err = -EIO;
 
 	/* The response arrived, so the command reached the controller and
 	 * the transport's failure does not count.
 	 */
-	send_test_cmd(&xport, &cmd, &rsp, 0);
-	zassert_equal(rsp.len, 3);
-	zassert_equal(rsp.data[0], BT_HCI_ERR_SUCCESS);
+	send_test_cmd(xport, &cmd, &rsp, 0);
+	assert_int_equal(rsp.len, 3);
+	assert_int_equal(rsp.data[0], BT_HCI_ERR_SUCCESS);
 
 	/* And its allowance was replaced by the response's */
-	xport.send_err = 0;
-	send_test_cmd(&xport, &cmd, &rsp, 0);
-	zassert_equal(xport.sends, 2);
+	xport->send_err = 0;
+	send_test_cmd(xport, &cmd, &rsp, 0);
+	assert_int_equal(xport->sends, 2);
 }
 
-ZTEST_SUITE(bt_hci_lockstep, NULL, NULL, NULL, NULL, NULL);
+
+
+
+
+static int bt_test_bt_hci_lockstep_after(void **state)
+{
+	(void)state;
+	while (owned_count) {
+		struct fake_transport *xport = owned_transports[--owned_count];
+
+		clear_transport(xport);
+		free(xport);
+	}
+	return 0;
+}
+
+static const struct CMUnitTest test_cases_bt_hci_lockstep[] = {
+	cmocka_unit_test_setup_teardown(bt_hci_lockstep__test_cmd_complete_from_send, NULL, bt_test_bt_hci_lockstep_after),
+	cmocka_unit_test_setup_teardown(bt_hci_lockstep__test_cmd_complete_async, NULL, bt_test_bt_hci_lockstep_after),
+	cmocka_unit_test_setup_teardown(bt_hci_lockstep__test_cmd_complete_error_status, NULL, bt_test_bt_hci_lockstep_after),
+	cmocka_unit_test_setup_teardown(bt_hci_lockstep__test_cmd_status, NULL, bt_test_bt_hci_lockstep_after),
+	cmocka_unit_test_setup_teardown(bt_hci_lockstep__test_no_rsp_buffer, NULL, bt_test_bt_hci_lockstep_after),
+	cmocka_unit_test_setup_teardown(bt_hci_lockstep__test_rsp_truncated_to_buffer, NULL, bt_test_bt_hci_lockstep_after),
+	cmocka_unit_test_setup_teardown(bt_hci_lockstep__test_timeout, NULL, bt_test_bt_hci_lockstep_after),
+	cmocka_unit_test_setup_teardown(bt_hci_lockstep__test_send_error, NULL, bt_test_bt_hci_lockstep_after),
+	cmocka_unit_test_setup_teardown(bt_hci_lockstep__test_feed_idle, NULL, bt_test_bt_hci_lockstep_after),
+	cmocka_unit_test_setup_teardown(bt_hci_lockstep__test_other_opcode_not_consumed, NULL, bt_test_bt_hci_lockstep_after),
+	cmocka_unit_test_setup_teardown(bt_hci_lockstep__test_unrelated_event_not_consumed, NULL, bt_test_bt_hci_lockstep_after),
+	cmocka_unit_test_setup_teardown(bt_hci_lockstep__test_nop_cmd_complete_not_consumed, NULL, bt_test_bt_hci_lockstep_after),
+	cmocka_unit_test_setup_teardown(bt_hci_lockstep__test_malformed_event_not_consumed, NULL, bt_test_bt_hci_lockstep_after),
+	cmocka_unit_test_setup_teardown(bt_hci_lockstep__test_cmd_status_error, NULL, bt_test_bt_hci_lockstep_after),
+	cmocka_unit_test_setup_teardown(bt_hci_lockstep__test_cmd_complete_without_status, NULL, bt_test_bt_hci_lockstep_after),
+	cmocka_unit_test_setup_teardown(bt_hci_lockstep__test_too_many_params, NULL, bt_test_bt_hci_lockstep_after),
+	cmocka_unit_test_setup_teardown(bt_hci_lockstep__test_cmd_without_params, NULL, bt_test_bt_hci_lockstep_after),
+	cmocka_unit_test_setup_teardown(bt_hci_lockstep__test_reuse, NULL, bt_test_bt_hci_lockstep_after),
+	cmocka_unit_test_setup_teardown(bt_hci_lockstep__test_cmd_complete_no_credit, NULL, bt_test_bt_hci_lockstep_after),
+	cmocka_unit_test_setup_teardown(bt_hci_lockstep__test_cmd_status_no_credit, NULL, bt_test_bt_hci_lockstep_after),
+	cmocka_unit_test_setup_teardown(bt_hci_lockstep__test_send_error_keeps_credit, NULL, bt_test_bt_hci_lockstep_after),
+	cmocka_unit_test_setup_teardown(bt_hci_lockstep__test_timeout_uses_credit, NULL, bt_test_bt_hci_lockstep_after),
+	cmocka_unit_test_setup_teardown(bt_hci_lockstep__test_reset_restores_the_allowance, NULL, bt_test_bt_hci_lockstep_after),
+	cmocka_unit_test_setup_teardown(bt_hci_lockstep__test_reset_is_repeatable, NULL, bt_test_bt_hci_lockstep_after),
+	cmocka_unit_test_setup_teardown(bt_hci_lockstep__test_reset_abandons_the_command_in_progress, NULL, bt_test_bt_hci_lockstep_after),
+	cmocka_unit_test_setup_teardown(bt_hci_lockstep__test_reset_releases_a_send_waiting_for_the_allowance, NULL, bt_test_bt_hci_lockstep_after),
+	cmocka_unit_test_setup_teardown(bt_hci_lockstep__test_nop_while_waiting_is_no_response, NULL, bt_test_bt_hci_lockstep_after),
+	cmocka_unit_test_setup_teardown(bt_hci_lockstep__test_send_error_after_revoke, NULL, bt_test_bt_hci_lockstep_after),
+	cmocka_unit_test_setup_teardown(bt_hci_lockstep__test_send_error_after_grant, NULL, bt_test_bt_hci_lockstep_after),
+	cmocka_unit_test_setup_teardown(bt_hci_lockstep__test_response_before_send_error, NULL, bt_test_bt_hci_lockstep_after),
+};
+BT_TEST_SUITE(bt_hci_lockstep, test_cases_bt_hci_lockstep, bt_test_base_setup, NULL);

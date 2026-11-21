@@ -1,3 +1,5 @@
+#include "support/test_support.h"
+
 /*
  * SPDX-FileCopyrightText: Copyright (c) 2026 Silicon Laboratories Inc.
  * SPDX-License-Identifier: Apache-2.0
@@ -9,16 +11,14 @@
 #include <stdint.h>
 #include <string.h>
 
-#include <zephyr/bluetooth/att.h>
-#include <zephyr/bluetooth/audio/vocs.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/gatt.h>
-#include <zephyr/bluetooth/hci_types.h>
-#include <zephyr/bluetooth/uuid.h>
-#include <zephyr/fff.h>
-#include <zephyr/sys/util.h>
-#include <zephyr/ztest.h>
-
+#include <embt/bluetooth/att.h>
+#include <embt/bluetooth/audio/vocs.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/gatt.h>
+#include <embt/bluetooth/hci_types.h>
+#include <embt/bluetooth/uuid.h>
+#include <fff.h>
+#include <embt/base/util.h>
 #include "conn.h"
 
 DEFINE_FFF_GLOBALS;
@@ -64,8 +64,8 @@ static void vocs_client_discover(struct vocs_client_test_suite_fixture *fixture)
 	int err;
 
 	err = bt_vocs_discover(&fixture->conn, fixture->inst, &param);
-	zassert_equal(err, 0, "Unexpected return value %d", err);
-	zassert_equal(bt_gatt_discover_fake.call_count, 1U);
+	assert_int_equal(err, 0);
+	assert_int_equal(bt_gatt_discover_fake.call_count, 1U);
 
 	params = bt_gatt_discover_fake.arg1_val;
 
@@ -77,12 +77,12 @@ static void vocs_client_discover(struct vocs_client_test_suite_fixture *fixture)
 			.user_data = &value,
 		};
 
-		zassert_equal(params->func(&fixture->conn, &attr, params), BT_GATT_ITER_CONTINUE);
+		assert_int_equal(params->func(&fixture->conn, &attr, params), BT_GATT_ITER_CONTINUE);
 	}
 
-	zassert_equal(params->func(&fixture->conn, NULL, params), BT_GATT_ITER_STOP);
-	zassert_equal(discover_cb_fake.call_count, 1U);
-	zassert_equal(discover_cb_fake.arg1_val, 0);
+	assert_int_equal(params->func(&fixture->conn, NULL, params), BT_GATT_ITER_STOP);
+	assert_int_equal(discover_cb_fake.call_count, 1U);
+	assert_int_equal(discover_cb_fake.arg1_val, 0);
 }
 
 static void *vocs_client_test_suite_setup(void)
@@ -94,7 +94,7 @@ static void *vocs_client_test_suite_setup(void)
 	static struct vocs_client_test_suite_fixture fixture;
 
 	fixture.inst = bt_vocs_client_free_instance_get();
-	zassert_not_null(fixture.inst);
+	assert_non_null(fixture.inst);
 
 	bt_vocs_client_cb_register(fixture.inst, &vocs_cb);
 
@@ -119,86 +119,85 @@ static void vocs_client_test_suite_after(void *f)
 	mock_bt_conn_disconnected(&fixture->conn, BT_HCI_ERR_REMOTE_USER_TERM_CONN);
 }
 
-ZTEST_SUITE(vocs_client_test_suite, NULL, vocs_client_test_suite_setup,
-	    vocs_client_test_suite_before, vocs_client_test_suite_after, NULL);
+
 
 static void read_rsp(struct vocs_client_test_suite_fixture *fixture, const void *data,
 		     uint16_t length)
 {
 	struct bt_gatt_read_params *params = bt_gatt_read_fake.arg1_val;
 
-	zassert_not_null(params);
-	zassert_equal(params->func(&fixture->conn, 0U, params, data, length), BT_GATT_ITER_STOP);
+	assert_non_null(params);
+	assert_int_equal(params->func(&fixture->conn, 0U, params, data, length), BT_GATT_ITER_STOP);
 }
 
 static void write_rsp(struct vocs_client_test_suite_fixture *fixture, uint8_t err)
 {
 	struct bt_gatt_write_params *params = bt_gatt_write_fake.arg1_val;
 
-	zassert_not_null(params);
+	assert_non_null(params);
 	params->func(&fixture->conn, err, params);
 }
 
-static ZTEST_F(vocs_client_test_suite, test_set_offset_counter_retry_state_empty)
+static void vocs_client_test_suite__test_set_offset_counter_retry_state_empty(void **cm_state)
 {
+	struct vocs_client_test_suite_fixture *fixture = *cm_state;
 	/* Offset 10, change counter 4 */
 	const uint8_t state[] = {0x0AU, 0x00U, 0x04U};
 	int err;
 
 	err = bt_vocs_state_set(fixture->inst, 10);
-	zassert_equal(err, 0, "Unexpected return value %d", err);
-	zassert_equal(bt_gatt_write_fake.call_count, 1U);
+	assert_int_equal(err, 0);
+	assert_int_equal(bt_gatt_write_fake.call_count, 1U);
 
 	/* A rejected change counter makes the client read the state before writing again */
 	write_rsp(fixture, BT_VOCS_ERR_INVALID_COUNTER);
-	zassert_equal(bt_gatt_read_fake.call_count, 1U);
+	assert_int_equal(bt_gatt_read_fake.call_count, 1U);
 
 	read_rsp(fixture, NULL, 0U);
 
-	zassert_equal(bt_gatt_write_fake.call_count, 1U);
-	zassert_equal(set_offset_cb_fake.call_count, 1U);
-	zassert_equal(set_offset_cb_fake.arg1_val, BT_ATT_ERR_UNLIKELY, "Unexpected err %d",
-		      set_offset_cb_fake.arg1_val);
+	assert_int_equal(bt_gatt_write_fake.call_count, 1U);
+	assert_int_equal(set_offset_cb_fake.call_count, 1U);
+	assert_int_equal(set_offset_cb_fake.arg1_val, BT_ATT_ERR_UNLIKELY);
 
 	err = bt_vocs_state_set(fixture->inst, 10);
-	zassert_equal(err, 0, "Unexpected return value %d", err);
-	zassert_equal(bt_gatt_write_fake.call_count, 2U);
+	assert_int_equal(err, 0);
+	assert_int_equal(bt_gatt_write_fake.call_count, 2U);
 
 	/* The failed retry does not keep the next operation from retrying */
 	write_rsp(fixture, BT_VOCS_ERR_INVALID_COUNTER);
-	zassert_equal(bt_gatt_read_fake.call_count, 2U);
+	assert_int_equal(bt_gatt_read_fake.call_count, 2U);
 
 	read_rsp(fixture, state, sizeof(state));
-	zassert_equal(bt_gatt_write_fake.call_count, 3U);
+	assert_int_equal(bt_gatt_write_fake.call_count, 3U);
 
 	write_rsp(fixture, 0U);
-	zassert_equal(set_offset_cb_fake.call_count, 2U);
-	zassert_equal(set_offset_cb_fake.arg1_val, 0, "Unexpected err %d",
-		      set_offset_cb_fake.arg1_val);
+	assert_int_equal(set_offset_cb_fake.call_count, 2U);
+	assert_int_equal(set_offset_cb_fake.arg1_val, 0);
 }
 
-static ZTEST_F(vocs_client_test_suite, test_set_offset_counter_retry_state_short)
+static void vocs_client_test_suite__test_set_offset_counter_retry_state_short(void **cm_state)
 {
+	struct vocs_client_test_suite_fixture *fixture = *cm_state;
 	/* Only the first octet is received */
 	const uint8_t state[] = {0x0AU, 0x00U, 0x04U};
 	int err;
 
 	err = bt_vocs_state_set(fixture->inst, 10);
-	zassert_equal(err, 0, "Unexpected return value %d", err);
+	assert_int_equal(err, 0);
 
 	write_rsp(fixture, BT_VOCS_ERR_INVALID_COUNTER);
-	zassert_equal(bt_gatt_read_fake.call_count, 1U);
+	assert_int_equal(bt_gatt_read_fake.call_count, 1U);
 
 	read_rsp(fixture, state, 1U);
 
-	zassert_equal(bt_gatt_write_fake.call_count, 1U);
-	zassert_equal(set_offset_cb_fake.call_count, 1U);
-	zassert_equal(set_offset_cb_fake.arg1_val, BT_ATT_ERR_UNLIKELY, "Unexpected err %d",
-		      set_offset_cb_fake.arg1_val);
+	assert_int_equal(bt_gatt_write_fake.call_count, 1U);
+	assert_int_equal(set_offset_cb_fake.call_count, 1U);
+	assert_int_equal(set_offset_cb_fake.arg1_val, BT_ATT_ERR_UNLIKELY);
 }
 
-static ZTEST_F(vocs_client_test_suite, test_discover_subscribe_fail)
+static void vocs_client_test_suite__test_discover_subscribe_fail(void **cm_state)
 {
+	struct vocs_client_test_suite_fixture *fixture = *cm_state;
 	struct bt_gatt_chrc chrc = BT_GATT_CHRC_INIT(BT_UUID_VOCS_STATE, 0x0003U,
 						     BT_GATT_CHRC_READ | BT_GATT_CHRC_NOTIFY);
 	const struct bt_gatt_attr attr = {
@@ -214,15 +213,15 @@ static ZTEST_F(vocs_client_test_suite, test_discover_subscribe_fail)
 	int err;
 
 	err = bt_vocs_discover(&fixture->conn, fixture->inst, &param);
-	zassert_equal(err, 0, "Unexpected return value %d", err);
-	zassert_equal(bt_gatt_discover_fake.call_count, 2U);
+	assert_int_equal(err, 0);
+	assert_int_equal(bt_gatt_discover_fake.call_count, 2U);
 
 	params = bt_gatt_discover_fake.arg1_val;
 	bt_gatt_subscribe_fake.return_val = -ENOMEM;
 
-	zassert_equal(params->func(&fixture->conn, &attr, params), BT_GATT_ITER_STOP);
-	zassert_equal(discover_cb_fake.call_count, 2U);
-	zassert_equal(discover_cb_fake.arg1_val, -ENOMEM);
+	assert_int_equal(params->func(&fixture->conn, &attr, params), BT_GATT_ITER_STOP);
+	assert_int_equal(discover_cb_fake.call_count, 2U);
+	assert_int_equal(discover_cb_fake.arg1_val, -ENOMEM);
 
 	/* The failed discovery does not leave the instance busy */
 	RESET_FAKE(bt_gatt_discover);
@@ -230,3 +229,34 @@ static ZTEST_F(vocs_client_test_suite, test_discover_subscribe_fail)
 	RESET_FAKE(discover_cb);
 	vocs_client_discover(fixture);
 }
+
+static int bt_test_vocs_client_test_suite_setup(void **state)
+{
+	int environment_result = bt_test_base_setup(state);
+
+	if (environment_result != 0) {
+		return environment_result;
+	}
+
+	*state = vocs_client_test_suite_setup();
+	return 0;
+}
+static int bt_test_vocs_client_test_suite_before(void **state)
+{
+	(void)state;
+	vocs_client_test_suite_before(*state);
+	return 0;
+}
+static int bt_test_vocs_client_test_suite_after(void **state)
+{
+	(void)state;
+	vocs_client_test_suite_after(*state);
+	return 0;
+}
+
+static const struct CMUnitTest test_cases_vocs_client_test_suite[] = {
+	cmocka_unit_test_setup_teardown(vocs_client_test_suite__test_set_offset_counter_retry_state_empty, bt_test_vocs_client_test_suite_before, bt_test_vocs_client_test_suite_after),
+	cmocka_unit_test_setup_teardown(vocs_client_test_suite__test_set_offset_counter_retry_state_short, bt_test_vocs_client_test_suite_before, bt_test_vocs_client_test_suite_after),
+	cmocka_unit_test_setup_teardown(vocs_client_test_suite__test_discover_subscribe_fail, bt_test_vocs_client_test_suite_before, bt_test_vocs_client_test_suite_after),
+};
+BT_TEST_SUITE(vocs_client_test_suite, test_cases_vocs_client_test_suite, bt_test_vocs_client_test_suite_setup, NULL);

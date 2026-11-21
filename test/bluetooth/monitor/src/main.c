@@ -1,70 +1,75 @@
+/****************************************************************************
+ *  Copyright (C) 2026 EmBT contributors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ ***************************************************************************/
+
+/**
+ * @file
+ * @brief Real monitor encoding with bounded memory and file output sinks.
+ */
+
 /*
  * Copyright (c) 2026 Silicon Laboratories Inc.
  *
  * SPDX-License-Identifier: Apache-2.0
  */
 
-/* Integration test for the interrupt-driven Bluetooth monitor UART output.
- *
- * Drives bt_monitor_send() through the real producer path and the real UART
- * interrupt handler against the emulated serial-test UART, and parses the
- * emitted monitor byte stream. The emulated UART invokes the interrupt
- * handler synchronously from uart_irq_tx_enable(), draining the monitor ring
- * buffer until it is empty or the capture buffer (which is smaller than the
- * monitor buffer) is full, so buffer-full handling, drop accounting and ring
- * buffer wrap-around are all exercised.
- */
-
-#include <stddef.h>
-#include <stdint.h>
-#include <string.h>
-
-#include <zephyr/device.h>
-#include <zephyr/devicetree.h>
-#include <zephyr/drivers/bluetooth.h>
-#include <zephyr/drivers/uart.h>
-#include <zephyr/drivers/uart/serial_test.h>
-#include <zephyr/sys/byteorder.h>
-#include <zephyr/ztest.h>
-
+#include "support/test_support.h"
+#include <embt/base/byteorder.h>
 #include "monitor.h"
+#include "monitor_buffer.h"
 
-/* Minimal fake HCI driver to satisfy the zephyr,bt-hci chosen node; the
- * monitor is initialized via SYS_INIT and does not need bt_enable().
+static uint8_t monitor_storage[128];
+static struct ring_buf monitor_buf;
+static bool reject_output;
+static FILE *output_file;
+
+/**
+ * @brief Copy a complete record into the bounded capture queue.
+ * @param[in] frags Borrowed header and payload fragments.
+ * @param[in] count Number of fragments.
+ * @param[in,out] context Capture ring buffer.
+ * @retval 0 The complete record was copied.
+ * @retval -ENOSPC No bytes were published.
  */
-#define DT_DRV_COMPAT zephyr_bt_hci_test
-
-static int fake_driver_open(const struct device *dev)
+static int buffer_sink(const struct bt_monitor_data *frags, size_t count, void *context)
 {
-	ARG_UNUSED(dev);
-
-	return -ENOSYS;
+	if (reject_output || !bt_monitor_ring_buf_put(context, frags, count)) {
+		return -ENOSPC;
+	}
+	return 0;
 }
 
-static int fake_driver_send(const struct device *dev, struct net_buf *buf)
+/**
+ * @brief Write borrowed fragments synchronously to the test's temporary file.
+ * @param[in] frags Borrowed header and payload fragments.
+ * @param[in] count Number of fragments.
+ * @param[in,out] context Open binary output file.
+ * @retval 0 Every fragment was written.
+ * @retval -EIO File output failed; previously written bytes are not rolled back.
+ */
+static int file_sink(const struct bt_monitor_data *frags, size_t count, void *context)
 {
-	ARG_UNUSED(dev);
-	ARG_UNUSED(buf);
+	FILE *file = context;
 
-	return -ENOSYS;
+	for (size_t i = 0; i < count; i++) {
+		if (frags[i].len && fwrite(frags[i].data, 1, frags[i].len, file) != frags[i].len) {
+			return -EIO;
+		}
+	}
+	return 0;
 }
-
-static DEVICE_API(bt_hci, fake_driver_api) = {
-	.open = fake_driver_open,
-	.send = fake_driver_send,
-};
-
-#define TEST_DEVICE_INIT(inst) \
-	static struct bt_hci_driver_data fake_driver_data_##inst; \
-	static const struct bt_hci_driver_config fake_driver_config_##inst = \
-		BT_DT_HCI_DRIVER_CONFIG_INST_GET(inst); \
-	DEVICE_DT_INST_DEFINE(inst, NULL, NULL, &fake_driver_data_##inst, \
-			      &fake_driver_config_##inst, POST_KERNEL, \
-			      CONFIG_KERNEL_INIT_PRIORITY_DEVICE, &fake_driver_api)
-
-DT_INST_FOREACH_STATUS_OKAY(TEST_DEVICE_INIT)
-
-static const struct device *const mon_uart = DEVICE_DT_GET(DT_CHOSEN(zephyr_bt_mon_uart));
 
 /* Large enough for every test's full capture */
 static uint8_t stream[4096];
@@ -81,7 +86,7 @@ static size_t stream_len;
 
 static uint32_t tx_seq;
 
-static void send_record(void)
+static void send_record_opcode(uint16_t opcode)
 {
 	uint8_t payload[TEST_PAYLOAD_LEN];
 
@@ -90,42 +95,38 @@ static void send_record(void)
 		payload[i] = PATTERN_BYTE(i);
 	}
 
-	bt_monitor_send(TEST_OPCODE, payload, sizeof(payload));
+	bt_monitor_send(opcode, payload, sizeof(payload));
 	tx_seq++;
 }
 
-/* serial_test only invokes the interrupt handler from within
- * uart_irq_tx_enable(): once its capture buffer fills mid-drain, the pump
- * stops and reading data out does not restart it. Re-assert TX enable to
- * emulate the TX-ready interrupt a real UART raises as accepted bytes
- * drain onto the wire; the interrupt handler is idempotent and disables
- * TX again when the monitor ring buffer is empty.
- */
-static void pump(void)
+static void send_record(void)
 {
-	uart_irq_tx_enable(mon_uart);
+	send_record_opcode(TEST_OPCODE);
 }
 
+/** @brief Drain committed bytes in small chunks, including wrapped records. */
 static void capture(void)
 {
-	uint32_t got;
+	uint8_t *data;
+	uint32_t len;
 
-	do {
-		pump();
-		got = serial_vnd_read_out_data(mon_uart, &stream[stream_len],
-					       sizeof(stream) - stream_len);
-		stream_len += got;
-	} while (got > 0);
-
-	zassert_true(stream_len < sizeof(stream), "stream buffer exhausted");
+	while ((len = bt_monitor_ring_buf_get_ptr(&monitor_buf, &data)) != 0) {
+		len = MIN(len, 7U);
+		assert_true(len <= sizeof(stream) - stream_len);
+		memcpy(stream + stream_len, data, len);
+		stream_len += len;
+		bt_monitor_ring_buf_consume(&monitor_buf, len);
+	}
 }
 
 struct stream_stats {
-	uint32_t records;      /* well-formed records of TEST_OPCODE */
+	uint32_t records;      /* Well-formed payload records. */
 	uint32_t last_seq;     /* sequence number of the last such record */
 	uint32_t seq_errors;   /* out-of-order or corrupt payloads */
 	uint32_t acl_tx_drops; /* accumulated from extended headers */
 	uint32_t parse_errors; /* framing violations */
+	uint32_t opcode_mask;
+	uint8_t largest_acl_tx_drop;
 };
 
 static void parse_stream(struct stream_stats *st)
@@ -152,13 +153,19 @@ static void parse_stream(struct stream_stats *st)
 
 		/* Opcodes above the highest defined one indicate lost framing */
 		if (data_len < BT_MONITOR_BASE_HDR_LEN - sizeof(data_len) + hdr_len ||
-		    opcode > BT_MONITOR_ISO_RX_PKT) {
+		    opcode > BT_MONITOR_ISO_RX_PKT ||
+		    hdr_len < sizeof(struct bt_monitor_ts32) || hdr_len > BT_MONITOR_EXT_HDR_MAX ||
+		    stream[pos + offsetof(struct bt_monitor_hdr, flags)] != 0) {
 			st->parse_errors++;
 			return;
 		}
-
 		if (pos + sizeof(data_len) + data_len > stream_len) {
-			/* Truncated tail: not published yet, stop parsing */
+			/* capture() drains the queue, so a partial tail is a framing error. */
+			st->parse_errors++;
+			return;
+		}
+		if (ext[0] != BT_MONITOR_TS32) {
+			st->parse_errors++;
 			return;
 		}
 
@@ -166,6 +173,13 @@ static void parse_stream(struct stream_stats *st)
 		payload = &stream[pos + BT_MONITOR_BASE_HDR_LEN + hdr_len];
 
 		while (i < hdr_len) {
+			size_t field_len = ext[i] == BT_MONITOR_TS32 ?
+					   sizeof(struct bt_monitor_ts32) : 2;
+
+			if (field_len > hdr_len - i) {
+				st->parse_errors++;
+				return;
+			}
 			switch (ext[i]) {
 			case BT_MONITOR_TS32:
 				/* Type byte plus 32-bit timestamp */
@@ -173,6 +187,7 @@ static void parse_stream(struct stream_stats *st)
 				break;
 			case BT_MONITOR_ACL_TX_DROPS:
 				st->acl_tx_drops += ext[i + 1];
+				st->largest_acl_tx_drop = MAX(st->largest_acl_tx_drop, ext[i + 1]);
 				/* Type byte plus 8-bit drop count */
 				i += 2;
 				break;
@@ -191,7 +206,9 @@ static void parse_stream(struct stream_stats *st)
 			}
 		}
 
-		if (opcode == TEST_OPCODE) {
+		st->opcode_mask |= BIT(opcode);
+		if (opcode == TEST_OPCODE || opcode == BT_MONITOR_COMMAND_PKT ||
+		    opcode == BT_MONITOR_EVENT_PKT) {
 			uint32_t seq;
 
 			if (payload_len != TEST_PAYLOAD_LEN) {
@@ -219,47 +236,61 @@ static void parse_stream(struct stream_stats *st)
 
 		pos += sizeof(data_len) + data_len;
 	}
+	if (pos != stream_len) {
+		st->parse_errors++;
+	}
 }
 
-/* Flush boot-time records (log backend output, etc.) and any content stuck
- * in the monitor ring buffer from a full capture buffer, so that each test
- * starts from an empty pipeline.
- */
-static void monitor_test_before(void *fixture)
+static int monitor_test_before(void **state)
 {
-	ARG_UNUSED(fixture);
-
-	uint8_t discard[64];
-	uint32_t got;
-
-	do {
-		pump();
-		got = serial_vnd_read_out_data(mon_uart, discard, sizeof(discard));
-	} while (got > 0);
-
+	(void)state;
+	ring_buf_init(&monitor_buf, sizeof(monitor_storage), monitor_storage);
+	reject_output = false;
 	stream_len = 0;
 	tx_seq = 0;
+	assert_int_equal(bt_monitor_init(buffer_sink, &monitor_buf), 0);
+	return 0;
 }
 
-ZTEST_SUITE(bt_monitor_irq, NULL, NULL, monitor_test_before, NULL, NULL);
-
-ZTEST(bt_monitor_irq, test_single_record)
+static int monitor_test_after(void **state)
 {
+	(void)state;
+	int result = 0;
+
+	if (output_file) {
+		result = fclose(output_file);
+		output_file = NULL;
+	}
+	/* No producer runs during the fixture's sink replacement. */
+	assert_int_equal(bt_monitor_init(buffer_sink, &monitor_buf), 0);
+	return result;
+}
+
+static void bt_monitor__test_single_record(void **cm_state)
+{
+	(void)cm_state;
 	struct stream_stats st;
+	uint64_t before = bt_uptime_get_us() / 100;
 
 	send_record();
 	capture();
 	parse_stream(&st);
+	uint64_t after = bt_uptime_get_us() / 100;
 
-	zassert_equal(st.parse_errors, 0);
-	zassert_equal(st.seq_errors, 0);
-	zassert_equal(st.records, 1);
-	zassert_equal(st.last_seq, 0);
-	zassert_equal(st.acl_tx_drops, 0);
+	assert_int_equal(st.parse_errors, 0);
+	assert_int_equal(st.seq_errors, 0);
+	assert_int_equal(st.records, 1);
+	assert_int_equal(st.last_seq, 0);
+	assert_int_equal(st.acl_tx_drops, 0);
+	assert_int_equal(stream_len, BT_MONITOR_BASE_HDR_LEN + sizeof(struct bt_monitor_ts32) +
+			 TEST_PAYLOAD_LEN);
+	assert_true((uint32_t)(sys_get_le32(stream + BT_MONITOR_BASE_HDR_LEN + 1) -
+			      (uint32_t)before) <= after - before);
 }
 
-ZTEST(bt_monitor_irq, test_stream_across_wrap)
+static void bt_monitor__test_stream_across_wrap(void **cm_state)
 {
+	(void)cm_state;
 	struct stream_stats st;
 
 	/* Each record is ~40 bytes against a 128-byte monitor buffer, so
@@ -272,29 +303,27 @@ ZTEST(bt_monitor_irq, test_stream_across_wrap)
 	}
 	parse_stream(&st);
 
-	zassert_equal(st.parse_errors, 0);
-	zassert_equal(st.seq_errors, 0);
-	zassert_equal(st.records, 64);
-	zassert_equal(st.last_seq, 63);
-	zassert_equal(st.acl_tx_drops, 0);
+	assert_int_equal(st.parse_errors, 0);
+	assert_int_equal(st.seq_errors, 0);
+	assert_int_equal(st.records, 64);
+	assert_int_equal(st.last_seq, 63);
+	assert_int_equal(st.acl_tx_drops, 0);
 }
 
-ZTEST(bt_monitor_irq, test_overflow_drops_whole_records)
+static void bt_monitor__test_overflow_drops_whole_records(void **cm_state)
 {
+	(void)cm_state;
 	struct stream_stats st;
 	uint32_t sent;
 
-	/* Without draining the capture buffer, the emulated UART fills up,
-	 * the interrupt handler stops accepting data, and the monitor ring
-	 * buffer overflows: records must be dropped whole and counted.
+	/* Pause the consumer so the bounded sink fills up. Rejected records
+	 * must not publish a partial header or lose accumulated drop counts.
 	 */
 	for (int i = 0; i < 16; i++) {
 		send_record();
 	}
 
-	/* Drain in stages: each new record re-enables TX, which moves
-	 * another capture buffer's worth of backlog out of the ring.
-	 */
+	/* Resume consumption in stages and publish the accumulated drops. */
 	for (int i = 0; i < 16; i++) {
 		capture();
 		send_record();
@@ -303,10 +332,128 @@ ZTEST(bt_monitor_irq, test_overflow_drops_whole_records)
 	sent = tx_seq;
 	parse_stream(&st);
 
-	zassert_equal(st.parse_errors, 0, "corrupt stream after overflow");
-	zassert_equal(st.seq_errors, 0, "partial or reordered records");
-	zassert_true(st.acl_tx_drops > 0, "overflow did not drop records");
-	zassert_equal(st.records + st.acl_tx_drops, sent,
-		      "records (%u) + drops (%u) != sent (%u)",
-		      st.records, st.acl_tx_drops, sent);
+	assert_int_equal(st.parse_errors, 0);
+	assert_int_equal(st.seq_errors, 0);
+	assert_true(st.acl_tx_drops > 0);
+	assert_int_equal(st.records + st.acl_tx_drops, sent);
 }
+
+/** @brief Rejected records must preserve both their bytes and previous drop counts. */
+static void bt_monitor__test_repeated_rejection_preserves_drops(void **state)
+{
+	(void)state;
+	struct stream_stats st;
+
+	send_record();
+	uint32_t queued = ring_buf_size_get(&monitor_buf);
+
+	reject_output = true;
+	for (int i = 0; i < 7; i++) {
+		send_record();
+		assert_int_equal(ring_buf_size_get(&monitor_buf), queued);
+	}
+	reject_output = false;
+	capture();
+	send_record();
+	capture();
+	parse_stream(&st);
+
+	assert_int_equal(st.parse_errors, 0);
+	assert_int_equal(st.seq_errors, 0);
+	assert_int_equal(st.records, 2);
+	assert_int_equal(st.acl_tx_drops, 7);
+	assert_int_equal(st.last_seq, 8);
+	assert_int_equal(st.records + st.acl_tx_drops, tx_seq);
+
+	/* A subsequent accepted record must not report the same drops again. */
+	send_record();
+	capture();
+	parse_stream(&st);
+	assert_int_equal(st.parse_errors, 0);
+	assert_int_equal(st.seq_errors, 0);
+	assert_int_equal(st.records, 3);
+	assert_int_equal(st.acl_tx_drops, 7);
+}
+
+/** @brief Report byte-sized drop fields across records without losing the surplus. */
+static void bt_monitor__test_drop_count_over_255(void **state)
+{
+	(void)state;
+	struct stream_stats st;
+
+	reject_output = true;
+	for (int i = 0; i < 300; i++) {
+		send_record();
+		assert_true(ring_buf_is_empty(&monitor_buf));
+	}
+	reject_output = false;
+
+	for (uint32_t i = 0; i < 3; i++) {
+		send_record();
+		capture();
+		parse_stream(&st);
+		assert_int_equal(st.parse_errors, 0);
+		assert_int_equal(st.seq_errors, 0);
+		assert_int_equal(st.records, i + 1);
+		assert_int_equal(st.acl_tx_drops, i == 0 ? 255 : 300);
+		assert_int_equal(st.largest_acl_tx_drop, 255);
+	}
+	assert_int_equal(st.last_seq, 302);
+	assert_int_equal(st.records + st.acl_tx_drops, tx_seq);
+}
+
+/** @brief Read back the real binary framing and ordered payloads from a file sink. */
+static void bt_monitor__test_file_output(void **state)
+{
+	(void)state;
+	static const uint16_t opcodes[] = {
+		BT_MONITOR_COMMAND_PKT, BT_MONITOR_EVENT_PKT, BT_MONITOR_ACL_TX_PKT,
+	};
+	struct stream_stats st;
+	size_t pos = 0;
+
+	output_file = tmpfile();
+	assert_non_null(output_file);
+	assert_int_equal(bt_monitor_init(file_sink, output_file), 0);
+	for (size_t i = 0; i < ARRAY_SIZE(opcodes); i++) {
+		send_record_opcode(opcodes[i]);
+	}
+	assert_int_equal(fflush(output_file), 0);
+	assert_int_equal(fseek(output_file, 0, SEEK_SET), 0);
+	stream_len = fread(stream, 1, sizeof(stream), output_file);
+	assert_int_equal(ferror(output_file), 0);
+	assert_true(feof(output_file));
+	assert_int_equal(stream_len, ARRAY_SIZE(opcodes) *
+			 (BT_MONITOR_BASE_HDR_LEN + sizeof(struct bt_monitor_ts32) +
+			  TEST_PAYLOAD_LEN));
+	parse_stream(&st);
+	assert_int_equal(st.parse_errors, 0);
+	assert_int_equal(st.seq_errors, 0);
+	assert_int_equal(st.records, ARRAY_SIZE(opcodes));
+	assert_int_equal(st.last_seq, 2);
+	assert_int_equal(st.acl_tx_drops, 0);
+	assert_int_equal(st.opcode_mask, BIT(BT_MONITOR_COMMAND_PKT) |
+			 BIT(BT_MONITOR_EVENT_PKT) | BIT(BT_MONITOR_ACL_TX_PKT));
+
+	for (size_t i = 0; i < ARRAY_SIZE(opcodes); i++) {
+		uint16_t opcode = sys_get_le16(stream + pos +
+					     offsetof(struct bt_monitor_hdr, opcode));
+
+		assert_int_equal(opcode, opcodes[i]);
+		pos += sizeof(uint16_t) + sys_get_le16(stream + pos);
+	}
+	assert_int_equal(pos, stream_len);
+}
+
+#define MONITOR_CASE(name) \
+	cmocka_unit_test_setup_teardown(bt_monitor__##name, monitor_test_before, monitor_test_after)
+
+static const struct CMUnitTest monitor_cases[] = {
+	MONITOR_CASE(test_single_record),
+	MONITOR_CASE(test_stream_across_wrap),
+	MONITOR_CASE(test_overflow_drops_whole_records),
+	MONITOR_CASE(test_repeated_rejection_preserves_drops),
+	MONITOR_CASE(test_drop_count_over_255),
+	MONITOR_CASE(test_file_output),
+};
+BT_TEST_SUITE(bt_monitor, monitor_cases, bt_test_base_setup, NULL);

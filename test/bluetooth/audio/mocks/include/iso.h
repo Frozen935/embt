@@ -8,10 +8,10 @@
 #define MOCKS_ISO_H_
 #include <stdint.h>
 
-#include <zephyr/autoconf.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/iso.h>
-#include <zephyr/fff.h>
+#include <embt/autoconf.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/iso.h>
+#include <fff.h>
 
 #if defined(CONFIG_BT_BAP_BROADCAST_SOURCE)
 struct bt_iso_big {

@@ -1,3 +1,6 @@
+#include "support/test_support.h"
+void fff_reset_rule_before(const struct bt_test_case_info *, void *);
+
 /*
  * Copyright (c) 2022 Nordic Semiconductor ASA
  *
@@ -9,23 +12,23 @@
 #include "mocks/prng.h"
 #include "mocks/prng_expects.h"
 
-#include <zephyr/bluetooth/crypto.h>
-#include <zephyr/fff.h>
-#include <zephyr/kernel.h>
+#include <embt/bluetooth/crypto.h>
+#include <fff.h>
+
 
 #include <host/crypto.h>
 
 DEFINE_FFF_GLOBALS;
 
-static void fff_reset_rule_before(const struct ztest_unit_test *test, void *fixture)
+void fff_reset_rule_before(const struct bt_test_case_info *test, void *fixture)
 {
 	HCI_CORE_FFF_FAKES_LIST(RESET_FAKE);
 	PRNG_FFF_FAKES_LIST(RESET_FAKE);
 }
 
-ZTEST_RULE(fff_reset_rule, fff_reset_rule_before, NULL);
 
-ZTEST_SUITE(bt_rand, NULL, NULL, NULL, NULL, NULL);
+
+
 
 /*
  *  Test bt_rand() succeeds while 'CONFIG_BT_HOST_CRYPTO_PRNG' isn't enabled.
@@ -37,14 +40,18 @@ ZTEST_SUITE(bt_rand, NULL, NULL, NULL, NULL, NULL);
  *  Expected behaviour:
  *   - bt_rand() returns 0 (success)
  */
-ZTEST(bt_rand, test_bt_rand_succeeds_host_crypto_prng_disabled)
+static void bt_rand__test_bt_rand_succeeds_host_crypto_prng_disabled(void **cm_state)
 {
+	(void)cm_state;
 	int err;
 	uint8_t buf[16];
 	size_t buf_len = 16;
 	uint8_t expected_args_history[] = {16};
 
-	Z_TEST_SKIP_IFDEF(CONFIG_BT_HOST_CRYPTO_PRNG);
+	#if defined(CONFIG_BT_HOST_CRYPTO_PRNG)
+	skip();
+#endif
+
 
 	bt_hci_le_rand_fake.return_val = 0;
 
@@ -52,7 +59,7 @@ ZTEST(bt_rand, test_bt_rand_succeeds_host_crypto_prng_disabled)
 
 	expect_call_count_bt_hci_le_rand(1, expected_args_history);
 
-	zassert_ok(err, "Unexpected error code '%d' was returned", err);
+	assert_int_equal(err, 0);
 }
 
 /*
@@ -66,13 +73,17 @@ ZTEST(bt_rand, test_bt_rand_succeeds_host_crypto_prng_disabled)
  *  Expected behaviour:
  *   - bt_rand() returns 0 (success)
  */
-ZTEST(bt_rand, test_psa_generate_random_succeeds_on_first_call)
+static void bt_rand__test_psa_generate_random_succeeds_on_first_call(void **cm_state)
 {
+	(void)cm_state;
 	int err;
 	uint8_t buf[16];
 	size_t buf_len = 16;
 
-	Z_TEST_SKIP_IFNDEF(CONFIG_BT_HOST_CRYPTO_PRNG);
+	#if !defined(CONFIG_BT_HOST_CRYPTO_PRNG)
+	skip();
+#endif
+
 
 	psa_generate_random_fake.return_val = PSA_SUCCESS;
 
@@ -80,5 +91,20 @@ ZTEST(bt_rand, test_psa_generate_random_succeeds_on_first_call)
 
 	expect_single_call_psa_generate_random(buf, buf_len);
 
-	zassert_ok(err, "Unexpected error code '%d' was returned", err);
+	assert_int_equal(err, 0);
 }
+
+
+static int bt_test_bt_rand_before(void **state)
+{
+	(void)state;
+	fff_reset_rule_before(NULL, *state);
+	return 0;
+}
+
+
+static const struct CMUnitTest test_cases_bt_rand[] = {
+	cmocka_unit_test_setup_teardown(bt_rand__test_bt_rand_succeeds_host_crypto_prng_disabled, bt_test_bt_rand_before, NULL),
+	cmocka_unit_test_setup_teardown(bt_rand__test_psa_generate_random_succeeds_on_first_call, bt_test_bt_rand_before, NULL),
+};
+BT_TEST_SUITE(bt_rand, test_cases_bt_rand, bt_test_base_setup, NULL);

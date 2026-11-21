@@ -1,3 +1,10 @@
+#include "support/test_support.h"
+#include "test_environment.h"
+void mock_init_rule_before_05ae85(const struct bt_test_case_info *, void *);
+void mock_destroy_rule_after_05ae85(const struct bt_test_case_info *, void *);
+
+#include <embt/base/log.h>
+
 /* test_unicast_stop.c - unit test for unicast stop procedure */
 
 /*
@@ -12,21 +19,18 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <zephyr/autoconf.h>
-#include <zephyr/bluetooth/assigned_numbers.h>
-#include <zephyr/bluetooth/audio/audio.h>
-#include <zephyr/bluetooth/audio/bap.h>
-#include <zephyr/bluetooth/audio/bap_lc3_preset.h>
-#include <zephyr/bluetooth/audio/cap.h>
-#include <zephyr/bluetooth/hci_types.h>
-#include <zephyr/bluetooth/iso.h>
-#include <zephyr/fff.h>
-#include <zephyr/sys/slist.h>
-#include <zephyr/sys/util.h>
-#include <zephyr/toolchain.h>
-#include <zephyr/ztest_assert.h>
-#include <zephyr/ztest_test.h>
-
+#include <embt/autoconf.h>
+#include <embt/bluetooth/assigned_numbers.h>
+#include <embt/bluetooth/audio/audio.h>
+#include <embt/bluetooth/audio/bap.h>
+#include <embt/bluetooth/audio/bap_lc3_preset.h>
+#include <embt/bluetooth/audio/cap.h>
+#include <embt/bluetooth/hci_types.h>
+#include <embt/bluetooth/iso.h>
+#include <fff.h>
+#include <embt/base/slist.h>
+#include <embt/base/util.h>
+#include <embt/compiler.h>
 #include <sys/errno.h>
 
 #include "audio/bap_endpoint.h"
@@ -96,7 +100,7 @@ static void cap_initiator_test_unicast_stop_fixture_init(
 	group_param.params = group_pair_params;
 
 	err = bt_cap_unicast_group_create(&group_param, &fixture->unicast_group);
-	zassert_equal(err, 0, "Unexpected return value %d", err);
+	assert_int_equal(err, 0);
 }
 
 static struct bt_conn *get_conn_from_index(struct cap_initiator_test_unicast_stop_fixture *fixture,
@@ -151,7 +155,7 @@ static void *cap_initiator_test_unicast_stop_setup(void)
 	struct cap_initiator_test_unicast_stop_fixture *fixture;
 
 	fixture = malloc(sizeof(*fixture));
-	zassert_not_null(fixture);
+	assert_non_null(fixture);
 
 	return fixture;
 }
@@ -165,7 +169,7 @@ static void cap_initiator_test_unicast_stop_before(void *f)
 	cap_initiator_test_unicast_stop_fixture_init(f);
 
 	err = bt_cap_initiator_register_cb(&mock_cap_initiator_cb);
-	zassert_equal(0, err, "Unexpected return value %d", err);
+	assert_int_equal(0, err);
 
 	mock_discover(fixture->conns, fixture->snk_eps, fixture->src_eps);
 	init_default_params(fixture);
@@ -177,7 +181,7 @@ static void cap_initiator_test_unicast_stop_after(void *f)
 	int err;
 
 	err = bt_cap_initiator_unregister_cb(&mock_cap_initiator_cb);
-	zassert_true(err == 0 || err == -EINVAL, "Unexpected error: %d", err);
+	assert_true(err == 0 || err == -EINVAL);
 
 	for (size_t i = 0U; i < ARRAY_SIZE(fixture->conns); i++) {
 		mock_bt_conn_disconnected(&fixture->conns[i], BT_HCI_ERR_REMOTE_USER_TERM_CONN);
@@ -186,7 +190,7 @@ static void cap_initiator_test_unicast_stop_after(void *f)
 	/* In the case of a test failing, we cancel the procedure so that subsequent won't fail */
 	err = bt_cap_initiator_unicast_audio_cancel();
 	/* May fail if no CAP procedure is in progress */
-	zassert_true(err == 0 || err == -EALREADY, "Unexpected error: %d", err);
+	assert_true(err == 0 || err == -EALREADY);
 
 	if (fixture->unicast_group != NULL) {
 		const struct bt_cap_unicast_audio_stop_param param = {
@@ -198,12 +202,12 @@ static void cap_initiator_test_unicast_stop_after(void *f)
 
 		err = bt_cap_initiator_unicast_audio_stop(&param);
 		if (err != 0) {
-			printk("Failed to stop unicast audio (err %d)\n", err);
+			bt_log_print("Failed to stop unicast audio (err %d)\n", err);
 		}
 
 		err = bt_cap_unicast_group_delete(fixture->unicast_group);
 		if (err != 0) {
-			printk("Failed to delete unicast group (err %d)\n", err);
+			bt_log_print("Failed to delete unicast group (err %d)\n", err);
 		}
 	}
 }
@@ -213,13 +217,11 @@ static void cap_initiator_test_unicast_stop_teardown(void *f)
 	free(f);
 }
 
-ZTEST_SUITE(cap_initiator_test_unicast_stop, NULL, cap_initiator_test_unicast_stop_setup,
-	    cap_initiator_test_unicast_stop_before, cap_initiator_test_unicast_stop_after,
-	    cap_initiator_test_unicast_stop_teardown);
 
-static ZTEST_F(cap_initiator_test_unicast_stop,
-	       test_initiator_unicast_stop_disable_state_codec_configured)
+
+static void cap_initiator_test_unicast_stop__test_initiator_unicast_stop_disable_state_codec_configured(void **cm_state)
 {
+	struct cap_initiator_test_unicast_stop_fixture *fixture = *cm_state;
 	int err;
 
 	ARRAY_FOR_EACH(fixture->cap_streams, i) {
@@ -229,7 +231,7 @@ static ZTEST_F(cap_initiator_test_unicast_stop,
 	}
 
 	err = bt_cap_initiator_unicast_audio_stop(&fixture->audio_stop_param);
-	zassert_equal(err, -EALREADY, "Unexpected return value %d", err);
+	assert_int_equal(err, -EALREADY);
 
 	zexpect_call_count("bt_cap_initiator_cb.unicast_stop_complete_cb", 0,
 			   mock_cap_initiator_unicast_stop_complete_cb_fake.call_count);
@@ -238,14 +240,13 @@ static ZTEST_F(cap_initiator_test_unicast_stop,
 		const struct bt_bap_stream *bap_stream = &fixture->cap_streams[i].bap_stream;
 		const enum bt_bap_ep_state state = bap_stream->ep->state;
 
-		zassert_equal(state, BT_BAP_EP_STATE_CODEC_CONFIGURED,
-			      "[%zu]: Stream %p unexpected state: %d", i, bap_stream, state);
+		assert_int_equal(state, BT_BAP_EP_STATE_CODEC_CONFIGURED);
 	}
 }
 
-static ZTEST_F(cap_initiator_test_unicast_stop,
-	       test_initiator_unicast_stop_disable_state_qos_configured)
+static void cap_initiator_test_unicast_stop__test_initiator_unicast_stop_disable_state_qos_configured(void **cm_state)
 {
+	struct cap_initiator_test_unicast_stop_fixture *fixture = *cm_state;
 	int err;
 
 	ARRAY_FOR_EACH(fixture->cap_streams, i) {
@@ -255,7 +256,7 @@ static ZTEST_F(cap_initiator_test_unicast_stop,
 	}
 
 	err = bt_cap_initiator_unicast_audio_stop(&fixture->audio_stop_param);
-	zassert_equal(err, -EALREADY, "Unexpected return value %d", err);
+	assert_int_equal(err, -EALREADY);
 
 	zexpect_call_count("bt_cap_initiator_cb.unicast_stop_complete_cb", 0,
 			   mock_cap_initiator_unicast_stop_complete_cb_fake.call_count);
@@ -264,13 +265,13 @@ static ZTEST_F(cap_initiator_test_unicast_stop,
 		const struct bt_bap_stream *bap_stream = &fixture->cap_streams[i].bap_stream;
 		const enum bt_bap_ep_state state = bap_stream->ep->state;
 
-		zassert_equal(state, BT_BAP_EP_STATE_QOS_CONFIGURED,
-			      "[%zu]: Stream %p unexpected state: %d", i, bap_stream, state);
+		assert_int_equal(state, BT_BAP_EP_STATE_QOS_CONFIGURED);
 	}
 }
 
-static ZTEST_F(cap_initiator_test_unicast_stop, test_initiator_unicast_stop_disable_state_enabling)
+static void cap_initiator_test_unicast_stop__test_initiator_unicast_stop_disable_state_enabling(void **cm_state)
 {
+	struct cap_initiator_test_unicast_stop_fixture *fixture = *cm_state;
 	int err;
 
 	ARRAY_FOR_EACH(fixture->cap_streams, i) {
@@ -280,7 +281,7 @@ static ZTEST_F(cap_initiator_test_unicast_stop, test_initiator_unicast_stop_disa
 	}
 
 	err = bt_cap_initiator_unicast_audio_stop(&fixture->audio_stop_param);
-	zassert_equal(err, 0, "Unexpected return value %d", err);
+	assert_int_equal(err, 0);
 
 	zexpect_call_count("bt_cap_initiator_cb.unicast_stop_complete_cb", 1,
 			   mock_cap_initiator_unicast_stop_complete_cb_fake.call_count);
@@ -299,13 +300,13 @@ static ZTEST_F(cap_initiator_test_unicast_stop, test_initiator_unicast_stop_disa
 		const struct bt_bap_stream *bap_stream = &fixture->cap_streams[i].bap_stream;
 		const enum bt_bap_ep_state state = bap_stream->ep->state;
 
-		zassert_equal(state, BT_BAP_EP_STATE_QOS_CONFIGURED,
-			      "[%zu]: Stream %p unexpected state: %d", i, bap_stream, state);
+		assert_int_equal(state, BT_BAP_EP_STATE_QOS_CONFIGURED);
 	}
 }
 
-static ZTEST_F(cap_initiator_test_unicast_stop, test_initiator_unicast_stop_disable_state_streaming)
+static void cap_initiator_test_unicast_stop__test_initiator_unicast_stop_disable_state_streaming(void **cm_state)
 {
+	struct cap_initiator_test_unicast_stop_fixture *fixture = *cm_state;
 	int err;
 
 	ARRAY_FOR_EACH(fixture->cap_streams, i) {
@@ -315,7 +316,7 @@ static ZTEST_F(cap_initiator_test_unicast_stop, test_initiator_unicast_stop_disa
 	}
 
 	err = bt_cap_initiator_unicast_audio_stop(&fixture->audio_stop_param);
-	zassert_equal(err, 0, "Unexpected return value %d", err);
+	assert_int_equal(err, 0);
 
 	zexpect_call_count("bt_cap_initiator_cb.unicast_stop_complete_cb", 1,
 			   mock_cap_initiator_unicast_stop_complete_cb_fake.call_count);
@@ -334,13 +335,13 @@ static ZTEST_F(cap_initiator_test_unicast_stop, test_initiator_unicast_stop_disa
 		const struct bt_bap_stream *bap_stream = &fixture->cap_streams[i].bap_stream;
 		const enum bt_bap_ep_state state = bap_stream->ep->state;
 
-		zassert_equal(state, BT_BAP_EP_STATE_QOS_CONFIGURED,
-			      "[%zu]: Stream %p unexpected state: %d", i, bap_stream, state);
+		assert_int_equal(state, BT_BAP_EP_STATE_QOS_CONFIGURED);
 	}
 }
 
-static ZTEST_F(cap_initiator_test_unicast_stop, test_initiator_unicast_stop_disable_next_fail)
+static void cap_initiator_test_unicast_stop__test_initiator_unicast_stop_disable_next_fail(void **cm_state)
 {
+	struct cap_initiator_test_unicast_stop_fixture *fixture = *cm_state;
 	int err;
 
 	ARRAY_FOR_EACH(fixture->cap_streams, i) {
@@ -353,18 +354,18 @@ static ZTEST_F(cap_initiator_test_unicast_stop, test_initiator_unicast_stop_disa
 	mock_bap_unicast_client_set_disable_err(&fixture->cap_streams[1].bap_stream, -ENOMEM);
 
 	err = bt_cap_initiator_unicast_audio_stop(&fixture->audio_stop_param);
-	zassert_equal(err, 0, "Unexpected return value %d", err);
+	assert_int_equal(err, 0);
 
 	zexpect_call_count("bt_cap_initiator_cb.unicast_stop_complete_cb", 1,
 			   mock_cap_initiator_unicast_stop_complete_cb_fake.call_count);
 
 	err = mock_cap_initiator_unicast_stop_complete_cb_fake.arg0_val;
-	zassert_equal(err, -ENOMEM, "Unexpected err %d", err);
+	assert_int_equal(err, -ENOMEM);
 }
 
-static ZTEST_F(cap_initiator_test_unicast_stop,
-	       test_initiator_unicast_stop_release_state_codec_configured)
+static void cap_initiator_test_unicast_stop__test_initiator_unicast_stop_release_state_codec_configured(void **cm_state)
 {
+	struct cap_initiator_test_unicast_stop_fixture *fixture = *cm_state;
 	int err;
 
 	ARRAY_FOR_EACH(fixture->cap_streams, i) {
@@ -376,7 +377,7 @@ static ZTEST_F(cap_initiator_test_unicast_stop,
 	fixture->audio_stop_param.release = true;
 
 	err = bt_cap_initiator_unicast_audio_stop(&fixture->audio_stop_param);
-	zassert_equal(err, 0, "Unexpected return value %d", err);
+	assert_int_equal(err, 0);
 
 	zexpect_call_count("bt_cap_initiator_cb.unicast_stop_complete_cb", 1,
 			   mock_cap_initiator_unicast_stop_complete_cb_fake.call_count);
@@ -394,14 +395,13 @@ static ZTEST_F(cap_initiator_test_unicast_stop,
 	ARRAY_FOR_EACH(fixture->cap_streams, i) {
 		const struct bt_bap_stream *bap_stream = &fixture->cap_streams[i].bap_stream;
 
-		zassert_equal(bap_stream->ep, NULL, "[%zu]: Stream %p not released (%p)", i,
-			      bap_stream, bap_stream->ep);
+		assert_int_equal(bap_stream->ep, NULL);
 	}
 }
 
-static ZTEST_F(cap_initiator_test_unicast_stop,
-	       test_initiator_unicast_stop_release_state_qos_configured)
+static void cap_initiator_test_unicast_stop__test_initiator_unicast_stop_release_state_qos_configured(void **cm_state)
 {
+	struct cap_initiator_test_unicast_stop_fixture *fixture = *cm_state;
 	int err;
 
 	ARRAY_FOR_EACH(fixture->cap_streams, i) {
@@ -413,7 +413,7 @@ static ZTEST_F(cap_initiator_test_unicast_stop,
 	fixture->audio_stop_param.release = true;
 
 	err = bt_cap_initiator_unicast_audio_stop(&fixture->audio_stop_param);
-	zassert_equal(err, 0, "Unexpected return value %d", err);
+	assert_int_equal(err, 0);
 
 	zexpect_call_count("bt_cap_initiator_cb.unicast_stop_complete_cb", 1,
 			   mock_cap_initiator_unicast_stop_complete_cb_fake.call_count);
@@ -431,13 +431,13 @@ static ZTEST_F(cap_initiator_test_unicast_stop,
 	ARRAY_FOR_EACH(fixture->cap_streams, i) {
 		const struct bt_bap_stream *bap_stream = &fixture->cap_streams[i].bap_stream;
 
-		zassert_equal(bap_stream->ep, NULL, "[%zu]: Stream %p not released (%p)", i,
-			      bap_stream, bap_stream->ep);
+		assert_int_equal(bap_stream->ep, NULL);
 	}
 }
 
-static ZTEST_F(cap_initiator_test_unicast_stop, test_initiator_unicast_stop_release_state_enabling)
+static void cap_initiator_test_unicast_stop__test_initiator_unicast_stop_release_state_enabling(void **cm_state)
 {
+	struct cap_initiator_test_unicast_stop_fixture *fixture = *cm_state;
 	int err;
 
 	ARRAY_FOR_EACH(fixture->cap_streams, i) {
@@ -449,7 +449,7 @@ static ZTEST_F(cap_initiator_test_unicast_stop, test_initiator_unicast_stop_rele
 	fixture->audio_stop_param.release = true;
 
 	err = bt_cap_initiator_unicast_audio_stop(&fixture->audio_stop_param);
-	zassert_equal(err, 0, "Unexpected return value %d", err);
+	assert_int_equal(err, 0);
 
 	zexpect_call_count("bt_cap_initiator_cb.unicast_stop_complete_cb", 1,
 			   mock_cap_initiator_unicast_stop_complete_cb_fake.call_count);
@@ -467,13 +467,13 @@ static ZTEST_F(cap_initiator_test_unicast_stop, test_initiator_unicast_stop_rele
 	ARRAY_FOR_EACH(fixture->cap_streams, i) {
 		const struct bt_bap_stream *bap_stream = &fixture->cap_streams[i].bap_stream;
 
-		zassert_equal(bap_stream->ep, NULL, "[%zu]: Stream %p not released (%p)", i,
-			      bap_stream, bap_stream->ep);
+		assert_int_equal(bap_stream->ep, NULL);
 	}
 }
 
-static ZTEST_F(cap_initiator_test_unicast_stop, test_initiator_unicast_stop_release_state_streaming)
+static void cap_initiator_test_unicast_stop__test_initiator_unicast_stop_release_state_streaming(void **cm_state)
 {
+	struct cap_initiator_test_unicast_stop_fixture *fixture = *cm_state;
 	int err;
 
 	ARRAY_FOR_EACH(fixture->cap_streams, i) {
@@ -485,7 +485,7 @@ static ZTEST_F(cap_initiator_test_unicast_stop, test_initiator_unicast_stop_rele
 	fixture->audio_stop_param.release = true;
 
 	err = bt_cap_initiator_unicast_audio_stop(&fixture->audio_stop_param);
-	zassert_equal(err, 0, "Unexpected return value %d", err);
+	assert_int_equal(err, 0);
 
 	zexpect_call_count("bt_cap_initiator_cb.unicast_stop_complete_cb", 1,
 			   mock_cap_initiator_unicast_stop_complete_cb_fake.call_count);
@@ -502,38 +502,39 @@ static ZTEST_F(cap_initiator_test_unicast_stop, test_initiator_unicast_stop_rele
 	ARRAY_FOR_EACH(fixture->cap_streams, i) {
 		const struct bt_bap_stream *bap_stream = &fixture->cap_streams[i].bap_stream;
 
-		zassert_equal(bap_stream->ep, NULL, "[%zu]: Stream %p not released (%p)", i,
-			      bap_stream, bap_stream->ep);
+		assert_int_equal(bap_stream->ep, NULL);
 	}
 }
 
-static ZTEST_F(cap_initiator_test_unicast_stop, test_initiator_unicast_stop_inval_param_null)
+static void cap_initiator_test_unicast_stop__test_initiator_unicast_stop_inval_param_null(void **cm_state)
 {
+	struct cap_initiator_test_unicast_stop_fixture *fixture = *cm_state;
 	int err;
 
 	err = bt_cap_initiator_unicast_audio_stop(NULL);
-	zassert_equal(err, -EINVAL, "Unexpected return value %d", err);
+	assert_int_equal(err, -EINVAL);
 
 	zexpect_call_count("bt_cap_initiator_cb.unicast_stop_complete_cb", 0,
 			   mock_cap_initiator_unicast_stop_complete_cb_fake.call_count);
 }
 
-static ZTEST_F(cap_initiator_test_unicast_stop,
-	       test_initiator_unicast_stop_inval_param_null_streams)
+static void cap_initiator_test_unicast_stop__test_initiator_unicast_stop_inval_param_null_streams(void **cm_state)
 {
+	struct cap_initiator_test_unicast_stop_fixture *fixture = *cm_state;
 	int err;
 
 	fixture->audio_stop_param.streams = NULL;
 
 	err = bt_cap_initiator_unicast_audio_stop(&fixture->audio_stop_param);
-	zassert_equal(err, -EINVAL, "Unexpected return value %d", err);
+	assert_int_equal(err, -EINVAL);
 
 	zexpect_call_count("bt_cap_initiator_cb.unicast_stop_complete_cb", 0,
 			   mock_cap_initiator_unicast_stop_complete_cb_fake.call_count);
 }
 
-static ZTEST_F(cap_initiator_test_unicast_stop, test_initiator_unicast_stop_inval_missing_cas)
+static void cap_initiator_test_unicast_stop__test_initiator_unicast_stop_inval_missing_cas(void **cm_state)
 {
+	struct cap_initiator_test_unicast_stop_fixture *fixture = *cm_state;
 	int err;
 
 	fixture->audio_stop_param.type = BT_CAP_SET_TYPE_CSIP;
@@ -545,34 +546,85 @@ static ZTEST_F(cap_initiator_test_unicast_stop, test_initiator_unicast_stop_inva
 	}
 
 	err = bt_cap_initiator_unicast_audio_stop(&fixture->audio_stop_param);
-	zassert_equal(err, -EINVAL, "Unexpected return value %d", err);
+	assert_int_equal(err, -EINVAL);
 
 	zexpect_call_count("bt_cap_initiator_cb.unicast_stop_complete_cb", 0,
 			   mock_cap_initiator_unicast_stop_complete_cb_fake.call_count);
 }
 
-static ZTEST_F(cap_initiator_test_unicast_stop, test_initiator_unicast_stop_inval_param_zero_count)
+static void cap_initiator_test_unicast_stop__test_initiator_unicast_stop_inval_param_zero_count(void **cm_state)
 {
+	struct cap_initiator_test_unicast_stop_fixture *fixture = *cm_state;
 	int err;
 
 	fixture->audio_stop_param.count = 0U;
 
 	err = bt_cap_initiator_unicast_audio_stop(&fixture->audio_stop_param);
-	zassert_equal(err, -EINVAL, "Unexpected return value %d", err);
+	assert_int_equal(err, -EINVAL);
 
 	zexpect_call_count("bt_cap_initiator_cb.unicast_stop_complete_cb", 0,
 			   mock_cap_initiator_unicast_stop_complete_cb_fake.call_count);
 }
 
-static ZTEST_F(cap_initiator_test_unicast_stop, test_initiator_unicast_stop_inval_param_inval_count)
+static void cap_initiator_test_unicast_stop__test_initiator_unicast_stop_inval_param_inval_count(void **cm_state)
 {
+	struct cap_initiator_test_unicast_stop_fixture *fixture = *cm_state;
 	int err;
 
 	fixture->audio_stop_param.count = CONFIG_BT_BAP_UNICAST_CLIENT_GROUP_STREAM_COUNT + 1U;
 
 	err = bt_cap_initiator_unicast_audio_stop(&fixture->audio_stop_param);
-	zassert_equal(err, -EINVAL, "Unexpected return value %d", err);
+	assert_int_equal(err, -EINVAL);
 
 	zexpect_call_count("bt_cap_initiator_cb.unicast_stop_complete_cb", 0,
 			   mock_cap_initiator_unicast_stop_complete_cb_fake.call_count);
 }
+
+int bt_test_cap_initiator_test_unicast_stop_setup(void **state)
+{
+	int environment_result = bt_test_audio_cap_initiator_environment_setup(state);
+
+	if (environment_result != 0) {
+		return environment_result;
+	}
+
+	*state = cap_initiator_test_unicast_stop_setup();
+	return 0;
+}
+static int bt_test_cap_initiator_test_unicast_stop_before(void **state)
+{
+	(void)state;
+	cap_initiator_test_unicast_stop_before(*state);
+	mock_init_rule_before_05ae85(NULL, *state);
+	return 0;
+}
+int bt_test_cap_initiator_test_unicast_stop_after(void **state)
+{
+	(void)state;
+	cap_initiator_test_unicast_stop_after(*state);
+	mock_destroy_rule_after_05ae85(NULL, *state);
+	return 0;
+}
+int bt_test_cap_initiator_test_unicast_stop_teardown(void **state)
+{
+	(void)state;
+	cap_initiator_test_unicast_stop_teardown(*state);
+	return 0;
+}
+static const struct CMUnitTest test_cases_cap_initiator_test_unicast_stop[] = {
+	cmocka_unit_test_setup_teardown(cap_initiator_test_unicast_stop__test_initiator_unicast_stop_disable_state_codec_configured, bt_test_cap_initiator_test_unicast_stop_before, bt_test_cap_initiator_test_unicast_stop_after),
+	cmocka_unit_test_setup_teardown(cap_initiator_test_unicast_stop__test_initiator_unicast_stop_disable_state_qos_configured, bt_test_cap_initiator_test_unicast_stop_before, bt_test_cap_initiator_test_unicast_stop_after),
+	cmocka_unit_test_setup_teardown(cap_initiator_test_unicast_stop__test_initiator_unicast_stop_disable_state_enabling, bt_test_cap_initiator_test_unicast_stop_before, bt_test_cap_initiator_test_unicast_stop_after),
+	cmocka_unit_test_setup_teardown(cap_initiator_test_unicast_stop__test_initiator_unicast_stop_disable_state_streaming, bt_test_cap_initiator_test_unicast_stop_before, bt_test_cap_initiator_test_unicast_stop_after),
+	cmocka_unit_test_setup_teardown(cap_initiator_test_unicast_stop__test_initiator_unicast_stop_disable_next_fail, bt_test_cap_initiator_test_unicast_stop_before, bt_test_cap_initiator_test_unicast_stop_after),
+	cmocka_unit_test_setup_teardown(cap_initiator_test_unicast_stop__test_initiator_unicast_stop_release_state_codec_configured, bt_test_cap_initiator_test_unicast_stop_before, bt_test_cap_initiator_test_unicast_stop_after),
+	cmocka_unit_test_setup_teardown(cap_initiator_test_unicast_stop__test_initiator_unicast_stop_release_state_qos_configured, bt_test_cap_initiator_test_unicast_stop_before, bt_test_cap_initiator_test_unicast_stop_after),
+	cmocka_unit_test_setup_teardown(cap_initiator_test_unicast_stop__test_initiator_unicast_stop_release_state_enabling, bt_test_cap_initiator_test_unicast_stop_before, bt_test_cap_initiator_test_unicast_stop_after),
+	cmocka_unit_test_setup_teardown(cap_initiator_test_unicast_stop__test_initiator_unicast_stop_release_state_streaming, bt_test_cap_initiator_test_unicast_stop_before, bt_test_cap_initiator_test_unicast_stop_after),
+	cmocka_unit_test_setup_teardown(cap_initiator_test_unicast_stop__test_initiator_unicast_stop_inval_param_null, bt_test_cap_initiator_test_unicast_stop_before, bt_test_cap_initiator_test_unicast_stop_after),
+	cmocka_unit_test_setup_teardown(cap_initiator_test_unicast_stop__test_initiator_unicast_stop_inval_param_null_streams, bt_test_cap_initiator_test_unicast_stop_before, bt_test_cap_initiator_test_unicast_stop_after),
+	cmocka_unit_test_setup_teardown(cap_initiator_test_unicast_stop__test_initiator_unicast_stop_inval_missing_cas, bt_test_cap_initiator_test_unicast_stop_before, bt_test_cap_initiator_test_unicast_stop_after),
+	cmocka_unit_test_setup_teardown(cap_initiator_test_unicast_stop__test_initiator_unicast_stop_inval_param_zero_count, bt_test_cap_initiator_test_unicast_stop_before, bt_test_cap_initiator_test_unicast_stop_after),
+	cmocka_unit_test_setup_teardown(cap_initiator_test_unicast_stop__test_initiator_unicast_stop_inval_param_inval_count, bt_test_cap_initiator_test_unicast_stop_before, bt_test_cap_initiator_test_unicast_stop_after),
+};
+BT_TEST_SUITE(cap_initiator_test_unicast_stop, test_cases_cap_initiator_test_unicast_stop, bt_test_cap_initiator_test_unicast_stop_setup, bt_test_cap_initiator_test_unicast_stop_teardown);

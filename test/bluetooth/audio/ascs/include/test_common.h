@@ -1,3 +1,4 @@
+#include "support/test_support.h"
 /*
  * Copyright (c) 2023 Codecoup
  *
@@ -6,11 +7,11 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include <zephyr/bluetooth/audio/bap.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/gatt.h>
-#include <zephyr/bluetooth/iso.h>
-#include <zephyr/bluetooth/uuid.h>
+#include <embt/bluetooth/audio/bap.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/gatt.h>
+#include <embt/bluetooth/iso.h>
+#include <embt/bluetooth/uuid.h>
 
 #define test_ase_snk_get(_num_ase, ...) test_ase_get(BT_UUID_ASCS_ASE_SNK, _num_ase, __VA_ARGS__)
 #define test_ase_src_get(_num_ase, ...) test_ase_get(BT_UUID_ASCS_ASE_SRC, _num_ase, __VA_ARGS__)
@@ -40,6 +41,8 @@ struct test_ase_cp_chrc_value_hdr {
 void test_mocks_init(void);
 void test_mocks_cleanup(void);
 void test_mocks_reset(void);
+/** @brief Flush notification work; return whether any client had pending work. */
+bool bt_test_ascs_flush_notifications(void);
 void test_drain_syswq(void);
 
 /* Initialize connection object for test */

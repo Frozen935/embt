@@ -8,11 +8,11 @@
 #define MOCKS_BAP_STREAM_H_
 #include <stdint.h>
 
-#include <zephyr/bluetooth/audio/ascs.h>
-#include <zephyr/bluetooth/iso.h>
-#include <zephyr/fff.h>
-#include <zephyr/bluetooth/audio/bap.h>
-#include <zephyr/net_buf.h>
+#include <embt/bluetooth/audio/ascs.h>
+#include <embt/bluetooth/iso.h>
+#include <fff.h>
+#include <embt/bluetooth/audio/bap.h>
+#include <embt/net_buf.h>
 
 extern struct bt_bap_stream_ops mock_bap_stream_ops;
 

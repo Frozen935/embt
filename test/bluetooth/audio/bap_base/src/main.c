@@ -1,3 +1,5 @@
+#include "support/test_support.h"
+
 /* main.c - Application main entry point */
 
 /*
@@ -12,13 +14,11 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <zephyr/bluetooth/audio/audio.h>
-#include <zephyr/bluetooth/audio/bap.h>
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/toolchain.h>
-#include <zephyr/ztest_assert.h>
-#include <zephyr/ztest_test.h>
-#include <zephyr/fff.h>
+#include <embt/bluetooth/audio/audio.h>
+#include <embt/bluetooth/audio/bap.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/compiler.h>
+#include <fff.h>
 
 DEFINE_FFF_GLOBALS;
 
@@ -62,7 +62,7 @@ static void bap_base_test_suite_fixture_init(struct bap_base_test_suite_fixture 
 	};
 
 	fixture->valid_base_data = malloc(sizeof(base_data));
-	zassert_not_null(fixture->valid_base_data);
+	assert_non_null(fixture->valid_base_data);
 	memcpy(fixture->valid_base_data, base_data, sizeof(base_data));
 
 	fixture->valid_base_ad.type = 0x16U; /* service data */
@@ -72,7 +72,7 @@ static void bap_base_test_suite_fixture_init(struct bap_base_test_suite_fixture 
 	/* Modify the CC length to generate an invalid BASE for invalid BASE tests */
 	base_data[12] = 0xaa; /* Set invalid CC length*/
 	fixture->invalid_base_data = malloc(sizeof(base_data));
-	zassert_not_null(fixture->invalid_base_data);
+	assert_non_null(fixture->invalid_base_data);
 	memcpy(fixture->invalid_base_data, base_data, sizeof(base_data));
 
 	fixture->invalid_base_ad.type = 0x16U; /* service data */
@@ -85,7 +85,7 @@ static void *bap_base_test_suite_setup(void)
 	struct bap_base_test_suite_fixture *fixture;
 
 	fixture = malloc(sizeof(*fixture));
-	zassert_not_null(fixture);
+	assert_non_null(fixture);
 
 	return fixture;
 }
@@ -109,54 +109,59 @@ static void bap_base_test_suite_teardown(void *f)
 	free(f);
 }
 
-ZTEST_SUITE(bap_base_test_suite, NULL, bap_base_test_suite_setup, bap_base_test_suite_before,
-	    bap_base_test_suite_after, bap_base_test_suite_teardown);
 
-ZTEST_F(bap_base_test_suite, test_base_get_base_from_ad)
+
+static void bap_base_test_suite__test_base_get_base_from_ad(void **cm_state)
 {
+	struct bap_base_test_suite_fixture *fixture = *cm_state;
 	const struct bt_bap_base *base = bt_bap_base_get_base_from_ad(&fixture->valid_base_ad);
 
-	zassert_not_null(base);
+	assert_non_null(base);
 }
 
-ZTEST_F(bap_base_test_suite, test_base_get_base_from_ad_inval_base)
+static void bap_base_test_suite__test_base_get_base_from_ad_inval_base(void **cm_state)
 {
+	struct bap_base_test_suite_fixture *fixture = *cm_state;
 	const struct bt_bap_base *base = bt_bap_base_get_base_from_ad(&fixture->invalid_base_ad);
 
-	zassert_is_null(base);
+	assert_null(base);
 }
 
-ZTEST_F(bap_base_test_suite, test_base_get_base_from_ad_inval_param_null)
+static void bap_base_test_suite__test_base_get_base_from_ad_inval_param_null(void **cm_state)
 {
+	struct bap_base_test_suite_fixture *fixture = *cm_state;
 	const struct bt_bap_base *base = bt_bap_base_get_base_from_ad(NULL);
 
-	zassert_is_null(base);
+	assert_null(base);
 }
 
-ZTEST_F(bap_base_test_suite, test_base_get_base_from_ad_inval_param_type)
+static void bap_base_test_suite__test_base_get_base_from_ad_inval_param_type(void **cm_state)
 {
+	struct bap_base_test_suite_fixture *fixture = *cm_state;
 	const struct bt_bap_base *base;
 
 	fixture->valid_base_ad.type = 0x03U; /* BT_DATA_UUID16_ALL */
 
 	base = bt_bap_base_get_base_from_ad(&fixture->valid_base_ad);
 
-	zassert_is_null(base);
+	assert_null(base);
 }
 
-ZTEST_F(bap_base_test_suite, test_base_get_base_from_ad_inval_param_len)
+static void bap_base_test_suite__test_base_get_base_from_ad_inval_param_len(void **cm_state)
 {
+	struct bap_base_test_suite_fixture *fixture = *cm_state;
 	const struct bt_bap_base *base;
 
 	fixture->valid_base_ad.data_len = 0x03U; /* Minimum len is BASE_MIN_SIZE (16) */
 
 	base = bt_bap_base_get_base_from_ad(&fixture->valid_base_ad);
 
-	zassert_is_null(base);
+	assert_null(base);
 }
 
-ZTEST_F(bap_base_test_suite, test_base_get_base_from_ad_inval_param_uuid)
+static void bap_base_test_suite__test_base_get_base_from_ad_inval_param_uuid(void **cm_state)
 {
+	struct bap_base_test_suite_fixture *fixture = *cm_state;
 	const struct bt_bap_base *base;
 
 	/* Modify the BASE data to have invalid UUID */
@@ -165,98 +170,106 @@ ZTEST_F(bap_base_test_suite, test_base_get_base_from_ad_inval_param_uuid)
 
 	base = bt_bap_base_get_base_from_ad(&fixture->valid_base_ad);
 
-	zassert_is_null(base);
+	assert_null(base);
 }
 
-ZTEST_F(bap_base_test_suite, test_base_get_size)
+static void bap_base_test_suite__test_base_get_size(void **cm_state)
 {
+	struct bap_base_test_suite_fixture *fixture = *cm_state;
 	const struct bt_bap_base *base = bt_bap_base_get_base_from_ad(&fixture->valid_base_ad);
 	int ret;
 
-	zassert_not_null(base);
+	assert_non_null(base);
 
 	ret = bt_bap_base_get_size(base);
-	zassert_equal(ret, 70, "Unexpected BASE size: %d", ret);
+	assert_int_equal(ret, 70);
 }
 
-ZTEST_F(bap_base_test_suite, test_base_get_size_inval_param_null)
+static void bap_base_test_suite__test_base_get_size_inval_param_null(void **cm_state)
 {
+	struct bap_base_test_suite_fixture *fixture = *cm_state;
 	int ret;
 
 	ret = bt_bap_base_get_size(NULL);
-	zassert_equal(ret, -EINVAL, "Unexpected return value: %d", ret);
+	assert_int_equal(ret, -EINVAL);
 }
 
-ZTEST_F(bap_base_test_suite, test_base_get_pres_delay)
+static void bap_base_test_suite__test_base_get_pres_delay(void **cm_state)
 {
+	struct bap_base_test_suite_fixture *fixture = *cm_state;
 	const struct bt_bap_base *base = bt_bap_base_get_base_from_ad(&fixture->valid_base_ad);
 	int ret;
 
-	zassert_not_null(base);
+	assert_non_null(base);
 
 	ret = bt_bap_base_get_pres_delay(base);
-	zassert_equal(ret, 40000, "Unexpected presentation delay: %d", ret);
+	assert_int_equal(ret, 40000);
 }
 
-ZTEST_F(bap_base_test_suite, test_base_get_pres_delay_inval_param_null)
+static void bap_base_test_suite__test_base_get_pres_delay_inval_param_null(void **cm_state)
 {
+	struct bap_base_test_suite_fixture *fixture = *cm_state;
 	int ret;
 
 	ret = bt_bap_base_get_pres_delay(NULL);
-	zassert_equal(ret, -EINVAL, "Unexpected return value: %d", ret);
+	assert_int_equal(ret, -EINVAL);
 }
 
-ZTEST_F(bap_base_test_suite, test_base_get_subgroup_count)
+static void bap_base_test_suite__test_base_get_subgroup_count(void **cm_state)
 {
+	struct bap_base_test_suite_fixture *fixture = *cm_state;
 	const struct bt_bap_base *base = bt_bap_base_get_base_from_ad(&fixture->valid_base_ad);
 	int ret;
 
-	zassert_not_null(base);
+	assert_non_null(base);
 
 	ret = bt_bap_base_get_subgroup_count(base);
-	zassert_equal(ret, 2, "Unexpected presentation delay: %d", ret);
+	assert_int_equal(ret, 2);
 }
 
-ZTEST_F(bap_base_test_suite, test_base_get_subgroup_count_inval_param_null)
+static void bap_base_test_suite__test_base_get_subgroup_count_inval_param_null(void **cm_state)
 {
+	struct bap_base_test_suite_fixture *fixture = *cm_state;
 	int ret;
 
 	ret = bt_bap_base_get_subgroup_count(NULL);
-	zassert_equal(ret, -EINVAL, "Unexpected return value: %d", ret);
+	assert_int_equal(ret, -EINVAL);
 }
 
-ZTEST_F(bap_base_test_suite, test_base_get_bis_indexes)
+static void bap_base_test_suite__test_base_get_bis_indexes(void **cm_state)
 {
+	struct bap_base_test_suite_fixture *fixture = *cm_state;
 	const struct bt_bap_base *base = bt_bap_base_get_base_from_ad(&fixture->valid_base_ad);
 	uint32_t bis_indexes;
 	int ret;
 
-	zassert_not_null(base);
+	assert_non_null(base);
 
 	ret = bt_bap_base_get_bis_indexes(base, &bis_indexes);
-	zassert_equal(ret, 0, "Unexpected return value: %d", ret);
-	zassert_equal(bis_indexes, 0x00000003U /* Bit 1 and 2 */,
-		      "Unexpected BIS index value: 0x%08X", bis_indexes);
+	assert_int_equal(ret, 0);
+	assert_int_equal(bis_indexes, 0x00000003U /* Bit 1 and 2 */);
 }
 
-ZTEST_F(bap_base_test_suite, test_base_get_bis_indexes_inval_param_null_base)
+static void bap_base_test_suite__test_base_get_bis_indexes_inval_param_null_base(void **cm_state)
 {
+	struct bap_base_test_suite_fixture *fixture = *cm_state;
 	uint32_t bis_indexes;
 	int ret;
 
 	ret = bt_bap_base_get_bis_indexes(NULL, &bis_indexes);
-	zassert_equal(ret, -EINVAL, "Unexpected return value: %d", ret);
+	assert_int_equal(ret, -EINVAL);
 }
 
-ZTEST_F(bap_base_test_suite, test_base_get_bis_indexes_inval_param_null_index)
+static void bap_base_test_suite__test_base_get_bis_indexes_inval_param_null_index(void **cm_state)
 {
+	struct bap_base_test_suite_fixture *fixture = *cm_state;
 	const struct bt_bap_base *base = bt_bap_base_get_base_from_ad(&fixture->valid_base_ad);
 	int ret;
 
-	zassert_not_null(base);
+	assert_non_null(base);
 
 	ret = bt_bap_base_get_bis_indexes(base, NULL);
-	zassert_equal(ret, -EINVAL, "Unexpected return value: %d", ret);
+	assert_int_equal(ret, -EINVAL);
 }
 
 static bool test_base_foreach_subgroup_cb(const struct bt_bap_base_subgroup *subgroup,
@@ -271,37 +284,40 @@ static bool test_base_foreach_subgroup_cb(const struct bt_bap_base_subgroup *sub
 	return true;
 }
 
-ZTEST_F(bap_base_test_suite, test_base_foreach_subgroup)
+static void bap_base_test_suite__test_base_foreach_subgroup(void **cm_state)
 {
+	struct bap_base_test_suite_fixture *fixture = *cm_state;
 	const struct bt_bap_base *base = bt_bap_base_get_base_from_ad(&fixture->valid_base_ad);
 	size_t count = 0U;
 	int ret;
 
-	zassert_not_null(base);
+	assert_non_null(base);
 
 	ret = bt_bap_base_foreach_subgroup(base, test_base_foreach_subgroup_cb, &count);
-	zassert_equal(ret, 0, "Unexpected return value: %d", ret);
-	zassert_equal(count, 0x02U, "Unexpected subgroup count value: %u", count);
+	assert_int_equal(ret, 0);
+	assert_int_equal(count, 0x02U);
 }
 
-ZTEST_F(bap_base_test_suite, test_base_foreach_subgroup_inval_param_null_base)
+static void bap_base_test_suite__test_base_foreach_subgroup_inval_param_null_base(void **cm_state)
 {
+	struct bap_base_test_suite_fixture *fixture = *cm_state;
 	size_t count;
 	int ret;
 
 	ret = bt_bap_base_foreach_subgroup(NULL, test_base_foreach_subgroup_cb, &count);
-	zassert_equal(ret, -EINVAL, "Unexpected return value: %d", ret);
+	assert_int_equal(ret, -EINVAL);
 }
 
-ZTEST_F(bap_base_test_suite, test_base_foreach_subgroup_inval_param_null_cb)
+static void bap_base_test_suite__test_base_foreach_subgroup_inval_param_null_cb(void **cm_state)
 {
+	struct bap_base_test_suite_fixture *fixture = *cm_state;
 	const struct bt_bap_base *base = bt_bap_base_get_base_from_ad(&fixture->valid_base_ad);
 	int ret;
 
-	zassert_not_null(base);
+	assert_non_null(base);
 
 	ret = bt_bap_base_foreach_subgroup(base, NULL, NULL);
-	zassert_equal(ret, -EINVAL, "Unexpected return value: %d", ret);
+	assert_int_equal(ret, -EINVAL);
 }
 
 static bool test_base_get_subgroup_codec_id_cb(const struct bt_bap_base_subgroup *subgroup,
@@ -313,23 +329,24 @@ static bool test_base_get_subgroup_codec_id_cb(const struct bt_bap_base_subgroup
 	ARG_UNUSED(user_data);
 
 	ret = bt_bap_base_get_subgroup_codec_id(subgroup, &codec_id);
-	zassert_equal(ret, 0, "Unexpected return value: %d", ret);
-	zassert_equal(codec_id.id, 0x06U, "Unexpected codec.id value: %u", codec_id.id);
-	zassert_equal(codec_id.cid, 0x0000U, "Unexpected codec.cid value: %u", codec_id.cid);
-	zassert_equal(codec_id.vid, 0x0000U, "Unexpected codec.vid value: %u", codec_id.vid);
+	assert_int_equal(ret, 0);
+	assert_int_equal(codec_id.id, 0x06U);
+	assert_int_equal(codec_id.cid, 0x0000U);
+	assert_int_equal(codec_id.vid, 0x0000U);
 
 	return true;
 }
 
-ZTEST_F(bap_base_test_suite, test_base_get_subgroup_codec_id)
+static void bap_base_test_suite__test_base_get_subgroup_codec_id(void **cm_state)
 {
+	struct bap_base_test_suite_fixture *fixture = *cm_state;
 	const struct bt_bap_base *base = bt_bap_base_get_base_from_ad(&fixture->valid_base_ad);
 	int ret;
 
-	zassert_not_null(base);
+	assert_non_null(base);
 
 	ret = bt_bap_base_foreach_subgroup(base, test_base_get_subgroup_codec_id_cb, NULL);
-	zassert_equal(ret, 0, "Unexpected return value: %d", ret);
+	assert_int_equal(ret, 0);
 }
 
 static bool test_base_get_subgroup_codec_id_inval_param_null_subgroup_cb(
@@ -342,21 +359,22 @@ static bool test_base_get_subgroup_codec_id_inval_param_null_subgroup_cb(
 	ARG_UNUSED(user_data);
 
 	ret = bt_bap_base_get_subgroup_codec_id(NULL, &codec_id);
-	zassert_equal(ret, -EINVAL, "Unexpected return value: %d", ret);
+	assert_int_equal(ret, -EINVAL);
 
 	return true;
 }
 
-ZTEST_F(bap_base_test_suite, test_base_get_subgroup_codec_id_inval_param_null_subgroup)
+static void bap_base_test_suite__test_base_get_subgroup_codec_id_inval_param_null_subgroup(void **cm_state)
 {
+	struct bap_base_test_suite_fixture *fixture = *cm_state;
 	const struct bt_bap_base *base = bt_bap_base_get_base_from_ad(&fixture->valid_base_ad);
 	int ret;
 
-	zassert_not_null(base);
+	assert_non_null(base);
 
 	ret = bt_bap_base_foreach_subgroup(
 		base, test_base_get_subgroup_codec_id_inval_param_null_subgroup_cb, NULL);
-	zassert_equal(ret, 0, "Unexpected return value: %d", ret);
+	assert_int_equal(ret, 0);
 }
 
 static bool
@@ -368,21 +386,22 @@ test_base_get_subgroup_codec_id_inval_param_null_cb(const struct bt_bap_base_sub
 	ARG_UNUSED(user_data);
 
 	ret = bt_bap_base_get_subgroup_codec_id(subgroup, NULL);
-	zassert_equal(ret, -EINVAL, "Unexpected return value: %d", ret);
+	assert_int_equal(ret, -EINVAL);
 
 	return true;
 }
 
-ZTEST_F(bap_base_test_suite, test_base_get_subgroup_codec_id_inval_param_null)
+static void bap_base_test_suite__test_base_get_subgroup_codec_id_inval_param_null(void **cm_state)
 {
+	struct bap_base_test_suite_fixture *fixture = *cm_state;
 	const struct bt_bap_base *base = bt_bap_base_get_base_from_ad(&fixture->valid_base_ad);
 	int ret;
 
-	zassert_not_null(base);
+	assert_non_null(base);
 
 	ret = bt_bap_base_foreach_subgroup(
 		base, test_base_get_subgroup_codec_id_inval_param_null_cb, NULL);
-	zassert_equal(ret, 0, "Unexpected return value: %d", ret);
+	assert_int_equal(ret, 0);
 }
 
 static bool test_base_get_subgroup_codec_data_cb(const struct bt_bap_base_subgroup *subgroup,
@@ -398,21 +417,22 @@ static bool test_base_get_subgroup_codec_data_cb(const struct bt_bap_base_subgro
 	ARG_UNUSED(user_data);
 
 	ret = bt_bap_base_get_subgroup_codec_data(subgroup, &data);
-	zassert_equal(ret, sizeof(expected_data), "Unexpected return value: %d", ret);
-	zassert_mem_equal(data, expected_data, sizeof(expected_data));
+	assert_int_equal(ret, sizeof(expected_data));
+	assert_memory_equal(data, expected_data, sizeof(expected_data));
 
 	return true;
 }
 
-ZTEST_F(bap_base_test_suite, test_base_get_subgroup_codec_data)
+static void bap_base_test_suite__test_base_get_subgroup_codec_data(void **cm_state)
 {
+	struct bap_base_test_suite_fixture *fixture = *cm_state;
 	const struct bt_bap_base *base = bt_bap_base_get_base_from_ad(&fixture->valid_base_ad);
 	int ret;
 
-	zassert_not_null(base);
+	assert_non_null(base);
 
 	ret = bt_bap_base_foreach_subgroup(base, test_base_get_subgroup_codec_data_cb, NULL);
-	zassert_equal(ret, 0, "Unexpected return value: %d", ret);
+	assert_int_equal(ret, 0);
 }
 
 static bool test_base_get_subgroup_codec_data_inval_param_null_subgroup_cb(
@@ -425,21 +445,22 @@ static bool test_base_get_subgroup_codec_data_inval_param_null_subgroup_cb(
 	ARG_UNUSED(user_data);
 
 	ret = bt_bap_base_get_subgroup_codec_data(NULL, &data);
-	zassert_equal(ret, -EINVAL, "Unexpected return value: %d", ret);
+	assert_int_equal(ret, -EINVAL);
 
 	return true;
 }
 
-ZTEST_F(bap_base_test_suite, test_base_get_subgroup_codec_data_inval_param_null_subgroup)
+static void bap_base_test_suite__test_base_get_subgroup_codec_data_inval_param_null_subgroup(void **cm_state)
 {
+	struct bap_base_test_suite_fixture *fixture = *cm_state;
 	const struct bt_bap_base *base = bt_bap_base_get_base_from_ad(&fixture->valid_base_ad);
 	int ret;
 
-	zassert_not_null(base);
+	assert_non_null(base);
 
 	ret = bt_bap_base_foreach_subgroup(
 		base, test_base_get_subgroup_codec_data_inval_param_null_subgroup_cb, NULL);
-	zassert_equal(ret, 0, "Unexpected return value: %d", ret);
+	assert_int_equal(ret, 0);
 }
 
 static bool
@@ -451,21 +472,22 @@ test_base_get_subgroup_codec_data_inval_param_null_cb(const struct bt_bap_base_s
 	ARG_UNUSED(user_data);
 
 	ret = bt_bap_base_get_subgroup_codec_data(subgroup, NULL);
-	zassert_equal(ret, -EINVAL, "Unexpected return value: %d", ret);
+	assert_int_equal(ret, -EINVAL);
 
 	return true;
 }
 
-ZTEST_F(bap_base_test_suite, test_base_get_subgroup_codec_data_inval_param_null)
+static void bap_base_test_suite__test_base_get_subgroup_codec_data_inval_param_null(void **cm_state)
 {
+	struct bap_base_test_suite_fixture *fixture = *cm_state;
 	const struct bt_bap_base *base = bt_bap_base_get_base_from_ad(&fixture->valid_base_ad);
 	int ret;
 
-	zassert_not_null(base);
+	assert_non_null(base);
 
 	ret = bt_bap_base_foreach_subgroup(
 		base, test_base_get_subgroup_codec_data_inval_param_null_cb, NULL);
-	zassert_equal(ret, 0, "Unexpected return value: %d", ret);
+	assert_int_equal(ret, 0);
 }
 
 static bool test_base_get_subgroup_codec_meta_cb(const struct bt_bap_base_subgroup *subgroup,
@@ -478,21 +500,22 @@ static bool test_base_get_subgroup_codec_meta_cb(const struct bt_bap_base_subgro
 	ARG_UNUSED(user_data);
 
 	ret = bt_bap_base_get_subgroup_codec_meta(subgroup, &data);
-	zassert_equal(ret, sizeof(expected_data), "Unexpected return value: %d", ret);
-	zassert_mem_equal(data, expected_data, sizeof(expected_data));
+	assert_int_equal(ret, sizeof(expected_data));
+	assert_memory_equal(data, expected_data, sizeof(expected_data));
 
 	return true;
 }
 
-ZTEST_F(bap_base_test_suite, test_base_get_subgroup_codec_meta)
+static void bap_base_test_suite__test_base_get_subgroup_codec_meta(void **cm_state)
 {
+	struct bap_base_test_suite_fixture *fixture = *cm_state;
 	const struct bt_bap_base *base = bt_bap_base_get_base_from_ad(&fixture->valid_base_ad);
 	int ret;
 
-	zassert_not_null(base);
+	assert_non_null(base);
 
 	ret = bt_bap_base_foreach_subgroup(base, test_base_get_subgroup_codec_meta_cb, NULL);
-	zassert_equal(ret, 0, "Unexpected return value: %d", ret);
+	assert_int_equal(ret, 0);
 }
 
 static bool test_base_get_subgroup_codec_meta_inval_param_null_subgroup_cb(
@@ -505,21 +528,22 @@ static bool test_base_get_subgroup_codec_meta_inval_param_null_subgroup_cb(
 	ARG_UNUSED(user_data);
 
 	ret = bt_bap_base_get_subgroup_codec_meta(NULL, &data);
-	zassert_equal(ret, -EINVAL, "Unexpected return value: %d", ret);
+	assert_int_equal(ret, -EINVAL);
 
 	return true;
 }
 
-ZTEST_F(bap_base_test_suite, test_base_get_subgroup_codec_meta_inval_param_null_subgroup)
+static void bap_base_test_suite__test_base_get_subgroup_codec_meta_inval_param_null_subgroup(void **cm_state)
 {
+	struct bap_base_test_suite_fixture *fixture = *cm_state;
 	const struct bt_bap_base *base = bt_bap_base_get_base_from_ad(&fixture->valid_base_ad);
 	int ret;
 
-	zassert_not_null(base);
+	assert_non_null(base);
 
 	ret = bt_bap_base_foreach_subgroup(
 		base, test_base_get_subgroup_codec_meta_inval_param_null_subgroup_cb, NULL);
-	zassert_equal(ret, 0, "Unexpected return value: %d", ret);
+	assert_int_equal(ret, 0);
 }
 
 static bool
@@ -531,21 +555,22 @@ test_base_get_subgroup_codec_meta_inval_param_null_cb(const struct bt_bap_base_s
 	ARG_UNUSED(user_data);
 
 	ret = bt_bap_base_get_subgroup_codec_meta(subgroup, NULL);
-	zassert_equal(ret, -EINVAL, "Unexpected return value: %d", ret);
+	assert_int_equal(ret, -EINVAL);
 
 	return true;
 }
 
-ZTEST_F(bap_base_test_suite, test_base_get_subgroup_codec_meta_inval_param_null)
+static void bap_base_test_suite__test_base_get_subgroup_codec_meta_inval_param_null(void **cm_state)
 {
+	struct bap_base_test_suite_fixture *fixture = *cm_state;
 	const struct bt_bap_base *base = bt_bap_base_get_base_from_ad(&fixture->valid_base_ad);
 	int ret;
 
-	zassert_not_null(base);
+	assert_non_null(base);
 
 	ret = bt_bap_base_foreach_subgroup(
 		base, test_base_get_subgroup_codec_meta_inval_param_null_cb, NULL);
-	zassert_equal(ret, 0, "Unexpected return value: %d", ret);
+	assert_int_equal(ret, 0);
 }
 
 static bool test_base_subgroup_codec_to_codec_cfg_cb(const struct bt_bap_base_subgroup *subgroup,
@@ -562,24 +587,25 @@ static bool test_base_subgroup_codec_to_codec_cfg_cb(const struct bt_bap_base_su
 	ARG_UNUSED(user_data);
 
 	ret = bt_bap_base_subgroup_codec_to_codec_cfg(subgroup, &codec_cfg);
-	zassert_equal(ret, 0, "Unexpected return value: %d", ret);
-	zassert_equal(codec_cfg.data_len, sizeof(expected_data), "Unexpected data length: %d", ret);
-	zassert_equal(codec_cfg.meta_len, sizeof(expected_meta), "Unexpected meta length: %d", ret);
-	zassert_mem_equal(codec_cfg.data, expected_data, sizeof(expected_data));
-	zassert_mem_equal(codec_cfg.meta, expected_meta, sizeof(expected_meta));
+	assert_int_equal(ret, 0);
+	assert_int_equal(codec_cfg.data_len, sizeof(expected_data));
+	assert_int_equal(codec_cfg.meta_len, sizeof(expected_meta));
+	assert_memory_equal(codec_cfg.data, expected_data, sizeof(expected_data));
+	assert_memory_equal(codec_cfg.meta, expected_meta, sizeof(expected_meta));
 
 	return true;
 }
 
-ZTEST_F(bap_base_test_suite, test_base_subgroup_codec_to_codec_cfg)
+static void bap_base_test_suite__test_base_subgroup_codec_to_codec_cfg(void **cm_state)
 {
+	struct bap_base_test_suite_fixture *fixture = *cm_state;
 	const struct bt_bap_base *base = bt_bap_base_get_base_from_ad(&fixture->valid_base_ad);
 	int ret;
 
-	zassert_not_null(base);
+	assert_non_null(base);
 
 	ret = bt_bap_base_foreach_subgroup(base, test_base_subgroup_codec_to_codec_cfg_cb, NULL);
-	zassert_equal(ret, 0, "Unexpected return value: %d", ret);
+	assert_int_equal(ret, 0);
 }
 
 static bool test_base_subgroup_codec_to_codec_cfg_inval_param_null_subgroup_cb(
@@ -592,21 +618,22 @@ static bool test_base_subgroup_codec_to_codec_cfg_inval_param_null_subgroup_cb(
 	ARG_UNUSED(user_data);
 
 	ret = bt_bap_base_subgroup_codec_to_codec_cfg(NULL, &codec_cfg);
-	zassert_equal(ret, -EINVAL, "Unexpected return value: %d", ret);
+	assert_int_equal(ret, -EINVAL);
 
 	return true;
 }
 
-ZTEST_F(bap_base_test_suite, test_base_subgroup_codec_to_codec_cfg_inval_param_null_subgroup)
+static void bap_base_test_suite__test_base_subgroup_codec_to_codec_cfg_inval_param_null_subgroup(void **cm_state)
 {
+	struct bap_base_test_suite_fixture *fixture = *cm_state;
 	const struct bt_bap_base *base = bt_bap_base_get_base_from_ad(&fixture->valid_base_ad);
 	int ret;
 
-	zassert_not_null(base);
+	assert_non_null(base);
 
 	ret = bt_bap_base_foreach_subgroup(
 		base, test_base_subgroup_codec_to_codec_cfg_inval_param_null_subgroup_cb, NULL);
-	zassert_equal(ret, 0, "Unexpected return value: %d", ret);
+	assert_int_equal(ret, 0);
 }
 
 static bool test_base_subgroup_codec_to_codec_cfg_inval_param_null_cb(
@@ -617,21 +644,22 @@ static bool test_base_subgroup_codec_to_codec_cfg_inval_param_null_cb(
 	ARG_UNUSED(user_data);
 
 	ret = bt_bap_base_subgroup_codec_to_codec_cfg(subgroup, NULL);
-	zassert_equal(ret, -EINVAL, "Unexpected return value: %d", ret);
+	assert_int_equal(ret, -EINVAL);
 
 	return true;
 }
 
-ZTEST_F(bap_base_test_suite, test_base_subgroup_codec_to_codec_cfg_inval_param_null)
+static void bap_base_test_suite__test_base_subgroup_codec_to_codec_cfg_inval_param_null(void **cm_state)
 {
+	struct bap_base_test_suite_fixture *fixture = *cm_state;
 	const struct bt_bap_base *base = bt_bap_base_get_base_from_ad(&fixture->valid_base_ad);
 	int ret;
 
-	zassert_not_null(base);
+	assert_non_null(base);
 
 	ret = bt_bap_base_foreach_subgroup(
 		base, test_base_subgroup_codec_to_codec_cfg_inval_param_null_cb, NULL);
-	zassert_equal(ret, 0, "Unexpected return value: %d", ret);
+	assert_int_equal(ret, 0);
 }
 
 static bool test_base_get_subgroup_bis_count_cb(const struct bt_bap_base_subgroup *subgroup,
@@ -642,20 +670,21 @@ static bool test_base_get_subgroup_bis_count_cb(const struct bt_bap_base_subgrou
 	ARG_UNUSED(user_data);
 
 	ret = bt_bap_base_get_subgroup_bis_count(subgroup);
-	zassert_equal(ret, 0x01, "Unexpected return value: %d", ret);
+	assert_int_equal(ret, 0x01);
 
 	return true;
 }
 
-ZTEST_F(bap_base_test_suite, test_base_get_subgroup_bis_count)
+static void bap_base_test_suite__test_base_get_subgroup_bis_count(void **cm_state)
 {
+	struct bap_base_test_suite_fixture *fixture = *cm_state;
 	const struct bt_bap_base *base = bt_bap_base_get_base_from_ad(&fixture->valid_base_ad);
 	int ret;
 
-	zassert_not_null(base);
+	assert_non_null(base);
 
 	ret = bt_bap_base_foreach_subgroup(base, test_base_get_subgroup_bis_count_cb, NULL);
-	zassert_equal(ret, 0, "Unexpected return value: %d", ret);
+	assert_int_equal(ret, 0);
 }
 
 static bool test_base_get_subgroup_bis_count_inval_param_null_subgroup_cb(
@@ -667,21 +696,22 @@ static bool test_base_get_subgroup_bis_count_inval_param_null_subgroup_cb(
 	ARG_UNUSED(user_data);
 
 	ret = bt_bap_base_get_subgroup_bis_count(NULL);
-	zassert_equal(ret, -EINVAL, "Unexpected return value: %d", ret);
+	assert_int_equal(ret, -EINVAL);
 
 	return true;
 }
 
-ZTEST_F(bap_base_test_suite, test_base_get_subgroup_bis_count_inval_param_null_subgroup)
+static void bap_base_test_suite__test_base_get_subgroup_bis_count_inval_param_null_subgroup(void **cm_state)
 {
+	struct bap_base_test_suite_fixture *fixture = *cm_state;
 	const struct bt_bap_base *base = bt_bap_base_get_base_from_ad(&fixture->valid_base_ad);
 	int ret;
 
-	zassert_not_null(base);
+	assert_non_null(base);
 
 	ret = bt_bap_base_foreach_subgroup(
 		base, test_base_get_subgroup_bis_count_inval_param_null_subgroup_cb, NULL);
-	zassert_equal(ret, 0, "Unexpected return value: %d", ret);
+	assert_int_equal(ret, 0);
 }
 
 static bool
@@ -694,23 +724,23 @@ test_bt_bap_base_subgroup_get_bis_indexes_cb(const struct bt_bap_base_subgroup *
 	ARG_UNUSED(user_data);
 
 	ret = bt_bap_base_subgroup_get_bis_indexes(subgroup, &bis_indexes);
-	zassert_equal(ret, 0, "Unexpected return value: %d", ret);
-	zassert_not_equal(bis_indexes, 0U /* May be Bit 1 or 2 */,
-			  "Unexpected BIS index value: 0x%08X", bis_indexes);
+	assert_int_equal(ret, 0);
+	assert_int_not_equal(bis_indexes, 0U /* May be Bit 1 or 2 */);
 
 	return true;
 }
 
-ZTEST_F(bap_base_test_suite, test_bt_bap_base_subgroup_get_bis_indexes)
+static void bap_base_test_suite__test_bt_bap_base_subgroup_get_bis_indexes(void **cm_state)
 {
+	struct bap_base_test_suite_fixture *fixture = *cm_state;
 	const struct bt_bap_base *base = bt_bap_base_get_base_from_ad(&fixture->valid_base_ad);
 	int ret;
 
-	zassert_not_null(base);
+	assert_non_null(base);
 
 	ret = bt_bap_base_foreach_subgroup(base, test_bt_bap_base_subgroup_get_bis_indexes_cb,
 					   NULL);
-	zassert_equal(ret, 0, "Unexpected return value: %d", ret);
+	assert_int_equal(ret, 0);
 }
 
 static bool test_bt_bap_base_subgroup_get_bis_indexes_inval_param_null_subgroup_cb(
@@ -723,21 +753,22 @@ static bool test_bt_bap_base_subgroup_get_bis_indexes_inval_param_null_subgroup_
 	ARG_UNUSED(user_data);
 
 	ret = bt_bap_base_subgroup_get_bis_indexes(NULL, &bis_indexes);
-	zassert_equal(ret, -EINVAL, "Unexpected return value: %d", ret);
+	assert_int_equal(ret, -EINVAL);
 
 	return true;
 }
 
-ZTEST_F(bap_base_test_suite, test_bt_bap_base_subgroup_get_bis_indexes_inval_param_null_subgroup)
+static void bap_base_test_suite__test_bt_bap_base_subgroup_get_bis_indexes_inval_param_null_subgroup(void **cm_state)
 {
+	struct bap_base_test_suite_fixture *fixture = *cm_state;
 	const struct bt_bap_base *base = bt_bap_base_get_base_from_ad(&fixture->valid_base_ad);
 	int ret;
 
-	zassert_not_null(base);
+	assert_non_null(base);
 
 	ret = bt_bap_base_foreach_subgroup(
 		base, test_bt_bap_base_subgroup_get_bis_indexes_inval_param_null_subgroup_cb, NULL);
-	zassert_equal(ret, 0, "Unexpected return value: %d", ret);
+	assert_int_equal(ret, 0);
 }
 
 static bool test_bt_bap_base_subgroup_get_bis_indexes_inval_param_null_index_cb(
@@ -748,21 +779,22 @@ static bool test_bt_bap_base_subgroup_get_bis_indexes_inval_param_null_index_cb(
 	ARG_UNUSED(user_data);
 
 	ret = bt_bap_base_subgroup_get_bis_indexes(subgroup, NULL);
-	zassert_equal(ret, -EINVAL, "Unexpected return value: %d", ret);
+	assert_int_equal(ret, -EINVAL);
 
 	return true;
 }
 
-ZTEST_F(bap_base_test_suite, test_bt_bap_base_subgroup_get_bis_indexes_inval_param_null_index)
+static void bap_base_test_suite__test_bt_bap_base_subgroup_get_bis_indexes_inval_param_null_index(void **cm_state)
 {
+	struct bap_base_test_suite_fixture *fixture = *cm_state;
 	const struct bt_bap_base *base = bt_bap_base_get_base_from_ad(&fixture->valid_base_ad);
 	int ret;
 
-	zassert_not_null(base);
+	assert_non_null(base);
 
 	ret = bt_bap_base_foreach_subgroup(
 		base, test_bt_bap_base_subgroup_get_bis_indexes_inval_param_null_index_cb, NULL);
-	zassert_equal(ret, 0, "Unexpected return value: %d", ret);
+	assert_int_equal(ret, 0);
 }
 
 static bool
@@ -787,26 +819,27 @@ static bool test_base_subgroup_foreach_bis_subgroup_cb(const struct bt_bap_base_
 
 	ret = bt_bap_base_subgroup_foreach_bis(
 		subgroup, test_base_subgroup_foreach_bis_subgroup_bis_cb, &count);
-	zassert_equal(ret, 0, "Unexpected return value: %d", ret);
-	zassert_equal(count, 0x01U, "Unexpected subgroup count value: %u", count);
+	assert_int_equal(ret, 0);
+	assert_int_equal(count, 0x01U);
 
 	*total_count += count;
 
 	return true;
 }
 
-ZTEST_F(bap_base_test_suite, test_base_subgroup_foreach_bis)
+static void bap_base_test_suite__test_base_subgroup_foreach_bis(void **cm_state)
 {
+	struct bap_base_test_suite_fixture *fixture = *cm_state;
 	const struct bt_bap_base *base = bt_bap_base_get_base_from_ad(&fixture->valid_base_ad);
 	size_t count = 0U;
 	int ret;
 
-	zassert_not_null(base);
+	assert_non_null(base);
 
 	ret = bt_bap_base_foreach_subgroup(base, test_base_subgroup_foreach_bis_subgroup_cb,
 					   &count);
-	zassert_equal(ret, 0, "Unexpected return value: %d", ret);
-	zassert_equal(count, 0x02U, "Unexpected subgroup count value: %u", count);
+	assert_int_equal(ret, 0);
+	assert_int_equal(count, 0x02U);
 }
 
 static bool test_base_subgroup_foreach_bis_inval_param_null_subgroup_cb(
@@ -820,21 +853,22 @@ static bool test_base_subgroup_foreach_bis_inval_param_null_subgroup_cb(
 
 	ret = bt_bap_base_subgroup_foreach_bis(NULL, test_base_subgroup_foreach_bis_subgroup_bis_cb,
 					       &count);
-	zassert_equal(ret, -EINVAL, "Unexpected return value: %d", ret);
+	assert_int_equal(ret, -EINVAL);
 
 	return true;
 }
 
-ZTEST_F(bap_base_test_suite, test_base_subgroup_foreach_bis_inval_param_null_subgroup)
+static void bap_base_test_suite__test_base_subgroup_foreach_bis_inval_param_null_subgroup(void **cm_state)
 {
+	struct bap_base_test_suite_fixture *fixture = *cm_state;
 	const struct bt_bap_base *base = bt_bap_base_get_base_from_ad(&fixture->valid_base_ad);
 	int ret;
 
-	zassert_not_null(base);
+	assert_non_null(base);
 
 	ret = bt_bap_base_foreach_subgroup(
 		base, test_base_subgroup_foreach_bis_inval_param_null_subgroup_cb, NULL);
-	zassert_equal(ret, 0, "Unexpected return value: %d", ret);
+	assert_int_equal(ret, 0);
 }
 
 static bool
@@ -846,21 +880,22 @@ test_base_subgroup_foreach_bis_inval_param_null_cb_cb(const struct bt_bap_base_s
 	ARG_UNUSED(user_data);
 
 	ret = bt_bap_base_subgroup_foreach_bis(subgroup, NULL, NULL);
-	zassert_equal(ret, -EINVAL, "Unexpected return value: %d", ret);
+	assert_int_equal(ret, -EINVAL);
 
 	return true;
 }
 
-ZTEST_F(bap_base_test_suite, test_base_subgroup_foreach_bis_inval_param_null_cb)
+static void bap_base_test_suite__test_base_subgroup_foreach_bis_inval_param_null_cb(void **cm_state)
 {
+	struct bap_base_test_suite_fixture *fixture = *cm_state;
 	const struct bt_bap_base *base = bt_bap_base_get_base_from_ad(&fixture->valid_base_ad);
 	int ret;
 
-	zassert_not_null(base);
+	assert_non_null(base);
 
 	ret = bt_bap_base_foreach_subgroup(
 		base, test_base_subgroup_foreach_bis_inval_param_null_cb_cb, NULL);
-	zassert_equal(ret, 0, "Unexpected return value: %d", ret);
+	assert_int_equal(ret, 0);
 }
 
 static bool
@@ -874,9 +909,9 @@ test_base_subgroup_bis_codec_to_codec_cfg_bis_cb(const struct bt_bap_base_subgro
 	ARG_UNUSED(user_data);
 
 	ret = bt_bap_base_subgroup_bis_codec_to_codec_cfg(bis, &codec_cfg);
-	zassert_equal(ret, 0, "Unexpected return value: %d", ret);
-	zassert_equal(codec_cfg.data_len, sizeof(expected_data), "Unexpected data length: %d", ret);
-	zassert_mem_equal(codec_cfg.data, expected_data, sizeof(expected_data));
+	assert_int_equal(ret, 0);
+	assert_int_equal(codec_cfg.data_len, sizeof(expected_data));
+	assert_memory_equal(codec_cfg.data, expected_data, sizeof(expected_data));
 
 	return true;
 }
@@ -891,21 +926,22 @@ test_base_subgroup_bis_codec_to_codec_cfg_subgroup_cb(const struct bt_bap_base_s
 
 	ret = bt_bap_base_subgroup_foreach_bis(
 		subgroup, test_base_subgroup_bis_codec_to_codec_cfg_bis_cb, NULL);
-	zassert_equal(ret, 0, "Unexpected return value: %d", ret);
+	assert_int_equal(ret, 0);
 
 	return true;
 }
 
-ZTEST_F(bap_base_test_suite, test_base_subgroup_bis_codec_to_codec_cfg)
+static void bap_base_test_suite__test_base_subgroup_bis_codec_to_codec_cfg(void **cm_state)
 {
+	struct bap_base_test_suite_fixture *fixture = *cm_state;
 	const struct bt_bap_base *base = bt_bap_base_get_base_from_ad(&fixture->valid_base_ad);
 	int ret;
 
-	zassert_not_null(base);
+	assert_non_null(base);
 
 	ret = bt_bap_base_foreach_subgroup(
 		base, test_base_subgroup_bis_codec_to_codec_cfg_subgroup_cb, NULL);
-	zassert_equal(ret, 0, "Unexpected return value: %d", ret);
+	assert_int_equal(ret, 0);
 }
 
 static bool test_base_subgroup_bis_codec_to_codec_cfg_inval_param_null_bis_bis_cb(
@@ -918,7 +954,7 @@ static bool test_base_subgroup_bis_codec_to_codec_cfg_inval_param_null_bis_bis_c
 	ARG_UNUSED(user_data);
 
 	ret = bt_bap_base_subgroup_bis_codec_to_codec_cfg(NULL, &codec_cfg);
-	zassert_equal(ret, -EINVAL, "Unexpected return value: %d", ret);
+	assert_int_equal(ret, -EINVAL);
 
 	return true;
 }
@@ -933,22 +969,23 @@ static bool test_base_subgroup_bis_codec_to_codec_cfg_inval_param_null_bis_subgr
 
 	ret = bt_bap_base_subgroup_foreach_bis(
 		NULL, test_base_subgroup_bis_codec_to_codec_cfg_inval_param_null_bis_bis_cb, NULL);
-	zassert_equal(ret, -EINVAL, "Unexpected return value: %d", ret);
+	assert_int_equal(ret, -EINVAL);
 
 	return true;
 }
 
-ZTEST_F(bap_base_test_suite, test_base_subgroup_foreach_bis_inval_param_null_bis)
+static void bap_base_test_suite__test_base_subgroup_foreach_bis_inval_param_null_bis(void **cm_state)
 {
+	struct bap_base_test_suite_fixture *fixture = *cm_state;
 	const struct bt_bap_base *base = bt_bap_base_get_base_from_ad(&fixture->valid_base_ad);
 	int ret;
 
-	zassert_not_null(base);
+	assert_non_null(base);
 
 	ret = bt_bap_base_foreach_subgroup(
 		base, test_base_subgroup_bis_codec_to_codec_cfg_inval_param_null_bis_subgroup_cb,
 		NULL);
-	zassert_equal(ret, 0, "Unexpected return value: %d", ret);
+	assert_int_equal(ret, 0);
 }
 
 static bool test_base_subgroup_bis_codec_to_codec_cfg_inval_param_null_codec_cfg_bis_cb(
@@ -959,7 +996,7 @@ static bool test_base_subgroup_bis_codec_to_codec_cfg_inval_param_null_codec_cfg
 	ARG_UNUSED(user_data);
 
 	ret = bt_bap_base_subgroup_bis_codec_to_codec_cfg(bis, NULL);
-	zassert_equal(ret, -EINVAL, "Unexpected return value: %d", ret);
+	assert_int_equal(ret, -EINVAL);
 
 	return true;
 }
@@ -975,21 +1012,96 @@ static bool test_base_subgroup_bis_codec_to_codec_cfg_inval_param_null_codec_cfg
 	ret = bt_bap_base_subgroup_foreach_bis(
 		NULL, test_base_subgroup_bis_codec_to_codec_cfg_inval_param_null_codec_cfg_bis_cb,
 		NULL);
-	zassert_equal(ret, -EINVAL, "Unexpected return value: %d", ret);
+	assert_int_equal(ret, -EINVAL);
 
 	return true;
 }
 
-ZTEST_F(bap_base_test_suite, test_base_subgroup_foreach_bis_inval_param_null_codec_cfg)
+static void bap_base_test_suite__test_base_subgroup_foreach_bis_inval_param_null_codec_cfg(void **cm_state)
 {
+	struct bap_base_test_suite_fixture *fixture = *cm_state;
 	const struct bt_bap_base *base = bt_bap_base_get_base_from_ad(&fixture->valid_base_ad);
 	int ret;
 
-	zassert_not_null(base);
+	assert_non_null(base);
 
 	ret = bt_bap_base_foreach_subgroup(
 		base,
 		test_base_subgroup_bis_codec_to_codec_cfg_inval_param_null_codec_cfg_subgroup_cb,
 		NULL);
-	zassert_equal(ret, 0, "Unexpected return value: %d", ret);
+	assert_int_equal(ret, 0);
 }
+
+static int bt_test_bap_base_test_suite_setup(void **state)
+{
+	int environment_result = bt_test_host_setup(state);
+
+	if (environment_result != 0) {
+		return environment_result;
+	}
+
+	*state = bap_base_test_suite_setup();
+	return 0;
+}
+static int bt_test_bap_base_test_suite_before(void **state)
+{
+	(void)state;
+	bap_base_test_suite_before(*state);
+	return 0;
+}
+static int bt_test_bap_base_test_suite_after(void **state)
+{
+	(void)state;
+	bap_base_test_suite_after(*state);
+	return 0;
+}
+static int bt_test_bap_base_test_suite_teardown(void **state)
+{
+	(void)state;
+	bap_base_test_suite_teardown(*state);
+	return 0;
+}
+static const struct CMUnitTest test_cases_bap_base_test_suite[] = {
+	cmocka_unit_test_setup_teardown(bap_base_test_suite__test_base_get_base_from_ad, bt_test_bap_base_test_suite_before, bt_test_bap_base_test_suite_after),
+	cmocka_unit_test_setup_teardown(bap_base_test_suite__test_base_get_base_from_ad_inval_base, bt_test_bap_base_test_suite_before, bt_test_bap_base_test_suite_after),
+	cmocka_unit_test_setup_teardown(bap_base_test_suite__test_base_get_base_from_ad_inval_param_null, bt_test_bap_base_test_suite_before, bt_test_bap_base_test_suite_after),
+	cmocka_unit_test_setup_teardown(bap_base_test_suite__test_base_get_base_from_ad_inval_param_type, bt_test_bap_base_test_suite_before, bt_test_bap_base_test_suite_after),
+	cmocka_unit_test_setup_teardown(bap_base_test_suite__test_base_get_base_from_ad_inval_param_len, bt_test_bap_base_test_suite_before, bt_test_bap_base_test_suite_after),
+	cmocka_unit_test_setup_teardown(bap_base_test_suite__test_base_get_base_from_ad_inval_param_uuid, bt_test_bap_base_test_suite_before, bt_test_bap_base_test_suite_after),
+	cmocka_unit_test_setup_teardown(bap_base_test_suite__test_base_get_size, bt_test_bap_base_test_suite_before, bt_test_bap_base_test_suite_after),
+	cmocka_unit_test_setup_teardown(bap_base_test_suite__test_base_get_size_inval_param_null, bt_test_bap_base_test_suite_before, bt_test_bap_base_test_suite_after),
+	cmocka_unit_test_setup_teardown(bap_base_test_suite__test_base_get_pres_delay, bt_test_bap_base_test_suite_before, bt_test_bap_base_test_suite_after),
+	cmocka_unit_test_setup_teardown(bap_base_test_suite__test_base_get_pres_delay_inval_param_null, bt_test_bap_base_test_suite_before, bt_test_bap_base_test_suite_after),
+	cmocka_unit_test_setup_teardown(bap_base_test_suite__test_base_get_subgroup_count, bt_test_bap_base_test_suite_before, bt_test_bap_base_test_suite_after),
+	cmocka_unit_test_setup_teardown(bap_base_test_suite__test_base_get_subgroup_count_inval_param_null, bt_test_bap_base_test_suite_before, bt_test_bap_base_test_suite_after),
+	cmocka_unit_test_setup_teardown(bap_base_test_suite__test_base_get_bis_indexes, bt_test_bap_base_test_suite_before, bt_test_bap_base_test_suite_after),
+	cmocka_unit_test_setup_teardown(bap_base_test_suite__test_base_get_bis_indexes_inval_param_null_base, bt_test_bap_base_test_suite_before, bt_test_bap_base_test_suite_after),
+	cmocka_unit_test_setup_teardown(bap_base_test_suite__test_base_get_bis_indexes_inval_param_null_index, bt_test_bap_base_test_suite_before, bt_test_bap_base_test_suite_after),
+	cmocka_unit_test_setup_teardown(bap_base_test_suite__test_base_foreach_subgroup, bt_test_bap_base_test_suite_before, bt_test_bap_base_test_suite_after),
+	cmocka_unit_test_setup_teardown(bap_base_test_suite__test_base_foreach_subgroup_inval_param_null_base, bt_test_bap_base_test_suite_before, bt_test_bap_base_test_suite_after),
+	cmocka_unit_test_setup_teardown(bap_base_test_suite__test_base_foreach_subgroup_inval_param_null_cb, bt_test_bap_base_test_suite_before, bt_test_bap_base_test_suite_after),
+	cmocka_unit_test_setup_teardown(bap_base_test_suite__test_base_get_subgroup_codec_id, bt_test_bap_base_test_suite_before, bt_test_bap_base_test_suite_after),
+	cmocka_unit_test_setup_teardown(bap_base_test_suite__test_base_get_subgroup_codec_id_inval_param_null_subgroup, bt_test_bap_base_test_suite_before, bt_test_bap_base_test_suite_after),
+	cmocka_unit_test_setup_teardown(bap_base_test_suite__test_base_get_subgroup_codec_id_inval_param_null, bt_test_bap_base_test_suite_before, bt_test_bap_base_test_suite_after),
+	cmocka_unit_test_setup_teardown(bap_base_test_suite__test_base_get_subgroup_codec_data, bt_test_bap_base_test_suite_before, bt_test_bap_base_test_suite_after),
+	cmocka_unit_test_setup_teardown(bap_base_test_suite__test_base_get_subgroup_codec_data_inval_param_null_subgroup, bt_test_bap_base_test_suite_before, bt_test_bap_base_test_suite_after),
+	cmocka_unit_test_setup_teardown(bap_base_test_suite__test_base_get_subgroup_codec_data_inval_param_null, bt_test_bap_base_test_suite_before, bt_test_bap_base_test_suite_after),
+	cmocka_unit_test_setup_teardown(bap_base_test_suite__test_base_get_subgroup_codec_meta, bt_test_bap_base_test_suite_before, bt_test_bap_base_test_suite_after),
+	cmocka_unit_test_setup_teardown(bap_base_test_suite__test_base_get_subgroup_codec_meta_inval_param_null_subgroup, bt_test_bap_base_test_suite_before, bt_test_bap_base_test_suite_after),
+	cmocka_unit_test_setup_teardown(bap_base_test_suite__test_base_get_subgroup_codec_meta_inval_param_null, bt_test_bap_base_test_suite_before, bt_test_bap_base_test_suite_after),
+	cmocka_unit_test_setup_teardown(bap_base_test_suite__test_base_subgroup_codec_to_codec_cfg, bt_test_bap_base_test_suite_before, bt_test_bap_base_test_suite_after),
+	cmocka_unit_test_setup_teardown(bap_base_test_suite__test_base_subgroup_codec_to_codec_cfg_inval_param_null_subgroup, bt_test_bap_base_test_suite_before, bt_test_bap_base_test_suite_after),
+	cmocka_unit_test_setup_teardown(bap_base_test_suite__test_base_subgroup_codec_to_codec_cfg_inval_param_null, bt_test_bap_base_test_suite_before, bt_test_bap_base_test_suite_after),
+	cmocka_unit_test_setup_teardown(bap_base_test_suite__test_base_get_subgroup_bis_count, bt_test_bap_base_test_suite_before, bt_test_bap_base_test_suite_after),
+	cmocka_unit_test_setup_teardown(bap_base_test_suite__test_base_get_subgroup_bis_count_inval_param_null_subgroup, bt_test_bap_base_test_suite_before, bt_test_bap_base_test_suite_after),
+	cmocka_unit_test_setup_teardown(bap_base_test_suite__test_bt_bap_base_subgroup_get_bis_indexes, bt_test_bap_base_test_suite_before, bt_test_bap_base_test_suite_after),
+	cmocka_unit_test_setup_teardown(bap_base_test_suite__test_bt_bap_base_subgroup_get_bis_indexes_inval_param_null_subgroup, bt_test_bap_base_test_suite_before, bt_test_bap_base_test_suite_after),
+	cmocka_unit_test_setup_teardown(bap_base_test_suite__test_bt_bap_base_subgroup_get_bis_indexes_inval_param_null_index, bt_test_bap_base_test_suite_before, bt_test_bap_base_test_suite_after),
+	cmocka_unit_test_setup_teardown(bap_base_test_suite__test_base_subgroup_foreach_bis, bt_test_bap_base_test_suite_before, bt_test_bap_base_test_suite_after),
+	cmocka_unit_test_setup_teardown(bap_base_test_suite__test_base_subgroup_foreach_bis_inval_param_null_subgroup, bt_test_bap_base_test_suite_before, bt_test_bap_base_test_suite_after),
+	cmocka_unit_test_setup_teardown(bap_base_test_suite__test_base_subgroup_foreach_bis_inval_param_null_cb, bt_test_bap_base_test_suite_before, bt_test_bap_base_test_suite_after),
+	cmocka_unit_test_setup_teardown(bap_base_test_suite__test_base_subgroup_bis_codec_to_codec_cfg, bt_test_bap_base_test_suite_before, bt_test_bap_base_test_suite_after),
+	cmocka_unit_test_setup_teardown(bap_base_test_suite__test_base_subgroup_foreach_bis_inval_param_null_bis, bt_test_bap_base_test_suite_before, bt_test_bap_base_test_suite_after),
+	cmocka_unit_test_setup_teardown(bap_base_test_suite__test_base_subgroup_foreach_bis_inval_param_null_codec_cfg, bt_test_bap_base_test_suite_before, bt_test_bap_base_test_suite_after),
+};
+BT_TEST_SUITE(bap_base_test_suite, test_cases_bap_base_test_suite, bt_test_bap_base_test_suite_setup, bt_test_bap_base_test_suite_teardown);

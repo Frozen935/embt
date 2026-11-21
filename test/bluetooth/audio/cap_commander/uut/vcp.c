@@ -1,3 +1,4 @@
+#include "support/test_support.h"
 /* csip.c - CAP Commander specific VCP mocks */
 
 /*
@@ -10,15 +11,15 @@
 #include <stdint.h>
 #include <string.h>
 
-#include <zephyr/autoconf.h>
-#include <zephyr/bluetooth/audio/aics.h>
-#include <zephyr/bluetooth/audio/vcp.h>
-#include <zephyr/bluetooth/audio/vocs.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/sys/__assert.h>
-#include <zephyr/sys/util.h>
-#include <zephyr/sys/util_macro.h>
-#include <zephyr/toolchain.h>
+#include <embt/autoconf.h>
+#include <embt/bluetooth/audio/aics.h>
+#include <embt/bluetooth/audio/vcp.h>
+#include <embt/bluetooth/audio/vocs.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/base/assert.h>
+#include <embt/base/util.h>
+#include <embt/base/util_macro.h>
+#include <embt/compiler.h>
 
 static struct bt_vcp_vol_ctlr_cb *vcp_cb;
 

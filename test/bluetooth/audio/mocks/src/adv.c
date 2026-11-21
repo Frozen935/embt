@@ -1,3 +1,5 @@
+#include "support/test_support.h"
+
 /*
  * Copyright (c) 2025 Nordic Semiconductor ASA
  *
@@ -8,9 +10,9 @@
 #include <stddef.h>
 #include <string.h>
 
-#include <zephyr/bluetooth/addr.h>
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/sys/atomic.h>
+#include <embt/bluetooth/addr.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/base/atomic.h>
 
 #include "bluetooth.h"
 

@@ -1,15 +1,14 @@
+#include "support/test_support.h"
+#include <embt/base/log.h>
 /*
  * Copyright (c) 2020 Nordic Semiconductor ASA
  *
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <zephyr/kernel.h>
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/hci.h>
 
-#include <zephyr/ztest.h>
-
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/hci.h>
 #define DEVICE_NAME CONFIG_BT_DEVICE_NAME
 #define DEVICE_NAME_LEN (sizeof(DEVICE_NAME) - 1)
 
@@ -24,30 +23,43 @@ static const struct bt_data sd[] = {
 	BT_DATA(BT_DATA_NAME_COMPLETE, DEVICE_NAME, DEVICE_NAME_LEN),
 };
 
-ZTEST_SUITE(adv_tests, NULL, NULL, NULL, NULL, NULL);
 
-ZTEST(adv_tests, test_adv_fast_ad_data_update)
+
+static void adv_tests__test_adv_fast_ad_data_update(void **cm_state)
 {
+	(void)cm_state;
 	int err;
 
-	printk("Starting Beacon Demo\n");
+	bt_log_print("Starting Beacon Demo\n");
 
 	/* Initialize the Bluetooth Subsystem */
 	err = bt_enable(NULL);
-	zassert_equal(err, 0, "Bluetooth init failed (err %d)\n", err);
+	assert_int_equal(err, 0);
 
-	printk("Bluetooth initialized\n");
+	bt_log_print("Bluetooth initialized\n");
 
 	/* Start advertising */
 	err = bt_le_adv_start(BT_LE_ADV_NCONN, ad, ARRAY_SIZE(ad),
 			      sd, ARRAY_SIZE(sd));
-	zassert_equal(err, 0, "Advertising failed to start (err %d)\n", err);
+	assert_int_equal(err, 0);
 
-	printk("Advertising started\n");
+	bt_log_print("Advertising started\n");
 
-	while (k_uptime_get() < TIMEOUT_MS) {
+	const int64_t started = bt_uptime_get_ms();
+	while (bt_uptime_get_ms() - started < TIMEOUT_MS) {
 		err = bt_le_adv_update_data(ad, ARRAY_SIZE(ad),
 					    sd, ARRAY_SIZE(sd));
-		zassert_equal(err, 0, "Update adv data failed (err %d)\n", err);
+		assert_int_equal(err, 0);
 	}
+	assert_int_equal(bt_le_adv_stop(), 0);
+	assert_int_equal(bt_disable(), 0);
 }
+
+
+
+
+
+static const struct CMUnitTest test_cases_adv_tests[] = {
+	cmocka_unit_test(adv_tests__test_adv_fast_ad_data_update),
+};
+BT_TEST_SUITE(adv_tests, test_cases_adv_tests, bt_test_base_setup, NULL);

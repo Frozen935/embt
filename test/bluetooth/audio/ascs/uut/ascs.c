@@ -1,3 +1,4 @@
+#include "support/test_support.h"
 /*
  * Copyright (c) 2023 Codecoup
  * Copyright (c) 2026 Nordic Semiconductor ASA
@@ -7,11 +8,11 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include <zephyr/bluetooth/audio/ascs.h>
-#include <zephyr/bluetooth/audio/audio.h>
-#include <zephyr/bluetooth/audio/bap.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/fff.h>
+#include <embt/bluetooth/audio/ascs.h>
+#include <embt/bluetooth/audio/audio.h>
+#include <embt/bluetooth/audio/bap.h>
+#include <embt/bluetooth/conn.h>
+#include <fff.h>
 
 #include "ascs.h"
 

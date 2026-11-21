@@ -1,3 +1,4 @@
+#include "support/test_support.h"
 /* csip.c - CAP Commander specific AICS mocks */
 
 /*
@@ -10,10 +11,10 @@
 #include <stdint.h>
 #include <stddef.h>
 
-#include <zephyr/bluetooth/audio/aics.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/sys/util.h>
-#include <zephyr/toolchain.h>
+#include <embt/bluetooth/audio/aics.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/base/util.h>
+#include <embt/compiler.h>
 
 static struct bt_aics {
 	bool active;

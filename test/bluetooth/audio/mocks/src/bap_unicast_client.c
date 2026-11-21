@@ -1,3 +1,5 @@
+#include "support/test_support.h"
+
 /*
  * Copyright (c) 2023 Codecoup
  * Copyright (c) 2024-2025 Nordic Semiconductor ASA
@@ -11,19 +13,18 @@
 #include <stdint.h>
 #include <string.h>
 
-#include <zephyr/bluetooth/audio/ascs.h>
-#include <zephyr/bluetooth/audio/audio.h>
-#include <zephyr/bluetooth/audio/bap.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/hci_types.h>
-#include <zephyr/bluetooth/iso.h>
+#include <embt/bluetooth/audio/ascs.h>
+#include <embt/bluetooth/audio/audio.h>
+#include <embt/bluetooth/audio/bap.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/hci_types.h>
+#include <embt/bluetooth/iso.h>
 #include <embt/base/log.h>
-#include <zephyr/sys/__assert.h>
-#include <zephyr/sys/printk.h>
-#include <zephyr/sys/slist.h>
-#include <zephyr/sys/util.h>
-#include <zephyr/toolchain.h>
-#include <zephyr/ztest_assert.h>
+#include <embt/base/assert.h>
+#include <embt/base/log.h>
+#include <embt/base/slist.h>
+#include <embt/base/util.h>
+#include <embt/compiler.h>
 #include <sys/errno.h>
 
 #include "audio/bap_endpoint.h"
@@ -391,7 +392,7 @@ int bt_bap_unicast_client_disable(struct bt_bap_stream *stream)
 		return -EINVAL;
 	}
 
-	printk("%s %p %d\n", __func__, stream, stream->ep->dir);
+	bt_log_print("%s %p %d\n", __func__, stream, stream->ep->dir);
 
 	switch (stream->ep->state) {
 	case BT_BAP_EP_STATE_ENABLING:
@@ -449,7 +450,7 @@ int bt_bap_unicast_client_stop(struct bt_bap_stream *stream)
 {
 	struct bt_bap_unicast_client_cb *listener, *next;
 
-	printk("%s %p\n", __func__, stream);
+	bt_log_print("%s %p\n", __func__, stream);
 
 	/* As per the ASCS spec, only source streams can be stopped by the client */
 	if (stream == NULL || stream->ep == NULL || stream->ep->iso == NULL ||
@@ -522,7 +523,7 @@ int bt_bap_unicast_client_release(struct bt_bap_stream *stream)
 {
 	struct bt_bap_unicast_client_cb *listener, *next;
 
-	printk("%s %p\n", __func__, stream);
+	bt_log_print("%s %p\n", __func__, stream);
 
 	if (stream == NULL || stream->ep == NULL) {
 		return -EINVAL;
@@ -909,7 +910,7 @@ static void unicast_group_free(struct bt_bap_unicast_group *group)
 			} else if (bap_iso->tx.stream == stream) {
 				bt_bap_iso_unbind_stream(stream, BT_AUDIO_DIR_SINK);
 			} else {
-				__ASSERT_PRINT("stream %p has invalid bap_iso %p", stream, bap_iso);
+				bt_log_print("stream %p has invalid bap_iso %p", stream, bap_iso);
 			}
 		}
 

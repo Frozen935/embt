@@ -1,12 +1,11 @@
+#include "support/test_support.h"
 /*
  * Copyright (c) 2023 Nordic Semiconductor ASA
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-
-#include <zephyr/ztest.h>
-#include <zephyr/net_buf.h>
-#include <zephyr/bluetooth/mesh.h>
+#include <embt/net_buf.h>
+#include <embt/bluetooth/mesh.h>
 
 #include "settings.h"
 #include "net.h"
@@ -57,16 +56,15 @@ static void prepare_rpl_and_start_reset(void)
 			.seq = test_vector[i].seq,
 		};
 
-		ztest_expect_value(bt_mesh_settings_store_schedule, flag,
-				   BT_MESH_SETTINGS_RPL_PENDING);
-		zassert_false(bt_mesh_rpl_check(&msg, NULL, false));
+		expect_value(bt_mesh_settings_store_schedule, flag, BT_MESH_SETTINGS_RPL_PENDING);
+		assert_false(bt_mesh_rpl_check(&msg, NULL, false));
 	}
 
 	/* settings_save_one() will be triggered for all new entries when
 	 * bt_mesh_rpl_pending_store() is called.
 	 */
 	for (int i = 0; i < ARRAY_SIZE(test_vector); i++) {
-		ztest_expect_data(settings_save_one, name, test_vector[i].name);
+		expect_string(settings_save_one, name, test_vector[i].name);
 	}
 	bt_mesh_rpl_pending_store(BT_MESH_ADDR_ALL_NODES);
 
@@ -79,14 +77,13 @@ static void prepare_rpl_and_start_reset(void)
 			.seq = test_vector[i].seq,
 		};
 
-		zassert_true(bt_mesh_rpl_check(&msg, NULL, false));
+		assert_true(bt_mesh_rpl_check(&msg, NULL, false));
 	}
 
 	/* Simulate IVI Update. This should only flip flags. The actual storing will happen
 	 * when bt_mesh_rpl_pending_store() is called.
 	 */
-	ztest_expect_value(bt_mesh_settings_store_schedule, flag,
-			   BT_MESH_SETTINGS_RPL_RESET_PENDING);
+	expect_value(bt_mesh_settings_store_schedule, flag, BT_MESH_SETTINGS_RPL_RESET_PENDING);
 	bt_mesh_rpl_reset();
 }
 
@@ -107,11 +104,10 @@ static void check_entries_from_test_vector(void)
 
 		/* Removed entries can now be added again. */
 		if (test_vector[i].old_iv) {
-			ztest_expect_value(bt_mesh_settings_store_schedule, flag,
-					   BT_MESH_SETTINGS_RPL_PENDING);
-			zassert_false(bt_mesh_rpl_check(&msg, NULL, false));
+			expect_value(bt_mesh_settings_store_schedule, flag, BT_MESH_SETTINGS_RPL_PENDING);
+			assert_false(bt_mesh_rpl_check(&msg, NULL, false));
 		} else {
-			zassert_true(bt_mesh_rpl_check(&msg, NULL, false));
+			assert_true(bt_mesh_rpl_check(&msg, NULL, false));
 		}
 	}
 }
@@ -127,9 +123,8 @@ static void check_empty_entries(int cnt)
 			.seq = i,
 		};
 
-		ztest_expect_value(bt_mesh_settings_store_schedule, flag,
-				   BT_MESH_SETTINGS_RPL_PENDING);
-		zassert_false(bt_mesh_rpl_check(&msg, NULL, false));
+		expect_value(bt_mesh_settings_store_schedule, flag, BT_MESH_SETTINGS_RPL_PENDING);
+		assert_false(bt_mesh_rpl_check(&msg, NULL, false));
 	}
 
 	/* Check that there are no more empty entries in RPL. */
@@ -139,7 +134,7 @@ static void check_empty_entries(int cnt)
 		.old_iv = false,
 		.seq = 1024,
 	};
-	zassert_true(bt_mesh_rpl_check(&msg, NULL, false));
+	assert_true(bt_mesh_rpl_check(&msg, NULL, false));
 }
 
 static void check_op(int op)
@@ -148,9 +143,8 @@ static void check_op(int op)
 		if (settings_func_cnt > 1) {
 			settings_func_cnt--;
 		} else {
-			ztest_expect_value(bt_mesh_settings_store_schedule, flag,
-					   BT_MESH_SETTINGS_RPL_PENDING);
-			zassert_false(bt_mesh_rpl_check(&recv_msg, NULL, false));
+			expect_value(bt_mesh_settings_store_schedule, flag, BT_MESH_SETTINGS_RPL_PENDING);
+			assert_false(bt_mesh_rpl_check(&recv_msg, NULL, false));
 
 			settings_func_cnt--;
 			settings_func = 0;
@@ -174,9 +168,9 @@ static void expect_pending_store(void)
 	/* Entries with old_iv == true should be removed, others should be stored. */
 	for (int i = 0; i < ARRAY_SIZE(test_vector); i++) {
 		if (test_vector[i].old_iv) {
-			ztest_expect_value(settings_delete, name, test_vector[i].name);
+			expect_string(settings_delete, name, test_vector[i].name);
 		} else {
-			ztest_expect_data(settings_save_one, name, test_vector[i].name);
+			expect_string(settings_save_one, name, test_vector[i].name);
 		}
 	}
 }
@@ -199,8 +193,7 @@ static void setup(void *f)
 
 	/* Clear RPL before every test. */
 	skip_delete = true;
-	ztest_expect_value(bt_mesh_settings_store_schedule, flag,
-			   BT_MESH_SETTINGS_RPL_RESET_PENDING);
+	expect_value(bt_mesh_settings_store_schedule, flag, BT_MESH_SETTINGS_RPL_RESET_PENDING);
 	bt_mesh_rpl_clear();
 	bt_mesh_rpl_pending_store(BT_MESH_ADDR_ALL_NODES);
 	skip_delete = false;
@@ -213,7 +206,7 @@ static void setup(void *f)
 
 void bt_mesh_settings_store_schedule(enum bt_mesh_settings_flag flag)
 {
-	ztest_check_expected_value(flag);
+	check_expected(flag);
 }
 
 void bt_mesh_settings_store_cancel(enum bt_mesh_settings_flag flag)
@@ -222,7 +215,7 @@ void bt_mesh_settings_store_cancel(enum bt_mesh_settings_flag flag)
 
 int settings_save_one(const char *name, const void *value, size_t val_len)
 {
-	ztest_check_expected_data(name, strlen(name));
+	check_expected(name);
 
 	check_op(SETTINGS_SAVE_ONE);
 
@@ -235,7 +228,7 @@ int settings_delete(const char *name)
 		return 0;
 	}
 
-	ztest_check_expected_data(name, strlen(name));
+	check_expected(name);
 
 	check_op(SETTINGS_DELETE);
 
@@ -244,11 +237,12 @@ int settings_delete(const char *name)
 
 /**** Tests ****/
 
-ZTEST_SUITE(bt_mesh_rpl_reset, NULL, NULL, setup, NULL, NULL);
+
 
 /** Test that entries with old_iv == true are removed after the reset operation finished. */
-ZTEST(bt_mesh_rpl_reset, test_reset_normal)
+static void bt_mesh_rpl_reset__test_reset_normal(void **cm_state)
 {
+	(void)cm_state;
 	prepare_rpl_and_start_reset();
 	expect_pending_store();
 
@@ -260,8 +254,9 @@ ZTEST(bt_mesh_rpl_reset, test_reset_normal)
 /** Test that RPL accepts and stores a valid entry that was just deleted. The entry should be
  * stored after the reset operation is finished.
  */
-ZTEST(bt_mesh_rpl_reset, test_rpl_check_on_delete_same_entry)
+static void bt_mesh_rpl_reset__test_rpl_check_on_delete_same_entry(void **cm_state)
 {
+	(void)cm_state;
 	prepare_rpl_and_start_reset();
 	expect_pending_store();
 
@@ -270,15 +265,15 @@ ZTEST(bt_mesh_rpl_reset, test_rpl_check_on_delete_same_entry)
 	 */
 	struct test_rpl_entry *entry = &test_vector[1];
 
-	zassert_true(entry->old_iv);
+	assert_true(entry->old_iv);
 	entry->old_iv = false;
 	call_rpl_check_on(SETTINGS_DELETE, 1, entry);
 
 	bt_mesh_rpl_pending_store(BT_MESH_ADDR_ALL_NODES);
-	zassert_true(is_rpl_check_called());
+	assert_true(is_rpl_check_called());
 
 	/* Call bt_mesh_rpl_pending_store() to store new entry. */
-	ztest_expect_data(settings_save_one, name, entry->name);
+	expect_string(settings_save_one, name, entry->name);
 	bt_mesh_rpl_pending_store(BT_MESH_ADDR_ALL_NODES);
 
 	verify_rpl();
@@ -287,8 +282,9 @@ ZTEST(bt_mesh_rpl_reset, test_rpl_check_on_delete_same_entry)
 /** Test that RPL accepts and stores a valid entry that was just stored. The entry should be stored
  * after the reset operation is finished.
  */
-ZTEST(bt_mesh_rpl_reset, test_rpl_check_on_save_same_entry)
+static void bt_mesh_rpl_reset__test_rpl_check_on_save_same_entry(void **cm_state)
 {
+	(void)cm_state;
 	prepare_rpl_and_start_reset();
 	expect_pending_store();
 
@@ -297,14 +293,14 @@ ZTEST(bt_mesh_rpl_reset, test_rpl_check_on_save_same_entry)
 	 */
 	struct test_rpl_entry *entry = &test_vector[0];
 
-	zassert_false(entry->old_iv);
+	assert_false(entry->old_iv);
 	call_rpl_check_on(SETTINGS_SAVE_ONE, 1, entry);
 
 	bt_mesh_rpl_pending_store(BT_MESH_ADDR_ALL_NODES);
-	zassert_true(is_rpl_check_called());
+	assert_true(is_rpl_check_called());
 
 	/* Call bt_mesh_rpl_pending_store() to store new entry. */
-	ztest_expect_data(settings_save_one, name, entry->name);
+	expect_string(settings_save_one, name, entry->name);
 	bt_mesh_rpl_pending_store(BT_MESH_ADDR_ALL_NODES);
 
 	verify_rpl();
@@ -313,8 +309,9 @@ ZTEST(bt_mesh_rpl_reset, test_rpl_check_on_save_same_entry)
 /** Test that RPL accepts and stores a valid entry that has not yet been deleted. The entry should
  * be stored during the reset operation.
  */
-ZTEST(bt_mesh_rpl_reset, test_rpl_check_on_delete_other_entry)
+static void bt_mesh_rpl_reset__test_rpl_check_on_delete_other_entry(void **cm_state)
 {
+	(void)cm_state;
 	prepare_rpl_and_start_reset();
 
 	/* Take the non-first entry with old_iv == true and simulate msg reception with same src
@@ -324,14 +321,14 @@ ZTEST(bt_mesh_rpl_reset, test_rpl_check_on_delete_other_entry)
 	 */
 	struct test_rpl_entry *entry = &test_vector[3];
 
-	zassert_true(entry->old_iv);
+	assert_true(entry->old_iv);
 	entry->old_iv = false;
 	call_rpl_check_on(SETTINGS_DELETE, 1, entry);
 
 	expect_pending_store();
 
 	bt_mesh_rpl_pending_store(BT_MESH_ADDR_ALL_NODES);
-	zassert_true(is_rpl_check_called());
+	assert_true(is_rpl_check_called());
 
 	/* The entry should have been deleted in previous bt_mesh_rpl_pending_store() call. Another
 	 * call should not do anything.
@@ -344,8 +341,9 @@ ZTEST(bt_mesh_rpl_reset, test_rpl_check_on_delete_other_entry)
 /* Test that RPL accepts and stores a valid entry that has not yet been stored. The entry should be
  * stored during the reset operation.
  */
-ZTEST(bt_mesh_rpl_reset, test_rpl_check_on_save_other_entry)
+static void bt_mesh_rpl_reset__test_rpl_check_on_save_other_entry(void **cm_state)
 {
+	(void)cm_state;
 	prepare_rpl_and_start_reset();
 
 	/* Take RPL entry from test vector that has old_iv == false and is not stored yet after
@@ -356,13 +354,13 @@ ZTEST(bt_mesh_rpl_reset, test_rpl_check_on_save_other_entry)
 	 */
 	struct test_rpl_entry *entry = &test_vector[2];
 
-	zassert_false(entry->old_iv);
+	assert_false(entry->old_iv);
 	call_rpl_check_on(SETTINGS_SAVE_ONE, 1, entry);
 
 	expect_pending_store();
 
 	bt_mesh_rpl_pending_store(BT_MESH_ADDR_ALL_NODES);
-	zassert_true(is_rpl_check_called());
+	assert_true(is_rpl_check_called());
 
 	/* The entry should have been stored in previous bt_mesh_rpl_pending_store() call. Another
 	 * call should not do anything.
@@ -376,8 +374,9 @@ ZTEST(bt_mesh_rpl_reset, test_rpl_check_on_save_other_entry)
  * The entry will be added at the end of RPL, therefore it should be stored during the reset
  * operation.
  */
-ZTEST(bt_mesh_rpl_reset, test_rpl_check_on_delete_deleted_entry)
+static void bt_mesh_rpl_reset__test_rpl_check_on_delete_deleted_entry(void **cm_state)
 {
+	(void)cm_state;
 	prepare_rpl_and_start_reset();
 	expect_pending_store();
 
@@ -386,16 +385,16 @@ ZTEST(bt_mesh_rpl_reset, test_rpl_check_on_delete_deleted_entry)
 	 */
 	struct test_rpl_entry *entry = &test_vector[1];
 
-	zassert_true(entry->old_iv);
+	assert_true(entry->old_iv);
 	entry->old_iv = false;
 	call_rpl_check_on(SETTINGS_DELETE, 2, entry);
 	/* The entry will be stored during the reset operation as it will be added to the end of
 	 * the RPL.
 	 */
-	ztest_expect_data(settings_save_one, name, entry->name);
+	expect_string(settings_save_one, name, entry->name);
 
 	bt_mesh_rpl_pending_store(BT_MESH_ADDR_ALL_NODES);
-	zassert_true(is_rpl_check_called());
+	assert_true(is_rpl_check_called());
 
 	/* The new entry should have been stored already. Another bt_mesh_rpl_pending_store() call
 	 * should not do anything.
@@ -409,8 +408,9 @@ ZTEST(bt_mesh_rpl_reset, test_rpl_check_on_delete_deleted_entry)
  * Since the entry has been already in the list, it should be stored again after the reset
  * operation is finished.
  */
-ZTEST(bt_mesh_rpl_reset, test_rpl_check_on_store_stored_entry)
+static void bt_mesh_rpl_reset__test_rpl_check_on_store_stored_entry(void **cm_state)
 {
+	(void)cm_state;
 	prepare_rpl_and_start_reset();
 	expect_pending_store();
 
@@ -419,26 +419,27 @@ ZTEST(bt_mesh_rpl_reset, test_rpl_check_on_store_stored_entry)
 	 */
 	struct test_rpl_entry *entry = &test_vector[0];
 
-	zassert_false(entry->old_iv);
+	assert_false(entry->old_iv);
 	entry->old_iv = true;
 	entry->seq++;
 	call_rpl_check_on(SETTINGS_SAVE_ONE, 2, entry);
 
 	bt_mesh_rpl_pending_store(BT_MESH_ADDR_ALL_NODES);
-	zassert_true(is_rpl_check_called());
+	assert_true(is_rpl_check_called());
 
 	/* The entry was updated after bt_mesh_rpl_pending_store() checked it. So it should be
 	 * stored again.
 	 */
-	ztest_expect_data(settings_save_one, name, entry->name);
+	expect_string(settings_save_one, name, entry->name);
 	bt_mesh_rpl_pending_store(BT_MESH_ADDR_ALL_NODES);
 
 	verify_rpl();
 }
 
 /** Test that RPL accepts and stores a new entry when the reset operation is not yet finished. */
-ZTEST(bt_mesh_rpl_reset, test_rpl_check_on_save_new_entry)
+static void bt_mesh_rpl_reset__test_rpl_check_on_save_new_entry(void **cm_state)
 {
+	(void)cm_state;
 	prepare_rpl_and_start_reset();
 	expect_pending_store();
 
@@ -449,11 +450,11 @@ ZTEST(bt_mesh_rpl_reset, test_rpl_check_on_save_new_entry)
 		.old_iv = false,
 		.seq = 32,
 	};
-	ztest_expect_data(settings_save_one, name, entry.name);
+	expect_string(settings_save_one, name, entry.name);
 	call_rpl_check_on(SETTINGS_SAVE_ONE, 1, &entry);
 
 	bt_mesh_rpl_pending_store(BT_MESH_ADDR_ALL_NODES);
-	zassert_true(is_rpl_check_called());
+	assert_true(is_rpl_check_called());
 
 	/* The entry should have been stored in previous bt_mesh_rpl_pending_store() call. Another
 	 * call should not do anything.
@@ -468,6 +469,27 @@ ZTEST(bt_mesh_rpl_reset, test_rpl_check_on_save_new_entry)
 		.old_iv = entry.old_iv,
 		.seq = entry.seq
 	};
-	zassert_true(bt_mesh_rpl_check(&msg, NULL, false));
+	assert_true(bt_mesh_rpl_check(&msg, NULL, false));
 	check_empty_entries(EMPTY_ENTRIES_CNT - 1);
 }
+
+
+static int bt_test_bt_mesh_rpl_reset_before(void **state)
+{
+	(void)state;
+	setup(*state);
+	return 0;
+}
+
+
+static const struct CMUnitTest test_cases_bt_mesh_rpl_reset[] = {
+	cmocka_unit_test_setup_teardown(bt_mesh_rpl_reset__test_reset_normal, bt_test_bt_mesh_rpl_reset_before, NULL),
+	cmocka_unit_test_setup_teardown(bt_mesh_rpl_reset__test_rpl_check_on_delete_same_entry, bt_test_bt_mesh_rpl_reset_before, NULL),
+	cmocka_unit_test_setup_teardown(bt_mesh_rpl_reset__test_rpl_check_on_save_same_entry, bt_test_bt_mesh_rpl_reset_before, NULL),
+	cmocka_unit_test_setup_teardown(bt_mesh_rpl_reset__test_rpl_check_on_delete_other_entry, bt_test_bt_mesh_rpl_reset_before, NULL),
+	cmocka_unit_test_setup_teardown(bt_mesh_rpl_reset__test_rpl_check_on_save_other_entry, bt_test_bt_mesh_rpl_reset_before, NULL),
+	cmocka_unit_test_setup_teardown(bt_mesh_rpl_reset__test_rpl_check_on_delete_deleted_entry, bt_test_bt_mesh_rpl_reset_before, NULL),
+	cmocka_unit_test_setup_teardown(bt_mesh_rpl_reset__test_rpl_check_on_store_stored_entry, bt_test_bt_mesh_rpl_reset_before, NULL),
+	cmocka_unit_test_setup_teardown(bt_mesh_rpl_reset__test_rpl_check_on_save_new_entry, bt_test_bt_mesh_rpl_reset_before, NULL),
+};
+BT_TEST_SUITE(bt_mesh_rpl_reset, test_cases_bt_mesh_rpl_reset, bt_test_base_setup, NULL);

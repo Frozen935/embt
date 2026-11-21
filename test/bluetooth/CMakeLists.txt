@@ -19,6 +19,10 @@ set(EMBT_BT_TEST_FILTER "core" CACHE STRING "Test unit directory or core")
 set(BT_TEST_ROOT "${CMAKE_CURRENT_SOURCE_DIR}")
 set(BT_TEST_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}")
 set(core_suites addr uuid gap at bt_crypto bt_crypto_ccm hci_pkt host/monitor_buffer)
+if(EMBT_BT_TEST_FILTER STREQUAL "core" AND
+   (NOT CONFIG_BT_HOST_CCM OR NOT CONFIG_BT_HFP_HF))
+  message(FATAL_ERROR "Core tests require CCM and HFP AT providers; reset with test/bluetooth/core.conf")
+endif()
 include("${EMBT_SOURCE_DIR}/tools/cmake/embt_bt_tests.cmake")
 
 add_library(bt_test_support STATIC support/test_support.c)

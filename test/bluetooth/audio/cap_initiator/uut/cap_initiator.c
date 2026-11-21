@@ -1,3 +1,4 @@
+#include "support/test_support.h"
 /*
  * Copyright (c) 2023-2024 Nordic Semiconductor ASA
  *
@@ -5,12 +6,12 @@
  */
 #include <stdint.h>
 
-#include <zephyr/bluetooth/audio/cap.h>
-#include <zephyr/bluetooth/audio/csip.h>
-#include <zephyr/bluetooth/bluetooth.h>
+#include <embt/bluetooth/audio/cap.h>
+#include <embt/bluetooth/audio/csip.h>
+#include <embt/bluetooth/bluetooth.h>
 
 #include "cap_initiator.h"
-#include <zephyr/fff.h>
+#include <fff.h>
 
 /* List of fakes used by this unit tester */
 #define FFF_FAKES_LIST(FAKE)                                                                       \

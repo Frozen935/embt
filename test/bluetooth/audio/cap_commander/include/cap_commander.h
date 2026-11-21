@@ -1,3 +1,4 @@
+#include "support/test_support.h"
 /*
  * Copyright (c) 2023 Nordic Semiconductor ASA
  *
@@ -7,10 +8,10 @@
 #ifndef MOCKS_CAP_COMMANDER_H_
 #define MOCKS_CAP_COMMANDER_H_
 
-#include <zephyr/bluetooth/audio/csip.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/fff.h>
-#include <zephyr/bluetooth/audio/cap.h>
+#include <embt/bluetooth/audio/csip.h>
+#include <embt/bluetooth/conn.h>
+#include <fff.h>
+#include <embt/bluetooth/audio/cap.h>
 
 extern const struct bt_cap_commander_cb mock_cap_commander_cb;
 

@@ -1,3 +1,4 @@
+#include "support/test_support.h"
 /*
  * Copyright (c) 2024 Nordic Semiconductor ASA
  *
@@ -9,14 +10,12 @@
 #include <stdint.h>
 #include <string.h>
 
-#include <zephyr/autoconf.h>
-#include <zephyr/bluetooth/addr.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/audio/bap.h>
-#include <zephyr/bluetooth/iso.h>
-#include <zephyr/sys/slist.h>
-#include <zephyr/ztest_assert.h>
-
+#include <embt/autoconf.h>
+#include <embt/bluetooth/addr.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/audio/bap.h>
+#include <embt/bluetooth/iso.h>
+#include <embt/base/slist.h>
 #include "bap_broadcast_assistant.h"
 #include "test_common.h"
 
@@ -65,7 +64,7 @@ static struct bap_broadcast_assistant_instance *inst_by_conn(struct bt_conn *con
 {
 	struct bap_broadcast_assistant_instance *inst;
 
-	zassert_not_null(conn, "conn is NULL");
+	assert_non_null(conn);
 
 	inst = &broadcast_assistants[bt_conn_index(conn)];
 
@@ -118,11 +117,11 @@ int bt_bap_broadcast_assistant_add_src(struct bt_conn *conn,
 	}
 
 	/* Note that proper parameter checking is done in the caller */
-	zassert_not_null(conn, "conn is NULL");
-	zassert_not_null(param, "param is NULL");
+	assert_non_null(conn);
+	assert_non_null(param);
 
 	inst = inst_by_conn(conn);
-	zassert_not_null(inst, "inst is NULL");
+	assert_non_null(inst);
 
 	max_src_id++;
 	inst->recv_states.past_avail = false;
@@ -161,11 +160,11 @@ int bt_bap_broadcast_assistant_mod_src(struct bt_conn *conn,
 	struct bt_bap_scan_delegator_recv_state state;
 	struct bt_bap_broadcast_assistant_cb *listener, *next;
 
-	zassert_not_null(conn, "conn is NULL");
-	zassert_not_null(param, "param is NULL");
+	assert_non_null(conn);
+	assert_non_null(param);
 
 	inst = inst_by_conn(conn);
-	zassert_not_null(inst, "inst is NULL");
+	assert_non_null(inst);
 
 	state.pa_sync_state = param->pa_sync ? BT_BAP_PA_STATE_SYNCED : BT_BAP_PA_STATE_NOT_SYNCED;
 	state.src_id = param->src_id;
@@ -195,13 +194,13 @@ int bt_bap_broadcast_assistant_rem_src(struct bt_conn *conn, uint8_t src_id)
 	struct bap_broadcast_assistant_instance *inst;
 	struct bt_bap_broadcast_assistant_cb *listener, *next;
 
-	zassert_not_null(conn, "conn is NULL");
+	assert_non_null(conn);
 
 	inst = inst_by_conn(conn);
-	zassert_equal(src_id, inst->recv_states.src_id, "Invalid src_id");
-	zassert_equal(BT_BAP_PA_STATE_NOT_SYNCED, inst->pa_sync_state, "Invalid sync state");
+	assert_int_equal(src_id, inst->recv_states.src_id);
+	assert_int_equal(BT_BAP_PA_STATE_NOT_SYNCED, inst->pa_sync_state);
 	for (int i = 0; i < inst->num_subgroups; i++) {
-		zassert_equal(0, inst->subgroups[i].bis_sync);
+		assert_int_equal(0, inst->subgroups[i].bis_sync);
 	}
 
 	SYS_SLIST_FOR_EACH_CONTAINER_SAFE(&broadcast_assistant_cbs, listener, next, _node) {
@@ -223,12 +222,12 @@ int bt_bap_broadcast_assistant_set_broadcast_code(
 	struct bt_bap_broadcast_assistant_cb *listener, *next;
 	int err;
 
-	zassert_not_null(conn, "conn is NULL");
+	assert_non_null(conn);
 
-	zassert_equal(src_id, RANDOM_SRC_ID, "Invalid src_id");
+	assert_int_equal(src_id, RANDOM_SRC_ID);
 
 	err = strncmp((const char *)broadcast_code, BROADCAST_CODE, sizeof(BROADCAST_CODE));
-	zassert_equal(0, err, "Unexpected broadcast code");
+	assert_int_equal(0, err);
 
 	SYS_SLIST_FOR_EACH_CONTAINER_SAFE(&broadcast_assistant_cbs, listener, next, _node) {
 		if (listener->broadcast_code != NULL) {

@@ -1,3 +1,4 @@
+#include "support/test_support.h"
 /*
  * SPDX-FileCopyrightText: Copyright (c) 2026 Silicon Laboratories Inc.
  * SPDX-License-Identifier: Apache-2.0
@@ -7,17 +8,15 @@
 #include <stdint.h>
 #include <string.h>
 
-#include <zephyr/bluetooth/addr.h>
-#include <zephyr/bluetooth/classic/l2cap_br.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/l2cap.h>
-#include <zephyr/kernel.h>
-#include <zephyr/net_buf.h>
-#include <zephyr/sys/byteorder.h>
-#include <zephyr/sys/slist.h>
-#include <zephyr/sys/util.h>
-#include <zephyr/ztest.h>
+#include <embt/bluetooth/addr.h>
+#include <embt/bluetooth/classic/l2cap_br.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/l2cap.h>
 
+#include <embt/net_buf.h>
+#include <embt/base/byteorder.h>
+#include <embt/base/slist.h>
+#include <embt/base/util.h>
 #include "host/conn_internal.h"
 #include "host/classic/l2cap_br_interface.h"
 
@@ -56,8 +55,8 @@ static void record(struct cb_log *rec, uint8_t ident, struct net_buf *buf)
 {
 	struct seen *s;
 
-	zassert_true(rec->count < ARRAY_SIZE(rec->calls), "Too many calls");
-	zassert_true(buf->len <= sizeof(s->data));
+	assert_true(rec->count < ARRAY_SIZE(rec->calls));
+	assert_true(buf->len <= sizeof(s->data));
 
 	s = &rec->calls[rec->count++];
 	s->ident = ident;
@@ -71,9 +70,9 @@ static void check(const struct cb_log *rec, size_t call, uint8_t ident, const ch
 {
 	const struct seen *s = &rec->calls[call];
 
-	zassert_equal(s->ident, ident, "call %zu: ident %u", call, s->ident);
-	zassert_equal(s->len, strlen(data), "call %zu: len %u", call, s->len);
-	zassert_mem_equal(s->data, data, strlen(data), "call %zu: data", call);
+	assert_int_equal(s->ident, ident);
+	assert_int_equal(s->len, strlen(data));
+	assert_memory_equal(s->data, data, strlen(data));
 }
 
 static void echo_req_0(struct bt_conn *acl, uint8_t ident, struct net_buf *buf)
@@ -103,13 +102,13 @@ static struct bt_l2cap_br_echo_cb echo_cb[] = {
 
 static void connless_recv_0(struct bt_conn *acl, uint16_t psm, struct net_buf *buf)
 {
-	zassert_equal(psm, CONNLESS_PSM);
+	assert_int_equal(psm, CONNLESS_PSM);
 	record(&connless_log[0], 0, buf);
 }
 
 static void connless_recv_1(struct bt_conn *acl, uint16_t psm, struct net_buf *buf)
 {
-	zassert_equal(psm, CONNLESS_PSM);
+	assert_int_equal(psm, CONNLESS_PSM);
 	record(&connless_log[1], 0, buf);
 }
 
@@ -123,8 +122,8 @@ static struct net_buf *l2cap_pdu(uint16_t cid)
 {
 	struct net_buf *buf;
 
-	buf = net_buf_alloc(&pdu_pool, K_NO_WAIT);
-	zassert_not_null(buf);
+	buf = net_buf_alloc(&pdu_pool, BT_NO_WAIT);
+	assert_non_null(buf);
 
 	/* Length, filled in by send_pdu() */
 	net_buf_add_le16(buf, 0U);
@@ -151,7 +150,7 @@ static struct bt_l2cap_br_chan *sig_chan(void)
 {
 	struct bt_l2cap_chan *sig = bt_l2cap_br_lookup_rx_cid(conn, SIG_CID);
 
-	zassert_not_null(sig);
+	assert_non_null(sig);
 
 	return CONTAINER_OF(sig, struct bt_l2cap_br_chan, chan);
 }
@@ -162,13 +161,13 @@ static uint8_t send_echo_req(void)
 	struct net_buf *buf;
 	int err;
 
-	buf = net_buf_alloc(&tx_pool, K_NO_WAIT);
-	zassert_not_null(buf);
+	buf = net_buf_alloc(&tx_pool, BT_NO_WAIT);
+	assert_non_null(buf);
 	net_buf_reserve(buf, BT_L2CAP_BR_ECHO_REQ_RESERVE);
 
 	err = bt_l2cap_br_echo_req(conn, buf);
-	zassert_equal(err, 0, "err %d", err);
-	zassert_equal_ptr(sys_slist_peek_tail(&sig_chan()->_pdu_tx_queue), &buf->node);
+	assert_int_equal(err, 0);
+	assert_ptr_equal(sys_slist_peek_tail(&sig_chan()->_pdu_tx_queue), &buf->node);
 
 	/* L2CAP header, then the signaling header code and identifier */
 	return buf->data[5];
@@ -179,15 +178,15 @@ static void *setup(void)
 	static const bt_addr_t addr = { .val = { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06 } };
 
 	ARRAY_FOR_EACH_PTR(echo_cb, cb) {
-		zassert_ok(bt_l2cap_br_echo_cb_register(cb));
+		assert_int_equal(bt_l2cap_br_echo_cb_register(cb), 0);
 	}
 
 	ARRAY_FOR_EACH_PTR(connless_cb, cb) {
-		zassert_ok(bt_l2cap_br_connless_register(cb));
+		assert_int_equal(bt_l2cap_br_connless_register(cb), 0);
 	}
 
 	conn = bt_conn_add_br(&addr);
-	zassert_not_null(conn);
+	assert_non_null(conn);
 
 	bt_l2cap_br_connected(conn);
 
@@ -215,14 +214,15 @@ static void after(void *fixture)
 	}
 }
 
-ZTEST_SUITE(l2cap_br_sig, NULL, setup, before, after, NULL);
+
 
 /* Each Echo Request callback sees exactly the data of that request, although
  * another request follows in the same signaling packet and the other callback
  * consumes the data.
  */
-ZTEST(l2cap_br_sig, test_echo_req)
+static void l2cap_br_sig__test_echo_req(void **cm_state)
 {
+	(void)cm_state;
 	struct net_buf *buf = l2cap_pdu(SIG_CID);
 
 	add_sig_cmd(buf, ECHO_REQ, 1, "abc");
@@ -230,15 +230,16 @@ ZTEST(l2cap_br_sig, test_echo_req)
 	send_pdu(buf);
 
 	ARRAY_FOR_EACH_PTR(echo_log, rec) {
-		zassert_equal(rec->count, 2);
+		assert_int_equal(rec->count, 2);
 		check(rec, 0, 1, "abc");
 		check(rec, 1, 2, "xy");
 	}
 }
 
 /* Each Echo Response callback sees exactly the data of the response */
-ZTEST(l2cap_br_sig, test_echo_rsp)
+static void l2cap_br_sig__test_echo_rsp(void **cm_state)
 {
+	(void)cm_state;
 	struct net_buf *buf;
 	uint8_t ident;
 
@@ -250,14 +251,15 @@ ZTEST(l2cap_br_sig, test_echo_rsp)
 	send_pdu(buf);
 
 	ARRAY_FOR_EACH_PTR(echo_rsp_log, rec) {
-		zassert_equal(rec->count, 1);
+		assert_int_equal(rec->count, 1);
 		check(rec, 0, 0, "pq");
 	}
 }
 
 /* Each connectionless callback sees the whole data, although the other one consumes it */
-ZTEST(l2cap_br_sig, test_connless_recv)
+static void l2cap_br_sig__test_connless_recv(void **cm_state)
 {
+	(void)cm_state;
 	struct net_buf *buf = l2cap_pdu(CONNLESS_CID);
 
 	net_buf_add_le16(buf, CONNLESS_PSM);
@@ -265,7 +267,62 @@ ZTEST(l2cap_br_sig, test_connless_recv)
 	send_pdu(buf);
 
 	ARRAY_FOR_EACH_PTR(connless_log, rec) {
-		zassert_equal(rec->count, 1);
+		assert_int_equal(rec->count, 1);
 		check(rec, 0, 0, "hello");
 	}
+}
+
+static void storage_init_b47e028381(void)
+{
+	net_buf_pool_init(&pdu_pool);
+	net_buf_pool_init(&tx_pool);
+}
+
+static void migrated_pools_init(void)
+{
+	net_buf_pool_init(&pdu_pool);
+	net_buf_pool_init(&tx_pool);
+}
+
+int bt_test_l2cap_br_sig_setup(void **state)
+{
+	int environment_result = bt_test_host_setup(state);
+
+	if (environment_result != 0) {
+		return environment_result;
+	}
+
+	bt_test_require(bt_conn_init());
+	migrated_pools_init();
+	storage_init_b47e028381();
+	*state = setup();
+	return 0;
+}
+static int bt_test_l2cap_br_sig_before(void **state)
+{
+	(void)state;
+	before(*state);
+	return 0;
+}
+int bt_test_l2cap_br_sig_after(void **state)
+{
+	(void)state;
+	after(*state);
+	return 0;
+}
+
+static const struct CMUnitTest test_cases_l2cap_br_sig[] = {
+	cmocka_unit_test_setup_teardown(l2cap_br_sig__test_echo_req, bt_test_l2cap_br_sig_before, bt_test_l2cap_br_sig_after),
+	cmocka_unit_test_setup_teardown(l2cap_br_sig__test_echo_rsp, bt_test_l2cap_br_sig_before, bt_test_l2cap_br_sig_after),
+	cmocka_unit_test_setup_teardown(l2cap_br_sig__test_connless_recv, bt_test_l2cap_br_sig_before, bt_test_l2cap_br_sig_after),
+};
+BT_TEST_SUITE(l2cap_br_sig, test_cases_l2cap_br_sig, bt_test_l2cap_br_sig_setup, NULL);
+
+/* This fixture observes queued outbound PDUs without a running Controller.
+ * The real connection queue operations run; the TX wakeup is captured here.
+ */
+static unsigned int captured_tx_wakeups;
+void __wrap_bt_tx_irq_raise(void)
+{
+ captured_tx_wakeups++;
 }

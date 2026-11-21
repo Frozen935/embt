@@ -1,3 +1,6 @@
+#include "support/test_support.h"
+static const struct bt_hci_transport test_driver;
+#include "host/hci_core.h"
 /*
  * SPDX-FileCopyrightText: Copyright The Zephyr Project Contributors
  * SPDX-License-Identifier: Apache-2.0
@@ -7,27 +10,21 @@
 #include <stdint.h>
 #include <string.h>
 
-#include <zephyr/bluetooth/addr.h>
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/buf.h>
-#include <zephyr/bluetooth/hci.h>
-#include <zephyr/bluetooth/hci_types.h>
-#include <zephyr/device.h>
-#include <zephyr/devicetree.h>
-#include <zephyr/drivers/bluetooth.h>
-#include <zephyr/kernel.h>
-#include <zephyr/net_buf.h>
-#include <zephyr/settings/settings.h>
-#include <zephyr/sys/byteorder.h>
-#include <zephyr/sys/util.h>
-#include <zephyr/ztest.h>
+#include <embt/bluetooth/addr.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/buf.h>
+#include <embt/bluetooth/hci.h>
+#include <embt/bluetooth/hci_types.h>
+#include <embt/drivers/bluetooth.h>
 
-#include <host/hci_core.h>
+#include <embt/net_buf.h>
+#include <embt/settings/settings.h>
+#include <embt/base/byteorder.h>
+#include <embt/base/util.h>
 #include <host/keys.h>
 #include <host/settings.h>
-#include <zephyr/sys/byteorder.h>
+#include <embt/base/byteorder.h>
 
-#define DT_DRV_COMPAT zephyr_bt_hci_test
 
 #define GENERIC_RP_SIZE 64U
 
@@ -74,7 +71,7 @@ static void *cmd_complete(struct net_buf **buf, uint8_t plen, uint16_t opcode)
 {
 	struct bt_hci_evt_cmd_complete *cc;
 
-	*buf = bt_buf_get_evt(BT_HCI_EVT_CMD_COMPLETE, false, K_FOREVER);
+	*buf = bt_buf_get_evt(BT_HCI_EVT_CMD_COMPLETE, false, BT_FOREVER);
 	evt_create(*buf, BT_HCI_EVT_CMD_COMPLETE, sizeof(*cc) + plen);
 	cc = net_buf_add(*buf, sizeof(*cc));
 	cc->ncmd = 1U;
@@ -278,7 +275,7 @@ static const struct cmd_handler cmds[] = {
 	},
 };
 
-static void cmd_handle(const struct device *dev, struct net_buf *cmd)
+static void cmd_handle(const struct bt_hci_transport *dev, struct net_buf *cmd)
 {
 	struct net_buf *evt = NULL;
 	struct bt_hci_cmd_hdr *chdr;
@@ -299,54 +296,57 @@ static void cmd_handle(const struct device *dev, struct net_buf *cmd)
 	bt_hci_recv(dev, evt);
 }
 
-static int driver_open(const struct device *dev)
+static int driver_open(const struct bt_hci_transport *dev)
 {
 	ARG_UNUSED(dev);
 
 	return 0;
 }
 
-static int driver_close(const struct device *dev)
+static int driver_close(const struct bt_hci_transport *dev)
 {
 	ARG_UNUSED(dev);
 
 	return 0;
 }
 
-static int driver_send(const struct device *dev, struct net_buf *buf)
+static int driver_send(const struct bt_hci_transport *dev, struct net_buf *buf)
 {
 	uint8_t type = net_buf_pull_u8(buf);
 
-	zassert_equal(type, BT_HCI_H4_CMD, "Unexpected buffer type %u", type);
+	assert_int_equal(type, BT_HCI_H4_CMD);
 	cmd_handle(dev, buf);
 	net_buf_unref(buf);
 
 	return 0;
 }
 
-static DEVICE_API(bt_hci, driver_api) = {
+static const struct bt_hci_driver_api driver_api = {
 	.open = driver_open,
 	.close = driver_close,
 	.send = driver_send,
 };
 
-#define TEST_DEVICE_INIT(inst)                                                                     \
-	static struct bt_hci_driver_data driver_data_##inst = {0};                                 \
-	static const struct bt_hci_driver_config driver_config_##inst =                            \
-		BT_DT_HCI_DRIVER_CONFIG_INST_GET(inst);                                            \
-	DEVICE_DT_INST_DEFINE(inst, NULL, NULL, &driver_data_##inst, &driver_config_##inst,        \
-			      POST_KERNEL, CONFIG_KERNEL_INIT_PRIORITY_DEVICE, &driver_api)
+static struct bt_hci_driver_data test_driver_data;
+static const struct bt_hci_transport test_driver = {
+ .name = "upstream-test", .bus = 0,
+ .api = &driver_api, .data = &test_driver_data,
+};
+static void test_transport_init(void)
+{
+ bt_test_require(bt_stack_init());
+ bt_dev.hci = &test_driver;
+}
 
-DT_INST_FOREACH_STATUS_OKAY(TEST_DEVICE_INIT)
 
 static void store_bond(size_t idx)
 {
 	struct bt_keys *keys;
 
 	keys = bt_keys_get_type(BT_KEYS_IRK, BT_ID_DEFAULT, &peers[idx]);
-	zassert_not_null(keys, "No room for peer %zu's keys", idx);
+	assert_non_null(keys);
 	(void)memset(keys->irk.val, 0x5A + idx, sizeof(keys->irk.val));
-	zassert_ok(bt_keys_store(keys), "Failed to store peer %zu's keys", idx);
+	assert_int_equal(bt_keys_store(keys), 0);
 }
 
 static void *keys_setup(void)
@@ -354,7 +354,7 @@ static void *keys_setup(void)
 	int err;
 
 	err = bt_enable(NULL);
-	zassert_true(err == 0 || err == -EALREADY, "bt_enable failed (%d)", err);
+	assert_true(err == 0 || err == -EALREADY);
 
 	store_bond(0U);
 	/* Drop the in-RAM copy so that the first settings_load() has to restore it. */
@@ -365,42 +365,38 @@ static void *keys_setup(void)
 
 static void load_and_advertise(void)
 {
-	zassert_ok(settings_load(), "settings_load() failed");
-	zassert_ok(bt_le_adv_start(BT_LE_ADV_NCONN, NULL, 0, NULL, 0), "Advertising failed");
-	zassert_ok(bt_le_adv_stop(), "Stopping advertising failed");
+	assert_int_equal(settings_load(), 0);
+	assert_int_equal(bt_le_adv_start(BT_LE_ADV_NCONN, NULL, 0, NULL, 0), 0);
+	assert_int_equal(bt_le_adv_stop(), 0);
 }
 
-ZTEST_SUITE(bt_keys_commit, NULL, keys_setup, NULL, NULL, NULL);
 
-ZTEST(bt_keys_commit, test_settings_reload_does_not_add_irk_twice)
+
+static void bt_keys_commit__test_settings_reload_does_not_add_irk_twice(void **cm_state)
 {
+	(void)cm_state;
 	const uint8_t expected_adds = (CONFIG_TEST_RL_SIZE > 0) ? 1U : 0U;
 	struct bt_keys *keys;
 
-	zassert_is_null(bt_keys_find(BT_KEYS_IRK, BT_ID_DEFAULT, &peers[0]),
-			"The peer's keys survived bt_keys_reset()");
+	assert_null(bt_keys_find(BT_KEYS_IRK, BT_ID_DEFAULT, &peers[0]));
 
 	load_and_advertise();
 
 	keys = bt_keys_find(BT_KEYS_IRK, BT_ID_DEFAULT, &peers[0]);
-	zassert_not_null(keys, "The peer's keys were not restored");
-	zassert_true((keys->state & BT_KEYS_ID_ADDED) != 0U, "The peer's IRK was never added");
-	zassert_equal(bt_dev.le.rl_entries, 1U, "rl_entries %u after the first load",
-		      bt_dev.le.rl_entries);
-	zassert_equal(rl_adds[0], expected_adds, "%u adds after the first load", rl_adds[0]);
+	assert_non_null(keys);
+	assert_true((keys->state & BT_KEYS_ID_ADDED) != 0U);
+	assert_int_equal(bt_dev.le.rl_entries, 1U);
+	assert_int_equal(rl_adds[0], expected_adds);
 
 	store_bond(1U);
 
 	load_and_advertise();
 
-	zassert_equal(rl_adds[0], expected_adds, "%u adds of the first peer after the second load",
-		      rl_adds[0]);
-	zassert_equal(rl_adds[1], expected_adds, "%u adds of the second peer after the second load",
-		      rl_adds[1]);
-	zassert_equal(rl_rejects[0], 0U, "%u adds of the first peer rejected", rl_rejects[0]);
-	zassert_equal(rl_rejects[1], 0U, "%u adds of the second peer rejected", rl_rejects[1]);
-	zassert_equal(bt_dev.le.rl_entries, 2U, "rl_entries %u after the second load",
-		      bt_dev.le.rl_entries);
+	assert_int_equal(rl_adds[0], expected_adds);
+	assert_int_equal(rl_adds[1], expected_adds);
+	assert_int_equal(rl_rejects[0], 0U);
+	assert_int_equal(rl_rejects[1], 0U);
+	assert_int_equal(bt_dev.le.rl_entries, 2U);
 }
 
 /* ZTest does not guarantee test execution order within a suite, so reset
@@ -413,25 +409,26 @@ static void reset_key_pool(void *fixture)
 	bt_keys_reset();
 }
 
-ZTEST_SUITE(bt_keys_pool, NULL, NULL, reset_key_pool, NULL, NULL);
+
 
 /* bt_keys_get_addr(): allocate a slot and find it again. */
-static ZTEST(bt_keys_pool, test_get_addr_allocates_slot)
+static void bt_keys_pool__test_get_addr_allocates_slot(void **cm_state)
 {
+	(void)cm_state;
 	const struct bt_keys *keys = bt_keys_get_addr(BT_ID_DEFAULT, &peers[0]);
 
-	zassert_not_null(keys, "No slot for the first peer");
-	zassert_equal_ptr(keys, bt_keys_find_addr(BT_ID_DEFAULT, &peers[0]),
-			  "Allocated slot not findable");
-	zassert_equal(keys->keys, 0U, "New slot must have no key types");
+	assert_non_null(keys);
+	assert_ptr_equal(keys, bt_keys_find_addr(BT_ID_DEFAULT, &peers[0]));
+	assert_int_equal(keys->keys, 0U);
 }
 
 /* bt_keys_get_addr(): a full pool rejects new addresses, but an existing
  * entry must still be returned — the find-first path must not be confused
  * with allocation.
  */
-static ZTEST(bt_keys_pool, test_get_addr_returns_existing_when_full)
+static void bt_keys_pool__test_get_addr_returns_existing_when_full(void **cm_state)
 {
+	(void)cm_state;
 	const struct bt_keys *keys;
 
 	if (IS_ENABLED(CONFIG_BT_KEYS_OVERWRITE_OLDEST)) {
@@ -439,25 +436,24 @@ static ZTEST(bt_keys_pool, test_get_addr_returns_existing_when_full)
 		 * least recently used entry instead of rejecting; that behavior
 		 * is covered by the bt_keys_oldest suite.
 		 */
-		ztest_test_skip();
+		skip();
 	}
 
-	zassert_not_null(bt_keys_get_addr(BT_ID_DEFAULT, &peers[0]));
-	zassert_not_null(bt_keys_get_addr(BT_ID_DEFAULT, &peers[1]));
+	assert_non_null(bt_keys_get_addr(BT_ID_DEFAULT, &peers[0]));
+	assert_non_null(bt_keys_get_addr(BT_ID_DEFAULT, &peers[1]));
 
 	keys = bt_keys_get_addr(BT_ID_DEFAULT, &peer_extra);
-	zassert_is_null(keys, "Pool full, but a slot was still handed out");
+	assert_null(keys);
 
-	zassert_equal_ptr(bt_keys_get_addr(BT_ID_DEFAULT, &peers[0]),
-			  bt_keys_find_addr(BT_ID_DEFAULT, &peers[0]),
-			  "Existing entry lost when the pool filled up");
+	assert_ptr_equal(bt_keys_get_addr(BT_ID_DEFAULT, &peers[0]), bt_keys_find_addr(BT_ID_DEFAULT, &peers[0]));
 }
 
 /* bt_keys_get_type(): same ref on repeated calls, key type bit set, and no
  * slot handed out from a full pool.
  */
-static ZTEST(bt_keys_pool, test_get_type_existing_and_full)
+static void bt_keys_pool__test_get_type_existing_and_full(void **cm_state)
 {
+	(void)cm_state;
 	const struct bt_keys *keys;
 
 	if (IS_ENABLED(CONFIG_BT_KEYS_OVERWRITE_OLDEST)) {
@@ -465,20 +461,18 @@ static ZTEST(bt_keys_pool, test_get_type_existing_and_full)
 		 * least recently used entry instead of rejecting; that behavior
 		 * is covered by the bt_keys_oldest suite.
 		 */
-		ztest_test_skip();
+		skip();
 	}
 
-	zassert_not_null(bt_keys_get_addr(BT_ID_DEFAULT, &peers[0]));
-	zassert_not_null(bt_keys_get_addr(BT_ID_DEFAULT, &peers[1]));
+	assert_non_null(bt_keys_get_addr(BT_ID_DEFAULT, &peers[0]));
+	assert_non_null(bt_keys_get_addr(BT_ID_DEFAULT, &peers[1]));
 
 	keys = bt_keys_get_type(BT_KEYS_IRK, BT_ID_DEFAULT, &peers[0]);
-	zassert_not_null(keys, "Existing key type not found");
-	zassert_equal_ptr(keys, bt_keys_get_type(BT_KEYS_IRK, BT_ID_DEFAULT, &peers[0]),
-			  "Repeated get_type returned a different ref");
-	zassert_true((keys->keys & BT_KEYS_IRK) != 0U, "IRK bit not set");
+	assert_non_null(keys);
+	assert_ptr_equal(keys, bt_keys_get_type(BT_KEYS_IRK, BT_ID_DEFAULT, &peers[0]));
+	assert_true((keys->keys & BT_KEYS_IRK) != 0U);
 
-	zassert_is_null(bt_keys_get_type(BT_KEYS_IRK, BT_ID_DEFAULT, &peer_extra),
-			"Full pool must not hand out more slots");
+	assert_null(bt_keys_get_type(BT_KEYS_IRK, BT_ID_DEFAULT, &peer_extra));
 }
 
 static void bond_count_cb(const struct bt_bond_info *info, void *user_data)
@@ -492,26 +486,23 @@ static void bond_count_cb(const struct bt_bond_info *info, void *user_data)
 /* bt_keys_find()/find_addr(): miss on empty pool, miss for a type that is
  * not set, hit, and the public bond enumeration agrees.
  */
-static ZTEST(bt_keys_pool, test_find_and_foreach)
+static void bt_keys_pool__test_find_and_foreach(void **cm_state)
 {
+	(void)cm_state;
 	const struct bt_keys *keys;
 	size_t count = 0;
 
-	zassert_is_null(bt_keys_find(BT_KEYS_IRK, BT_ID_DEFAULT, &peers[0]),
-			"Find must miss on an empty pool");
+	assert_null(bt_keys_find(BT_KEYS_IRK, BT_ID_DEFAULT, &peers[0]));
 
 	keys = bt_keys_get_type(BT_KEYS_IRK, BT_ID_DEFAULT, &peers[0]);
-	zassert_not_null(keys);
+	assert_non_null(keys);
 
-	zassert_equal_ptr(bt_keys_find(BT_KEYS_IRK, BT_ID_DEFAULT, &peers[0]), keys,
-			  "IRK key not findable");
-	zassert_is_null(bt_keys_find(BT_KEYS_LTK, BT_ID_DEFAULT, &peers[0]),
-			"Find must miss for a type that is not set");
-	zassert_equal_ptr(bt_keys_find_addr(BT_ID_DEFAULT, &peers[0]), keys,
-			  "find_addr must locate the slot");
+	assert_ptr_equal(bt_keys_find(BT_KEYS_IRK, BT_ID_DEFAULT, &peers[0]), keys);
+	assert_null(bt_keys_find(BT_KEYS_LTK, BT_ID_DEFAULT, &peers[0]));
+	assert_ptr_equal(bt_keys_find_addr(BT_ID_DEFAULT, &peers[0]), keys);
 
 	bt_foreach_bond(BT_ID_DEFAULT, bond_count_cb, &count);
-	zassert_equal(count, 1U, "bt_foreach_bond counted %zu bonds", count);
+	assert_int_equal(count, 1U);
 }
 
 /* ------------------------------------------------------------------------
@@ -574,8 +565,8 @@ static void *settings_suite_setup(void)
 {
 	int err;
 
-	err = settings_subsys_init();
-	zassert_true(err == 0 || err == -EALREADY, "settings_subsys_init() failed (%d)", err);
+	err = bt_settings_init();
+	assert_int_equal(err, 0);
 
 	return NULL;
 }
@@ -589,19 +580,19 @@ static void settings_suite_teardown(void *fixture)
 
 	bt_keys_reset();
 	for (size_t i = 0; i < ARRAY_SIZE(migration_peers); i++) {
-		zassert_ok(bt_settings_encode_key(name, sizeof(name), "keys", &migration_peers[i],
-						  NULL));
+		assert_int_equal(bt_settings_encode_key(name, sizeof(name), "keys", &migration_peers[i],
+						  NULL), 0);
 		err = settings_save_one(name, NULL, 0);
-		zassert_true(err == 0 || err == -ENOENT, "settings_save_one() failed (%d)", err);
+		assert_true(err == 0 || err == -ENOENT);
 	}
 }
 
-ZTEST_SUITE(bt_keys_settings, NULL, settings_suite_setup, reset_key_pool, NULL,
-	    settings_suite_teardown);
+
 
 /* Well-formed stored bond restores through the real load path. */
-static ZTEST(bt_keys_settings, test_load_stored_bond)
+static void bt_keys_settings__test_load_stored_bond(void **cm_state)
 {
+	(void)cm_state;
 	struct bt_keys stored;
 	const struct bt_keys *keys;
 	char name[BT_SETTINGS_KEY_MAX];
@@ -611,47 +602,48 @@ static ZTEST(bt_keys_settings, test_load_stored_bond)
 		stored.irk.val[i] = 0xa0 + i;
 	}
 
-	zassert_ok(bt_settings_encode_key(name, sizeof(name), "keys", &migration_peers[0], NULL));
-	zassert_ok(settings_save_one(name, stored.storage_start, BT_KEYS_STORAGE_LEN));
-	zassert_ok(settings_load_subtree(name));
+	assert_int_equal(bt_settings_encode_key(name, sizeof(name), "keys", &migration_peers[0], NULL), 0);
+	assert_int_equal(settings_save_one(name, stored.storage_start, BT_KEYS_STORAGE_LEN), 0);
+	assert_int_equal(settings_load_subtree(name), 0);
 
 	keys = bt_keys_find(BT_KEYS_IRK, BT_ID_DEFAULT, &migration_peers[0]);
-	zassert_not_null(keys, "Stored bond not restored");
-	zassert_mem_equal(keys->irk.val, stored.irk.val, 16, "IRK mismatch after load");
+	assert_non_null(keys);
+	assert_memory_equal(keys->irk.val, stored.irk.val, 16);
 }
 
 /* A zero-length entry is settings' delete representation: it removes an
  * existing bond (covers the keys_set delete branch).
  */
-static ZTEST(bt_keys_settings, test_load_delete_marker_removes_bond)
+static void bt_keys_settings__test_load_delete_marker_removes_bond(void **cm_state)
 {
+	(void)cm_state;
 	struct bt_keys stored;
 	const struct bt_keys *keys;
 	char name[BT_SETTINGS_KEY_MAX];
 
 	migration_blob_init(&stored, &migration_peers[1], BT_KEYS_IRK, 0);
 
-	zassert_ok(bt_settings_encode_key(name, sizeof(name), "keys", &migration_peers[1], NULL));
-	zassert_ok(settings_save_one(name, stored.storage_start, BT_KEYS_STORAGE_LEN));
-	zassert_ok(settings_load_subtree(name));
+	assert_int_equal(bt_settings_encode_key(name, sizeof(name), "keys", &migration_peers[1], NULL), 0);
+	assert_int_equal(settings_save_one(name, stored.storage_start, BT_KEYS_STORAGE_LEN), 0);
+	assert_int_equal(settings_load_subtree(name), 0);
 
 	keys = bt_keys_find(BT_KEYS_IRK, BT_ID_DEFAULT, &migration_peers[1]);
-	zassert_not_null(keys, "Stored bond not restored");
+	assert_non_null(keys);
 
 	/* Drop the NVS copy and deliver a zero-length entry through the
 	 * runtime backend to reach the keys_set delete branch.
 	 */
-	zassert_ok(settings_save_one(name, NULL, 0));
-	zassert_ok(settings_runtime_set(name, stored.storage_start, 0));
-	zassert_ok(settings_load_subtree(name));
+	assert_int_equal(settings_save_one(name, NULL, 0), 0);
+	assert_int_equal(settings_runtime_set(name, stored.storage_start, 0), 0);
+	assert_int_equal(settings_load_subtree(name), 0);
 
-	zassert_is_null(bt_keys_find_addr(BT_ID_DEFAULT, &migration_peers[1]),
-			"Delete marker did not remove the bond");
+	assert_null(bt_keys_find_addr(BT_ID_DEFAULT, &migration_peers[1]));
 }
 
 /* Old storage format: no cfg_version/cfg_flags, blob starts at enc_size. */
-static ZTEST(bt_keys_settings, test_load_old_format_bond)
+static void bt_keys_settings__test_load_old_format_bond(void **cm_state)
 {
+	(void)cm_state;
 	struct bt_keys stored;
 	const struct bt_keys *keys;
 	char name[BT_SETTINGS_KEY_MAX];
@@ -662,103 +654,102 @@ static ZTEST(bt_keys_settings, test_load_old_format_bond)
 		stored.irk.val[i] = 0xb0 + i;
 	}
 
-	zassert_ok(bt_settings_encode_key(name, sizeof(name), "keys", &migration_peers[2], NULL));
-	zassert_ok(settings_save_one(name, &stored.enc_size, old_len));
-	zassert_ok(settings_load_subtree(name));
+	assert_int_equal(bt_settings_encode_key(name, sizeof(name), "keys", &migration_peers[2], NULL), 0);
+	assert_int_equal(settings_save_one(name, &stored.enc_size, old_len), 0);
+	assert_int_equal(settings_load_subtree(name), 0);
 
 	keys = bt_keys_find(BT_KEYS_IRK, BT_ID_DEFAULT, &migration_peers[2]);
-	zassert_not_null(keys, "Old-format bond not restored");
-	zassert_mem_equal(keys->irk.val, stored.irk.val, 16, "IRK mismatch after old-format load");
+	assert_non_null(keys);
+	assert_memory_equal(keys->irk.val, stored.irk.val, 16);
 }
 
 /* Neither the current nor the compatible length: rejected. */
-static ZTEST(bt_keys_settings, test_load_rejects_invalid_length)
+static void bt_keys_settings__test_load_rejects_invalid_length(void **cm_state)
 {
+	(void)cm_state;
 	struct bt_keys stored;
 	char name[BT_SETTINGS_KEY_MAX];
 
 	migration_blob_init(&stored, &migration_peers[3], BT_KEYS_IRK, 0);
 
-	zassert_ok(bt_settings_encode_key(name, sizeof(name), "keys", &migration_peers[3], NULL));
-	zassert_ok(settings_save_one(name, stored.storage_start, BT_KEYS_STORAGE_LEN - 1));
-	zassert_ok(settings_load_subtree(name));
+	assert_int_equal(bt_settings_encode_key(name, sizeof(name), "keys", &migration_peers[3], NULL), 0);
+	assert_int_equal(settings_save_one(name, stored.storage_start, BT_KEYS_STORAGE_LEN - 1), 0);
+	assert_int_equal(settings_load_subtree(name), 0);
 
-	zassert_is_null(bt_keys_find_addr(BT_ID_DEFAULT, &migration_peers[3]),
-			"Invalid-length entry must be rejected");
+	assert_null(bt_keys_find_addr(BT_ID_DEFAULT, &migration_peers[3]));
 }
 
 /* cfg_flags that do not match the current build: rejected. The toggle
  * mismatches regardless of which flags the build enables.
  */
-static ZTEST(bt_keys_settings, test_load_rejects_cfg_flags_mismatch)
+static void bt_keys_settings__test_load_rejects_cfg_flags_mismatch(void **cm_state)
 {
+	(void)cm_state;
 	struct bt_keys stored;
 	char name[BT_SETTINGS_KEY_MAX];
 
 	migration_blob_init(&stored, &migration_peers[4], BT_KEYS_IRK, 0);
 	stored.cfg_flags[0] ^= BT_KEYS_CFG_SIGNING;
 
-	zassert_ok(bt_settings_encode_key(name, sizeof(name), "keys", &migration_peers[4], NULL));
-	zassert_ok(settings_save_one(name, stored.storage_start, BT_KEYS_STORAGE_LEN));
-	zassert_ok(settings_load_subtree(name));
+	assert_int_equal(bt_settings_encode_key(name, sizeof(name), "keys", &migration_peers[4], NULL), 0);
+	assert_int_equal(settings_save_one(name, stored.storage_start, BT_KEYS_STORAGE_LEN), 0);
+	assert_int_equal(settings_load_subtree(name), 0);
 
-	zassert_is_null(bt_keys_find_addr(BT_ID_DEFAULT, &migration_peers[4]),
-			"cfg flags mismatch must be rejected");
+	assert_null(bt_keys_find_addr(BT_ID_DEFAULT, &migration_peers[4]));
 }
 
 /* A cfg_version other than the current one: rejected. */
-static ZTEST(bt_keys_settings, test_load_rejects_cfg_version_mismatch)
+static void bt_keys_settings__test_load_rejects_cfg_version_mismatch(void **cm_state)
 {
+	(void)cm_state;
 	struct bt_keys stored;
 	char name[BT_SETTINGS_KEY_MAX];
 
 	migration_blob_init(&stored, &migration_peers[6], BT_KEYS_IRK, 0);
 	stored.cfg_version = STORAGE_CFG_VERSION_CURRENT + 1;
 
-	zassert_ok(bt_settings_encode_key(name, sizeof(name), "keys", &migration_peers[6], NULL));
-	zassert_ok(settings_save_one(name, stored.storage_start, BT_KEYS_STORAGE_LEN));
-	zassert_ok(settings_load_subtree(name));
+	assert_int_equal(bt_settings_encode_key(name, sizeof(name), "keys", &migration_peers[6], NULL), 0);
+	assert_int_equal(settings_save_one(name, stored.storage_start, BT_KEYS_STORAGE_LEN), 0);
+	assert_int_equal(settings_load_subtree(name), 0);
 
-	zassert_is_null(bt_keys_find_addr(BT_ID_DEFAULT, &migration_peers[6]),
-			"cfg version mismatch must be rejected");
+	assert_null(bt_keys_find_addr(BT_ID_DEFAULT, &migration_peers[6]));
 }
 
 /* Legacy authenticated flag without SC or OOB pairing: downgraded to
  * unauthenticated on load. With SC set, it is retained.
  */
-static ZTEST(bt_keys_settings, test_load_downgrades_unprovable_authentication)
+static void bt_keys_settings__test_load_downgrades_unprovable_authentication(void **cm_state)
 {
+	(void)cm_state;
 	struct bt_keys stored;
 	const struct bt_keys *keys;
 	char name[BT_SETTINGS_KEY_MAX];
 
-	zassert_ok(bt_settings_encode_key(name, sizeof(name), "keys", &migration_peers[5], NULL));
+	assert_int_equal(bt_settings_encode_key(name, sizeof(name), "keys", &migration_peers[5], NULL), 0);
 
 	migration_blob_init(&stored, &migration_peers[5], BT_KEYS_LTK, BT_KEYS_AUTHENTICATED);
-	zassert_ok(settings_save_one(name, stored.storage_start, BT_KEYS_STORAGE_LEN));
-	zassert_ok(settings_load_subtree(name));
+	assert_int_equal(settings_save_one(name, stored.storage_start, BT_KEYS_STORAGE_LEN), 0);
+	assert_int_equal(settings_load_subtree(name), 0);
 
 	keys = bt_keys_find(BT_KEYS_LTK, BT_ID_DEFAULT, &migration_peers[5]);
-	zassert_not_null(keys, "LTK bond not restored");
-	zassert_equal(keys->flags & BT_KEYS_AUTHENTICATED, 0U,
-		      "AUTHENTICATED without SC/OOB must be downgraded");
+	assert_non_null(keys);
+	assert_int_equal(keys->flags & BT_KEYS_AUTHENTICATED, 0U);
 
 	migration_blob_init(&stored, &migration_peers[5], BT_KEYS_LTK,
 			    BT_KEYS_AUTHENTICATED | BT_KEYS_SC);
-	zassert_ok(settings_save_one(name, stored.storage_start, BT_KEYS_STORAGE_LEN));
-	zassert_ok(settings_load_subtree(name));
+	assert_int_equal(settings_save_one(name, stored.storage_start, BT_KEYS_STORAGE_LEN), 0);
+	assert_int_equal(settings_load_subtree(name), 0);
 
 	keys = bt_keys_find(BT_KEYS_LTK, BT_ID_DEFAULT, &migration_peers[5]);
-	zassert_not_null(keys);
-	zassert_not_equal(keys->flags & BT_KEYS_AUTHENTICATED, 0U,
-			  "AUTHENTICATED with SC must be retained");
+	assert_non_null(keys);
+	assert_int_not_equal(keys->flags & BT_KEYS_AUTHENTICATED, 0U);
 }
 
 #if defined(CONFIG_BT_KEYS_OVERWRITE_OLDEST)
 /* Deliver an HCI event to the host. Takes ownership of buf. */
 static void drv_recv(struct net_buf *buf)
 {
-	bt_hci_recv(DEVICE_DT_GET(DT_DRV_INST(0)), buf);
+	bt_hci_recv(&test_driver, buf);
 }
 
 /* ------------------------------------------------------------------------
@@ -770,26 +761,26 @@ static void drv_recv(struct net_buf *buf)
  * ---------------------------------------------------------------------
  */
 
-static K_SEM_DEFINE(connected_sem, 0, 1);
-static K_SEM_DEFINE(disconnected_sem, 0, 1);
+static os_sem_t connected_sem;
+static os_sem_t disconnected_sem;
 
 static struct bt_conn *connected_peers[2];
 static size_t connected_count;
 
 static void connected_cb(struct bt_conn *conn, uint8_t err)
 {
-	zassert_equal(err, 0U, "Connection failed (%u)", err);
+	assert_int_equal(err, 0U);
 	if (connected_count < ARRAY_SIZE(connected_peers)) {
 		connected_peers[connected_count++] = bt_conn_ref(conn);
 	}
-	k_sem_give(&connected_sem);
+	osi_sem_give(&connected_sem);
 }
 
 static void disconnected_cb(struct bt_conn *conn, uint8_t reason)
 {
 	ARG_UNUSED(conn);
 	ARG_UNUSED(reason);
-	k_sem_give(&disconnected_sem);
+	osi_sem_give(&disconnected_sem);
 }
 
 BT_CONN_CB_DEFINE(test_conn_cb) = {
@@ -799,7 +790,7 @@ BT_CONN_CB_DEFINE(test_conn_cb) = {
 
 static void inject_conn_complete(const bt_addr_le_t *peer, uint16_t handle)
 {
-	struct net_buf *buf = bt_buf_get_evt(BT_HCI_EVT_LE_META_EVENT, false, K_FOREVER);
+	struct net_buf *buf = bt_buf_get_evt(BT_HCI_EVT_LE_META_EVENT, false, BT_FOREVER);
 	struct bt_hci_evt_le_meta_event *mev;
 	struct bt_hci_evt_le_conn_complete *cc;
 
@@ -824,7 +815,7 @@ static void inject_conn_complete(const bt_addr_le_t *peer, uint16_t handle)
 
 static void inject_disconn_complete(uint16_t handle)
 {
-	struct net_buf *buf = bt_buf_get_evt(BT_HCI_EVT_DISCONN_COMPLETE, false, K_FOREVER);
+	struct net_buf *buf = bt_buf_get_evt(BT_HCI_EVT_DISCONN_COMPLETE, false, BT_FOREVER);
 	struct bt_hci_evt_disconn_complete *dc;
 
 	evt_create(buf, BT_HCI_EVT_DISCONN_COMPLETE, sizeof(struct bt_hci_evt_disconn_complete));
@@ -839,17 +830,17 @@ static void inject_disconn_complete(uint16_t handle)
 
 static void connect_peer(const bt_addr_le_t *peer, uint16_t handle)
 {
-	zassert_ok(bt_le_adv_start(BT_LE_ADV_CONN_FAST_1, NULL, 0, NULL, 0));
+	assert_int_equal(bt_le_adv_start(BT_LE_ADV_CONN_FAST_1, NULL, 0, NULL, 0), 0);
 	inject_conn_complete(peer, handle);
-	zassert_ok(k_sem_take(&connected_sem, K_SECONDS(1)), "No connected callback");
-	zassert_ok(bt_le_adv_stop());
+	assert_int_equal(osi_sem_take(&connected_sem, BT_SECONDS(1)), 0);
+	assert_int_equal(bt_le_adv_stop(), 0);
 }
 
 static void disconnect_peer(struct bt_conn *conn, uint16_t handle)
 {
-	zassert_ok(bt_conn_disconnect(conn, BT_HCI_ERR_REMOTE_USER_TERM_CONN));
+	assert_int_equal(bt_conn_disconnect(conn, BT_HCI_ERR_REMOTE_USER_TERM_CONN), 0);
 	inject_disconn_complete(handle);
-	zassert_ok(k_sem_take(&disconnected_sem, K_SECONDS(1)), "No disconnected callback");
+	assert_int_equal(osi_sem_take(&disconnected_sem, BT_SECONDS(1)), 0);
 	bt_conn_unref(conn);
 }
 
@@ -870,79 +861,77 @@ static void *oldest_setup(void)
 	int err;
 
 	err = bt_enable(NULL);
-	zassert_true(err == 0 || err == -EALREADY, "bt_enable failed (%d)", err);
-	zassert_ok(settings_load());
+	assert_true(err == 0 || err == -EALREADY);
+	assert_int_equal(settings_load(), 0);
 
 	return NULL;
 }
 
-ZTEST_SUITE(bt_keys_oldest, NULL, oldest_setup, oldest_before, NULL, NULL);
+
 
 /* A full pool evicts the oldest entry and hands out its slot. */
-static ZTEST(bt_keys_oldest, test_evict_oldest_not_in_use)
+static void bt_keys_oldest__test_evict_oldest_not_in_use(void **cm_state)
 {
+	(void)cm_state;
 	const struct bt_keys *k1 = bt_keys_get_addr(BT_ID_DEFAULT, &peers[0]);
 	const struct bt_keys *k2 = bt_keys_get_addr(BT_ID_DEFAULT, &peers[1]);
 	const struct bt_keys *k3;
 
-	zassert_not_null(k1);
-	zassert_not_null(k2);
+	assert_non_null(k1);
+	assert_non_null(k2);
 
 	k3 = bt_keys_get_addr(BT_ID_DEFAULT, &peer_extra);
-	zassert_not_null(k3, "Full pool must evict the oldest entry");
-	zassert_is_null(bt_keys_find_addr(BT_ID_DEFAULT, &peers[0]),
-			"Oldest peer still in the pool");
-	zassert_equal_ptr(k3, k1, "Eviction must reuse the oldest slot");
+	assert_non_null(k3);
+	assert_null(bt_keys_find_addr(BT_ID_DEFAULT, &peers[0]));
+	assert_ptr_equal(k3, k1);
 }
 
 /* bt_keys_update_usage() makes an entry the most recently used one, so the
  * other entry becomes the eviction candidate.
  */
-static ZTEST(bt_keys_oldest, test_least_recently_used_is_evicted)
+static void bt_keys_oldest__test_least_recently_used_is_evicted(void **cm_state)
 {
+	(void)cm_state;
 	const struct bt_keys *k3;
 
-	zassert_not_null(bt_keys_get_addr(BT_ID_DEFAULT, &peers[0]));
-	zassert_not_null(bt_keys_get_addr(BT_ID_DEFAULT, &peers[1]));
+	assert_non_null(bt_keys_get_addr(BT_ID_DEFAULT, &peers[0]));
+	assert_non_null(bt_keys_get_addr(BT_ID_DEFAULT, &peers[1]));
 
 	bt_keys_update_usage(BT_ID_DEFAULT, &peers[0]);
 
 	k3 = bt_keys_get_addr(BT_ID_DEFAULT, &peer_extra);
-	zassert_not_null(k3, "Full pool must evict an entry");
-	zassert_is_null(bt_keys_find_addr(BT_ID_DEFAULT, &peers[1]),
-			"Least recently used peer must be evicted");
-	zassert_not_null(bt_keys_find_addr(BT_ID_DEFAULT, &peers[0]),
-			 "Most recently used peer must survive");
+	assert_non_null(k3);
+	assert_null(bt_keys_find_addr(BT_ID_DEFAULT, &peers[1]));
+	assert_non_null(bt_keys_find_addr(BT_ID_DEFAULT, &peers[0]));
 }
 
 /* An entry in use by a connected peer must not be evicted. */
-static ZTEST(bt_keys_oldest, test_in_use_entry_is_not_evicted)
+static void bt_keys_oldest__test_in_use_entry_is_not_evicted(void **cm_state)
 {
-	zassert_not_null(bt_keys_get_addr(BT_ID_DEFAULT, &peers[0]));
-	zassert_not_null(bt_keys_get_addr(BT_ID_DEFAULT, &peers[1]));
+	(void)cm_state;
+	assert_non_null(bt_keys_get_addr(BT_ID_DEFAULT, &peers[0]));
+	assert_non_null(bt_keys_get_addr(BT_ID_DEFAULT, &peers[1]));
 
 	connect_peer(&peers[0], 0x0001);
 
-	zassert_not_null(bt_keys_get_addr(BT_ID_DEFAULT, &peer_extra));
-	zassert_is_null(bt_keys_find_addr(BT_ID_DEFAULT, &peers[1]),
-			"The unused peer must be evicted");
-	zassert_not_null(bt_keys_find_addr(BT_ID_DEFAULT, &peers[0]),
-			 "The in-use peer must survive");
+	assert_non_null(bt_keys_get_addr(BT_ID_DEFAULT, &peer_extra));
+	assert_null(bt_keys_find_addr(BT_ID_DEFAULT, &peers[1]));
+	assert_non_null(bt_keys_find_addr(BT_ID_DEFAULT, &peers[0]));
 
 	disconnect_peer(connected_peers[0], 0x0001);
 }
 
 /* When every entry is in use no slot can be handed out. */
-static ZTEST(bt_keys_oldest, test_all_in_use_returns_null)
+static void bt_keys_oldest__test_all_in_use_returns_null(void **cm_state)
 {
-	zassert_not_null(bt_keys_get_addr(BT_ID_DEFAULT, &peers[0]));
-	zassert_not_null(bt_keys_get_addr(BT_ID_DEFAULT, &peers[1]));
+	(void)cm_state;
+	assert_non_null(bt_keys_get_addr(BT_ID_DEFAULT, &peers[0]));
+	assert_non_null(bt_keys_get_addr(BT_ID_DEFAULT, &peers[1]));
 
 	connect_peer(&peers[0], 0x0001);
 	connect_peer(&peers[1], 0x0002);
 
-	zassert_is_null(bt_keys_get_addr(BT_ID_DEFAULT, &peer_extra),
-			"All entries in use, but a slot was still handed out");
+	assert_null(bt_keys_get_addr(BT_ID_DEFAULT, &peer_extra));
 
 	disconnect_peer(connected_peers[0], 0x0001);
 	disconnect_peer(connected_peers[1], 0x0002);
@@ -951,8 +940,9 @@ static ZTEST(bt_keys_oldest, test_all_in_use_returns_null)
 /* CONFIG_BT_KEYS_SAVE_AGING_COUNTER_ON_PAIRING: bt_keys_update_usage()
  * writes the aging counter back to settings.
  */
-static ZTEST(bt_keys_oldest, test_aging_counter_is_stored)
+static void bt_keys_oldest__test_aging_counter_is_stored(void **cm_state)
 {
+	(void)cm_state;
 	static const bt_addr_le_t peer_aging = {
 		.type = BT_ADDR_LE_PUBLIC,
 		.a.val = {0x90, 0x91, 0x92, 0x93, 0x94, 0x95},
@@ -961,30 +951,184 @@ static ZTEST(bt_keys_oldest, test_aging_counter_is_stored)
 	uint32_t counter;
 	char name[BT_SETTINGS_KEY_MAX];
 
-	zassert_not_null(bt_keys_get_type(BT_KEYS_IRK, BT_ID_DEFAULT, &peer_aging));
-	zassert_ok(bt_settings_encode_key(name, sizeof(name), "keys", &peer_aging, NULL));
+	assert_non_null(bt_keys_get_type(BT_KEYS_IRK, BT_ID_DEFAULT, &peer_aging));
+	assert_int_equal(bt_settings_encode_key(name, sizeof(name), "keys", &peer_aging, NULL), 0);
 
 	/* A new key is already the most recently used one, so another key
 	 * must be touched first for bt_keys_update_usage() to take effect.
 	 */
-	zassert_not_null(bt_keys_get_addr(BT_ID_DEFAULT, &peers[0]));
+	assert_non_null(bt_keys_get_addr(BT_ID_DEFAULT, &peers[0]));
 	bt_keys_update_usage(BT_ID_DEFAULT, &peer_aging);
 
 	keys = bt_keys_find_addr(BT_ID_DEFAULT, &peer_aging);
-	zassert_not_null(keys);
+	assert_non_null(keys);
 	counter = keys->aging_counter;
 
 	/* A reload must restore the counter written by bt_keys_update_usage(). */
 	bt_keys_reset();
-	zassert_ok(settings_load_subtree(name));
+	assert_int_equal(settings_load_subtree(name), 0);
 
 	keys = bt_keys_find_addr(BT_ID_DEFAULT, &peer_aging);
-	zassert_not_null(keys, "Aging counter was not stored");
-	zassert_equal(keys->aging_counter, counter, "Aging counter mismatch after reload");
+	assert_non_null(keys);
+	assert_int_equal(keys->aging_counter, counter);
 
 	/* Drop the entry again: a leftover stored bond changes what the other
 	 * suites restore from settings (e.g. bt_keys_commit's rl_entries count).
 	 */
-	zassert_ok(settings_delete(name));
+	assert_int_equal(settings_delete(name), 0);
 }
 #endif /* CONFIG_BT_KEYS_OVERWRITE_OLDEST */
+
+static void storage_init_58ac64f89f(void)
+{
+#if (defined(CONFIG_BT_KEYS_OVERWRITE_OLDEST))
+	bt_test_require(osi_sem_init(&connected_sem, 0, 1));
+#endif
+#if (defined(CONFIG_BT_KEYS_OVERWRITE_OLDEST))
+	bt_test_require(osi_sem_init(&disconnected_sem, 0, 1));
+#endif
+}
+
+static void migrated_callbacks_init(void)
+{
+ static bool initialized;
+ if (initialized) { return; }
+#if (defined(CONFIG_BT_KEYS_OVERWRITE_OLDEST))
+ bt_test_require(bt_conn_cb_register(&bt_conn_cb_test_conn_cb));
+#endif
+ initialized = true;
+}
+
+#if (defined(CONFIG_BT_KEYS_OVERWRITE_OLDEST))
+int bt_test_bt_keys_oldest_setup(void **state)
+{
+	int environment_result = bt_test_host_setup(state);
+
+	if (environment_result != 0) {
+		return environment_result;
+	}
+
+	migrated_callbacks_init();
+	test_transport_init();
+	storage_init_58ac64f89f();
+	*state = oldest_setup();
+	return 0;
+}
+static int bt_test_bt_keys_oldest_before(void **state)
+{
+	(void)state;
+	oldest_before(*state);
+	return 0;
+}
+
+
+static const struct CMUnitTest test_cases_bt_keys_oldest[] = {
+#if (defined(CONFIG_BT_KEYS_OVERWRITE_OLDEST))
+	cmocka_unit_test_setup_teardown(bt_keys_oldest__test_evict_oldest_not_in_use, bt_test_bt_keys_oldest_before, NULL),
+#endif
+#if (defined(CONFIG_BT_KEYS_OVERWRITE_OLDEST))
+	cmocka_unit_test_setup_teardown(bt_keys_oldest__test_least_recently_used_is_evicted, bt_test_bt_keys_oldest_before, NULL),
+#endif
+#if (defined(CONFIG_BT_KEYS_OVERWRITE_OLDEST))
+	cmocka_unit_test_setup_teardown(bt_keys_oldest__test_in_use_entry_is_not_evicted, bt_test_bt_keys_oldest_before, NULL),
+#endif
+#if (defined(CONFIG_BT_KEYS_OVERWRITE_OLDEST))
+	cmocka_unit_test_setup_teardown(bt_keys_oldest__test_all_in_use_returns_null, bt_test_bt_keys_oldest_before, NULL),
+#endif
+#if (defined(CONFIG_BT_KEYS_OVERWRITE_OLDEST))
+	cmocka_unit_test_setup_teardown(bt_keys_oldest__test_aging_counter_is_stored, bt_test_bt_keys_oldest_before, NULL),
+#endif
+};
+BT_TEST_SUITE(bt_keys_oldest, test_cases_bt_keys_oldest, bt_test_bt_keys_oldest_setup, NULL);
+#endif
+
+
+int bt_test_bt_keys_settings_setup(void **state)
+{
+	int environment_result = bt_test_host_setup(state);
+
+	if (environment_result != 0) {
+		return environment_result;
+	}
+
+	migrated_callbacks_init();
+	test_transport_init();
+	storage_init_58ac64f89f();
+	*state = settings_suite_setup();
+	return 0;
+}
+static int bt_test_bt_keys_settings_before(void **state)
+{
+	(void)state;
+	reset_key_pool(*state);
+	return 0;
+}
+
+int bt_test_bt_keys_settings_teardown(void **state)
+{
+	(void)state;
+	settings_suite_teardown(*state);
+	return 0;
+}
+static const struct CMUnitTest test_cases_bt_keys_settings[] = {
+	cmocka_unit_test_setup_teardown(bt_keys_settings__test_load_stored_bond, bt_test_bt_keys_settings_before, NULL),
+	cmocka_unit_test_setup_teardown(bt_keys_settings__test_load_delete_marker_removes_bond, bt_test_bt_keys_settings_before, NULL),
+	cmocka_unit_test_setup_teardown(bt_keys_settings__test_load_old_format_bond, bt_test_bt_keys_settings_before, NULL),
+	cmocka_unit_test_setup_teardown(bt_keys_settings__test_load_rejects_invalid_length, bt_test_bt_keys_settings_before, NULL),
+	cmocka_unit_test_setup_teardown(bt_keys_settings__test_load_rejects_cfg_flags_mismatch, bt_test_bt_keys_settings_before, NULL),
+	cmocka_unit_test_setup_teardown(bt_keys_settings__test_load_rejects_cfg_version_mismatch, bt_test_bt_keys_settings_before, NULL),
+	cmocka_unit_test_setup_teardown(bt_keys_settings__test_load_downgrades_unprovable_authentication, bt_test_bt_keys_settings_before, NULL),
+};
+BT_TEST_SUITE(bt_keys_settings, test_cases_bt_keys_settings, bt_test_bt_keys_settings_setup, bt_test_bt_keys_settings_teardown);
+
+int bt_test_bt_keys_pool_setup(void **state)
+{
+	int environment_result = bt_test_host_setup(state);
+
+	if (environment_result != 0) {
+		return environment_result;
+	}
+
+	migrated_callbacks_init();
+	test_transport_init();
+	storage_init_58ac64f89f();
+	*state = NULL;
+	return 0;
+}
+static int bt_test_bt_keys_pool_before(void **state)
+{
+	(void)state;
+	reset_key_pool(*state);
+	return 0;
+}
+
+
+static const struct CMUnitTest test_cases_bt_keys_pool[] = {
+	cmocka_unit_test_setup_teardown(bt_keys_pool__test_get_addr_allocates_slot, bt_test_bt_keys_pool_before, NULL),
+	cmocka_unit_test_setup_teardown(bt_keys_pool__test_get_addr_returns_existing_when_full, bt_test_bt_keys_pool_before, NULL),
+	cmocka_unit_test_setup_teardown(bt_keys_pool__test_get_type_existing_and_full, bt_test_bt_keys_pool_before, NULL),
+	cmocka_unit_test_setup_teardown(bt_keys_pool__test_find_and_foreach, bt_test_bt_keys_pool_before, NULL),
+};
+BT_TEST_SUITE(bt_keys_pool, test_cases_bt_keys_pool, bt_test_bt_keys_pool_setup, NULL);
+
+int bt_test_bt_keys_commit_setup(void **state)
+{
+	int environment_result = bt_test_host_setup(state);
+
+	if (environment_result != 0) {
+		return environment_result;
+	}
+
+	migrated_callbacks_init();
+	test_transport_init();
+	storage_init_58ac64f89f();
+	*state = keys_setup();
+	return 0;
+}
+
+
+
+static const struct CMUnitTest test_cases_bt_keys_commit[] = {
+	cmocka_unit_test(bt_keys_commit__test_settings_reload_does_not_add_irk_twice),
+};
+BT_TEST_SUITE(bt_keys_commit, test_cases_bt_keys_commit, bt_test_bt_keys_commit_setup, NULL);

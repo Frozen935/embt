@@ -1,16 +1,17 @@
+#include "support/test_support.h"
 /*
  * Copyright (c) 2024 Nordic Semiconductor ASA
  *
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <zephyr/kernel.h>
-#include <zephyr/bluetooth/cs.h>
-#include <zephyr/fff.h>
+
+#include <embt/bluetooth/cs.h>
+#include <fff.h>
 
 DEFINE_FFF_GLOBALS;
 
-ZTEST_SUITE(bt_le_cs_set_valid_chmap_bits, NULL, NULL, NULL, NULL, NULL);
+
 
 /*
  *  Test uninitialized chmap buffer is populated correctly
@@ -18,13 +19,23 @@ ZTEST_SUITE(bt_le_cs_set_valid_chmap_bits, NULL, NULL, NULL, NULL, NULL);
  *  Expected behaviour:
  *   - test_chmap matches correct_chmap
  */
-ZTEST(bt_le_cs_set_valid_chmap_bits, test_uninitialized_chmap)
+static void bt_le_cs_set_valid_chmap_bits__test_uninitialized_chmap(void **cm_state)
 {
+	(void)cm_state;
 	uint8_t test_chmap[10];
 
 	bt_le_cs_set_valid_chmap_bits(test_chmap);
 
 	uint8_t correct_chmap[10] = {0xFC, 0xFF, 0x7F, 0xFC, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x1F};
 
-	zassert_mem_equal(test_chmap, correct_chmap, 10);
+	assert_memory_equal(test_chmap, correct_chmap, 10);
 }
+
+
+
+
+
+static const struct CMUnitTest test_cases_bt_le_cs_set_valid_chmap_bits[] = {
+	cmocka_unit_test(bt_le_cs_set_valid_chmap_bits__test_uninitialized_chmap),
+};
+BT_TEST_SUITE(bt_le_cs_set_valid_chmap_bits, test_cases_bt_le_cs_set_valid_chmap_bits, bt_test_base_setup, NULL);

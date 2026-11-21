@@ -1,10 +1,11 @@
+#include "support/test_support.h"
 /*
  * Copyright (c) 2022 Nordic Semiconductor ASA
  *
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <zephyr/kernel.h>
+
 
 /*
  *  Validate expected behaviour when bt_hci_le_rand() is called

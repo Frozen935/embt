@@ -9,9 +9,9 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include <zephyr/fff.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/gatt.h>
+#include <fff.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/gatt.h>
 
 void mock_bt_gatt_init(void);
 void mock_bt_gatt_cleanup(void);
