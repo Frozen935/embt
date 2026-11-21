@@ -47,4 +47,14 @@ config EMBT_AUDIO_BLOCK_BYTES
 	range 1920 8192
 	default 2048
 
+config EMBT_A2DP_PLAYER
+	bool "Shared SBC playback component"
+	depends on LIBSBC
+	default n
+
+config EMBT_BAP_PLAYER
+	bool "Shared LC3 playback component"
+	depends on LIBLC3
+	default n
+
 endif
