@@ -72,6 +72,11 @@ int bt_audio_driver_init(void);
  */
 void bt_audio_driver_shutdown(void);
 /**
+ * @brief Register PulseAudio without connecting to an audio server.
+ * @return Zero on success, or a negative error for invalid state, duplicates or resource failure.
+ */
+int bt_audio_pulse_register(void);
+/**
  * @brief Request a playback stream on a named backend.
  * @param[in] backend Registered backend name; must not be NULL.
  * @param[in] device Backend device name, or NULL for its default.

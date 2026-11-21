@@ -20,6 +20,13 @@ menuconfig EMBT_AUDIO_DRIVER
 
 if EMBT_AUDIO_DRIVER
 
+config EMBT_AUDIO_PULSE
+	bool "Native PulseAudio backend"
+	default n
+	help
+	  Link the installed libpulse client. The target must provide a reachable
+	  PulseAudio-compatible server. This does not enable Bluetooth audio profiles.
+
 config EMBT_AUDIO_DRIVERS
 	int "Maximum registered audio backends"
 	range 1 8
