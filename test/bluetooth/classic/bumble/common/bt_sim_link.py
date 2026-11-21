@@ -9,11 +9,16 @@ import bt_sim_ll as sim_ll
 import bumble.hci as hci
 from bt_sim_controller import bt_sim_controller
 from bumble.link import LocalLink
+from pairing import ClassicPairing
 
 logger = logging.getLogger(__name__)
 
 
 class bt_sim_local_link(LocalLink):
+    def __init__(self):
+        super().__init__()
+        self.pairing = ClassicPairing(self)
+
     def start_inquiry(
         self,
         sender_controller: bt_sim_controller,
@@ -237,6 +242,11 @@ class bt_sim_local_link(LocalLink):
         peer_address: hci.Address,
     ):
         loop = asyncio.get_running_loop()
+        connection = sender_controller._find_classic_connection(peer_address)
+        secure_key = connection and connection.link_key_type in (
+            hci.LinkKeyType.UNAUTHENTICATED_COMBINATION_KEY_GENERATED_FROM_P_256,
+            hci.LinkKeyType.AUTHENTICATED_COMBINATION_KEY_GENERATED_FROM_P_256)
+        encryption_mode = 0x02 if secure_key else 0x01
         for c in self.controllers:
             if c == sender_controller:
                 continue
@@ -245,11 +255,11 @@ class bt_sim_local_link(LocalLink):
                 loop.call_soon(
                     c.on_start_encryption_req_accepted_ind,
                     sender_controller.public_address,
-                    0x02,
+                    encryption_mode,
                 )
                 loop.call_soon(
                     sender_controller.on_start_encryption_req_accepted_ind,
                     c.public_address,
-                    0x02,
+                    encryption_mode,
                 )
                 return

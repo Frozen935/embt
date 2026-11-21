@@ -6,7 +6,7 @@
     "pytest"
   ],
   "timeout_s": 150,
-  "pytest": "classic/l2cap_s/pytest/test_l2cap_common.py",
+  "pytest": "classic/l2cap_s/pytest/test_l2cap_server.py",
   "scenarios": {
     "default": {}
   }

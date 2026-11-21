@@ -7,7 +7,7 @@ import logging
 import sys
 
 import bumble
-import rfcomm_utility
+from . import rfcomm_utility
 from bumble import hci
 from bumble.core import BT_BR_EDR_TRANSPORT, DeviceClass, InvalidStateError
 from bumble.device import DEVICE_DEFAULT_INQUIRY_LENGTH, Device
@@ -15,8 +15,8 @@ from bumble.hci import Address, HCI_Write_Page_Timeout_Command
 from bumble.rfcomm import DLC, RFCOMM_MCC_PN, MccType, RFCOMM_Frame, Server
 from bumble.snoop import BtSnooper
 from bumble.transport import open_transport_or_link
-from rfcomm_utility import send_value, setup_logger_capture, wait_mux_response
-from twister_harness import DeviceAdapter, Shell
+from .rfcomm_utility import send_value, setup_logger_capture, wait_mux_response
+from embt_harness import DeviceAdapter, Shell
 
 logger = logging.getLogger(__name__)
 logger_capture = setup_logger_capture(logger)
@@ -57,6 +57,8 @@ async def _wait_for_shell_response(dut, response, max_wait_sec=10):
                     found = True
                     break
             lines = lines + read_lines
+            if found:
+                break
             await asyncio.sleep(1)
         logger.info(f'{str(lines)}')
     except Exception as e:
@@ -97,6 +99,8 @@ async def send_cmd_to_iut(
             if response in shell_cmd_ret_str:
                 found = True
                 lines = shell_cmd_ret_str
+        elif response in str(shell_cmd_ret):
+            found, lines = True, str(shell_cmd_ret)
         else:
             found, lines = await _wait_for_shell_response(dut, response, max_wait_sec)
     else:

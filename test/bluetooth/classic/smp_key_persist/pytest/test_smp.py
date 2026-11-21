@@ -25,7 +25,7 @@ from bumble.smp import (
 )
 from bumble.snoop import BtSnooper
 from bumble.transport import open_transport_or_link
-from twister_harness import DeviceAdapter, Shell
+from embt_harness import DeviceAdapter, Shell
 
 logger = logging.getLogger(__name__)
 
@@ -157,24 +157,10 @@ async def sm_test_initial_disconnect(dut, connection) -> None:
 
 
 async def sm_test_reboot(shell, dut) -> None:
-    logger.info('reboot DUT...')
-    command = "test_smp reboot"
-    command_ext = f'{command}\n'
-    dut.clear_buffer()
-    dut.write(command_ext.encode())
-
-    found, _ = await wait_for_shell_response(
-        dut,
-        [
-            "PROJECT EXECUTION SUCCESSFUL",
-        ],
-    )
-    assert found is True
-
+    await asyncio.to_thread(dut.restart)
     await send_cmd_to_iut(shell, dut, "bt init", "Settings Loaded", max_wait_sec=30)
     await send_cmd_to_iut(shell, dut, "br pscan on")
     await send_cmd_to_iut(shell, dut, "br iscan on")
-    logger.info('reboot initialized')
 
 
 async def sm_test_reconnect_no_pair(device, shell, dut, bumble_address, iut_address) -> None:

@@ -15,7 +15,7 @@ from bumble.l2cap import (
 from bumble.pairing import PairingConfig, PairingDelegate
 from bumble.snoop import BtSnooper
 from bumble.transport import open_transport_or_link
-from test_l2cap_common import (
+from .test_l2cap_common import (
     L2CAP_CHAN_IUT_ID,
     L2CAP_SERVER_PSM,
     MAX_MTU,
@@ -29,7 +29,7 @@ from test_l2cap_common import (
     send_cmd_to_iut,
     wait_for_shell_response,
 )
-from twister_harness import DeviceAdapter, Shell
+from embt_harness import DeviceAdapter, Shell
 
 
 async def l2cap_client_case_1(hci_port, shell, dut, address, snoop_file) -> None:

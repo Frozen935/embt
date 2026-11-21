@@ -36,7 +36,7 @@ from bumble.smp import (
 from bumble.snoop import BtSnooper
 from bumble.transport import open_transport_or_link
 from bumble.utils import AsyncRunner
-from twister_harness import DeviceAdapter, Shell
+from embt_harness import DeviceAdapter, Shell
 
 logger = logging.getLogger(__name__)
 
@@ -115,12 +115,17 @@ async def wait_for_shell_response(dut, regex: list[str] | str, max_wait_sec=10):
 
 
 async def send_cmd_to_iut(shell, dut, cmd, parse=None):
-    shell.exec_command(cmd)
+    lines = shell.exec_command(cmd)
     if parse is not None:
-        found, lines = await wait_for_shell_response(dut, parse)
+        patterns = [parse] if isinstance(parse, str) else parse
+        remaining = [pattern for pattern in patterns
+                     if not any(re.search(pattern, line) for line in lines)]
+        found = not remaining
+        if remaining:
+            found, pending_lines = await wait_for_shell_response(dut, remaining)
+            lines += pending_lines
     else:
         found = True
-        lines = []
     assert found is True
 
     return lines
@@ -173,7 +178,7 @@ class SmpDevice(Device):
         # Ask what the pairing config should be for this connection
         pairing_config = self.pairing_config_factory(connection)
         io_capability = pairing_config.delegate.classic_io_capability
-        peer_io_capability = connection.peer_pairing_io_capability
+        peer_io_capability = connection.pairing_peer_io_capability
 
         async def confirm() -> bool:
             # Ask the user to confirm the pairing, without display
@@ -227,7 +232,7 @@ class SmpDevice(Device):
 
         async def reply() -> None:
             try:
-                if await connection.abort_on('disconnection', method()):
+                if await connection.cancel_on_disconnection(method()):
                     await self.host.send_command(
                         HCI_User_Confirmation_Request_Reply_Command(bd_addr=connection.peer_address)
                     )
@@ -251,9 +256,9 @@ class SmpDevice(Device):
         pairing_config = self.pairing_config_factory(connection)
 
         # Show the passkey to the user
-        connection.abort_on(
-            'disconnection', pairing_config.delegate.display_number(passkey, digits=6)
-        )
+        AsyncRunner.spawn(connection.cancel_on_disconnection(
+            pairing_config.delegate.display_number(passkey, digits=6)
+        ))
 
 
 def sm_get_pairing_method(local_sec, local_io_cap, remote_sec, remote_io_cap):

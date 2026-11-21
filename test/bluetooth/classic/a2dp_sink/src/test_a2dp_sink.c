@@ -1,3 +1,4 @@
+#include "support/test_support.h"
 /*
  * Copyright 2025 NXP
  *
@@ -5,24 +6,24 @@
  */
 
 #include <errno.h>
-#include <zephyr/types.h>
+#include <stdint.h>
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
-#include <zephyr/sys/byteorder.h>
-#include <zephyr/kernel.h>
+#include <embt/base/byteorder.h>
 
-#include <zephyr/settings/settings.h>
 
-#include <zephyr/bluetooth/hci.h>
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/l2cap.h>
-#include <zephyr/bluetooth/classic/a2dp_codec_sbc.h>
-#include <zephyr/bluetooth/classic/a2dp.h>
-#include <zephyr/bluetooth/classic/sdp.h>
+#include <embt/settings/settings.h>
 
-#include <zephyr/shell/shell.h>
+#include <embt/bluetooth/hci.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/l2cap.h>
+#include <embt/bluetooth/classic/a2dp_codec_sbc.h>
+#include <embt/bluetooth/classic/a2dp.h>
+#include <embt/bluetooth/classic/sdp.h>
+
+#include <shell/bt_shell.h>
 
 #include <host/shell/bt.h>
 #include <common/bt_shell_private.h>
@@ -384,35 +385,35 @@ static struct bt_a2dp_cb a2dp_cb = {
 	.reconfig_req = app_reconfig_req,
 };
 
-static int cmd_register_cb(const struct shell *sh, int32_t argc, char *argv[])
+static int cmd_register_cb(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 
 	if (a2dp_initialized) {
-		shell_error(sh, "already registered");
+		bt_shell_session_error(sh, "already registered");
 		return -ENOEXEC;
 	}
 
 	err = bt_a2dp_register_cb(&a2dp_cb);
 	if (err != 0) {
-		shell_print(sh, "fail to register cb (%d)", err);
+		bt_shell_session_print(sh, "fail to register cb (%d)", err);
 		return err;
 	}
 
 	a2dp_initialized = true;
-	shell_print(sh, "success");
+	bt_shell_session_print(sh, "success");
 
 	return 0;
 }
 
-static int cmd_register_ep(const struct shell *sh, int32_t argc, char *argv[])
+static int cmd_register_ep(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 	const char *type;
 	const char *action;
 
 	if (!a2dp_initialized) {
-		shell_error(sh, "need to register a2dp connection callbacks");
+		bt_shell_session_error(sh, "need to register a2dp connection callbacks");
 		return -ENOEXEC;
 	}
 
@@ -420,13 +421,13 @@ static int cmd_register_ep(const struct shell *sh, int32_t argc, char *argv[])
 	action = argv[2];
 
 	if (strcmp(action, "sbc") != 0) {
-		shell_help(sh);
-		return SHELL_CMD_HELP_PRINTED;
+		bt_shell_help(sh);
+		return BT_SHELL_CMD_HELP_PRINTED;
 	}
 
 	if (!(IS_ENABLED(CONFIG_BT_A2DP_SINK) && strcmp(type, "sink") == 0)) {
-		shell_help(sh);
-		return SHELL_CMD_HELP_PRINTED;
+		bt_shell_help(sh);
+		return BT_SHELL_CMD_HELP_PRINTED;
 	}
 
 	if (a2dp_sink_sdp_registered == false) {
@@ -436,52 +437,52 @@ static int cmd_register_ep(const struct shell *sh, int32_t argc, char *argv[])
 
 	err = bt_a2dp_register_ep(&sink_sbc_endpoint, BT_AVDTP_AUDIO, BT_AVDTP_SINK);
 	if (err != 0) {
-		shell_error(sh, "fail to register endpoint (%d)", err);
+		bt_shell_session_error(sh, "fail to register endpoint (%d)", err);
 		return err;
 	}
 
-	shell_print(sh, "SBC sink endpoint is registered");
+	bt_shell_session_print(sh, "SBC sink endpoint is registered");
 	registered_sbc_endpoint = &sink_sbc_endpoint;
 	return 0;
 }
 
-static int cmd_connect(const struct shell *sh, int32_t argc, char *argv[])
+static int cmd_connect(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	if (!a2dp_initialized) {
-		shell_error(sh, "need to register a2dp connection callbacks");
+		bt_shell_session_error(sh, "need to register a2dp connection callbacks");
 		return -ENOEXEC;
 	}
 
 	if (default_conn == NULL) {
-		shell_error(sh, "Not connected");
+		bt_shell_session_error(sh, "Not connected");
 		return -ENOEXEC;
 	}
 
 	default_a2dp = bt_a2dp_connect(default_conn);
 	if (NULL == default_a2dp) {
-		shell_error(sh, "fail to connect a2dp");
+		bt_shell_session_error(sh, "fail to connect a2dp");
 	}
 
 	found_peer_sbc_endpoint = NULL;
 	return 0;
 }
 
-static int cmd_disconnect(const struct shell *sh, int32_t argc, char *argv[])
+static int cmd_disconnect(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 
 	if (!a2dp_initialized) {
-		shell_error(sh, "need to register a2dp connection callbacks");
+		bt_shell_session_error(sh, "need to register a2dp connection callbacks");
 		return -ENOEXEC;
 	}
 
 	if (default_a2dp == NULL) {
-		shell_error(sh, "a2dp is not connected");
+		bt_shell_session_error(sh, "a2dp is not connected");
 		return -ENOEXEC;
 	}
 	err = bt_a2dp_disconnect(default_a2dp);
 	if (err != 0) {
-		shell_print(sh, "fail to send disconnect cmd");
+		bt_shell_session_print(sh, "fail to send disconnect cmd");
 		return err;
 	}
 
@@ -501,27 +502,27 @@ static struct bt_a2dp_stream_ops stream_ops = {
 };
 
 BT_A2DP_SBC_EP_CFG_DEFAULT(sbc_cfg, A2DP_SBC_SAMP_FREQ_44100);
-static int cmd_configure(const struct shell *sh, int32_t argc, char *argv[])
+static int cmd_configure(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 
 	if (!a2dp_initialized) {
-		shell_error(sh, "need to register a2dp connection callbacks");
+		bt_shell_session_error(sh, "need to register a2dp connection callbacks");
 		return -ENOEXEC;
 	}
 
 	if (default_a2dp == NULL) {
-		shell_error(sh, "a2dp is not connected");
+		bt_shell_session_error(sh, "a2dp is not connected");
 		return -EINVAL;
 	}
 
 	if (registered_sbc_endpoint == NULL) {
-		shell_error(sh, "no endpoint");
+		bt_shell_session_error(sh, "no endpoint");
 		return -EINVAL;
 	}
 
 	if (found_peer_sbc_endpoint == NULL) {
-		shell_error(sh, "don't find the peer sbc endpoint");
+		bt_shell_session_error(sh, "don't find the peer sbc endpoint");
 		return -EINVAL;
 	}
 
@@ -529,22 +530,22 @@ static int cmd_configure(const struct shell *sh, int32_t argc, char *argv[])
 	err = bt_a2dp_stream_config(default_a2dp, &sbc_stream, registered_sbc_endpoint,
 				    found_peer_sbc_endpoint, &sbc_cfg);
 	if (err != 0) {
-		shell_error(sh, "fail to configure");
+		bt_shell_session_error(sh, "fail to configure");
 		return err;
 	}
 
 	return 0;
 }
 
-static int cmd_reconfigure(const struct shell *sh, int32_t argc, char *argv[])
+static int cmd_reconfigure(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	if (!a2dp_initialized) {
-		shell_error(sh, "need to register a2dp connection callbacks");
+		bt_shell_session_error(sh, "need to register a2dp connection callbacks");
 		return -ENOEXEC;
 	}
 
 	if (bt_a2dp_stream_reconfig(&sbc_stream, &sbc_cfg) != 0) {
-		shell_error(sh, "fail");
+		bt_shell_session_error(sh, "fail");
 	}
 	return 0;
 }
@@ -607,7 +608,7 @@ stop:
 	return BT_SDP_DISCOVER_UUID_STOP;
 }
 
-static int cmd_get_peer_eps(const struct shell *sh, int32_t argc, char *argv[])
+static int cmd_get_peer_eps(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 
@@ -616,107 +617,120 @@ static int cmd_get_peer_eps(const struct shell *sh, int32_t argc, char *argv[])
 
 	err = bt_sdp_discover(default_conn, &discov_a2dp);
 	if (err != 0) {
-		shell_error(sh, "SDP discover failed (err %d)", err);
+		bt_shell_session_error(sh, "SDP discover failed (err %d)", err);
 		return err;
 	}
 	return 0;
 }
 
-static int cmd_establish(const struct shell *sh, int32_t argc, char *argv[])
+static int cmd_establish(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	if (!a2dp_initialized) {
-		shell_error(sh, "need to register a2dp connection callbacks");
+		bt_shell_session_error(sh, "need to register a2dp connection callbacks");
 		return -ENOEXEC;
 	}
 
 	if (bt_a2dp_stream_establish(&sbc_stream) != 0) {
-		shell_error(sh, "fail");
+		bt_shell_session_error(sh, "fail");
 	}
 	return 0;
 }
 
-static int cmd_release(const struct shell *sh, int32_t argc, char *argv[])
+static int cmd_release(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	if (!a2dp_initialized) {
-		shell_error(sh, "need to register a2dp connection callbacks");
+		bt_shell_session_error(sh, "need to register a2dp connection callbacks");
 		return -ENOEXEC;
 	}
 
 	if (bt_a2dp_stream_release(&sbc_stream) != 0) {
-		shell_error(sh, "fail");
+		bt_shell_session_error(sh, "fail");
 	}
 	return 0;
 }
 
-static int cmd_start(const struct shell *sh, int32_t argc, char *argv[])
+static int cmd_start(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	if (!a2dp_initialized) {
-		shell_error(sh, "need to register a2dp connection callbacks");
+		bt_shell_session_error(sh, "need to register a2dp connection callbacks");
 		return -ENOEXEC;
 	}
 
 	if (bt_a2dp_stream_start(&sbc_stream) != 0) {
-		shell_error(sh, "fail");
+		bt_shell_session_error(sh, "fail");
 	}
 	return 0;
 }
 
-static int cmd_suspend(const struct shell *sh, int32_t argc, char *argv[])
+static int cmd_suspend(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	if (!a2dp_initialized) {
-		shell_error(sh, "need to register a2dp connection callbacks");
+		bt_shell_session_error(sh, "need to register a2dp connection callbacks");
 		return -ENOEXEC;
 	}
 
 	if (bt_a2dp_stream_suspend(&sbc_stream) != 0) {
-		shell_error(sh, "fail");
+		bt_shell_session_error(sh, "fail");
 	}
 	return 0;
 }
 
-static int cmd_abort(const struct shell *sh, int32_t argc, char *argv[])
+static int cmd_abort(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	if (!a2dp_initialized) {
-		shell_error(sh, "need to register a2dp connection callbacks");
+		bt_shell_session_error(sh, "need to register a2dp connection callbacks");
 		return -ENOEXEC;
 	}
 
 	if (bt_a2dp_stream_abort(&sbc_stream) != 0) {
-		shell_error(sh, "fail");
+		bt_shell_session_error(sh, "fail");
 	}
 	return 0;
 }
 
 #define HELP_NONE "[none]"
 
-SHELL_STATIC_SUBCMD_SET_CREATE(
+BT_SHELL_STATIC_SUBCMD_SET_CREATE(
 	a2dp_sink_cmds,
-	SHELL_CMD_ARG(register_cb, NULL, "register a2dp connection callbacks", cmd_register_cb, 1,
+	BT_SHELL_CMD_ARG(register_cb, NULL, "register a2dp connection callbacks", cmd_register_cb, 1,
 		      0),
-	SHELL_CMD_ARG(register_ep, NULL, "<type: sink or source> <value: sbc>", cmd_register_ep, 3,
+	BT_SHELL_CMD_ARG(register_ep, NULL, "<type: sink or source> <value: sbc>", cmd_register_ep, 3,
 		      0),
-	SHELL_CMD_ARG(connect, NULL, HELP_NONE, cmd_connect, 1, 0),
-	SHELL_CMD_ARG(disconnect, NULL, HELP_NONE, cmd_disconnect, 1, 0),
-	SHELL_CMD_ARG(discover_peer_eps, NULL, HELP_NONE, cmd_get_peer_eps, 1, 1),
-	SHELL_CMD_ARG(configure, NULL, HELP_NONE, cmd_configure, 1, 0),
-	SHELL_CMD_ARG(establish, NULL, HELP_NONE, cmd_establish, 1, 0),
-	SHELL_CMD_ARG(reconfigure, NULL, HELP_NONE, cmd_reconfigure, 1, 0),
-	SHELL_CMD_ARG(release, NULL, HELP_NONE, cmd_release, 1, 0),
-	SHELL_CMD_ARG(start, NULL, HELP_NONE, cmd_start, 1, 0),
-	SHELL_CMD_ARG(suspend, NULL, HELP_NONE, cmd_suspend, 1, 0),
-	SHELL_CMD_ARG(abort, NULL, HELP_NONE, cmd_abort, 1, 0), SHELL_SUBCMD_SET_END);
+	BT_SHELL_CMD_ARG(connect, NULL, HELP_NONE, cmd_connect, 1, 0),
+	BT_SHELL_CMD_ARG(disconnect, NULL, HELP_NONE, cmd_disconnect, 1, 0),
+	BT_SHELL_CMD_ARG(discover_peer_eps, NULL, HELP_NONE, cmd_get_peer_eps, 1, 1),
+	BT_SHELL_CMD_ARG(configure, NULL, HELP_NONE, cmd_configure, 1, 0),
+	BT_SHELL_CMD_ARG(establish, NULL, HELP_NONE, cmd_establish, 1, 0),
+	BT_SHELL_CMD_ARG(reconfigure, NULL, HELP_NONE, cmd_reconfigure, 1, 0),
+	BT_SHELL_CMD_ARG(release, NULL, HELP_NONE, cmd_release, 1, 0),
+	BT_SHELL_CMD_ARG(start, NULL, HELP_NONE, cmd_start, 1, 0),
+	BT_SHELL_CMD_ARG(suspend, NULL, HELP_NONE, cmd_suspend, 1, 0),
+	BT_SHELL_CMD_ARG(abort, NULL, HELP_NONE, cmd_abort, 1, 0), BT_SHELL_SUBCMD_SET_END);
 
-static int cmd_a2dp_sink(const struct shell *sh, size_t argc, char **argv)
+static int cmd_a2dp_sink(const struct bt_shell *sh, size_t argc, char **argv)
 {
 	if (argc == 1) {
-		shell_help(sh);
-		return SHELL_CMD_HELP_PRINTED;
+		bt_shell_help(sh);
+		return BT_SHELL_CMD_HELP_PRINTED;
 	}
 
-	shell_error(sh, "%s unknown parameter: %s", argv[0], argv[1]);
+	bt_shell_session_error(sh, "%s unknown parameter: %s", argv[0], argv[1]);
 
 	return -ENOEXEC;
 }
 
-SHELL_CMD_ARG_REGISTER(a2dp_sink, &a2dp_sink_cmds, "Bluetooth test A2DP SINK sh commands",
+BT_SHELL_CMD_ARG_REGISTER(a2dp_sink, &a2dp_sink_cmds, "Bluetooth test A2DP SINK sh commands",
 		       cmd_a2dp_sink, 1, 0);
+
+static void storage_init_06568dc215(void)
+{
+	net_buf_pool_init(&find_avdtp_version_pool);
+	net_buf_pool_init(&a2dp_tx_pool);
+}
+
+int test_classic_a2dp_sink_commands_init(struct bt_shell *sh)
+{
+	net_buf_pool_init(&find_avdtp_version_pool);
+	if (bt_shell_register(sh, &bt_shell_root_a2dp_sink)) { return -EINVAL; }
+	return 0;
+}

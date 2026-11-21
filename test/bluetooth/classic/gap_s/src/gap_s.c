@@ -1,3 +1,4 @@
+#include "support/test_support.h"
 /* gap_c.c - Bluetooth classic gap client smoke test */
 
 /*

@@ -11,7 +11,7 @@ from bumble.device import DEVICE_DEFAULT_INQUIRY_LENGTH, Device
 from bumble.hci import Address, HCI_Write_Page_Timeout_Command
 from bumble.snoop import BtSnooper
 from bumble.transport import open_transport_or_link
-from twister_harness import DeviceAdapter, Shell
+from embt_harness import DeviceAdapter, Shell
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +26,7 @@ async def device_power_on(device) -> None:
 
 
 # wait for shell response
-async def _wait_for_shell_response(dut, response, max_wait_sec=20):
+async def _wait_for_shell_response(dut, response, max_wait_sec=20, initial_lines=None):
     """
     _wait_for_shell_response() is used to wait for shell response.
     It will return after finding a specific 'response' or waiting long enough.
@@ -35,10 +35,12 @@ async def _wait_for_shell_response(dut, response, max_wait_sec=20):
     :param max_wait_sec: maximum waiting time
     :return: found: whether the 'response' is found; lines: DUT shell response
     """
-    found = False
-    lines = []
+    lines = list(initial_lines or [])
+    found = any(response in line for line in lines)
     try:
         for _ in range(0, max_wait_sec):
+            if found:
+                break
             read_lines = dut.readlines()
             for line in read_lines:
                 if response in line:
@@ -77,12 +79,11 @@ async def send_cmd_to_iut(
     :param max_wait_sec: maximum monitoring time
     :return: DUT shell response
     """
-    shell.exec_command(cmd)
+    lines = shell.exec_command(cmd)
     if response is not None:
-        found, lines = await _wait_for_shell_response(dut, response, max_wait_sec)
+        found, lines = await _wait_for_shell_response(dut, response, max_wait_sec, lines)
     else:
         found = True
-        lines = ''
     assert found is expect_to_find_resp
     return lines
 

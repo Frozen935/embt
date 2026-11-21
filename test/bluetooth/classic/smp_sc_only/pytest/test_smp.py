@@ -28,7 +28,7 @@ from bumble.smp import (
 )
 from bumble.snoop import BtSnooper
 from bumble.transport import open_transport_or_link
-from twister_harness import DeviceAdapter, Shell
+from embt_harness import DeviceAdapter, Shell
 
 logger = logging.getLogger(__name__)
 
@@ -71,17 +71,19 @@ def search_messages(result, messages, read_lines):
     return False
 
 
-async def wait_for_shell_response(dut, regex: list[str] | str, max_wait_sec=10):
-    found = False
-    lines = []
+async def wait_for_shell_response(dut, regex: list[str] | str, max_wait_sec=10, initial_lines=None):
+    lines = list(initial_lines or [])
 
     logger.debug('wait_for_shell_response')
 
     messages = [regex] if isinstance(regex, str) else regex
     result = dict.fromkeys(messages, False)
+    found = search_messages(result, messages, lines)
 
     try:
         for _ in range(0, max_wait_sec):
+            if found:
+                break
             read_lines = dut.readlines(print_output=True)
             lines += read_lines
             for line in read_lines:
@@ -102,12 +104,11 @@ async def wait_for_shell_response(dut, regex: list[str] | str, max_wait_sec=10):
 
 
 async def send_cmd_to_iut(shell, dut, cmd, parse=None):
-    shell.exec_command(cmd)
+    lines = shell.exec_command(cmd)
     if parse is not None:
-        found, lines = await wait_for_shell_response(dut, parse)
+        found, lines = await wait_for_shell_response(dut, parse, initial_lines=lines)
     else:
         found = True
-        lines = []
     assert found is True
 
     return lines
@@ -336,6 +337,9 @@ async def sm_sc_init_009(hci_port, shell, dut, address, snoop_file) -> None:
         lines = shell.exec_command(
             f"l2cap_br connect {format(l2cap_server_psm, 'x')} sec {dut_sec}"
         )
+        if not check_shell_response(lines, f"Enter.*?PIN code for {bumble_address}"):
+            found, pending = await wait_for_shell_response(dut, f"Enter.*?PIN code for {bumble_address}")
+            lines += pending
         assert check_shell_response(lines, f"Enter.*?PIN code for {bumble_address}")
 
         await send_cmd_to_iut(shell, dut, f"br auth-pincode {pin_code}", None)

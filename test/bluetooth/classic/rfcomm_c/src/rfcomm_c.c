@@ -1,3 +1,4 @@
+#include "support/test_support.h"
 /* rfcomm_c.c - Bluetooth classic rfcomm_c smoke test */
 
 /*
@@ -8,19 +9,19 @@
 #include <stdlib.h>
 
 #include <errno.h>
-#include <zephyr/types.h>
-#include <zephyr/kernel.h>
-#include <zephyr/sys/printk.h>
-#include <zephyr/sys/byteorder.h>
-#include <zephyr/shell/shell.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <embt/base/log.h>
+#include <embt/base/byteorder.h>
+#include <shell/bt_shell.h>
 
 /* Include stack file */
-#include <zephyr/bluetooth/hci.h>
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/l2cap.h>
-#include <zephyr/bluetooth/classic/rfcomm.h>
-#include <zephyr/bluetooth/classic/sdp.h>
+#include <embt/bluetooth/hci.h>
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/l2cap.h>
+#include <embt/bluetooth/classic/rfcomm.h>
+#include <embt/bluetooth/classic/sdp.h>
 #include <host/shell/bt.h>
 #include <common/bt_shell_private.h>
 
@@ -164,7 +165,7 @@ struct bt_rfcomm_server rfcomm_server_7 = {
 };
 
 /* RFCOMM shell command */
-static int cmd_register(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_register(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint8_t channel;
 	int err;
@@ -175,36 +176,36 @@ static int cmd_register(const struct shell *sh, size_t argc, char *argv[])
 	} else if (channel == 7U) {
 		rfcomm_server = &rfcomm_server_7;
 	} else {
-		shell_print(sh, "Channel %u isn't supported, just support channel 9 and 7",
+		bt_shell_session_print(sh, "Channel %u isn't supported, just support channel 9 and 7",
 			    channel);
 		return -ENOEXEC;
 	}
 
 	if (rfcomm_server->channel) {
-		shell_error(sh, "Already registered");
+		bt_shell_session_error(sh, "Already registered");
 		return -ENOEXEC;
 	}
 	rfcomm_server->channel = channel;
 
 	err = bt_rfcomm_server_register(rfcomm_server);
 	if (err < 0) {
-		shell_error(sh, "Unable to register channel %x", err);
+		bt_shell_session_error(sh, "Unable to register channel %x", err);
 		rfcomm_server->channel = 0U;
 		return -ENOEXEC;
 	}
-	shell_print(sh, "RFCOMM channel %u registered", rfcomm_server->channel);
+	bt_shell_session_print(sh, "RFCOMM channel %u registered", rfcomm_server->channel);
 	bt_sdp_register_service(&spp_rec);
 
 	return 0;
 }
 
-static int cmd_connect(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_connect(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint8_t channel;
 	int err;
 
 	if (!default_conn) {
-		shell_error(sh, "Not connected");
+		bt_shell_session_error(sh, "Not connected");
 		return -ENOEXEC;
 	}
 
@@ -214,7 +215,7 @@ static int cmd_connect(const struct shell *sh, size_t argc, char *argv[])
 	} else if (channel == 7U) {
 		rfcomm_dlc = &rfcomm_dlc_7;
 	} else {
-		shell_print(sh, "Channel %u isn't supported, just support channel 9 and 7",
+		bt_shell_session_print(sh, "Channel %u isn't supported, just support channel 9 and 7",
 			    channel);
 		return -ENOEXEC;
 	}
@@ -226,15 +227,15 @@ static int cmd_connect(const struct shell *sh, size_t argc, char *argv[])
 
 	err = bt_rfcomm_dlc_connect(default_conn, rfcomm_dlc, channel);
 	if (err < 0) {
-		shell_error(sh, "Unable to connect to channel %d (err %u)", channel, err);
+		bt_shell_session_error(sh, "Unable to connect to channel %d (err %u)", channel, err);
 	} else {
-		shell_print(sh, "RFCOMM connection pending");
+		bt_shell_session_print(sh, "RFCOMM connection pending");
 	}
 
 	return err;
 }
 
-static int cmd_disconnect(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_disconnect(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err;
 	uint8_t channel;
@@ -245,20 +246,20 @@ static int cmd_disconnect(const struct shell *sh, size_t argc, char *argv[])
 	} else if (channel == 7U) {
 		rfcomm_dlc = &rfcomm_dlc_7;
 	} else {
-		shell_print(sh, "Channel %u isn't supported, just support channel 9 and 7",
+		bt_shell_session_print(sh, "Channel %u isn't supported, just support channel 9 and 7",
 			    channel);
 		return -ENOEXEC;
 	}
 
 	err = bt_rfcomm_dlc_disconnect(rfcomm_dlc);
 	if (err) {
-		shell_error(sh, "Unable to disconnect: %u", -err);
+		bt_shell_session_error(sh, "Unable to disconnect: %u", -err);
 	}
 
 	return err;
 }
 
-static int cmd_send(const struct shell *sh, size_t argc, char *argv[])
+static int cmd_send(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint8_t buf_data[DATA_MTU];
 	int ret, data_len = 1;
@@ -270,12 +271,12 @@ static int cmd_send(const struct shell *sh, size_t argc, char *argv[])
 	channel = strtoul(argv[1], NULL, 16);
 	if (channel == 9U) {
 		rfcomm_dlc = &rfcomm_dlc_9;
-		shell_print(sh, "Send data on channel 9");
+		bt_shell_session_print(sh, "Send data on channel 9");
 	} else if (channel == 7U) {
 		rfcomm_dlc = &rfcomm_dlc_7;
-		shell_print(sh, "Send data on channel 7");
+		bt_shell_session_print(sh, "Send data on channel 7");
 	} else {
-		shell_print(sh, "Channel %u isn't supported, just support channel 9 and 7",
+		bt_shell_session_print(sh, "Channel %u isn't supported, just support channel 9 and 7",
 			    channel);
 		return -ENOEXEC;
 	}
@@ -290,7 +291,7 @@ static int cmd_send(const struct shell *sh, size_t argc, char *argv[])
 
 	ret = bt_rfcomm_dlc_send(rfcomm_dlc, buf);
 	if (ret < 0) {
-		shell_error(sh, "Unable to send: %d", -ret);
+		bt_shell_session_error(sh, "Unable to send: %d", -ret);
 		net_buf_unref(buf);
 		return -ENOEXEC;
 	}
@@ -298,24 +299,36 @@ static int cmd_send(const struct shell *sh, size_t argc, char *argv[])
 	return 0;
 }
 
-SHELL_STATIC_SUBCMD_SET_CREATE(
-	rfcomm_s_cmds, SHELL_CMD_ARG(register, NULL, "<server channel>", cmd_register, 2, 0),
-	SHELL_CMD_ARG(connect, NULL, "<server channel>", cmd_connect, 2, 0),
-	SHELL_CMD_ARG(disconnect, NULL, "<server channel>", cmd_disconnect, 2, 0),
-	SHELL_CMD_ARG(send, NULL, "<server channel> [data length]", cmd_send, 2, 1),
-	SHELL_SUBCMD_SET_END);
+BT_SHELL_STATIC_SUBCMD_SET_CREATE(
+	rfcomm_s_cmds, BT_SHELL_CMD_ARG(register, NULL, "<server channel>", cmd_register, 2, 0),
+	BT_SHELL_CMD_ARG(connect, NULL, "<server channel>", cmd_connect, 2, 0),
+	BT_SHELL_CMD_ARG(disconnect, NULL, "<server channel>", cmd_disconnect, 2, 0),
+	BT_SHELL_CMD_ARG(send, NULL, "<server channel> [data length]", cmd_send, 2, 1),
+	BT_SHELL_SUBCMD_SET_END);
 
-static int cmd_default_handler(const struct shell *sh, size_t argc, char **argv)
+static int cmd_default_handler(const struct bt_shell *sh, size_t argc, char **argv)
 {
 	if (argc == 1) {
-		shell_help(sh);
-		return SHELL_CMD_HELP_PRINTED;
+		bt_shell_help(sh);
+		return BT_SHELL_CMD_HELP_PRINTED;
 	}
 
-	shell_error(sh, "%s unknown parameter: %s", argv[0], argv[1]);
+	bt_shell_session_error(sh, "%s unknown parameter: %s", argv[0], argv[1]);
 
 	return -EINVAL;
 }
 
-SHELL_CMD_ARG_REGISTER(rfcomm_s, &rfcomm_s_cmds, "Bluetooth classic rfcomm shell commands",
+BT_SHELL_CMD_ARG_REGISTER(rfcomm_s, &rfcomm_s_cmds, "Bluetooth classic rfcomm shell commands",
 		       cmd_default_handler, 1, 1);
+
+static void storage_init_d0ecf02fdb(void)
+{
+	net_buf_pool_init(&pool);
+}
+
+int test_classic_rfcomm_c_commands_init(struct bt_shell *sh)
+{
+	net_buf_pool_init(&pool);
+	if (bt_shell_register(sh, &bt_shell_root_rfcomm_s)) { return -EINVAL; }
+	return 0;
+}

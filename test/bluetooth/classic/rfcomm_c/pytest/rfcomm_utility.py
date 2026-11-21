@@ -64,6 +64,8 @@ async def wait_mux_response(_logger_capture, response, max_wait_sec=10):
                 if response in line:
                     found = True
                     break
+            if found:
+                break
             await asyncio.sleep(1)
     except Exception as e:
         raise e
@@ -348,29 +350,21 @@ async def open_dlc(
             dlc.connect()
             return await self.open_result
 
-
-Multiplexer.send_rls_command = send_rls_command
-Multiplexer.on_mcc_rls = on_mcc_rls
-
-Multiplexer.send_rpn_command = send_rpn_command
-Multiplexer.on_mcc_rpn = on_mcc_rpn
-
-Multiplexer.send_test_command = send_test_command
-Multiplexer.on_mcc_test = on_mcc_test
-
-Multiplexer.send_fcon_command = send_fcon_command
-Multiplexer.on_mcc_fcon = on_mcc_fcon
-
-Multiplexer.send_fcoff_command = send_fcoff_command
-Multiplexer.on_mcc_fcoff = on_mcc_fcoff
-
-Multiplexer.on_mcc_nsc = on_mcc_nsc
-
-Multiplexer.send_bad_command = send_bad_command
-
-Multiplexer.on_uih_frame = on_uih_frame
-Multiplexer.on_disc_frame = on_disc_frame_mux
-
-Multiplexer.open_dlc = open_dlc
-
-DLC.on_disc_frame = on_disc_frame_dlc
+def install(monkeypatch):
+    """Install peer behavior only for the current RFCOMM test."""
+    monkeypatch.setattr(Multiplexer, "send_rls_command", send_rls_command, raising=False)
+    monkeypatch.setattr(Multiplexer, "on_mcc_rls", on_mcc_rls, raising=False)
+    monkeypatch.setattr(Multiplexer, "send_rpn_command", send_rpn_command, raising=False)
+    monkeypatch.setattr(Multiplexer, "on_mcc_rpn", on_mcc_rpn, raising=False)
+    monkeypatch.setattr(Multiplexer, "send_test_command", send_test_command, raising=False)
+    monkeypatch.setattr(Multiplexer, "on_mcc_test", on_mcc_test, raising=False)
+    monkeypatch.setattr(Multiplexer, "send_fcon_command", send_fcon_command, raising=False)
+    monkeypatch.setattr(Multiplexer, "on_mcc_fcon", on_mcc_fcon, raising=False)
+    monkeypatch.setattr(Multiplexer, "send_fcoff_command", send_fcoff_command, raising=False)
+    monkeypatch.setattr(Multiplexer, "on_mcc_fcoff", on_mcc_fcoff, raising=False)
+    monkeypatch.setattr(Multiplexer, "on_mcc_nsc", on_mcc_nsc, raising=False)
+    monkeypatch.setattr(Multiplexer, "send_bad_command", send_bad_command, raising=False)
+    monkeypatch.setattr(Multiplexer, "on_uih_frame", on_uih_frame, raising=False)
+    monkeypatch.setattr(Multiplexer, "on_disc_frame", on_disc_frame_mux, raising=False)
+    monkeypatch.setattr(Multiplexer, "open_dlc", open_dlc, raising=False)
+    monkeypatch.setattr(DLC, "on_disc_frame", on_disc_frame_dlc, raising=False)

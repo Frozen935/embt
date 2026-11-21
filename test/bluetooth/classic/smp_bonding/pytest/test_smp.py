@@ -20,7 +20,7 @@ from bumble.smp import (
 )
 from bumble.snoop import BtSnooper
 from bumble.transport import open_transport_or_link
-from twister_harness import DeviceAdapter, Shell
+from embt_harness import DeviceAdapter, Shell
 
 logger = logging.getLogger(__name__)
 
@@ -94,12 +94,17 @@ async def wait_for_shell_response(dut, regex: list[str] | str, max_wait_sec=10):
 
 
 async def send_cmd_to_iut(shell, dut, cmd, parse=None):
-    shell.exec_command(cmd)
+    lines = shell.exec_command(cmd)
     if parse is not None:
-        found, lines = await wait_for_shell_response(dut, parse)
+        patterns = [parse] if isinstance(parse, str) else parse
+        remaining = [pattern for pattern in patterns
+                     if not any(re.search(pattern, line) for line in lines)]
+        found = not remaining
+        if remaining:
+            found, pending_lines = await wait_for_shell_response(dut, remaining)
+            lines += pending_lines
     else:
         found = True
-        lines = []
     assert found is True
 
     return lines

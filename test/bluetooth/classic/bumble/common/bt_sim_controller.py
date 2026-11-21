@@ -105,12 +105,30 @@ class BtSimConnection(Connection):
     dhkey_check: bool = False
     authentication_done: bool = False
     encryption_enabled: int = 0
+    key_refresh_pending: bool = False
     link_key: int = 0
     link_key_type: int = 0
     key_size: int = 0
 
 
 class bt_sim_controller(controller):
+
+    def _update_host_features(self):
+        features = int.from_bytes(type(self).lmp_features[:8], 'little')
+        features |= (1 << hci.LmpFeature.SECURE_SIMPLE_PAIRING_CONTROLLER_SUPPORT)
+        features |= (1 << hci.LmpFeature.EXTENDED_FEATURES)
+        host = (1 << 1) | (int(bool(self.simple_pairing_mode)) << 0)
+        host |= int(bool(self.secure_connections_host_support)) << 3
+        self.lmp_features = (features.to_bytes(8, 'little') + host.to_bytes(8, 'little') +
+                             (1 << 8).to_bytes(8, 'little'))
+
+    def _pairing_reply(self, command, status=hci.HCI_SUCCESS):
+        if status == hci.HCI_SUCCESS and self._find_classic_connection(command.bd_addr) is None:
+            status = hci.HCI_UNKNOWN_CONNECTION_IDENTIFIER_ERROR
+        self.send_hci_packet(hci.HCI_Command_Complete_Event(
+            num_hci_command_packets=1, command_opcode=command.op_code,
+            return_parameters=command.create_return_parameters(status=status, bd_addr=command.bd_addr)))
+
     def _find_classic_connection(self, key: int | hci.Address) -> BtSimConnection | None:
         """Lookup an ACL BR/EDR connection.
 
@@ -171,8 +189,27 @@ class bt_sim_controller(controller):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.simple_pairing_mode = 0
+        self.secure_connections_host_support = 0
+        self.pairing_keys = {}
+        self.local_disconnect_address = None
+        self._update_host_features()
         if self.iac_lap is None:
             self.iac_lap = [hci.HCI_GENERAL_INQUIRY_LAP]
+
+    def on_hci_disconnect_command(self, command):
+        connection = self._find_classic_connection(command.connection_handle)
+        self.local_disconnect_address = connection.peer_address if connection else None
+        try:
+            return super().on_hci_disconnect_command(command)
+        finally:
+            self.local_disconnect_address = None
+
+    def on_classic_disconnected(self, peer_address: hci.Address, reason: int) -> None:
+        self.link.pairing.disconnected(self, peer_address)
+        if peer_address == self.local_disconnect_address:
+            reason = hci.HCI_CONNECTION_TERMINATED_BY_LOCAL_HOST_ERROR
+        super().on_classic_disconnected(peer_address, reason)
 
     def start_inquiry(self, lap) -> None:
         logger.debug("[%s] >>> Inquiry LAP %s", self.name, lap)
@@ -383,6 +420,10 @@ class bt_sim_controller(controller):
         return None
 
     def on_classic_connection_request(self, peer_address: hci.Address, link_type: int) -> None:
+        if link_type == hci.HCI_Connection_Complete_Event.LinkType.ACL and not (self.classic_scan_enable & 2):
+            self.send_lmp_packet(peer_address, lmp.LmpNotAccepted(
+                lmp.Opcode.LMP_HOST_CONNECTION_REQ, hci.HCI_PAGE_TIMEOUT_ERROR))
+            return
         if link_type == hci.HCI_Connection_Complete_Event.LinkType.ACL:
             self.classic_connections[peer_address] = BtSimConnection(
                 controller=self,
@@ -474,35 +515,12 @@ class bt_sim_controller(controller):
         '''
         See Bluetooth spec Vol 4, Part E - 7.2.7 Authentication Requested Command
         '''
-        logger.debug(f'Connect handle {command.connection_handle}')
-
-        connect = self._find_classic_connection(command.connection_handle)
-
-        if connect is None:
-            status = hci.HCI_UNKNOWN_CONNECTION_IDENTIFIER_ERROR
-        else:
-            status = hci.HCI_SUCCESS
-            if connect.authentication_request:
-                status = hci.HCI_HOST_BUSY_PAIRING_ERROR
-            else:
-                connect.authentication_request = True
-
-        self.send_hci_packet(
-            hci.HCI_Command_Status_Event(
-                status=status,
-                num_hci_command_packets=1,
-                command_opcode=command.op_code,
-            )
-        )
-
-        if connect is None:
-            return None
-
-        self.send_hci_packet(
-            hci.HCI_Link_Key_Request_Event(
-                bd_addr=connect.peer_address,
-            )
-        )
+        connection = self._find_classic_connection(command.connection_handle)
+        status = self.link.pairing.start(self, connection) if connection else hci.HCI_UNKNOWN_CONNECTION_IDENTIFIER_ERROR
+        if connection and status == hci.HCI_SUCCESS:
+            connection.authentication_request = True
+        self.send_hci_packet(hci.HCI_Command_Status_Event(
+            status=status, num_hci_command_packets=1, command_opcode=command.op_code))
         return None
 
     def on_hci_link_key_request_negative_reply_command(
@@ -511,38 +529,8 @@ class bt_sim_controller(controller):
         '''
         See Bluetooth spec Vol 4, Part E - 7.2.8 Link Key Request Negative Reply Command
         '''
-        logger.debug(f'BD Address {command.bd_addr}')
-
-        connect = self._find_classic_connection(command.bd_addr)
-
-        if connect is None:
-            status = hci.HCI_UNKNOWN_CONNECTION_IDENTIFIER_ERROR
-        else:
-            status = hci.HCI_SUCCESS
-
-        return_parameters = (
-            hci.HCI_Link_Key_Request_Negative_Reply_Command.create_return_parameters(
-                status=status,
-                bd_addr=command.bd_addr,
-            )
-        )
-
-        self.send_hci_packet(
-            hci.HCI_Command_Complete_Event(
-                num_hci_command_packets=1,
-                command_opcode=command.op_code,
-                return_parameters=return_parameters,
-            )
-        )
-
-        if status != hci.HCI_SUCCESS:
-            return None
-
-        self.send_hci_packet(
-            hci.HCI_IO_Capability_Request_Event(
-                bd_addr=command.bd_addr,
-            )
-        )
+        self._pairing_reply(command)
+        self.link.pairing.key_reply(self, command.bd_addr, None)
         return None
 
     def on_hci_io_capability_request_reply_command(
@@ -551,48 +539,8 @@ class bt_sim_controller(controller):
         '''
         See Bluetooth spec Vol 4, Part E - 7.2.11 IO Capability Request Reply Command
         '''
-        logger.debug(f'BD Address {command.bd_addr} IO CAP {command.io_capability}')
-
-        connect = self._find_classic_connection(command.bd_addr)
-
-        if connect is None:
-            status = hci.HCI_UNKNOWN_CONNECTION_IDENTIFIER_ERROR
-        else:
-            status = hci.HCI_SUCCESS
-
-        return_parameters = hci.HCI_IO_Capability_Request_Reply_Command.create_return_parameters(
-            status=status,
-            bd_addr=command.bd_addr,
-        )
-
-        self.send_hci_packet(
-            hci.HCI_Command_Complete_Event(
-                num_hci_command_packets=1,
-                command_opcode=command.op_code,
-                return_parameters=return_parameters,
-            )
-        )
-
-        if connect is None:
-            return None
-
-        if self.link:
-            if connect.authentication_request:
-                self.link.io_capability_request(
-                    self,
-                    command.bd_addr,
-                    command.io_capability,
-                    command.oob_data_present,
-                    command.authentication_requirements,
-                )
-            else:
-                self.link.io_capability_response(
-                    self,
-                    command.bd_addr,
-                    command.io_capability,
-                    command.oob_data_present,
-                    command.authentication_requirements,
-                )
+        self._pairing_reply(command)
+        self.link.pairing.io_reply(self, command)
         return None
 
     def on_hci_io_capability_response_ind(
@@ -645,91 +593,15 @@ class bt_sim_controller(controller):
     def on_hci_user_confirmation_request_reply_command(
         self, command: hci.HCI_User_Confirmation_Request_Reply_Command
     ) -> bytes | None:
-        logger.debug(f'BD Address {command.bd_addr}')
-
-        connect = self._find_classic_connection(command.bd_addr)
-
-        if connect is None:
-            status = hci.HCI_UNKNOWN_CONNECTION_IDENTIFIER_ERROR
-        else:
-            status = hci.HCI_SUCCESS
-
-        if connect is not None:
-            connect.numeric_comparison_done = True
-            connect.numeric_comparison_failed = False
-
-        return_parameters = (
-            hci.HCI_User_Confirmation_Request_Reply_Command.create_return_parameters(
-                status=status,
-                bd_addr=command.bd_addr,
-            )
-        )
-
-        self.send_hci_packet(
-            hci.HCI_Command_Complete_Event(
-                num_hci_command_packets=1,
-                command_opcode=command.op_code,
-                return_parameters=return_parameters,
-            )
-        )
-
-        if connect is None:
-            return None
-
-        if connect.authentication_request:
-            self.link.dhkey_check(
-                self,
-                command.bd_addr,
-            )
-        elif connect.dhkey_check:
-            self.link.dhkey_check_accepted(
-                self,
-                command.bd_addr,
-            )
+        self._pairing_reply(command)
+        self.link.pairing.decision(self, command.bd_addr, True)
         return None
 
     def on_hci_user_confirmation_request_negative_reply_command(
         self, command: hci.HCI_User_Confirmation_Request_Negative_Reply_Command
     ) -> bytes | None:
-        logger.debug(f'BD Address {command.bd_addr}')
-
-        connect = self._find_classic_connection(command.bd_addr)
-
-        if connect is None:
-            status = hci.HCI_UNKNOWN_CONNECTION_IDENTIFIER_ERROR
-        else:
-            status = hci.HCI_SUCCESS
-            connect.numeric_comparison_done = True
-            connect.numeric_comparison_failed = True
-
-        return_parameters = (
-            hci.HCI_User_Confirmation_Request_Negative_Reply_Command.create_return_parameters(
-                status=status,
-                bd_addr=command.bd_addr,
-            )
-        )
-
-        self.send_hci_packet(
-            hci.HCI_Command_Complete_Event(
-                num_hci_command_packets=1,
-                command_opcode=command.op_code,
-                return_parameters=return_parameters,
-            )
-        )
-
-        if connect is None:
-            return None
-
-        if connect.authentication_request:
-            self.link.numeric_comparison_failed(
-                self,
-                command.bd_addr,
-            )
-        elif connect.dhkey_check:
-            self.link.dhkey_check_not_accepted(
-                self,
-                command.bd_addr,
-            )
+        self._pairing_reply(command)
+        self.link.pairing.decision(self, command.bd_addr, False)
         return None
 
     def on_numeric_comparison_failed_ind(
@@ -896,7 +768,13 @@ class bt_sim_controller(controller):
         if connect is None:
             return
 
+        refresh = connect.key_refresh_pending and connect.encryption_enabled == encryption_enabled
         connect.encryption_enabled = encryption_enabled
+        connect.key_refresh_pending = False
+        if refresh:
+            self.send_hci_packet(hci.HCI_Encryption_Key_Refresh_Complete_Event(
+                status=hci.HCI_SUCCESS, connection_handle=connect.handle))
+            return
 
         self.send_hci_packet(
             hci.HCI_Encryption_Change_Event(
@@ -933,3 +811,74 @@ class bt_sim_controller(controller):
                 return_parameters=return_parameters,
             )
         )
+
+    def on_hci_write_simple_pairing_mode_command(self, command):
+        self.simple_pairing_mode = command.simple_pairing_mode
+        self._update_host_features()
+        return bytes([hci.HCI_SUCCESS])
+
+    def on_hci_write_secure_connections_host_support_command(self, command):
+        self.secure_connections_host_support = command.secure_connections_host_support
+        self._update_host_features()
+        return bytes([hci.HCI_SUCCESS])
+
+    def on_hci_read_remote_extended_features_command(self, command):
+        connection = self._find_classic_connection(command.connection_handle)
+        peer = self.link.pairing.find_peer(self, connection.peer_address) if connection else None
+        status = hci.HCI_SUCCESS if peer and command.page_number <= 2 else hci.HCI_UNKNOWN_CONNECTION_IDENTIFIER_ERROR
+        self.send_hci_packet(hci.HCI_Command_Status_Event(
+            status=status, num_hci_command_packets=1, command_opcode=command.op_code))
+        if status == hci.HCI_SUCCESS:
+            self.send_hci_packet(hci.HCI_Read_Remote_Extended_Features_Complete_Event(
+                status=status, connection_handle=connection.handle, page_number=command.page_number,
+                maximum_page_number=2,
+                extended_lmp_features=peer.lmp_features[command.page_number*8:(command.page_number+1)*8]))
+        return None
+
+
+    def on_hci_link_key_request_reply_command(self, command):
+        self._pairing_reply(command)
+        self.link.pairing.key_reply(self, command.bd_addr, bytes(command.link_key))
+        return None
+
+
+
+    def on_hci_io_capability_request_negative_reply_command(self, command):
+        self._pairing_reply(command)
+        self.link.pairing.reject(self, command.bd_addr)
+        return None
+
+    def on_hci_pin_code_request_reply_command(self, command):
+        valid = 1 <= command.pin_code_length <= 16
+        self._pairing_reply(command, hci.HCI_SUCCESS if valid else hci.HCI_INVALID_HCI_COMMAND_PARAMETERS_ERROR)
+        if valid:
+            self.link.pairing.pin_reply(self, command.bd_addr, bytes(command.pin_code)[:command.pin_code_length])
+        return None
+
+    def on_hci_pin_code_request_negative_reply_command(self, command):
+        self._pairing_reply(command)
+        self.link.pairing.pin_reply(self, command.bd_addr, None)
+        return None
+
+
+
+    def on_hci_user_passkey_request_reply_command(self, command):
+        self._pairing_reply(command)
+        self.link.pairing.passkey(self, command.bd_addr, command.numeric_value)
+        return None
+
+    def on_hci_user_passkey_request_negative_reply_command(self, command):
+        self._pairing_reply(command)
+        self.link.pairing.decision(self, command.bd_addr, False)
+        return None
+
+    def on_hci_reject_connection_request_command(self, command):
+        connection = self._find_classic_connection(command.bd_addr)
+        status = hci.HCI_SUCCESS if connection else hci.HCI_UNKNOWN_CONNECTION_IDENTIFIER_ERROR
+        self.send_hci_packet(hci.HCI_Command_Status_Event(
+            status=status, num_hci_command_packets=1, command_opcode=command.op_code))
+        if connection:
+            self.send_lmp_packet(command.bd_addr, lmp.LmpNotAccepted(
+                lmp.Opcode.LMP_HOST_CONNECTION_REQ, command.reason))
+            self.on_classic_connection_complete(command.bd_addr, command.reason)
+        return None

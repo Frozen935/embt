@@ -37,7 +37,7 @@ from bumble.sdp import (
 )
 from bumble.snoop import BtSnooper
 from bumble.transport import open_transport_or_link
-from twister_harness import DeviceAdapter, Shell
+from embt_harness import DeviceAdapter, Shell
 
 logger = logging.getLogger(__name__)
 
@@ -1114,7 +1114,7 @@ async def sdp_ssa_discover_fail(hci_port, shell, dut, address) -> None:
                 identifier=request.identifier,
                 destination_cid=self.source_cid,
                 source_cid=self.destination_cid,
-                result=L2CAP_Connection_Response.CONNECTION_REFUSED_NO_RESOURCES_AVAILABLE,
+                result=L2CAP_Connection_Response.Result.CONNECTION_REFUSED_NO_RESOURCES_AVAILABLE,
                 status=0x0000,
             )
         )

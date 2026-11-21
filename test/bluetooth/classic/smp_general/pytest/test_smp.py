@@ -51,7 +51,7 @@ from bumble.smp import (
 from bumble.snoop import BtSnooper
 from bumble.transport import open_transport_or_link
 from bumble.utils import AsyncRunner
-from twister_harness import DeviceAdapter, Shell
+from embt_harness import DeviceAdapter, Shell
 
 logger = logging.getLogger(__name__)
 
@@ -184,7 +184,13 @@ async def wait_for_shell_response(dut, regex: list[str] | str, max_wait_sec=10):
 async def send_cmd_to_iut(shell, dut, cmd, parse=None):
     lines = shell.exec_command(cmd)
     if parse is not None:
-        found, lines = await wait_for_shell_response(dut, parse)
+        patterns = [parse] if isinstance(parse, str) else parse
+        remaining = [pattern for pattern in patterns
+                     if not any(re.search(pattern, line) for line in lines)]
+        found = not remaining
+        if remaining:
+            found, pending_lines = await wait_for_shell_response(dut, remaining)
+            lines += pending_lines
     else:
         found = True
     assert found is True
@@ -239,7 +245,7 @@ class SmpDevice(Device):
         # Ask what the pairing config should be for this connection
         pairing_config = self.pairing_config_factory(connection)
         io_capability = pairing_config.delegate.classic_io_capability
-        peer_io_capability = connection.peer_pairing_io_capability
+        peer_io_capability = connection.pairing_peer_io_capability
 
         async def confirm() -> bool:
             # Ask the user to confirm the pairing, without display
@@ -293,7 +299,7 @@ class SmpDevice(Device):
 
         async def reply() -> None:
             try:
-                if await connection.abort_on('disconnection', method()):
+                if await connection.cancel_on_disconnection(method()):
                     await self.host.send_command(
                         HCI_User_Confirmation_Request_Reply_Command(bd_addr=connection.peer_address)
                     )
@@ -317,22 +323,13 @@ class SmpDevice(Device):
         pairing_config = self.pairing_config_factory(connection)
 
         # Show the passkey to the user
-        connection.abort_on(
-            'disconnection', pairing_config.delegate.display_number(passkey, digits=6)
-        )
+        AsyncRunner.spawn(connection.cancel_on_disconnection(
+            pairing_config.delegate.display_number(passkey, digits=6)
+        ))
 
 
 async def sm_reset_board(shell, dut):
-    logger.info("Reset board...")
-    command = "test_smp reboot"
-    dut.write(command.encode())
-    if not shell.wait_for_prompt():
-        logger.error('Prompt not found')
-    if dut.device_config.type == 'hardware':
-        # after booting up the device, there might appear additional logs
-        # after first prompt, so we need to wait and clear the buffer
-        await asyncio.sleep(0.5)
-        dut.clear_buffer()
+    await asyncio.to_thread(dut.restart)
 
 
 def sm_get_pairing_method(local_sec, local_io_cap, remote_sec, remote_io_cap):
@@ -1294,6 +1291,9 @@ async def sm_init_022(hci_port, shell, dut, address, snoop_file) -> None:
         )
         lines = shell.exec_command(f"l2cap_br connect {format(l2cap_server_psm, 'x')} sec 2")
         found = check_shell_response(lines, f"Enter PIN code for {bumble_address}")
+        if not found:
+            found, pending = await wait_for_shell_response(dut, f"Enter PIN code for {bumble_address}")
+            lines += pending
         assert found is True
 
         await send_cmd_to_iut(shell, dut, f"br auth-pincode {pin_code}", None)

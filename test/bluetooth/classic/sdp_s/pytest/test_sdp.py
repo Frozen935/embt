@@ -23,7 +23,7 @@ from bumble.sdp import (
 from bumble.sdp import Client as SDP_Client
 from bumble.snoop import BtSnooper
 from bumble.transport import open_transport_or_link
-from twister_harness import DeviceAdapter, Shell
+from embt_harness import DeviceAdapter, Shell
 
 logger = logging.getLogger(__name__)
 

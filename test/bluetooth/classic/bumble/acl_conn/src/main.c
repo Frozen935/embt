@@ -1,29 +1,25 @@
+#include "support/test_support.h"
 /*
  * Copyright (c) 2026 Silicon Laboratories Inc.
  *
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <zephyr/kernel.h>
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/classic/classic.h>
-#include <embt/base/log.h>
-#include <zephyr/ztest.h>
 
-#include "nsi_main.h"
-#include "soc.h"
-#include "cmdline.h" /* native_sim command line options header */
+#include <embt/bluetooth/bluetooth.h>
+#include <embt/bluetooth/conn.h>
+#include <embt/bluetooth/classic/classic.h>
+#include <embt/base/log.h>
 
 LOG_MODULE_REGISTER(test_acl_conn, LOG_LEVEL_DBG);
 
-static bt_addr_t peer_addr;
+bt_addr_t peer_addr;
 
 /* One semaphore per event: the peer may disconnect before the test thread has
  * seen the connection, and the state alone would then no longer show it.
  */
-static K_SEM_DEFINE(connected_sem, 0, 1);
-static K_SEM_DEFINE(disconnected_sem, 0, 1);
+static os_sem_t connected_sem;
+static os_sem_t disconnected_sem;
 static struct bt_conn *acl_conn;
 static uint8_t connected_err;
 
@@ -34,7 +30,11 @@ static void br_connected(struct bt_conn *conn, uint8_t conn_err)
 		acl_conn = bt_conn_ref(conn);
 	}
 	connected_err = conn_err;
-	k_sem_give(&connected_sem);
+	osi_sem_give(&connected_sem);
+	if (conn_err == 0) {
+		puts("PEER_CONNECTED");
+		fflush(stdout);
+	}
 }
 
 static void br_disconnected(struct bt_conn *conn, uint8_t reason)
@@ -44,7 +44,7 @@ static void br_disconnected(struct bt_conn *conn, uint8_t reason)
 		bt_conn_unref(acl_conn);
 		acl_conn = NULL;
 	}
-	k_sem_give(&disconnected_sem);
+	osi_sem_give(&disconnected_sem);
 }
 
 BT_CONN_CB_DEFINE(conn_callbacks) = {
@@ -57,7 +57,7 @@ static void *bt_setup(void)
 	int err;
 
 	err = bt_enable(NULL);
-	zassert_equal(err, 0, "Bluetooth init failed (err %d)", err);
+	assert_int_equal(err, 0);
 
 	return NULL;
 }
@@ -65,81 +65,116 @@ static void *bt_setup(void)
 /* The central pages the peer directly by its (known) address, verifies the
  * connection comes up, then disconnects and verifies it comes down.
  */
-ZTEST(acl_central, test_01_connect)
+static void acl_central__test_01_connect(void **cm_state)
 {
+	(void)cm_state;
 	struct bt_conn *conn;
 	int err;
 
 	conn = bt_conn_create_br(&peer_addr, BT_BR_CONN_PARAM_DEFAULT);
-	zassert_true(conn != NULL, "BR connection creating failed");
+	assert_true(conn != NULL);
 
-	err = k_sem_take(&connected_sem, K_SECONDS(CONFIG_BT_CREATE_CONN_TIMEOUT));
-	zassert_equal(err, 0, "Connection timeout (err %d)", err);
-	zassert_equal(connected_err, 0, "Connection failed (err 0x%02x)", connected_err);
-	zassert_equal(acl_conn, conn, "Connection mismatch %p != %p", acl_conn, conn);
+	err = osi_sem_take(&connected_sem, BT_SECONDS(CONFIG_BT_CREATE_CONN_TIMEOUT));
+	assert_int_equal(err, 0);
+	assert_int_equal(connected_err, 0);
+	assert_int_equal(acl_conn, conn);
 	bt_conn_unref(conn);
 
-	err = bt_conn_disconnect(acl_conn, BT_HCI_ERR_REMOTE_USER_TERM_CONN);
-	zassert_equal(err, 0, "Failed to disconnect (err %d)", err);
+	/* Wait until the pair runner observes the peer Host connected callback. */
+	if (getenv("EMBT_TEST_PEER_SYNC")) {
+		assert_int_not_equal(getchar(), EOF);
+	}
 
-	err = k_sem_take(&disconnected_sem, K_SECONDS(30));
-	zassert_equal(err, 0, "Disconnection timeout (err %d)", err);
-	zassert_true(acl_conn == NULL, "Disconnection failed");
+	err = bt_conn_disconnect(acl_conn, BT_HCI_ERR_REMOTE_USER_TERM_CONN);
+	assert_int_equal(err, 0);
+
+	err = osi_sem_take(&disconnected_sem, BT_SECONDS(30));
+	assert_int_equal(err, 0);
+	assert_true(acl_conn == NULL);
 }
 
-ZTEST_SUITE(acl_central, NULL, bt_setup, NULL, NULL, NULL);
+
 
 /* The peripheral makes itself connectable and waits for the central to
  * connect and then disconnect.
  */
-ZTEST(acl_peripheral, test_01_connect)
+static void acl_peripheral__test_01_connect(void **cm_state)
 {
+	(void)cm_state;
 	int err;
 
 	err = bt_br_set_connectable(true, NULL);
-	zassert_equal(err, 0, "Failed to set connectable (err %d)", err);
+	assert_int_equal(err, 0);
+	puts("CONNECTABLE");
+	fflush(stdout);
 
-	err = k_sem_take(&connected_sem, K_SECONDS(60));
-	zassert_equal(err, 0, "Connection timeout (err %d)", err);
-	zassert_equal(connected_err, 0, "Connection failed (err 0x%02x)", connected_err);
+	err = osi_sem_take(&connected_sem, BT_SECONDS(60));
+	assert_int_equal(err, 0);
+	assert_int_equal(connected_err, 0);
 
-	err = k_sem_take(&disconnected_sem, K_SECONDS(30));
-	zassert_equal(err, 0, "Disconnection timeout (err %d)", err);
-	zassert_true(acl_conn == NULL, "Disconnection failed");
+	err = osi_sem_take(&disconnected_sem, BT_SECONDS(30));
+	assert_int_equal(err, 0);
+	assert_true(acl_conn == NULL);
 
 	err = bt_br_set_connectable(false, NULL);
-	zassert_equal(err, 0, "Failed to clear connectable (err %d)", err);
+	assert_int_equal(err, 0);
 }
 
-ZTEST_SUITE(acl_peripheral, NULL, bt_setup, NULL, NULL, NULL);
 
-static void cmd_peer_bd_address_found(char *argv, int offset)
+
+
+static void storage_init_6326eb5978(void)
 {
-	char *addr_str = &argv[offset];
-	int err;
+	bt_test_require(osi_sem_init(&connected_sem, 0, 1));
+	bt_test_require(osi_sem_init(&disconnected_sem, 0, 1));
+}
 
-	err = bt_addr_from_str(addr_str, &peer_addr);
-	if (err != 0) {
-		LOG_ERR("Failed to parse peer Bluetooth address: %s (err %d)", addr_str, err);
-		nsi_exit(err);
+static void migrated_callbacks_init(void)
+{
+ static bool initialized;
+ if (initialized) { return; }
+ bt_test_require(bt_conn_cb_register(&bt_conn_cb_conn_callbacks));
+ initialized = true;
+}
+
+static int bt_test_acl_peripheral_setup(void **state)
+{
+	int environment_result = bt_test_base_setup(state);
+
+	if (environment_result != 0) {
+		return environment_result;
 	}
+
+	migrated_callbacks_init();
+	storage_init_6326eb5978();
+	*state = bt_setup();
+	return 0;
 }
 
-static void acl_conn_args(void)
+
+
+static const struct CMUnitTest test_cases_acl_peripheral[] = {
+	cmocka_unit_test(acl_peripheral__test_01_connect),
+};
+BT_TEST_SUITE(acl_peripheral, test_cases_acl_peripheral, bt_test_acl_peripheral_setup, NULL);
+
+static int bt_test_acl_central_setup(void **state)
 {
-	static struct args_struct_t args[] = {
-		{
-			.is_mandatory = true,
-			.option = "peer_bd_address",
-			.name = "XX:XX:XX:XX:XX:XX",
-			.type = 's',
-			.call_when_found = cmd_peer_bd_address_found,
-			.descript = "Bluetooth address of the peer device",
-		},
-		ARG_TABLE_ENDMARKER
-	};
+	int environment_result = bt_test_base_setup(state);
 
-	native_add_command_line_opts(args);
+	if (environment_result != 0) {
+		return environment_result;
+	}
+
+	migrated_callbacks_init();
+	storage_init_6326eb5978();
+	*state = bt_setup();
+	return 0;
 }
 
-NATIVE_TASK(acl_conn_args, PRE_BOOT_1, 20);
+
+
+static const struct CMUnitTest test_cases_acl_central[] = {
+	cmocka_unit_test(acl_central__test_01_connect),
+};
+BT_TEST_SUITE(acl_central, test_cases_acl_central, bt_test_acl_central_setup, NULL);
