@@ -1,9 +1,0 @@
-# SPDX-FileCopyrightText: Copyright The Zephyr Project Contributors
-# SPDX-License-Identifier: Apache-2.0
-
-tests:
-  libraries.ref:
-    integration_platforms:
-      - native_sim
-    tags:
-      - ref

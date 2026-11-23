@@ -1,0 +1,13 @@
+{
+  "runner": "pytest",
+  "tags": [
+    "bluetooth",
+    "classic",
+    "pytest"
+  ],
+  "timeout_s": 150,
+  "pytest": "classic/a2dp_sink/pytest/test_a2dp.py",
+  "scenarios": {
+    "default": {}
+  }
+}

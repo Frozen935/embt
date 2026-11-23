@@ -1,0 +1,22 @@
+{
+  "runner": "cmocka",
+  "tags": [
+    "bluetooth",
+    "host_l2cap_br_ret_fc",
+    "cmocka",
+    "host"
+  ],
+  "timeout_s": 45,
+  "execution": "case",
+  "scenarios": {
+    "default": {},
+    "bluetooth.host_l2cap_br_ret_fc.two_links": {
+      "options": [
+        "CONFIG_BT_MAX_CONN=2"
+      ],
+      "required_cases": [
+        "l2cap_br_ret_fc__test_max_transmit_other_link"
+      ]
+    }
+  }
+}

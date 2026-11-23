@@ -1,0 +1,24 @@
+{
+  "runner": "cmocka",
+  "tags": [
+    "bluetooth",
+    "host_adv_dir_timeout",
+    "cmocka",
+    "host"
+  ],
+  "timeout_s": 45,
+  "execution": "case",
+  "scenarios": {
+    "default": {},
+    "bluetooth.host_adv_dir_timeout.conn_complete_only.multiple_sets": {
+      "options": [
+        "CONFIG_BT_EXT_ADV_MAX_ADV_SET=2",
+        "CONFIG_BT_MAX_CONN=2",
+        "CONFIG_TEST_NO_ADV_TERM_ON_DIR_TIMEOUT=y"
+      ],
+      "required_cases": [
+        "bt_adv_dir_timeout__test_ext_adv_second_high_duty"
+      ]
+    }
+  }
+}

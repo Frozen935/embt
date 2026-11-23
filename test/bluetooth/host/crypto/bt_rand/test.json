@@ -1,0 +1,22 @@
+{
+  "runner": "cmocka",
+  "tags": [
+    "bluetooth",
+    "host",
+    "cmocka",
+    "crypto"
+  ],
+  "timeout_s": 45,
+  "execution": "case",
+  "scenarios": {
+    "default": {},
+    "bluetooth.host.bt_rand.host_crypto_prng_disabled": {
+      "options": [
+        "CONFIG_BT_HOST_CRYPTO_PRNG=n"
+      ],
+      "required_cases": [
+        "bt_rand__test_bt_rand_succeeds_host_crypto_prng_disabled"
+      ]
+    }
+  }
+}

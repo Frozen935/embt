@@ -1,4 +1,0 @@
-tests:
-  arch.arc.nocache:
-    filter: CONFIG_NOCACHE_MEMORY and CONFIG_DCACHE
-    platform_allow: nsim/nsim_hs/mpuv6

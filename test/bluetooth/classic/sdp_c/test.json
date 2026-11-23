@@ -1,0 +1,13 @@
+{
+  "runner": "pytest",
+  "tags": [
+    "bluetooth",
+    "classic",
+    "pytest"
+  ],
+  "timeout_s": 150,
+  "pytest": "classic/sdp_c/pytest/test_sdp.py",
+  "scenarios": {
+    "default": {}
+  }
+}

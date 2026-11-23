@@ -1,0 +1,32 @@
+{
+  "runner": "cmocka",
+  "tags": [
+    "bluetooth",
+    "host_keys",
+    "cmocka",
+    "host"
+  ],
+  "timeout_s": 45,
+  "execution": "case",
+  "scenarios": {
+    "default": {},
+    "bluetooth.host_keys.host_resolving": {
+      "options": [
+        "CONFIG_TEST_RL_SIZE=0"
+      ],
+      "required_cases": [
+        "bt_keys_commit__test_settings_reload_does_not_add_irk_twice"
+      ]
+    },
+    "bluetooth.host_keys.overwrite_oldest": {
+      "options": [
+        "CONFIG_BT_KEYS_OVERWRITE_OLDEST=y",
+        "CONFIG_BT_KEYS_SAVE_AGING_COUNTER_ON_PAIRING=y",
+        "CONFIG_BT_MAX_CONN=2"
+      ],
+      "required_cases": [
+        "bt_keys_oldest__test_evict_oldest_not_in_use"
+      ]
+    }
+  }
+}

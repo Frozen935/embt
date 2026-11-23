@@ -1,18 +1,8 @@
 # SPDX-License-Identifier: Apache-2.0
 
-# FIXME: SHADOW_VARS: Remove this once we have enabled -Wshadow globally.
-add_compile_options($<TARGET_PROPERTY:compiler,warning_shadow_variables>)
+if(CONFIG_BT_EAD OR CONFIG_LIBSBC)
+  embt_library(embt_bt_lib)
 
-add_subdirectory(libc)
-add_subdirectory_ifdef(CONFIG_CPP                  cpp)
-add_subdirectory(hash)
-add_subdirectory(heap)
-add_subdirectory(mem_blocks)
-add_subdirectory(midi2)
-add_subdirectory_ifdef(CONFIG_NET_BUF net_buf)
-add_subdirectory(os)
-add_subdirectory(utils)
-add_subdirectory_ifdef(CONFIG_SMF smf)
-add_subdirectory_ifdef(CONFIG_MIN_HEAP min_heap)
-add_subdirectory(uuid)
-add_subdirectory_ifdef(CONFIG_WORD_GRANULAR_ACCESS word_granular_access)
+  embt_library_sources_ifdef(CONFIG_BT_EAD ead.c)
+  embt_library_sources_ifdef(CONFIG_LIBSBC sbc.c)
+endif()

@@ -1,5 +1,0 @@
-name: sbom_unused_module
-
-build:
-  cmake: ./
-  kconfig: ./Kconfig

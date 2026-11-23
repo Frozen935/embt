@@ -1,0 +1,66 @@
+# /****************************************************************************
+#  *  Copyright (C) 2026 EmBT contributors
+#  *
+#  * Licensed under the Apache License, Version 2.0 (the "License");
+#  * you may not use this file except in compliance with the License.
+#  * You may obtain a copy of the License at
+#  *
+#  *      http://www.apache.org/licenses/LICENSE-2.0
+#  *
+#  * Unless required by applicable law or agreed to in writing, software
+#  * distributed under the License is distributed on an "AS IS" BASIS,
+#  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  * See the License for the specific language governing permissions and
+#  * limitations under the License.
+#  ***************************************************************************/
+
+menuconfig EMBT_AUDIO_DRIVER
+	bool "PCM playback drivers"
+	default n
+
+if EMBT_AUDIO_DRIVER
+
+config EMBT_AUDIO_PULSE
+	bool "Native PulseAudio backend"
+	default n
+	help
+	  Link the installed libpulse client. The target must provide a reachable
+	  PulseAudio-compatible server. This does not enable Bluetooth audio profiles.
+
+config EMBT_AUDIO_DRIVERS
+	int "Maximum registered audio backends"
+	range 1 8
+	default 4
+
+config EMBT_AUDIO_STREAMS
+	int "Maximum concurrent PCM streams"
+	range 1 16
+	default 4
+
+config EMBT_AUDIO_QUEUE_BLOCKS
+	int "PCM blocks per stream"
+	range 2 128
+	default 32
+
+config EMBT_AUDIO_BLOCK_BYTES
+	int "Maximum copied PCM block size"
+	range 1920 8192
+	default 2048
+
+config EMBT_A2DP_PLAYER
+	bool "Shared SBC playback component"
+	depends on LIBSBC
+	default n
+
+config EMBT_AUDIO_SHELL
+	bool "Bluetooth shell PCM playback"
+	depends on BT_SHELL && EMBT_AUDIO_PULSE
+	depends on (BT_A2DP_SINK && EMBT_A2DP_PLAYER) || (BT_AUDIO_RX && EMBT_BAP_PLAYER)
+	default n
+
+config EMBT_BAP_PLAYER
+	bool "Shared LC3 playback component"
+	depends on LIBLC3
+	default n
+
+endif

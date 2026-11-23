@@ -1,0 +1,24 @@
+{
+  "runner": "cmocka",
+  "tags": [
+    "bluetooth",
+    "host_tx_share",
+    "cmocka",
+    "host",
+    "async"
+  ],
+  "timeout_s": 45,
+  "execution": "case",
+  "scenarios": {
+    "default": {},
+    "bluetooth.host_tx_share.six_buffers": {
+      "options": [
+        "CONFIG_TEST_SIX_BUFFERS=y",
+        "CONFIG_BT_BUF_ACL_TX_COUNT=6"
+      ],
+      "required_cases": [
+        "host_tx_share__test_freed_buffer_to_connection_below_share"
+      ]
+    }
+  }
+}

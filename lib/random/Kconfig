@@ -1,0 +1,19 @@
+# Copyright (c) 2017 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
+menu "Random Number Generators"
+
+config PSA_CSPRNG_GENERATOR
+	bool "Use PSA CSPRNG"
+	depends on PSA_CRYPTO
+	select HAS_RANDOM_GENERATOR
+	help
+	  Enables a cryptographically secure random number generator
+	  that uses the PSA Crypto API. This CSPRNG implementation
+	  leverages the underlying PSA Crypto library's secure random
+	  number generation capabilities, which may use hardware
+	  entropy sources when available. The PSA CSPRNG provides
+	  cryptographically secure random numbers suitable for
+	  security-sensitive applications.
+
+endmenu

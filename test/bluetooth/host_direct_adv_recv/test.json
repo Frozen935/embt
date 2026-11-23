@@ -1,0 +1,39 @@
+{
+  "runner": "cmocka",
+  "tags": [
+    "bluetooth",
+    "host_direct_adv_recv",
+    "cmocka",
+    "host",
+    "async"
+  ],
+  "timeout_s": 45,
+  "execution": "case",
+  "scenarios": {
+    "default": {},
+    "bluetooth.host_direct_adv_recv.scan_with_identity": {
+      "options": [
+        "CONFIG_BT_SCAN_WITH_IDENTITY=y"
+      ],
+      "required_cases": [
+        "bt_direct_adv_recv__test_resolved_target_follows_privacy_rules"
+      ]
+    },
+    "bluetooth.host_direct_adv_recv.ext_adv": {
+      "options": [
+        "CONFIG_BT_EXT_ADV=y"
+      ],
+      "required_cases": [
+        "bt_direct_adv_recv__test_ext_report_unresolved_target"
+      ]
+    },
+    "bluetooth.host_direct_adv_recv.no_filter_accept_list": {
+      "options": [
+        "CONFIG_BT_FILTER_ACCEPT_LIST=n"
+      ],
+      "required_cases": [
+        "bt_direct_adv_recv__test_scan_filter_policy"
+      ]
+    }
+  }
+}

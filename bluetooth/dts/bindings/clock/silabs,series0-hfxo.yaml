@@ -1,8 +1,0 @@
-compatible: "silabs,series0-hfxo"
-
-title: Silicon Labs Series 0 HFXO (High-Frequency Crystal Oscillator)
-
-description: |
-  High-Frequency Crystal Oscillator peripheral.
-
-include: fixed-clock.yaml

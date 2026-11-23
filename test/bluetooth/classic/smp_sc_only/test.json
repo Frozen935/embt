@@ -1,0 +1,13 @@
+{
+  "runner": "pytest",
+  "tags": [
+    "bluetooth",
+    "classic",
+    "pytest"
+  ],
+  "timeout_s": 150,
+  "pytest": "classic/smp_sc_only/pytest/test_smp.py",
+  "scenarios": {
+    "default": {}
+  }
+}

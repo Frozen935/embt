@@ -1,7 +1,0 @@
-tests:
-  mpipe.unit:
-    tags:
-      - subsys
-      - mpipe
-    platform_allow:
-      - native_sim/native/64

@@ -1,0 +1,602 @@
+# /****************************************************************************
+#  *  Copyright (C) 2026 EmBT contributors
+#  *
+#  * Licensed under the Apache License, Version 2.0 (the "License");
+#  * you may not use this file except in compliance with the License.
+#  * You may obtain a copy of the License at
+#  *
+#  *      http://www.apache.org/licenses/LICENSE-2.0
+#  *
+#  * Unless required by applicable law or agreed to in writing, software
+#  * distributed under the License is distributed on an "AS IS" BASIS,
+#  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  * See the License for the specific language governing permissions and
+#  * limitations under the License.
+#  ***************************************************************************/
+
+menuconfig EMBT_LOG
+	bool "EmBT logging"
+	default y
+	help
+	  Enable the internal synchronous LOG provider and module configuration.
+	  Disabling this switch suppresses all LOG output and its arguments.
+
+if EMBT_LOG
+
+config EMBT_LOG_LEVEL
+	int "Default log level (0=off, 1=error, 2=warning, 3=info, 4=debug)"
+	range 0 4
+	default 3
+	help
+	  Modules configured as -1 follow this level after configuration reloads.
+	  Explicit module levels may be higher or lower than this default.
+	  The global runtime filter initially allows all compiled module levels.
+
+config EMBT_LOG_SNIFFER_INFO
+	bool "Bluetooth sniffer information"
+	default n
+	help
+	  Enable the original identity and pairing-key diagnostics for sniffers.
+	  Output still requires the corresponding module and runtime log levels.
+	  Disabled independently of the general debug log level.
+
+menu "Common and Host log levels"
+
+config BT_ATT_LOG_LEVEL
+	int "BT_ATT log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_CONN_LOG_LEVEL
+	int "BT_CONN log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_CRYPTO_LOG_LEVEL
+	int "BT_CRYPTO log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_DF_LOG_LEVEL
+	int "BT_DF log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_EAD_LOG_LEVEL
+	int "BT_EAD log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_GATT_LOG_LEVEL
+	int "BT_GATT log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_HCI_CORE_LOG_LEVEL
+	int "BT_HCI_CORE log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_HCI_DRIVER_LOG_LEVEL
+	int "BT_HCI_DRIVER log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_ISO_LOG_LEVEL
+	int "BT_ISO log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_KEYS_LOG_LEVEL
+	int "BT_KEYS log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_L2CAP_LOG_LEVEL
+	int "BT_L2CAP log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_LOG_LEVEL
+	int "BT log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_RPA_LOG_LEVEL
+	int "BT_RPA log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_SETTINGS_LOG_LEVEL
+	int "BT_SETTINGS log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_SMP_LOG_LEVEL
+	int "BT_SMP log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+endmenu
+
+menu "Classic log levels"
+
+config BT_A2DP_LOG_LEVEL
+	int "BT_A2DP log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_AVCTP_LOG_LEVEL
+	int "BT_AVCTP log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_AVDTP_LOG_LEVEL
+	int "BT_AVDTP log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_AVRCP_LOG_LEVEL
+	int "BT_AVRCP log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_BIP_LOG_LEVEL
+	int "BT_BIP log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_FTP_LOG_LEVEL
+	int "BT_FTP log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_GOEP_LOG_LEVEL
+	int "BT_GOEP log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_HFP_AG_LOG_LEVEL
+	int "BT_HFP_AG log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_HFP_HF_LOG_LEVEL
+	int "BT_HFP_HF log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_HID_HOST_LOG_LEVEL
+	int "BT_HID_HOST log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_MAP_LOG_LEVEL
+	int "BT_MAP log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_OPP_LOG_LEVEL
+	int "BT_OPP log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_PBAP_LOG_LEVEL
+	int "BT_PBAP log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_RFCOMM_LOG_LEVEL
+	int "BT_RFCOMM log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_SDP_LOG_LEVEL
+	int "BT_SDP log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+endmenu
+
+menu "Services log levels"
+
+config BT_ANS_LOG_LEVEL
+	int "BT_ANS log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_BAS_LOG_LEVEL
+	int "BT_BAS log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_CTS_LOG_LEVEL
+	int "BT_CTS log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_ETS_LOG_LEVEL
+	int "BT_ETS log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_HIDS_LOG_LEVEL
+	int "BT_HIDS log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_HRS_LOG_LEVEL
+	int "BT_HRS log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_IAS_CLIENT_LOG_LEVEL
+	int "BT_IAS_CLIENT log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_IAS_LOG_LEVEL
+	int "BT_IAS log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_OTS_CLIENT_LOG_LEVEL
+	int "BT_OTS_CLIENT log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_OTS_LOG_LEVEL
+	int "BT_OTS log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_SERVICE_LOG_LEVEL
+	int "BT_SERVICE log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_TPS_LOG_LEVEL
+	int "BT_TPS log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+endmenu
+
+menu "Mesh log levels"
+
+config BT_MESH_ACCESS_LOG_LEVEL
+	int "BT_MESH_ACCESS log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_MESH_ADV_LOG_LEVEL
+	int "BT_MESH_ADV log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_MESH_BEACON_LOG_LEVEL
+	int "BT_MESH_BEACON log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_MESH_BRG_LOG_LEVEL
+	int "BT_MESH_BRG log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_MESH_CDB_LOG_LEVEL
+	int "BT_MESH_CDB log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_MESH_CFG_LOG_LEVEL
+	int "BT_MESH_CFG log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_MESH_CRYPTO_LOG_LEVEL
+	int "BT_MESH_CRYPTO log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_MESH_DFU_LOG_LEVEL
+	int "BT_MESH_DFU log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_MESH_FRIEND_LOG_LEVEL
+	int "BT_MESH_FRIEND log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_MESH_KEYS_LOG_LEVEL
+	int "BT_MESH_KEYS log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_MESH_LOG_LEVEL
+	int "BT_MESH log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_MESH_LOW_POWER_LOG_LEVEL
+	int "BT_MESH_LOW_POWER log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_MESH_MODEL_LOG_LEVEL
+	int "BT_MESH_MODEL log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_MESH_NET_LOG_LEVEL
+	int "BT_MESH_NET log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_MESH_PROVISIONEE_LOG_LEVEL
+	int "BT_MESH_PROVISIONEE log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_MESH_PROVISIONER_LOG_LEVEL
+	int "BT_MESH_PROVISIONER log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_MESH_PROV_LOG_LEVEL
+	int "BT_MESH_PROV log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_MESH_PROXY_LOG_LEVEL
+	int "BT_MESH_PROXY log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_MESH_RPL_LOG_LEVEL
+	int "BT_MESH_RPL log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_MESH_SETTINGS_LOG_LEVEL
+	int "BT_MESH_SETTINGS log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_MESH_TRANS_LOG_LEVEL
+	int "BT_MESH_TRANS log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+endmenu
+
+menu "Audio log levels"
+
+config BT_AICS_CLIENT_LOG_LEVEL
+	int "BT_AICS_CLIENT log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_AICS_LOG_LEVEL
+	int "BT_AICS log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_ASCS_LOG_LEVEL
+	int "BT_ASCS log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_AUDIO_CODEC_LOG_LEVEL
+	int "BT_AUDIO_CODEC log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_AUDIO_LOG_LEVEL
+	int "BT_AUDIO log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_BAP_BASE_LOG_LEVEL
+	int "BT_BAP_BASE log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_BAP_BROADCAST_ASSISTANT_LOG_LEVEL
+	int "BT_BAP_BROADCAST_ASSISTANT log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_BAP_BROADCAST_SINK_LOG_LEVEL
+	int "BT_BAP_BROADCAST_SINK log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_BAP_BROADCAST_SOURCE_LOG_LEVEL
+	int "BT_BAP_BROADCAST_SOURCE log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_BAP_ISO_LOG_LEVEL
+	int "BT_BAP_ISO log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_BAP_SCAN_DELEGATOR_LOG_LEVEL
+	int "BT_BAP_SCAN_DELEGATOR log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_BAP_STREAM_LOG_LEVEL
+	int "BT_BAP_STREAM log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_BAP_UNICAST_CLIENT_LOG_LEVEL
+	int "BT_BAP_UNICAST_CLIENT log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_BAP_UNICAST_SERVER_LOG_LEVEL
+	int "BT_BAP_UNICAST_SERVER log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_CAP_ACCEPTOR_LOG_LEVEL
+	int "BT_CAP_ACCEPTOR log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_CAP_COMMANDER_LOG_LEVEL
+	int "BT_CAP_COMMANDER log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_CAP_COMMON_LOG_LEVEL
+	int "BT_CAP_COMMON log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_CAP_HANDOVER_LOG_LEVEL
+	int "BT_CAP_HANDOVER log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_CAP_INITIATOR_LOG_LEVEL
+	int "BT_CAP_INITIATOR log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_CAP_STREAM_LOG_LEVEL
+	int "BT_CAP_STREAM log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_CCP_CALL_CONTROL_CLIENT_LOG_LEVEL
+	int "BT_CCP_CALL_CONTROL_CLIENT log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_CCP_CALL_CONTROL_SERVER_LOG_LEVEL
+	int "BT_CCP_CALL_CONTROL_SERVER log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_CSIP_SET_COORDINATOR_LOG_LEVEL
+	int "BT_CSIP_SET_COORDINATOR log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_CSIP_SET_MEMBER_CRYPTO_LOG_LEVEL
+	int "BT_CSIP_SET_MEMBER_CRYPTO log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_CSIP_SET_MEMBER_LOG_LEVEL
+	int "BT_CSIP_SET_MEMBER log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_GMAP_LOG_LEVEL
+	int "BT_GMAP log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_HAS_CLIENT_LOG_LEVEL
+	int "BT_HAS_CLIENT log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_HAS_LOG_LEVEL
+	int "BT_HAS log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_MCC_LOG_LEVEL
+	int "BT_MCC log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_MCP_MEDIA_CONTROL_SERVER_LOG_LEVEL
+	int "BT_MCP_MEDIA_CONTROL_SERVER log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_MCS_LOG_LEVEL
+	int "BT_MCS log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_MICP_MIC_CTLR_LOG_LEVEL
+	int "BT_MICP_MIC_CTLR log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_MICP_MIC_DEV_LOG_LEVEL
+	int "BT_MICP_MIC_DEV log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_PACS_LOG_LEVEL
+	int "BT_PACS log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_PBP_LOG_LEVEL
+	int "BT_PBP log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_TBS_CLIENT_LOG_LEVEL
+	int "BT_TBS_CLIENT log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_TBS_LOG_LEVEL
+	int "BT_TBS log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_TMAP_LOG_LEVEL
+	int "BT_TMAP log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_VCP_VOL_CTLR_LOG_LEVEL
+	int "BT_VCP_VOL_CTLR log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_VCP_VOL_REND_LOG_LEVEL
+	int "BT_VCP_VOL_REND log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_VOCS_CLIENT_LOG_LEVEL
+	int "BT_VOCS_CLIENT log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config BT_VOCS_LOG_LEVEL
+	int "BT_VOCS log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+endmenu
+
+menu "System components log levels"
+
+config NET_BUF_LOG_LEVEL
+	int "NET_BUF log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+config SETTINGS_LOG_LEVEL
+	int "SETTINGS log level (-1=default, 0..4=off..debug)"
+	range -1 4
+	default -1
+
+endmenu
+
+endif # EMBT_LOG

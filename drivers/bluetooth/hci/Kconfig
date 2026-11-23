@@ -1,0 +1,12 @@
+# Copyright (c) 2016 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
+config EMBT_HCI_SOCKET
+	select BT_HCI_SET_PUBLIC_ADDR
+	bool "POSIX HCI socket transport"
+	default y
+	depends on BT_DRIVERS && BT_HCI
+	help
+	  Build one socket backend supporting TCP H4, Unix stream H4 and
+	  Linux HCI_CHANNEL_USER. Select the endpoint explicitly at runtime
+	  with bt_hci_socket_configure() before enabling the Host.

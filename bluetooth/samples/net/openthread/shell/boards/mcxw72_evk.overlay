@@ -1,8 +1,0 @@
-/*
- * Copyright 2026 NXP
- * SPDX-License-Identifier: Apache-2.0
- */
-
-&ieee802154_eui64_ifr0 {
-	status = "okay";
-};

@@ -1,0 +1,37 @@
+#include "support/test_support.h"
+/* test_common.h */
+
+/*
+ * Copyright (c) 2025 Nordic Semiconductor ASA
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+#include <stdint.h>
+
+#include <embt/autoconf.h>
+#include <embt/bluetooth/addr.h>
+#include <embt/bluetooth/audio/bap.h>
+#include <embt/bluetooth/audio/bap_lc3_preset.h>
+#include <embt/bluetooth/audio/cap.h>
+#include <embt/bluetooth/conn.h>
+
+#include "conn.h"
+
+#define TEST_COMMON_ADV_TYPE     BT_ADDR_LE_RANDOM
+#define TEST_COMMON_ADV_SID      0x00U
+#define TEST_COMMON_BROADCAST_ID 0x123456U
+#define TEST_COMMON_SRC_ID       0x00U
+
+void test_mocks_init(void);
+void test_mocks_cleanup(void);
+void mock_bt_csip_cleanup(void);
+
+void test_conn_init(struct bt_conn *conn, uint8_t index);
+
+void test_unicast_set_state(struct bt_cap_stream *cap_stream, struct bt_conn *conn,
+			    struct bt_bap_ep *ep, struct bt_bap_lc3_preset *preset,
+			    enum bt_bap_ep_state state);
+
+void mock_unicast_client_discover(
+	struct bt_conn *conn, struct bt_bap_ep *snk_eps[CONFIG_BT_BAP_UNICAST_CLIENT_ASE_SNK_COUNT],
+	struct bt_bap_ep *src_eps[CONFIG_BT_BAP_UNICAST_CLIENT_ASE_SRC_COUNT]);

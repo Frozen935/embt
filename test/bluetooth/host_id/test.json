@@ -1,0 +1,76 @@
+{
+  "runner": "cmocka",
+  "tags": [
+    "bluetooth",
+    "host_id",
+    "cmocka",
+    "host"
+  ],
+  "timeout_s": 45,
+  "execution": "case",
+  "scenarios": {
+    "default": {},
+    "bluetooth.host_id.privacy": {
+      "options": [
+        "CONFIG_BT_PRIVACY=y",
+        "CONFIG_BT_SMP=y",
+        "CONFIG_BT_BROADCASTER=y",
+        "CONFIG_BT_OBSERVER=y",
+        "CONFIG_BT_CENTRAL=y",
+        "CONFIG_BT_HOST_CRYPTO_PRNG=n",
+        "CONFIG_BT_RPA_TIMEOUT_DYNAMIC=y"
+      ],
+      "required_cases": [
+        "bt_id_public_api__test_reset_irk_updates_key"
+      ]
+    },
+    "bluetooth.host_id.privacy.no_smp": {
+      "options": [
+        "CONFIG_BT_PRIVACY=y",
+        "CONFIG_BT_SMP=n",
+        "CONFIG_BT_HOST_CRYPTO_PRNG=n",
+        "CONFIG_BT_PERIPHERAL=n",
+        "CONFIG_BT_CENTRAL=n"
+      ],
+      "required_cases": [
+        "bt_id_public_api__test_reset_irk_updates_key"
+      ]
+    },
+    "bluetooth.host_id.privacy.observer": {
+      "options": [
+        "CONFIG_BT_PRIVACY=y",
+        "CONFIG_BT_SMP=n",
+        "CONFIG_BT_BROADCASTER=n",
+        "CONFIG_BT_OBSERVER=y",
+        "CONFIG_BT_HOST_CRYPTO_PRNG=n",
+        "CONFIG_BT_RPA_TIMEOUT_DYNAMIC=y",
+        "CONFIG_BT_PERIPHERAL=n",
+        "CONFIG_BT_CENTRAL=n"
+      ],
+      "required_cases": [
+        "bt_id_public_api__test_rpa_timer_stops_without_active_scanner"
+      ]
+    },
+    "bluetooth.host_id.privacy.rpa_sharing": {
+      "options": [
+        "CONFIG_BT_PRIVACY=y",
+        "CONFIG_BT_SMP=y",
+        "CONFIG_BT_BROADCASTER=y",
+        "CONFIG_BT_EXT_ADV=y",
+        "CONFIG_BT_RPA_SHARING=y",
+        "CONFIG_BT_HOST_CRYPTO_PRNG=n"
+      ],
+      "required_cases": [
+        "bt_id_public_api__test_reset_irk_invalidates_cached_rpa"
+      ]
+    },
+    "bluetooth.host_id.public_addr": {
+      "options": [
+        "CONFIG_BT_HCI_SET_PUBLIC_ADDR=y"
+      ],
+      "required_cases": [
+        "bt_hci_public_addr__test_public_addr_reaches_the_driver"
+      ]
+    }
+  }
+}

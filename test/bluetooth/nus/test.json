@@ -1,0 +1,29 @@
+{
+  "runner": "cmocka",
+  "tags": [
+    "bluetooth",
+    "nus",
+    "cmocka"
+  ],
+  "timeout_s": 45,
+  "execution": "case",
+  "scenarios": {
+    "default": {},
+    "bluetooth.nus.encrypt": {
+      "options": [
+        "CONFIG_BT_ZEPHYR_NUS_SECURITY_ENCRYPT=y"
+      ],
+      "required_cases": [
+        "nus_perm__test_tx"
+      ]
+    },
+    "bluetooth.nus.authen": {
+      "options": [
+        "CONFIG_BT_ZEPHYR_NUS_SECURITY_AUTHEN=y"
+      ],
+      "required_cases": [
+        "nus_perm__test_tx"
+      ]
+    }
+  }
+}

@@ -1,6 +1,0 @@
-board:
-  name: matouch_mtro128g
-  full_name: Matouch MTRO128G
-  vendor: makerfabs
-  socs:
-  - name: esp32s3

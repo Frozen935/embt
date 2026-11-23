@@ -1,0 +1,32 @@
+{
+  "runner": "cmocka",
+  "tags": [
+    "bluetooth",
+    "host_long_adv_recv",
+    "cmocka",
+    "host",
+    "async"
+  ],
+  "timeout_s": 45,
+  "execution": "case",
+  "scenarios": {
+    "default": {},
+    "bluetooth.host_long_adv_recv.no_per_adv_reassembly": {
+      "options": [
+        "CONFIG_BT_PER_ADV_SYNC_BUF_SIZE=0"
+      ],
+      "required_cases": [
+        "long_adv_rx_tests__test_host_per_adv_report_incomplete"
+      ]
+    },
+    "bluetooth.host_long_adv_recv.per_adv_sync_rsp_no_reassembly": {
+      "options": [
+        "CONFIG_BT_PER_ADV_SYNC_RSP=y",
+        "CONFIG_BT_PER_ADV_SYNC_BUF_SIZE=0"
+      ],
+      "required_cases": [
+        "long_adv_rx_tests__test_host_per_adv_report_rx_failed"
+      ]
+    }
+  }
+}
