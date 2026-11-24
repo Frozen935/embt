@@ -2185,9 +2185,12 @@ static int conn_disconnect(struct bt_conn *conn, uint8_t reason)
 		return err;
 	}
 
+	/* Priority event ingress must not interleave this conditional state update. */
+	bt_sched_lock();
 	if (conn->state == BT_CONN_CONNECTED) {
 		bt_conn_set_state(conn, BT_CONN_DISCONNECTING);
 	}
+	bt_sched_unlock();
 
 	return 0;
 }

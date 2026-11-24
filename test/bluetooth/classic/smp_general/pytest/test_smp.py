@@ -736,11 +736,10 @@ async def sm_init_006(hci_port, shell, dut, address, snoop_file) -> None:
         )
         assert found is True
 
-        shell.exec_command("bt disconnect")
-        found, _ = await wait_for_shell_response(
-            dut, [r"Channel \w+ disconnected", f"Disconnected: {bumble_address}"]
+        await send_cmd_to_iut(
+            shell, dut, "bt disconnect",
+            [r"Channel \w+ disconnected", f"Disconnected: {bumble_address}"],
         )
-        assert found is True
 
 
 async def sm_init_008(hci_port, shell, dut, address, snoop_file) -> None:
