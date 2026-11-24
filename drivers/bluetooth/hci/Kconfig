@@ -10,3 +10,18 @@ config EMBT_HCI_SOCKET
 	  Build one socket backend supporting TCP H4, Unix stream H4 and
 	  Linux HCI_CHANNEL_USER. Select the endpoint explicitly at runtime
 	  with bt_hci_socket_configure() before enabling the Host.
+
+config EMBT_HCI_H4
+	bool "H4 device transport"
+	depends on BT_DRIVERS && BT_HCI
+	help
+	  Read and write H4 packets directly through an explicitly selected
+	  device, following the OpenVela zblue port H4 interface.
+
+config EMBT_HCI_H4_DEVICE
+	string "H4 device path"
+	default "/dev/ttyHCI0"
+	depends on EMBT_HCI_H4
+	help
+	  Device supplied by the platform. The goldfish profile uses the
+	  existing virtio serial HCI port; no NuttX Bluetooth driver is required.

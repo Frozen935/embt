@@ -29,7 +29,13 @@ function(embt_configure)
       list(APPEND arguments --fragment "${fragment}")
     endforeach()
   endif()
-  execute_process(COMMAND "${Python3_EXECUTABLE}" "${driver}" configure ${arguments}
+  set(action configure)
+  if(COMMAND nuttx_add_library)
+    set(action export)
+    set(arguments --build-dir "${build}" --kconfig "${NUTTX_DIR}/Kconfig"
+      --config "${CMAKE_BINARY_DIR}/.config" --srctree "${NUTTX_DIR}")
+  endif()
+  execute_process(COMMAND "${Python3_EXECUTABLE}" "${driver}" ${action} ${arguments}
     RESULT_VARIABLE result)
   if(NOT result EQUAL 0)
     message(FATAL_ERROR "EmBT configuration failed (${result})")
@@ -71,6 +77,9 @@ function(embt_configure)
   target_compile_options(embt_config INTERFACE
     "$<$<COMPILE_LANGUAGE:C,CXX>:SHELL:-include \"${header}\">")
 
+  if(COMMAND nuttx_add_library)
+    return()
+  endif()
   foreach(action menuconfig olddefconfig)
     add_custom_target(${action}
       COMMAND "${Python3_EXECUTABLE}" "${driver}" "${action}" --build-dir "${build}"
