@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief Explicit selection of Linux HCI user, TCP and Unix H4 transports.
+ * @brief Explicit selection of HCI sockets and platform H4 device transports.
  */
 
 #ifndef EMBT_BLUETOOTH_TRANSPORT_H_
@@ -46,6 +46,13 @@ struct bt_hci_socket_config {
  * @pre Call from the serialized stack lifecycle owner while the stack is disabled.
  */
 int bt_hci_socket_configure(const struct bt_hci_socket_config *config);
+/**
+ * @brief Select a platform H4 device before bt_enable().
+ * @param[in] path Absolute device path copied by the driver.
+ * @param[in] quirks Explicit BT_HCI_QUIRK_* flags.
+ * @return Zero on success or a negative errno value.
+ */
+int bt_hci_h4_configure(const char *path, uint32_t quirks);
 #ifdef __cplusplus
 }
 #endif

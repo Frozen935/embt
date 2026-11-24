@@ -148,7 +148,7 @@ static int file_validate(struct settings_file_io *file)
 	return 0;
 }
 
-static int file_open(struct settings_file_io *file, const char *path, int flags)
+static int settings_file_open(struct settings_file_io *file, const char *path, int flags)
 {
 	struct stat before;
 	bool existed = lstat(path, &before) == 0;
@@ -168,7 +168,7 @@ static int file_open(struct settings_file_io *file, const char *path, int flags)
 	return err;
 }
 
-static int file_close(struct settings_file_io *file)
+static int settings_file_close(struct settings_file_io *file)
 {
 	int err = file->io_error;
 
@@ -188,7 +188,7 @@ static int file_close(struct settings_file_io *file)
 	return err;
 }
 
-static int file_seek(struct settings_file_io *file, off_t offset, int whence)
+static int settings_file_seek(struct settings_file_io *file, off_t offset, int whence)
 {
 	if (lseek(file->fd, offset, whence) < 0) {
 		file->io_error = -errno;
@@ -197,7 +197,7 @@ static int file_seek(struct settings_file_io *file, off_t offset, int whence)
 	return 0;
 }
 
-static ssize_t file_read(struct settings_file_io *file, void *buffer, size_t size)
+static ssize_t settings_file_read(struct settings_file_io *file, void *buffer, size_t size)
 {
 	off_t position = lseek(file->fd, 0, SEEK_CUR);
 	ssize_t result;
@@ -219,7 +219,7 @@ static ssize_t file_read(struct settings_file_io *file, void *buffer, size_t siz
 	return result;
 }
 
-static ssize_t file_write(struct settings_file_io *file, const void *buffer, size_t size)
+static ssize_t settings_file_write(struct settings_file_io *file, const void *buffer, size_t size)
 {
 	size_t offset = 0;
 
@@ -425,7 +425,7 @@ static int settings_file_load_priv(struct settings_store *cs, line_load_cb cb, v
 
 	file_init(&file);
 
-	rc = file_open(&file, cf->cf_name, O_RDONLY);
+	rc = settings_file_open(&file, cf->cf_name, O_RDONLY);
 	if (rc != 0) {
 		if (rc == -ENOENT) {
 			return -ENOENT;
@@ -474,7 +474,7 @@ static int settings_file_load_priv(struct settings_store *cs, line_load_cb cb, v
 		lines++;
 	}
 
-	int close_rc = file_close(&file);
+	int close_rc = settings_file_close(&file);
 	cf->cf_lines = lines;
 
 	return rc < 0 ? rc : close_rc;
@@ -512,7 +512,7 @@ static int settings_file_create_or_replace(struct settings_file_io *zfp, const c
 		}
 	}
 
-	return file_open(zfp, file_name, O_CREAT | O_RDWR);
+	return settings_file_open(zfp, file_name, O_CREAT | O_RDWR);
 }
 
 /*
@@ -548,18 +548,18 @@ static int settings_file_save_and_compress(struct settings_file *cf,
 	file_init(&rf);
 	file_init(&wf);
 
-	if (file_open(&rf, cf->cf_name, O_CREAT | O_RDWR) != 0) {
+	if (settings_file_open(&rf, cf->cf_name, O_CREAT | O_RDWR) != 0) {
 		return -ENOEXEC;
 	}
 
 	rc = settings_tmpfile(tmp_file, cf->cf_name, ".cmp");
 	if (rc) {
-		file_close(&rf);
+		settings_file_close(&rf);
 		return rc;
 	}
 
 	if (settings_file_create_or_replace(&wf, tmp_file)) {
-		file_close(&rf);
+		settings_file_close(&rf);
 		return -ENOEXEC;
 	}
 
@@ -647,8 +647,8 @@ static int settings_file_save_and_compress(struct settings_file *cf,
 		goto end_rolback;
 	}
 
-	rc = file_close(&wf);
-	rc2 = file_close(&rf);
+	rc = settings_file_close(&wf);
+	rc2 = settings_file_close(&rf);
 	if (rc == 0 && rc2 == 0) {
 		rc = file_rename(tmp_file, cf->cf_name);
 		if (rc) {
@@ -667,8 +667,8 @@ static int settings_file_save_and_compress(struct settings_file *cf,
 	 */
 	return 0;
 end_rolback:
-	(void)file_close(&wf);
-	if (file_close(&rf) == 0) {
+	(void)settings_file_close(&wf);
+	if (settings_file_close(&rf) == 0) {
 		(void)file_unlink(tmp_file);
 	}
 	return -EIO;
@@ -702,12 +702,12 @@ static int settings_file_save_priv(struct settings_store *cs, const char *name, 
 	/*
 	 * Open the file to add this one value.
 	 */
-	rc = file_open(&file, cf->cf_name, O_CREAT | O_RDWR);
+	rc = settings_file_open(&file, cf->cf_name, O_CREAT | O_RDWR);
 	if (rc == 0) {
 		if (ftruncate(file.fd, file.limit) < 0) {
 			rc = -errno;
 		} else {
-			rc = file_seek(&file, 0, SEEK_END);
+			rc = settings_file_seek(&file, 0, SEEK_END);
 		}
 		if (rc == 0) {
 			entry_ctx.stor_ctx = &file;
@@ -720,7 +720,7 @@ static int settings_file_save_priv(struct settings_store *cs, const char *name, 
 			}
 		}
 
-		rc2 = file_close(&file);
+		rc2 = settings_file_close(&file);
 		if (rc == 0) {
 			rc = rc2;
 		}
@@ -760,12 +760,12 @@ static int settings_file_save_locked(struct settings_store *cs, const char *name
 		int sync_err;
 
 		file_init(&file);
-		sync_err = file_open(&file, cf->cf_name, O_RDONLY);
+		sync_err = settings_file_open(&file, cf->cf_name, O_RDONLY);
 		if (sync_err) {
 			return sync_err;
 		}
 		sync_err = fsync(file.fd) == 0 ? 0 : -errno;
-		int close_err = file_close(&file);
+		int close_err = settings_file_close(&file);
 
 		if (sync_err || close_err) {
 			return sync_err ? sync_err : close_err;
@@ -792,12 +792,12 @@ static int read_handler(void *ctx, off_t off, char *buf, size_t *len)
 		*len = MIN(*len, entry_ctx->len - (size_t)off);
 	}
 
-	rc = file_seek(file, entry_ctx->seek + off, SEEK_SET);
+	rc = settings_file_seek(file, entry_ctx->seek + off, SEEK_SET);
 	if (rc) {
 		goto end;
 	}
 
-	r_len = file_read(file, buf, *len);
+	r_len = settings_file_read(file, buf, *len);
 
 	if (r_len >= 0) {
 		*len = r_len;
@@ -824,10 +824,10 @@ static int write_handler(void *ctx, off_t off, char const *buf, size_t len)
 
 	(void)off;
 	/* append to file only */
-	rc = file_seek(file, 0, SEEK_END);
+	rc = settings_file_seek(file, 0, SEEK_END);
 
 	if (rc == 0) {
-		rc = file_write(file, buf, len);
+		rc = settings_file_write(file, buf, len);
 
 		if (rc > 0) {
 			rc = 0;

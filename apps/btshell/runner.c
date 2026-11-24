@@ -40,29 +40,49 @@
 
 static void usage(FILE *output)
 {
-	fprintf(output,
-		"Usage: btshell [--hci INDEX | --tcp HOST PORT | --unix PATH] [--no-flow-control]\n"
-		"       btshell --help | --version\n"
-		"Select a transport without opening it. Bluetooth starts only on an "
-		"explicit command.\n"
-		"--no-flow-control selects the Controller quirk for rejected Host flow-control "
-		"commands.\n");
+	fputs("Usage: btshell", output);
+#if defined(CONFIG_EMBT_HCI_H4)
+	fputs(" [--h4 PATH]", output);
+#endif
+#if defined(CONFIG_EMBT_HCI_SOCKET)
+	fputs(" [--hci INDEX | --tcp HOST PORT | --unix PATH]", output);
+#endif
+	fputs(" [--no-flow-control]\n"
+	      "       btshell --help | --version\n"
+	      "Select a transport without opening it. Bluetooth starts only on an "
+	      "explicit command.\n"
+	      "--no-flow-control selects the Controller quirk for rejected Host flow-control "
+	      "commands.\n", output);
+#if defined(CONFIG_EMBT_HCI_H4)
+	fprintf(output, "H4 default device: %s\n", CONFIG_EMBT_HCI_H4_DEVICE);
+#endif
 }
 
 static int configure(int argc, char **argv)
 {
+#if defined(CONFIG_EMBT_HCI_SOCKET)
 	struct bt_hci_socket_config config = {0};
 	unsigned long number;
-	bool no_flow_control = false;
 	int err = 0;
+#endif
+	bool no_flow_control = false;
 
 	if (argc > 1 && !strcmp(argv[argc - 1], "--no-flow-control")) {
 		no_flow_control = true;
 		argc--;
 	}
+#if defined(CONFIG_EMBT_HCI_H4)
+	if (argc == 1 || (argc == 3 && !strcmp(argv[1], "--h4"))) {
+		const char *path = argc == 1 ? CONFIG_EMBT_HCI_H4_DEVICE : argv[2];
+
+		return bt_hci_h4_configure(path,
+			no_flow_control ? BT_HCI_QUIRK_NO_FLOW_CONTROL : 0);
+	}
+#endif
 	if (argc == 1) {
 		return no_flow_control ? -EINVAL : 0;
 	}
+#if defined(CONFIG_EMBT_HCI_SOCKET)
 	if (argc == 3 && !strcmp(argv[1], "--hci")) {
 		number = bt_shell_strtoul(argv[2], 10, &err);
 		if (err || number >= UINT16_MAX) {
@@ -88,6 +108,9 @@ static int configure(int argc, char **argv)
 		config.quirks |= BT_HCI_QUIRK_NO_FLOW_CONTROL;
 	}
 	return bt_hci_socket_configure(&config);
+#else
+	return -EINVAL;
+#endif
 }
 
 /** Read one bounded line; discard overflow so the suffix cannot become a command. */

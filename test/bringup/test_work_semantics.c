@@ -261,7 +261,7 @@ static void test_timeout_cancel_reuse(void **state)
 	}
 	assert_int_equal(bt_work_queue_drain(&f.first, false), 0);
 }
-int main(void)
+int main(int argc, char **argv)
 {
 	const struct CMUnitTest tests[] = {
 		cmocka_unit_test_setup_teardown(test_timeout_independent, setup, teardown),
@@ -273,5 +273,7 @@ int main(void)
 		cmocka_unit_test_setup_teardown(test_drain_waiters, setup, teardown),
 		cmocka_unit_test_setup_teardown(test_timeout_cancel_reuse, setup, teardown),
 	};
+	(void)argc;
+	(void)argv;
 	return cmocka_run_group_tests(tests, NULL, NULL);
 }
