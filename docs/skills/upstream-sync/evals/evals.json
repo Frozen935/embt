@@ -1,0 +1,43 @@
+{
+  "skill_name": "embt-upstream-sync",
+  "evals": [
+    {
+      "id": 1,
+      "name": "controller-boundary",
+      "prompt": "Assess this simulated upstream candidate without reading or modifying any real repository. Original SHA 028cbb88566d4f69798d79f3a9470f79b9cd32dd changes tests/bluetooth/df/connectionless_cte_chains/src/common.c and subsys/bluetooth/controller/ll_sw/lll_adv_pdu.c. The test includes lll_adv.h, lll_adv_pdu.h and radio HAL helpers. EmBT removed its in-process Controller but retains Host DF APIs. Decide whether to import either part and state evidence and the retained-source boundary. Return result.json with decision, selected_targets, rationale and mutations fields. This is a read-only fixture assessment.",
+      "expected_output": "EXCLUDE both Controller internals and the adjacent Controller-dependent test; no source mutation.",
+      "assertions": [
+        "Controller-internal CTE test is excluded",
+        "No target is selected",
+        "No repository mutation is claimed"
+      ],
+      "files": []
+    },
+    {
+      "id": 2,
+      "name": "partial-ccp",
+      "prompt": "Assess this simulated upstream candidate, read-only, without inspecting a real repository. Original SHA 82140f37c2c1ecdf77c88d3310ef45ba4dafde9b replaces one mutex per CCP bearer with a global Audio mutex. It also fixes technology setter/getter registration and cached-value access that currently has no mutex in EmBT. Other EmBT setters and unregister lock the existing bearer mutex; explicit OSI initialization already exists. The user wants minimum behavior fixes and has not authorized global lock architecture changes. Return result.json with decision, selected_effects, omitted_effects, original_sha and mutations.",
+      "expected_output": "PARTIAL: synchronize technology access using retained ownership; omit the optional global lock/helper architecture and preserve full original SHA.",
+      "assertions": [
+        "Partial rather than whole-patch adoption",
+        "Technology synchronization is selected",
+        "Global lock architecture is omitted",
+        "Full original SHA is retained"
+      ],
+      "files": []
+    },
+    {
+      "id": 3,
+      "name": "execution-gate",
+      "prompt": "Assess this simulated delivery, read-only, without executing commands or touching a real repository. A runner returned exit 0 with pytest --collect-only. Its fresh JUnit file is <testsuite/> with no testcase elements. The source tree also changed after an earlier verification fingerprint was captured. The current branch is main. The user asked for local commits only. Return result.json with can_commit, validation_passed, required_next_steps and publish. Explain the execution, fingerprint and work-branch requirements; do not claim tests ran.",
+      "expected_output": "Reject validation and local commit in current state; require actual tests, new source binding and a task branch; publication stays false.",
+      "assertions": [
+        "Empty collect-only output is rejected",
+        "Changed source invalidates old verification",
+        "Main is not a commit target",
+        "No publication is authorized"
+      ],
+      "files": []
+    }
+  ]
+}
