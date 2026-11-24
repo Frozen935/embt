@@ -344,15 +344,16 @@ static void unkeep(void)
 static struct net_buf *tx(void)
 {
 	struct net_buf *buf;
+	struct bt_work_sync sync = {0};
 
 	buf = bt_fifo_get(&sent, TX_COMPLETION_TIMEOUT);
 	assert_non_null(buf);
 	/* FIFO publication precedes the driver's return. Observe that TX pass and its
-	 * system-queue completion callbacks before checking channel state.
+	 * completion work without draining a queue that still has active producers.
 	 */
 	bt_dev_lock();
 	bt_dev_unlock();
-	assert_int_equal(bt_work_queue_drain(&bt_sys_work_q, false), 0);
+	(void)bt_work_flush(&completed_work, &sync);
 
 	return buf;
 }

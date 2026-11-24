@@ -1,0 +1,49 @@
+{
+  "runner": "cmocka",
+  "tags": [
+    "bluetooth",
+    "audio",
+    "shell",
+    "cmocka"
+  ],
+  "timeout_s": 45,
+  "execution": "case",
+  "scenarios": {
+    "default": {
+      "required_cases": [
+        "codec_frame_limit",
+        "unsigned_id_rejection",
+        "unsigned_id_range"
+      ]
+    },
+    "bluetooth.audio.shell.broadcast_only": {
+      "options": [
+        "CONFIG_BT_BAP_UNICAST_SERVER=n",
+        "CONFIG_BT_ASCS=n",
+        "CONFIG_BT_BAP_BROADCAST_SOURCE=y",
+        "CONFIG_BT_ISO_BROADCASTER=y",
+        "CONFIG_BT_EXT_ADV=y",
+        "CONFIG_BT_PER_ADV=y",
+        "CONFIG_BT_CAP_INITIATOR=y",
+        "CONFIG_BT_BAP_BROADCAST_ASSISTANT=y",
+        "CONFIG_BT_CENTRAL=y",
+        "CONFIG_BT_GATT_CLIENT=y",
+        "CONFIG_BT_GATT_AUTO_DISCOVER_CCC=y",
+        "CONFIG_BT_GATT_AUTO_UPDATE_MTU=y",
+        "CONFIG_BT_GMAP=y",
+        "CONFIG_BT_PER_ADV_SYNC=y",
+        "CONFIG_BT_PAC_SRC=y",
+        "CONFIG_BT_ISO_SYNC_RECEIVER=y",
+        "CONFIG_BT_OBSERVER=y",
+        "CONFIG_BT_BAP_BROADCAST_SRC_STREAM_COUNT=2",
+        "CONFIG_BT_ISO_MAX_CHAN=2",
+        "CONFIG_BT_BAP_BROADCAST_SRC_SUBGROUP_COUNT=1"
+      ],
+      "required_cases": [
+        "codec_frame_limit",
+        "unsigned_id_rejection",
+        "unsigned_id_range"
+      ]
+    }
+  }
+}

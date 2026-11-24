@@ -24,6 +24,7 @@ void mock_destroy_rule_after_05ae85(const struct bt_test_case_info *, void *);
 #include <fff.h>
 #include <embt/base/log.h>
 #include <embt/base/util.h>
+#include <embt/base/util_macro.h>
 #include "audio/bap_endpoint.h"
 #include "bap_unicast_client.h"
 #include "cap_initiator.h"
@@ -115,48 +116,55 @@ void mock_discover(
 	assert_int_equal(0, err);
 
 	for (int i = 0U; i < CONFIG_BT_MAX_CONN; i++) {
-		RESET_FAKE(mock_bap_discover_endpoint);
-		err = bt_bap_unicast_client_discover(&conns[i], BT_AUDIO_DIR_SINK);
-		assert_int_equal(0, err);
 
 		/* TODO: use callback to populate eps */
 
-		zexpect_call_count("unicast_client_cb.bap_discover_endpoint",
-				   CONFIG_BT_BAP_UNICAST_CLIENT_ASE_SNK_COUNT,
-				   mock_bap_discover_endpoint_fake.call_count);
-		for (size_t j = 0U; j < mock_bap_discover_endpoint_fake.call_count; j++) {
-			/* Verify conn */
-			assert_int_equal(mock_bap_discover_endpoint_fake.arg0_history[j], &conns[i]);
+		if (IS_ENABLED(CONFIG_BT_BAP_UNICAST_CLIENT_ASE_SNK)) {
+			RESET_FAKE(mock_bap_discover_endpoint);
 
-			/* Verify dir */
-			assert_int_equal(mock_bap_discover_endpoint_fake.arg1_history[j], BT_AUDIO_DIR_SINK);
+			err = bt_bap_unicast_client_discover(&conns[i], BT_AUDIO_DIR_SINK);
+			assert_int_equal(0, err);
 
-			/* Verify and store ep */
-			assert_int_not_equal(mock_bap_discover_endpoint_fake.arg2_history[j], NULL);
+			zexpect_call_count("unicast_client_cb.bap_discover_endpoint",
+					   CONFIG_BT_BAP_UNICAST_CLIENT_ASE_SNK_COUNT,
+					   mock_bap_discover_endpoint_fake.call_count);
+			for (size_t j = 0U; j < mock_bap_discover_endpoint_fake.call_count; j++) {
+				/* Verify conn */
+				assert_int_equal(mock_bap_discover_endpoint_fake.arg0_history[j], &conns[i]);
 
-			snk_eps[conns[i].index][j] =
-				mock_bap_discover_endpoint_fake.arg2_history[j];
+				/* Verify dir */
+				assert_int_equal(mock_bap_discover_endpoint_fake.arg1_history[j], BT_AUDIO_DIR_SINK);
+
+				/* Verify and store ep */
+				assert_int_not_equal(mock_bap_discover_endpoint_fake.arg2_history[j], NULL);
+
+				snk_eps[conns[i].index][j] =
+					mock_bap_discover_endpoint_fake.arg2_history[j];
+			}
 		}
 
-		RESET_FAKE(mock_bap_discover_endpoint);
-		err = bt_bap_unicast_client_discover(&conns[i], BT_AUDIO_DIR_SOURCE);
-		assert_int_equal(0, err);
+		if (IS_ENABLED(CONFIG_BT_BAP_UNICAST_CLIENT_ASE_SRC)) {
+			RESET_FAKE(mock_bap_discover_endpoint);
 
-		zexpect_call_count("unicast_client_cb.bap_discover_endpoint",
-				   CONFIG_BT_BAP_UNICAST_CLIENT_ASE_SRC_COUNT,
-				   mock_bap_discover_endpoint_fake.call_count);
-		for (size_t j = 0U; j < mock_bap_discover_endpoint_fake.call_count; j++) {
-			/* Verify conn */
-			assert_int_equal(mock_bap_discover_endpoint_fake.arg0_history[j], &conns[i]);
+			err = bt_bap_unicast_client_discover(&conns[i], BT_AUDIO_DIR_SOURCE);
+			assert_int_equal(0, err);
 
-			/* Verify dir */
-			assert_int_equal(mock_bap_discover_endpoint_fake.arg1_history[j], BT_AUDIO_DIR_SOURCE);
+			zexpect_call_count("unicast_client_cb.bap_discover_endpoint",
+					   CONFIG_BT_BAP_UNICAST_CLIENT_ASE_SRC_COUNT,
+					   mock_bap_discover_endpoint_fake.call_count);
+			for (size_t j = 0U; j < mock_bap_discover_endpoint_fake.call_count; j++) {
+				/* Verify conn */
+				assert_int_equal(mock_bap_discover_endpoint_fake.arg0_history[j], &conns[i]);
 
-			/* Verify and store ep */
-			assert_int_not_equal(mock_bap_discover_endpoint_fake.arg2_history[j], NULL);
+				/* Verify dir */
+				assert_int_equal(mock_bap_discover_endpoint_fake.arg1_history[j], BT_AUDIO_DIR_SOURCE);
 
-			src_eps[conns[i].index][j] =
-				mock_bap_discover_endpoint_fake.arg2_history[j];
+				/* Verify and store ep */
+				assert_int_not_equal(mock_bap_discover_endpoint_fake.arg2_history[j], NULL);
+
+				src_eps[conns[i].index][j] =
+					mock_bap_discover_endpoint_fake.arg2_history[j];
+			}
 		}
 	}
 

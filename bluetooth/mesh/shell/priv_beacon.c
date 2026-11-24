@@ -102,6 +102,10 @@ static int cmd_priv_node_id_get(const struct bt_shell *sh, size_t argc, char *ar
 	int err = 0;
 
 	key_net_idx = bt_shell_strtoul(argv[1], 0, &err);
+	if (err) {
+		bt_shell_session_warn(sh, "Unable to parse input string argument");
+		return err;
+	}
 
 	err = bt_mesh_priv_beacon_cli_node_id_get(bt_mesh_shell_target_ctx.net_idx,
 						  bt_mesh_shell_target_ctx.dst, key_net_idx, &val);
@@ -144,7 +148,7 @@ const struct bt_shell_cmd_entry priv_beacons_cmds_entries[] = {
 	BT_SHELL_CMD_ARG(priv-beacon-set, NULL, "<Val(off, on)> <RandInt(10s steps)>",
 		      cmd_priv_beacon_set, 3, 0),
 	BT_SHELL_CMD_ARG(priv-gatt-proxy-get, NULL, NULL, cmd_priv_gatt_proxy_get, 1, 0),
-	BT_SHELL_CMD_ARG(priv-gatt-proxy-set, NULL, "Val(off, on)> ", cmd_priv_gatt_proxy_set,
+	BT_SHELL_CMD_ARG(priv-gatt-proxy-set, NULL, "<Val(off, on)>", cmd_priv_gatt_proxy_set,
 		      2, 0),
 	BT_SHELL_CMD_ARG(priv-node-id-get, NULL, "<NetKeyIdx>", cmd_priv_node_id_get, 2, 0),
 	BT_SHELL_CMD_ARG(priv-node-id-set, NULL, "<NetKeyIdx> <State>", cmd_priv_node_id_set, 3,

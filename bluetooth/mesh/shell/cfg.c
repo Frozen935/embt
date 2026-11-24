@@ -442,6 +442,22 @@ static int cmd_polltimeout_get(const struct bt_shell *sh, size_t argc, char *arg
 	return 0;
 }
 
+/* Network and Relay retransmissions: count 0 to 7, interval 10 to 320 ms in steps of 10 ms. */
+static bool transmit_valid(const struct bt_shell *sh, unsigned long count, unsigned long interval)
+{
+	if (count > 7) {
+		bt_shell_session_warn(sh, "Invalid retransmit count %lu", count);
+		return false;
+	}
+
+	if (interval < 10 || interval > 320 || (interval % 10)) {
+		bt_shell_session_warn(sh, "Invalid retransmit interval %lu", interval);
+		return false;
+	}
+
+	return true;
+}
+
 static int cmd_net_transmit(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint8_t transmit;
@@ -457,13 +473,18 @@ static int cmd_net_transmit(const struct bt_shell *sh, size_t argc, char *argv[]
 			return -EINVAL;
 		}
 
-		uint8_t count, interval, new_transmit;
+		unsigned long count, interval;
+		uint8_t new_transmit;
 
 		count = bt_shell_strtoul(argv[1], 0, &err);
 		interval = bt_shell_strtoul(argv[2], 0, &err);
 		if (err) {
 			bt_shell_session_warn(sh, "Unable to parse input string argument");
 			return err;
+		}
+
+		if (!transmit_valid(sh, count, interval)) {
+			return -EINVAL;
 		}
 
 		new_transmit = BT_MESH_TRANSMIT(count, interval);
@@ -493,30 +514,30 @@ static int cmd_relay(const struct bt_shell *sh, size_t argc, char *argv[])
 		err = bt_mesh_cfg_cli_relay_get(bt_mesh_shell_target_ctx.net_idx,
 					    bt_mesh_shell_target_ctx.dst, &relay, &transmit);
 	} else {
-		uint8_t count, interval, new_transmit;
-		uint8_t val = bt_shell_strtobool(argv[1], 0, &err);
+		unsigned long count = 2U;
+		unsigned long interval = 20U;
+		uint8_t new_transmit = 0U;
+		bool val = bt_shell_strtobool(argv[1], 0, &err);
 
-		if (val) {
-			if (argc > 2) {
-				count = bt_shell_strtoul(argv[2], 0, &err);
-			} else {
-				count = 2U;
-			}
+		if (val && argc > 2) {
+			count = bt_shell_strtoul(argv[2], 0, &err);
+		}
 
-			if (argc > 3) {
-				interval = bt_shell_strtoul(argv[3], 0, &err);
-			} else {
-				interval = 20U;
-			}
-
-			new_transmit = BT_MESH_TRANSMIT(count, interval);
-		} else {
-			new_transmit = 0U;
+		if (val && argc > 3) {
+			interval = bt_shell_strtoul(argv[3], 0, &err);
 		}
 
 		if (err) {
 			bt_shell_session_warn(sh, "Unable to parse input string argument");
 			return err;
+		}
+
+		if (val) {
+			if (!transmit_valid(sh, count, interval)) {
+				return -EINVAL;
+			}
+
+			new_transmit = BT_MESH_TRANSMIT(count, interval);
 		}
 
 		err = bt_mesh_cfg_cli_relay_set(bt_mesh_shell_target_ctx.net_idx,
@@ -1537,8 +1558,8 @@ static int mod_pub_set(const struct bt_shell *sh, uint16_t addr, bool is_va, uin
 		       uint16_t cid, char *argv[])
 {
 	struct bt_mesh_cfg_cli_mod_pub pub;
-	uint8_t status, count, res_step, steps;
-	uint16_t interval;
+	uint8_t status;
+	unsigned long count, interval, res_step, steps;
 	uint8_t uuid[16];
 	uint8_t len;
 	int err = 0;
@@ -1562,10 +1583,10 @@ static int mod_pub_set(const struct bt_shell *sh, uint16_t addr, bool is_va, uin
 		return -EINVAL;
 	}
 
-	pub.period = steps + (res_step << 6);
+	pub.period = (uint8_t)(steps + (res_step << 6));
 	count = bt_shell_strtoul(argv[6], 0, &err);
 	if (count > 7) {
-		bt_shell_session_print(sh, "Invalid retransmit count");
+		bt_shell_session_print(sh, "Invalid retransmit count %lu", count);
 		return -EINVAL;
 	}
 
@@ -1575,8 +1596,8 @@ static int mod_pub_set(const struct bt_shell *sh, uint16_t addr, bool is_va, uin
 		return err;
 	}
 
-	if (interval > (31 * 50) || (interval % 50)) {
-		bt_shell_session_print(sh, "Invalid retransmit interval %u", interval);
+	if (interval < 50 || interval > (32 * 50) || (interval % 50)) {
+		bt_shell_session_print(sh, "Invalid retransmit interval %lu", interval);
 		return -EINVAL;
 	}
 
@@ -1631,7 +1652,7 @@ static int cmd_mod_pub(const struct bt_shell *sh, size_t argc, char *argv[])
 	}
 
 	if (argc > 0) {
-		if (argc < 7) {
+		if (argc != 8) {
 			bt_shell_session_warn(sh, "Invalid number of argument");
 			return -EINVAL;
 		}
@@ -1648,10 +1669,10 @@ static int cmd_mod_pub_va(const struct bt_shell *sh, size_t argc, char *argv[])
 	uint16_t addr, mod_id, cid = CID_NVAL;
 
 	addr = bt_shell_strtoul(argv[1], 0, &err);
-	mod_id = bt_shell_strtoul(argv[9], 0, &err);
+	mod_id = bt_shell_strtoul(argv[10], 0, &err);
 
-	if (argc > 10) {
-		cid = bt_shell_strtoul(argv[10], 0, &err);
+	if (argc > 11) {
+		cid = bt_shell_strtoul(argv[11], 0, &err);
 	}
 
 	if (err) {
@@ -1878,7 +1899,7 @@ const struct bt_shell_cmd_entry cfg_cli_cmds_entries[] = {
 	BT_SHELL_CMD_ARG(gatt-proxy, NULL, "[Val(off, on)]", cmd_gatt_proxy, 1, 1),
 	BT_SHELL_CMD_ARG(relay, NULL, "[<Val(off, on)> [<Count> [Int(ms)]]]", cmd_relay,
 		      1, 3),
-	BT_SHELL_CMD_ARG(node-id, NULL, "<NetKeyIdx> [Identify]", cmd_node_id, 2, 1),
+	BT_SHELL_CMD_ARG(node-id, NULL, "<NetKeyIdx> [Identity]", cmd_node_id, 2, 1),
 	BT_SHELL_CMD_ARG(polltimeout-get, NULL, "<LPNAddr>", cmd_polltimeout_get, 2, 0),
 	BT_SHELL_CMD_ARG(net-transmit-param, NULL, "[<Count> <Int(ms)>]",
 		      cmd_net_transmit, 1, 2),

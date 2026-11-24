@@ -276,7 +276,7 @@ static int cmd_lpn(const struct bt_shell *sh, size_t argc, char *argv[])
 
 		err = bt_mesh_lpn_set(false);
 		if (err) {
-			bt_shell_session_error(sh, "Enabling LPN failed (err %d)", err);
+			bt_shell_session_error(sh, "Disabling LPN failed (err %d)", err);
 		} else {
 			enabled = false;
 		}
@@ -910,8 +910,8 @@ static int cmd_remote_pub_key_set(const struct bt_shell *sh, size_t argc, char *
 static int cmd_auth_method_set_input(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err = 0;
-	bt_mesh_input_action_t action = bt_shell_strtoul(argv[1], 10, &err);
-	uint8_t size = bt_shell_strtoul(argv[2], 10, &err);
+	bt_mesh_input_action_t action = bt_shell_strtoul(argv[1], 0, &err);
+	uint8_t size = bt_shell_strtoul(argv[2], 0, &err);
 
 	if (err) {
 		bt_shell_session_warn(sh, "Unable to parse input string argument");
@@ -929,8 +929,8 @@ static int cmd_auth_method_set_input(const struct bt_shell *sh, size_t argc, cha
 static int cmd_auth_method_set_output(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	int err = 0;
-	bt_mesh_output_action_t action = bt_shell_strtoul(argv[1], 10, &err);
-	uint8_t size = bt_shell_strtoul(argv[2], 10, &err);
+	bt_mesh_output_action_t action = bt_shell_strtoul(argv[1], 0, &err);
+	uint8_t size = bt_shell_strtoul(argv[2], 0, &err);
 
 	if (err) {
 		bt_shell_session_warn(sh, "Unable to parse input string argument");
@@ -1145,6 +1145,7 @@ static const struct bt_mesh_elem *primary_element(void)
 static int cmd_add_fault(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint8_t fault_id;
+	unsigned long val;
 	uint8_t i;
 	const struct bt_mesh_elem *elem;
 	int err = 0;
@@ -1155,16 +1156,18 @@ static int cmd_add_fault(const struct bt_shell *sh, size_t argc, char *argv[])
 		return -EINVAL;
 	}
 
-	fault_id = bt_shell_strtoul(argv[1], 0, &err);
+	val = bt_shell_strtoul(argv[1], 0, &err);
 	if (err) {
 		bt_shell_session_warn(sh, "Unable to parse input string argument");
 		return err;
 	}
 
-	if (!fault_id) {
-		bt_shell_session_print(sh, "The Fault ID must be non-zero!");
+	if (val == 0 || val > 0xff) {
+		bt_shell_session_print(sh, "The Fault ID must be between 0x01 and 0xff");
 		return -EINVAL;
 	}
+
+	fault_id = (uint8_t)val;
 
 	for (i = 0U; i < sizeof(cur_faults); i++) {
 		if (!cur_faults[i]) {
@@ -1198,6 +1201,7 @@ static int cmd_add_fault(const struct bt_shell *sh, size_t argc, char *argv[])
 static int cmd_del_fault(const struct bt_shell *sh, size_t argc, char *argv[])
 {
 	uint8_t fault_id;
+	unsigned long val;
 	uint8_t i;
 	const struct bt_mesh_elem *elem;
 	int err = 0;
@@ -1215,16 +1219,18 @@ static int cmd_del_fault(const struct bt_shell *sh, size_t argc, char *argv[])
 		return 0;
 	}
 
-	fault_id = bt_shell_strtoul(argv[1], 0, &err);
+	val = bt_shell_strtoul(argv[1], 0, &err);
 	if (err) {
 		bt_shell_session_warn(sh, "Unable to parse input string argument");
 		return err;
 	}
 
-	if (!fault_id) {
-		bt_shell_session_print(sh, "The Fault ID must be non-zero!");
+	if (val == 0 || val > 0xff) {
+		bt_shell_session_print(sh, "The Fault ID must be between 0x01 and 0xff");
 		return -EINVAL;
 	}
+
+	fault_id = (uint8_t)val;
 
 	for (i = 0U; i < sizeof(cur_faults); i++) {
 		if (cur_faults[i] == fault_id) {
@@ -1753,7 +1759,7 @@ BT_SHELL_STATIC_SUBCMD_SET_CREATE(auth_cmds,
 		      cmd_auth_method_set_input, 3, 0),
 	BT_SHELL_CMD_ARG(output, NULL, "<Action> <Size>",
 		      cmd_auth_method_set_output, 3, 0),
-	BT_SHELL_CMD_ARG(static, NULL, "<Val(1-16 hex)>", cmd_auth_method_set_static, 2,
+	BT_SHELL_CMD_ARG(static, NULL, "<Val(1-32 hex)>", cmd_auth_method_set_static, 2,
 		      0),
 	BT_SHELL_CMD_ARG(none, NULL, NULL, cmd_auth_method_set_none, 1, 0),
 	BT_SHELL_SUBCMD_SET_END);
@@ -1764,7 +1770,7 @@ BT_SHELL_STATIC_SUBCMD_SET_CREATE(
 	BT_SHELL_CMD_ARG(input-str, NULL, "<String>", cmd_input_str, 2, 0),
 	BT_SHELL_CMD_ARG(local, NULL, "<NetKeyIdx> <Addr> [IVI]", cmd_provision_local, 3, 1),
 #if defined(CONFIG_BT_MESH_SHELL_PROV_CTX_INSTANCE)
-	BT_SHELL_CMD_ARG(static-oob, NULL, "[Val]", cmd_static_oob, 2, 1),
+	BT_SHELL_CMD_ARG(static-oob, NULL, "[Val]", cmd_static_oob, 1, 1),
 	BT_SHELL_CMD_ARG(uuid, NULL, "[UUID(1-16 hex)]", cmd_uuid, 1, 1),
 	BT_SHELL_CMD_ARG(beacon-listen, NULL, "<Val(off, on)>", cmd_beacon_listen, 2, 0),
 #endif
