@@ -15,8 +15,10 @@
 #  ***************************************************************************/
 
 include(CheckSymbolExists)
-find_package(Threads REQUIRED)
-set(CMAKE_REQUIRED_LIBRARIES Threads::Threads)
+if(NOT EMBT_COMPILER_NUTTX)
+  find_package(Threads REQUIRED)
+  set(CMAKE_REQUIRED_LIBRARIES Threads::Threads)
+endif()
 if(NOT EMBT_COMPILER_NUTTX)
   set(CMAKE_REQUIRED_DEFINITIONS -D_GNU_SOURCE)
   set(CMAKE_REQUIRED_LIBRARIES Threads::Threads rt)
@@ -41,8 +43,8 @@ add_library(EmBT::osi ALIAS embt_osi)
 embt_library_sources(sync.c thread.c thread_config.c timer.c time.c memory.c io.c)
 target_include_directories(embt_osi PUBLIC
   "${EMBT_SOURCE_DIR}/include")
-target_link_libraries(embt_osi PUBLIC Threads::Threads)
 if(NOT EMBT_COMPILER_NUTTX)
+  target_link_libraries(embt_osi PUBLIC Threads::Threads)
   target_compile_definitions(embt_osi PUBLIC _GNU_SOURCE)
   target_link_libraries(embt_osi PUBLIC rt)
 endif()
